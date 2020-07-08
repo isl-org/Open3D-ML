@@ -3,7 +3,7 @@ An extension of Open3D to address 3D Machine Learning tasks
 This repo is a proposal for the directory structure.
 
 The repo can be used together with the precompiled open3d pip package but will also be shipped with the open3d package.
-The file ```examples/inference_segmentation.py``` contains a working example showing how the repo can be used directly and after it has been integrated in the open3d namespace.
+The file ```examples/train_semantic_seg.py``` contains a working example showing how the repo can be used directly and after it has been integrated in the open3d namespace.
 
 
 ## Directories
