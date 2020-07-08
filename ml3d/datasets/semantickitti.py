@@ -44,7 +44,7 @@ class ConfigSemanticKITTI:
     d_feature = 8 
 
     batch_size = 4  # batch_size during training
-    val_batch_size = 4  # batch_size during validation and test
+    val_batch_size = 2  # batch_size during validation and test
     train_steps = 500  # Number of steps per epochs
     val_steps = 100  # Number of validation steps per epoch
 
@@ -247,7 +247,7 @@ class DataProcessing:
 
 
 
-class ActiveLearningSampler(IterableDataset):
+class SimpleSampler(IterableDataset):
     def __init__(self, dataset, split='training'):
         cfg         = dataset.cfg
         path_list   = dataset.get_split_list(split)
@@ -352,8 +352,8 @@ class SemanticKITTI:
         self.ignored_labels = np.sort([0])
         self.cfg.ignored_label_inds = [self.label_to_idx[ign_label] for ign_label in self.ignored_labels]
 
-    def get_ActiveLearningSampler (self, split):
-        return ActiveLearningSampler(self, split=split)
+    def get_sampler (self, split):
+        return SimpleSampler(self, split=split)
 
     def preprocess(self, batch_data, device):
         cfg             = self.cfg

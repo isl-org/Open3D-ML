@@ -85,18 +85,6 @@ def accuracy(scores, labels):
 
 class SemanticSegmentation():
     def __init__(self, model, dataset, cfg):
-        '''
-        flat_inputs = dataset.flat_inputs
-        self.config = config
-        # Path of the result folder
-        if self.config.saving:
-            if self.config.saving_path is None:
-                self.saving_path = time.strftime('results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
-            else:
-                self.saving_path = self.config.saving_path
-            makedirs(self.saving_path) if not exists(self.saving_path) else None
-        '''
-        
         self.model      = model
         self.dataset    = dataset
         self.config     = cfg
@@ -120,9 +108,10 @@ class SemanticSegmentation():
         dataset = self.dataset
         cfg     = self.config
         model.to(device)
+        model.eval()
 
         Log_file = open('log_test_' + dataset.name + '.txt', 'a')
-        test_sampler = dataset.get_ActiveLearningSampler('test')
+        test_sampler = dataset.get_sampler('test')
         test_loader = DataLoader(test_sampler, batch_size=cfg.val_batch_size)
         test_probs = [np.zeros(shape=[len(l), self.config.num_classes], dtype=np.float16)
                            for l in dataset.possibility]
@@ -130,7 +119,6 @@ class SemanticSegmentation():
 
         test_smooth = 0.98
         epoch_ind   = 0
-        model.eval()
 
         while True:
             for batch_data in tqdm(test_loader, desc='test', leave=False):
@@ -188,7 +176,7 @@ class SemanticSegmentation():
 
         criterion = nn.CrossEntropyLoss(weight=weights)
 
-        train_sampler   = dataset.get_ActiveLearningSampler('training')
+        train_sampler   = dataset.get_sampler('training')
         train_loader    = DataLoader(train_sampler, 
                                      batch_size=cfg.val_batch_size)
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
