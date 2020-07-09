@@ -9,8 +9,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-*/lib/*
-*/build/*
+**/lib/
+**/build/
 lib64/
 parts/
 sdist/
@@ -19,3 +19,6 @@ var/
 .installed.cfg
 *.egg
 *linux-gnu.so
+
+#
+logs/
