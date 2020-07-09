@@ -114,8 +114,9 @@ class SemanticSegmentation():
         model.to(device)
         model.eval()
 
-        Log_file_path = join(cfg.logs_dir, 'log_test_'+ dataset.name + '.txt')
-        Log_file = open(Log_file_path, 'a')
+        Log_file_path   = join(cfg.logs_dir, 'log_test_'+ dataset.name + '.txt')
+        Log_file        = open(Log_file_path, 'a')
+        self.Log_file   = Log_file
 
 
         test_sampler = dataset.get_sampler('test')
@@ -123,6 +124,7 @@ class SemanticSegmentation():
         test_probs = [np.zeros(shape=[len(l), self.cfg.num_classes], dtype=np.float16)
                            for l in dataset.possibility]
 
+        self.load_ckpt(cfg.ckpt_path, False)
 
         test_smooth = 0.98
         epoch       = 0
@@ -180,6 +182,7 @@ class SemanticSegmentation():
 
         Log_file_path = join(cfg.logs_dir, 'log_train_'+ dataset.name + '.txt')
         Log_file = open(Log_file_path, 'a')
+        self.Log_file   = Log_file
 
         n_samples       = torch.tensor(cfg.class_weights, 
                             dtype=torch.float, device=device)
@@ -195,23 +198,12 @@ class SemanticSegmentation():
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 
                                                            cfg.scheduler_gamma)
 
-        first_epoch = 0
-        
-        if exists(cfg.ckpt_path):
-            #path = max(list((cfg.ckpt_path).glob('*.pth')))
-            path = cfg.ckpt_path
-            log_out(f'Loading checkpoint {path}', Log_file)
-            checkpoint = torch.load(path)
-            first_epoch = checkpoint['epoch']+1
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-        else:
-            log_out('No checkpoint', Log_file)
+        self.optimizer, self.scheduler = optimizer, scheduler
+        first_epoch = self.load_ckpt(cfg.ckpt_path, True)
         
 
         with SummaryWriter(cfg.logs_dir) as writer:
-            for epoch in range(first_epoch, cfg.max_epoch+1):
+            for epoch in range(0, cfg.max_epoch+1):
                 print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
                 # metrics
                 losses      = []
@@ -251,25 +243,42 @@ class SemanticSegmentation():
                     losses.append(loss.cpu().item())
                     accuracies.append(accuracy(scores, labels))
                     ious.append(intersection_over_union(scores, labels))
-                 
+                    
 
                 if epoch % cfg.save_ckpt_freq == 0:
                     path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-                    self.save_ckpt(path_ckpt, epoch, model, optimizer, scheduler)
-                    log_out(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}', Log_file)
+                    self.save_ckpt(path_ckpt, epoch)
                     
 
-    def save_ckpt(self, path_ckpt, epoch, model, optimizer, scheduler):
+    def load_ckpt(self, ckpt_path, is_train=True):
+        if exists(ckpt_path):
+            #path = max(list((cfg.ckpt_path).glob('*.pth')))
+            log_out(f'Loading checkpoint {ckpt_path}', self.Log_file)
+            ckpt = torch.load(ckpt_path)
+            first_epoch = ckpt['epoch']+1
+            self.model.load_state_dict(ckpt['model_state_dict'])
+            if is_train:
+                self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+                self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+        else:
+            first_epoch = 0
+            log_out('No checkpoint', Log_file)
+
+        return first_epoch
+
+    def save_ckpt(self, path_ckpt, epoch):
         makedirs(path_ckpt) if not exists(path_ckpt) else None
         torch.save(
             dict(
                 epoch=epoch,
-                model_state_dict=model.state_dict(),
-                optimizer_state_dict=optimizer.state_dict(),
-                scheduler_state_dict=scheduler.state_dict()
+                model_state_dict=self.model.state_dict(),
+                optimizer_state_dict=self.optimizer.state_dict(),
+                scheduler_state_dict=self.scheduler.state_dict()
             ),
             join(path_ckpt, f'ckpt_{epoch:02d}.pth')
         )
+        log_out(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}', self.Log_file)
+                    
 
         
         
