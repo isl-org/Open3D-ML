@@ -1,3 +1,4 @@
+
 # Open3D-ML
 An extension of Open3D to address 3D Machine Learning tasks
 This repo is a proposal for the directory structure.
@@ -5,6 +6,13 @@ This repo is a proposal for the directory structure.
 The repo can be used together with the precompiled open3d pip package but will also be shipped with the open3d package.
 The file ```examples/train_semantic_seg.py``` contains a working example showing how the repo can be used directly and after it has been integrated in the open3d namespace.
 
+TODO List:
+- [ ] tensorboard
+- [ ] validation loader
+- [ ] re-training
+- [ ] strucutred configure file
+- [ ] alternative cached preprocessing
+- [ ] rewrite preprocessing
 
 ## Directories
 
@@ -22,7 +30,34 @@ The file ```examples/train_semantic_seg.py``` contains a working example showing
           
 ```
 
+Some important functions of pipeline, model, and dataset classes,
+```
+pipline
+	__init__(model, dataset, cfg)
+	run_train
+	run_test
+	run_inference
+	compute metrics(iou, acc)
+
+model
+	__init__(cfg)
+	forward
+	preprocess         
+
+dataset
+	__init__(cfg)
+	save_test_result
+	get_sampler(split="training/test/validation")
+	get_data(file_path)
+```
+
 ## Usage example
+
+First build the project
+```bash
+bash compile_op.sh
+pip install -e .
+```
 
 Most users will either use tf or torch. The recommended import code is 
 ```python
