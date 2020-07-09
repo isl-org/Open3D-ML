@@ -43,8 +43,8 @@ class ConfigSemanticKITTI:
     d_in      = 3
     d_feature = 8 
 
-    batch_size = 4  # batch_size during training
-    val_batch_size = 2  # batch_size during validation and test
+    batch_size = 1  # batch_size during training
+    val_batch_size = 1  # batch_size during validation and test
     train_steps = 500  # Number of steps per epochs
     val_steps = 100  # Number of validation steps per epoch
 
@@ -61,6 +61,11 @@ class ConfigSemanticKITTI:
     saving = True
     saving_path = None
 
+    main_log_dir = './logs'
+    model_name = 'RandLANet'
+    logs_dir = join(main_log_dir, model_name)
+    ckpt_path = './ml3d/torch/checkpoint/randlanet_semantickitti.pth'
+
     # test
     test_split_number   = 11
     test_result_folder = './test'
@@ -69,9 +74,9 @@ class ConfigSemanticKITTI:
     grid_size = 0.06
 
     # training
-    logs_dir = './logs'
     training_split = ['00', '01', '02', '03', '04', '05', 
                         '06', '07', '09', '10']
+    save_ckpt_freq = 20
 
     adam_lr         = 1e-2
     scheduler_gamma = 0.95
@@ -190,7 +195,6 @@ class DataProcessing:
         """
 
         if (features is None) and (labels is None):
-            print(points)
             return cpp_subsampling.compute(points, sampleDl=grid_size, verbose=verbose)
         elif labels is None:
             return cpp_subsampling.compute(points, features=features, sampleDl=grid_size, verbose=verbose)
@@ -479,5 +483,4 @@ class SemanticKITTI:
         select_idx = DataProcessing.shuffle_idx(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]
-   
         return select_points, select_labels, select_idx

@@ -15,12 +15,14 @@ class RandLANet(nn.Module):
         super(RandLANet,self).__init__()
         self.cfg    = cfg
 
-        self.fc0   = nn.Linear(cfg.d_in, cfg.d_feature)
-        self.batch_normalization = nn.BatchNorm2d(cfg.d_feature, eps=1e-6, momentum=0.99)
+        d_feature   = cfg.d_feature
+
+        self.fc0    = nn.Linear(cfg.d_in, d_feature)
+        self.batch_normalization = nn.BatchNorm2d(d_feature, 
+                                            eps=1e-6, momentum=0.99)
 
         f_encoder_list = []
         d_encoder_list = []
-        d_feature      = cfg.d_feature
 
         # ###########################Encoder############################
         for i in range(cfg.num_layers):
@@ -277,6 +279,7 @@ class RandLANet(nn.Module):
         return result
 
 
+
     def forward(self, inputs):
         xyz         = inputs['xyz']
      
@@ -284,6 +287,7 @@ class RandLANet(nn.Module):
         sub_idx     = inputs['sub_idx']
         interp_idx  = inputs['interp_idx']
         feature     = inputs['features']
+
 
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature).transpose(-2,-1).unsqueeze(-1) # TODO
@@ -293,9 +297,10 @@ class RandLANet(nn.Module):
         feature = m_bn(feature)
 
 
-
         m_leakyrelu = nn.LeakyReLU(0.2)
         feature     = m_leakyrelu(feature)
+
+
 
         # B d N 1
         # B N 1 d
@@ -343,6 +348,7 @@ class RandLANet(nn.Module):
 
 
         test_hidden = f_layer_fc2.permute(0,2,3,1)
+
 
         m_conv2d = getattr(self, 'fc')
         f_layer_fc3 = m_conv2d(f_layer_drop)
