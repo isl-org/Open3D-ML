@@ -121,9 +121,9 @@ class SemanticSegmentation():
         model.to(device)
         model.eval()
 
-        Log_file_path   = join(cfg.logs_dir, 'log_test_'+ dataset.name + '.txt')
-        Log_file        = open(Log_file_path, 'a')
-        self.Log_file   = Log_file
+        log_file_path   = join(cfg.logs_dir, 'log_test_'+ dataset.name + '.txt')
+        log_file        = open(log_file_path, 'a')
+        self.log_file   = log_file
 
 
         test_sampler = dataset.get_sampler('test')
@@ -166,12 +166,12 @@ class SemanticSegmentation():
           
 
             new_min = np.min(dataset.min_possibility)
-            log_out('Epoch {:3d}, end. Min possibility = {:.1f}'.format(epoch, new_min), Log_file)
+            log_out('Epoch {:3d}, end. Min possibility = {:.1f}'.format(epoch, new_min), log_file)
            
             if np.min(dataset.min_possibility) > 0.5:  # 0.5
                 print('\nReproject Vote #{:d}'.format(int(np.floor(new_min))))
                 dataset.save_test_result(test_probs)
-                log_out(str(cfg.test_split_number) + ' finished', Log_file)
+                log_out(str(cfg.test_split_number) + ' finished', log_file)
                 return
           
             epoch += 1
@@ -188,10 +188,10 @@ class SemanticSegmentation():
         model.eval()
 
 
-        Log_file_path = join(cfg.general.logs_dir, 
+        log_file_path = join(cfg.general.logs_dir, 
                         'log_train_'+ dataset.name + '.txt')
-        Log_file = open(Log_file_path, 'a')
-        self.Log_file   = Log_file
+        log_file = open(log_file_path, 'a')
+        self.log_file   = log_file
 
         n_samples       = torch.tensor(cfg.train.class_weights, 
                             dtype=torch.float, device=device)
@@ -239,14 +239,11 @@ class SemanticSegmentation():
                 acc  = accuracy(scores, labels)
                 iou  = intersection_over_union(scores, labels)
 
-                #optimizer.zero_grad()
-                #loss.backward()
-                #optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
                 
                 step = step + 1
-
-                if step == 5:
-                    break
 
                 losses.append(loss.cpu().item())
                 accs.append(accuracy(scores, labels))
@@ -295,7 +292,7 @@ class SemanticSegmentation():
     def load_ckpt(self, ckpt_path, is_train=True):
         if exists(ckpt_path):
             #path = max(list((cfg.ckpt_path).glob('*.pth')))
-            log_out(f'Loading checkpoint {ckpt_path}', self.Log_file)
+            log_out(f'Loading checkpoint {ckpt_path}', self.log_file)
             ckpt = torch.load(ckpt_path)
             first_epoch = ckpt['epoch']+1
             self.model.load_state_dict(ckpt['model_state_dict'])
@@ -304,7 +301,7 @@ class SemanticSegmentation():
                 self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
         else:
             first_epoch = 0
-            log_out('No checkpoint', Log_file)
+            log_out('No checkpoint', log_file)
 
         return first_epoch
 
@@ -319,7 +316,7 @@ class SemanticSegmentation():
             ),
             join(path_ckpt, f'ckpt_{epoch:02d}.pth')
         )
-        log_out(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}', self.Log_file)
+        log_out(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}', self.log_file)
                     
 
         
