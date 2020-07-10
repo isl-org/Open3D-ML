@@ -14,6 +14,7 @@ TODO List:
 - [ ] re-training
 - [ ] alternative cached preprocessing
 - [ ] rewrite preprocessing
+- [ ] number/density of point clould
 
 ## Directories
 
