@@ -106,7 +106,6 @@ class RandLANet(nn.Module):
 
         return inputs
 
-
     def preprocess_inference(self, pc, device):
         cfg             = self.cfg
 
