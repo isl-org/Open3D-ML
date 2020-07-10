@@ -51,6 +51,15 @@ dataset
 	save_test_result
 	get_sampler(split="training/test/validation")
 	get_data(file_path)
+
+config
+	__init__()
+	load_from_file
+	
+	train...
+	test...
+	network...
+	general...
 ```
 
 ## Usage example
