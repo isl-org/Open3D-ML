@@ -34,7 +34,7 @@ TODO List:
 
 Some important functions of pipeline, model, and dataset classes,
 ```
-pipline
+pipeline
 	__init__(model, dataset, cfg)
 	run_train
 	run_test
@@ -55,7 +55,7 @@ dataset
 config
 	__init__()
 	load_from_file
-	
+
 	train...
 	test...
 	network...
