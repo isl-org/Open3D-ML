@@ -8,10 +8,10 @@ The file ```examples/train_semantic_seg.py``` contains a working example showing
 
 TODO List:
 - [x] tensorboard
+- [x] strucutred configure file
 - [ ] validation loader
 - [ ] reorganize the strucutre 
 - [ ] re-training
-- [ ] strucutred configure file
 - [ ] alternative cached preprocessing
 - [ ] rewrite preprocessing
 

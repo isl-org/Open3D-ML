@@ -1,3 +1,3 @@
-from .semantickitti import ConfigSemanticKITTI
+from .semantickitti import SemanticKITTI
 
-__all__ = ['ConfigSemanticKITTI']
+__all__ = ['SemanticKITTI']

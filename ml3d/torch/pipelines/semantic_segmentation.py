@@ -9,9 +9,11 @@ from tqdm import tqdm
 from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
-from os import makedirs
+
 from os.path import exists, join, isfile, dirname, abspath
+
 from ml3d.datasets.semantickitti import DataProcessing
+from ml3d.torch.utils import make_dir
 
 
 import yaml
@@ -91,8 +93,10 @@ class SemanticSegmentation():
         self.dataset    = dataset
         self.cfg        = cfg
 
-        makedirs(cfg.main_log_dir) if not exists(cfg.main_log_dir) else None
-        makedirs(cfg.logs_dir) if not exists(cfg.logs_dir) else None
+        make_dir(cfg.general.main_log_dir) 
+        cfg.general.logs_dir = join(cfg.general.main_log_dir, 
+                                    cfg.general.model_name)
+        make_dir(cfg.general.logs_dir) 
 
     def run_inference(self, points, device):
         cfg     = self.cfg
@@ -124,8 +128,8 @@ class SemanticSegmentation():
 
         test_sampler = dataset.get_sampler('test')
         test_loader = DataLoader(test_sampler, batch_size=cfg.val_batch_size)
-        test_probs = [np.zeros(shape=[len(l), self.cfg.num_classes], dtype=np.float16)
-                           for l in dataset.possibility]
+        test_probs = [np.zeros(shape=[len(l), self.cfg.network.num_classes], 
+                        dtype=np.float16) for l in dataset.possibility]
 
         self.load_ckpt(cfg.ckpt_path, False)
 
@@ -138,15 +142,16 @@ class SemanticSegmentation():
                 inputs          = model.preprocess(batch_data, device) 
                 result_torch    = model(inputs)
                 result_torch    = torch.reshape(result_torch,
-                                                    (-1, cfg.num_classes))
+                                                (-1, cfg.network.num_classes))
 
                 m_softmax       = nn.Softmax(dim=-1)
                 result_torch    = m_softmax(result_torch)
                 stacked_probs   = result_torch.cpu().data.numpy()
 
-                stacked_probs = np.reshape(stacked_probs, [cfg.val_batch_size,
-                                                           cfg.num_points,
-                                                           cfg.num_classes])
+                stacked_probs = np.reshape(stacked_probs, 
+                                            [cfg.test.batch_size, 
+                                            cfg.network.num_points, 
+                                            cfg.network.num_classes])
               
                 point_inds  = inputs['input_inds']
                 cloud_inds  = inputs['cloud_inds']
@@ -183,11 +188,12 @@ class SemanticSegmentation():
         model.eval()
 
 
-        Log_file_path = join(cfg.logs_dir, 'log_train_'+ dataset.name + '.txt')
+        Log_file_path = join(cfg.general.logs_dir, 
+                        'log_train_'+ dataset.name + '.txt')
         Log_file = open(Log_file_path, 'a')
         self.Log_file   = Log_file
 
-        n_samples       = torch.tensor(cfg.class_weights, 
+        n_samples       = torch.tensor(cfg.train.class_weights, 
                             dtype=torch.float, device=device)
         ratio_samples   = n_samples / n_samples.sum()
         weights         = 1 / (ratio_samples + 0.02)
@@ -196,18 +202,19 @@ class SemanticSegmentation():
 
         train_sampler   = dataset.get_sampler('training')
         train_loader    = DataLoader(train_sampler, 
-                                     batch_size=cfg.batch_size)
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
+                                     batch_size=cfg.train.batch_size)
+        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 
-                                                           cfg.scheduler_gamma)
+                                                cfg.train.scheduler_gamma)
 
         self.optimizer, self.scheduler = optimizer, scheduler
-        first_epoch = self.load_ckpt(cfg.ckpt_path, True)
+        first_epoch = self.load_ckpt(cfg.network.ckpt_path, True)
         
-        writer = SummaryWriter(cfg.logs_dir)
+        writer = SummaryWriter(join(cfg.general.logs_dir, 
+                                cfg.general.train_sum_dir))
     
-        for epoch in range(0, cfg.max_epoch+1):
-            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+        for epoch in range(0, cfg.train.max_epoch+1):
+            print(f'=== EPOCH {epoch:d}/{cfg.train.max_epoch:d} ===')
             # metrics
             losses      = []
             accs        = []
@@ -238,14 +245,17 @@ class SemanticSegmentation():
                 
                 step = step + 1
 
+                if step == 5:
+                    break
+
                 losses.append(loss.cpu().item())
                 accs.append(accuracy(scores, labels))
                 ious.append(intersection_over_union(scores, labels))
 
             self.save_logs(writer, epoch, losses, accs, ious)
 
-            if epoch % cfg.save_ckpt_freq == 0:
-                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
+            if epoch % cfg.train.save_ckpt_freq == 0:
+                path_ckpt = join(self.cfg.general.logs_dir, 'checkpoint')
                 self.save_ckpt(path_ckpt, epoch)
 
     def save_logs(self, writer, epoch, losses, accs, ious):
@@ -275,7 +285,7 @@ class SemanticSegmentation():
         # send results to tensorboard
         writer.add_scalars('Loss', loss_dict, epoch)
 
-        for i in range(self.cfg.num_classes):
+        for i in range(self.cfg.network.num_classes):
             writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i], epoch)
             writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
         writer.add_scalars('Per-class accuracy/Overall', acc_dicts[-1], epoch)
@@ -299,7 +309,7 @@ class SemanticSegmentation():
         return first_epoch
 
     def save_ckpt(self, path_ckpt, epoch):
-        makedirs(path_ckpt) if not exists(path_ckpt) else None
+        make_dir(path_ckpt)
         torch.save(
             dict(
                 epoch=epoch,
@@ -316,7 +326,7 @@ class SemanticSegmentation():
         
 
     def filter_valid(self, scores, labels, device):
-        valid_scores = scores.reshape(-1, self.cfg.num_classes)
+        valid_scores = scores.reshape(-1, self.cfg.network.num_classes)
         valid_labels = labels.reshape(-1).to(device)
                 
         ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
@@ -328,12 +338,12 @@ class SemanticSegmentation():
             torch.logical_not(ignored_bool))[0].to(device)
 
         valid_scores = torch.gather(valid_scores, 0, 
-            valid_idx.unsqueeze(-1).expand(-1, self.cfg.num_classes))
+            valid_idx.unsqueeze(-1).expand(-1, self.cfg.network.num_classes))
         valid_labels = torch.gather(valid_labels, 0, valid_idx)
 
         # Reduce label values in the range of logit shape
         reducing_list = torch.arange(0, 
-                        self.cfg.num_classes, dtype=torch.int64)
+                        self.cfg.network.num_classes, dtype=torch.int64)
         inserted_value = torch.zeros([1], dtype=torch.int64)
         
         for ign_label in self.cfg.ignored_label_inds:

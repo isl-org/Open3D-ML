@@ -33,61 +33,6 @@ remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
 # yaml
 # network
 # dataset
-class ConfigSemanticKITTI:
-    k_n = 16  # KNN
-    num_layers = 4  # Number of layers
-    num_points = 4096 * 11  # Number of input points
-    num_classes = 19  # Number of valid classes
-    sub_grid_size = 0.06  # preprocess_parameter
-
-    d_in      = 3
-    d_feature = 8 
-
-    batch_size = 1  # batch_size during training
-    val_batch_size = 1  # batch_size during validation and test
-    train_steps = 500  # Number of steps per epochs
-    val_steps = 100  # Number of validation steps per epoch
-
-    sub_sampling_ratio = [4, 4, 4, 4]  # sampling ratio of random sampling at each layer
-    d_out = [16, 64, 128, 256]  # feature dimension
-    num_sub_points = [num_points // 4, num_points // 16, num_points // 64, num_points // 256]
-
-    noise_init = 3.5  # noise initial parameter
-    max_epoch = 100  # maximum epoch during training
-    learning_rate = 1e-2  # initial learning rate
-    lr_decays = {i: 0.95 for i in range(0, 500)}  # decay rate of learning rate
-
-    train_sum_dir = 'train_log'
-    saving = True
-    saving_path = None
-
-    main_log_dir = './logs'
-    model_name = 'RandLANet'
-    logs_dir = join(main_log_dir, model_name)
-    ckpt_path = './ml3d/torch/checkpoint/randlanet_semantickitti.pth'
-
-    # test
-    test_split_number   = 11
-    test_result_folder = './test'
-
-    # inference
-    grid_size = 0.06
-
-    # training
-    training_split = ['00', '01', '02', '03', '04', '05', 
-                        '06', '07', '09', '10']
-    save_ckpt_freq = 20
-
-    adam_lr         = 1e-2
-    scheduler_gamma = 0.95
-    sampling_type = 'active_learning'
-
-    class_weights = [ 55437630, 320797, 541736, 2578735, 3274484, 552662, 
-                        184064, 78858, 240942562, 17294618, 170599734, 
-                        6369672, 230413074, 101130274, 476491114,9833174, 
-                        129609852, 4506626, 1168181]
-   
-
 
 class DataProcessing:
     @staticmethod
@@ -258,13 +203,13 @@ class SimpleSampler(IterableDataset):
 
         test = 0
         if split == 'training':
-            num_per_epoch = int(len(path_list) / cfg.batch_size) 
+            num_per_epoch = int(len(path_list) / cfg.train.batch_size) 
             dataset.train_list = path_list
         elif split == 'validation':
-            num_per_epoch = int(len(path_list) / cfg.val_batch_size) 
+            num_per_epoch = int(len(path_list) / cfg.train.val_batch_size) 
             dataset.val_list = path_list
         elif split == 'test':
-            num_per_epoch = int(len(path_list) / cfg.val_batch_size) * 4
+            num_per_epoch = int(len(path_list) / cfg.test.batch_size) * 4
             dataset.test_list = path_list
             for test_file_name in path_list:
                 points = np.load(test_file_name)
@@ -416,7 +361,7 @@ class SemanticKITTI:
         for j in range(len(test_probs)):
             test_file_name = self.test_list[j]
             frame = test_file_name.split('/')[-1][:-4]
-            proj_path = join(cfg.dataset_path, test_scan_name, 'proj')
+            proj_path = join(cfg.general.dataset_path, test_scan_name, 'proj')
             proj_file = join(proj_path, str(frame) + '_proj.pkl')
             if isfile(proj_file):
                 with open(proj_file, 'rb') as f:
@@ -434,7 +379,7 @@ class SemanticKITTI:
     def get_data(self, file_path, is_test=False):
         seq_id          = file_path.split('/')[-3]
         frame_id        = file_path.split('/')[-1][:-4]
-        kd_tree_path    = join(self.cfg.dataset_path, seq_id, 
+        kd_tree_path    = join(self.cfg.general.dataset_path, seq_id, 
                                 'KDTree', frame_id + '.pkl')
         # Read pkl with search tree
         with open(kd_tree_path, 'rb') as f:
@@ -445,21 +390,21 @@ class SemanticKITTI:
         if is_test:
             labels      = np.zeros(np.shape(points)[0], dtype=np.uint8)
         else:
-            label_path  = join(self.cfg.dataset_path, seq_id, 'labels', 
-                                frame_id + '.npy')
+            label_path  = join(self.cfg.general.dataset_path, seq_id, 
+                                'labels', frame_id + '.npy')
             labels      = np.squeeze(np.load(label_path))
         return points, search_tree, labels
 
 
     def get_split_list(self, split):
         cfg             = self.cfg
-        dataset_path    = cfg.dataset_path
+        dataset_path    = cfg.general.dataset_path
         file_list       = []
 
         if split == 'training':
-            seq_list = cfg.training_split
+            seq_list = cfg.train.training_split
         elif split == 'test':
-            seq_list = [str(cfg.test_split_number)]
+            seq_list = [str(cfg.test.test_split_number)]
         elif split == 'validation':
             pass
 
@@ -477,7 +422,8 @@ class SemanticKITTI:
     def crop_pc(self, points, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
         center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point, k=self.cfg.num_points)[1][0]
+        select_idx = search_tree.query(center_point, 
+                                k=self.cfg.network.num_points)[1][0]
         select_idx = DataProcessing.shuffle_idx(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]
