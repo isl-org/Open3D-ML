@@ -109,9 +109,13 @@ class RandLANet(nn.Module):
 
     def preprocess_inference(self, pc, device):
         cfg             = self.cfg
-        batch_pc        = torch.from_numpy(pc).unsqueeze(0).to(device)
-        
+
+        idx             = DataProcessing.shuffle_idx(np.arange(len(pc)))
+        pc              = pc[idx]
+        batch_pc        = torch.from_numpy(pc).unsqueeze(0)
         features        = batch_pc
+
+
         input_points    = []
         input_neighbors = []
         input_pools = []

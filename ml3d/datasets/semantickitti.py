@@ -324,7 +324,6 @@ class SemanticKITTI:
     def __init__(self, cfg):
         self.cfg = cfg
         self.name = 'SemanticKITTI'
-        self.dataset_path = cfg.dataset_path
         self.label_to_names = {0: 'unlabeled',
                                1: 'car',
                                2: 'bicycle',
@@ -346,7 +345,6 @@ class SemanticKITTI:
                                18: 'pole',
                                19: 'traffic-sign'}
         self.num_classes = len(self.label_to_names)
-        
         
         self.possibility = []
         self.min_possibility = []
@@ -418,7 +416,7 @@ class SemanticKITTI:
         for j in range(len(test_probs)):
             test_file_name = self.test_list[j]
             frame = test_file_name.split('/')[-1][:-4]
-            proj_path = join(self.dataset_path, test_scan_name, 'proj')
+            proj_path = join(cfg.dataset_path, test_scan_name, 'proj')
             proj_file = join(proj_path, str(frame) + '_proj.pkl')
             if isfile(proj_file):
                 with open(proj_file, 'rb') as f:
@@ -436,7 +434,7 @@ class SemanticKITTI:
     def get_data(self, file_path, is_test=False):
         seq_id          = file_path.split('/')[-3]
         frame_id        = file_path.split('/')[-1][:-4]
-        kd_tree_path    = join(self.dataset_path, seq_id, 
+        kd_tree_path    = join(self.cfg.dataset_path, seq_id, 
                                 'KDTree', frame_id + '.pkl')
         # Read pkl with search tree
         with open(kd_tree_path, 'rb') as f:
@@ -447,7 +445,7 @@ class SemanticKITTI:
         if is_test:
             labels      = np.zeros(np.shape(points)[0], dtype=np.uint8)
         else:
-            label_path  = join(self.dataset_path, seq_id, 'labels', 
+            label_path  = join(self.cfg.dataset_path, seq_id, 'labels', 
                                 frame_id + '.npy')
             labels      = np.squeeze(np.load(label_path))
         return points, search_tree, labels

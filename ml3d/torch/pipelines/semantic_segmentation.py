@@ -81,6 +81,7 @@ def accuracy(scores, labels):
         accuracies.append(per_class_accuracy.cpu().item())
     # overall accuracy
     accuracies.append(accuracy_mask.float().mean().cpu().item())
+    #accuracies = np.array(accuracies)
     return accuracies
 
 
@@ -94,15 +95,17 @@ class SemanticSegmentation():
         makedirs(cfg.logs_dir) if not exists(cfg.logs_dir) else None
 
     def run_inference(self, points, device):
-        cfg = self.cfg
-        grid_size   = cfg.grid_size
+        cfg     = self.cfg
+        model   = self.model
 
-        input_inference = self.preprocess_inference(points, device)
-        self.eval()
-        scores = self(input_inference)
+        model.to(device)
+        model.eval()
 
-        pred = torch.max(scores, dim=-2).indices
-        pred   = pred.cpu().data.numpy()
+        inputs  = model.preprocess_inference(points, device)
+        scores  = model(inputs)
+        pred    = torch.max(scores.squeeze(0), dim=-1).indices
+        pred    = pred.cpu().data.numpy()
+
         return pred
 
 
@@ -201,54 +204,83 @@ class SemanticSegmentation():
         self.optimizer, self.scheduler = optimizer, scheduler
         first_epoch = self.load_ckpt(cfg.ckpt_path, True)
         
+        writer = SummaryWriter(cfg.logs_dir)
+    
+        for epoch in range(0, cfg.max_epoch+1):
+            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            # metrics
+            losses      = []
+            accs        = []
+            ious        = []
+            step        = 0
 
-        with SummaryWriter(cfg.logs_dir) as writer:
-            for epoch in range(0, cfg.max_epoch+1):
-                print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-                # metrics
-                losses      = []
-                accuracies  = []
-                ious        = []
-                step        = 0
+            for batch_data in tqdm(train_loader, desc='Training', leave=False):
 
-                for batch_data in tqdm(train_loader, desc='Training', leave=False):
-
-                    inputs = model.preprocess(batch_data, device) 
-                    # scores: B x N x num_classes
-                    scores = model(inputs)
-
-
-                    labels = batch_data[1] 
-                    scores, labels = self.filter_valid(scores, labels, device)
+                inputs = model.preprocess(batch_data, device) 
+                # scores: B x N x num_classes
+                scores = model(inputs)
 
 
-                    logp = torch.distributions.utils.probs_to_logits(scores, 
-                                                            is_binary=False)
-                    
-                    loss = criterion(logp, labels)
-                    acc  = accuracy(scores, labels)
-                    iou  = intersection_over_union(scores, labels)
+                labels = batch_data[1] 
+                scores, labels = self.filter_valid(scores, labels, device)
 
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
 
-                    #if step % 2 == 0:
-                    #    print(iou[-1])
-                    #    print(acc[-1])
-                    #    print(loss)
+                logp = torch.distributions.utils.probs_to_logits(scores, 
+                                                        is_binary=False)
+                
+                loss = criterion(logp, labels)
+                acc  = accuracy(scores, labels)
+                iou  = intersection_over_union(scores, labels)
 
-                    
-                    step = step + 1
-                    losses.append(loss.cpu().item())
-                    accuracies.append(accuracy(scores, labels))
-                    ious.append(intersection_over_union(scores, labels))
-                    
+                #optimizer.zero_grad()
+                #loss.backward()
+                #optimizer.step()
+                
+                step = step + 1
 
-                if epoch % cfg.save_ckpt_freq == 0:
-                    path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-                    self.save_ckpt(path_ckpt, epoch)
-                    
+                losses.append(loss.cpu().item())
+                accs.append(accuracy(scores, labels))
+                ious.append(intersection_over_union(scores, labels))
+
+            self.save_logs(writer, epoch, losses, accs, ious)
+
+            if epoch % cfg.save_ckpt_freq == 0:
+                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
+                self.save_ckpt(path_ckpt, epoch)
+
+    def save_logs(self, writer, epoch, losses, accs, ious):
+
+        accs = np.nanmean(np.array(accs), axis=0)
+        ious = np.nanmean(np.array(ious), axis=0)
+
+        print(accs)
+
+        loss_dict = {
+            'Training loss':    np.mean(losses),
+            'Validation loss':  np.mean(losses)
+        }
+        acc_dicts = [
+            {
+                'Training accuracy': acc,
+                'Validation accuracy': val_acc
+            } for acc, val_acc in zip(accs, accs)
+        ]
+        iou_dicts = [
+            {
+                'Training IoU': iou,
+                'Validation IoU': val_iou
+            } for iou, val_iou in zip(ious, ious)
+        ]
+
+        # send results to tensorboard
+        writer.add_scalars('Loss', loss_dict, epoch)
+
+        for i in range(self.cfg.num_classes):
+            writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i], epoch)
+            writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
+        writer.add_scalars('Per-class accuracy/Overall', acc_dicts[-1], epoch)
+        writer.add_scalars('Per-class IoU/Mean IoU', iou_dicts[-1], epoch)
+
 
     def load_ckpt(self, ckpt_path, is_train=True):
         if exists(ckpt_path):

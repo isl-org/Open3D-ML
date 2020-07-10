@@ -16,6 +16,5 @@ pipeline = SemanticSegmentation(model, dataset, cfg)
 device  = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 #device  = torch.device('cpu')
 
-#pipeline.run_test(device)
 pipeline.run_train(device)
 
