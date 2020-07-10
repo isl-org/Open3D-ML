@@ -7,6 +7,7 @@ import torch
 import utils.cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 import utils.nearest_neighbors.lib.python.nearest_neighbors as nearest_neighbors
 
+from ml3d.torch.utils import make_dir
 import yaml
 
 
@@ -350,13 +351,13 @@ class SemanticKITTI:
     def save_test_result(self, test_probs):
         cfg = self.cfg
         
-        test_path = join(cfg.test_result_folder, 'sequences')
-        makedirs(test_path) if not exists(test_path) else None
-        save_path = join(test_path, str(cfg.test_split_number), 
+        test_path = join(cfg.general.test_result_folder, 'sequences')
+        make_dir(test_path) 
+        save_path = join(test_path, str(cfg.test.test_split_number), 
                                 'predictions')
-        makedirs(save_path) if not exists(save_path) else None
+        make_dir(save_path) 
 
-        test_scan_name = str(self.cfg.test_split_number)
+        test_scan_name = str(self.cfg.test.test_split_number)
 
         for j in range(len(test_probs)):
             test_file_name = self.test_list[j]

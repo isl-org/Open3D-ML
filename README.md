@@ -8,7 +8,10 @@ The file ```examples/train_semantic_seg.py``` contains a working example showing
 
 TODO List:
 - [x] tensorboard
-- [x] strucutred configure file
+- [x] strucutred config file
+- [ ] semantickitti example data for inference
+- [ ] distangle config
+- [ ] support yaml
 - [ ] validation loader
 - [ ] reorganize the strucutre 
 - [ ] re-training

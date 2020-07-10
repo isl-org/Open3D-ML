@@ -108,7 +108,7 @@ class SemanticSegmentation():
         inputs  = model.preprocess_inference(points, device)
         scores  = model(inputs)
         pred    = torch.max(scores.squeeze(0), dim=-1).indices
-        pred    = pred.cpu().data.numpy()
+        # pred    = pred.cpu().data.numpy()
 
         return pred
 
@@ -121,17 +121,18 @@ class SemanticSegmentation():
         model.to(device)
         model.eval()
 
-        log_file_path   = join(cfg.logs_dir, 'log_test_'+ dataset.name + '.txt')
+        log_file_path   = join(cfg.general.logs_dir, 
+                                'log_test_'+ dataset.name + '.txt')
         log_file        = open(log_file_path, 'a')
         self.log_file   = log_file
 
 
-        test_sampler = dataset.get_sampler('test')
-        test_loader = DataLoader(test_sampler, batch_size=cfg.val_batch_size)
-        test_probs = [np.zeros(shape=[len(l), self.cfg.network.num_classes], 
+        test_sampler    = dataset.get_sampler('test')
+        test_loader = DataLoader(test_sampler, batch_size=cfg.test.batch_size)
+        test_probs  = [np.zeros(shape=[len(l), self.cfg.network.num_classes], 
                         dtype=np.float16) for l in dataset.possibility]
 
-        self.load_ckpt(cfg.ckpt_path, False)
+        self.load_ckpt(cfg.network.ckpt_path, False)
 
         test_smooth = 0.98
         epoch       = 0
@@ -171,7 +172,7 @@ class SemanticSegmentation():
             if np.min(dataset.min_possibility) > 0.5:  # 0.5
                 print('\nReproject Vote #{:d}'.format(int(np.floor(new_min))))
                 dataset.save_test_result(test_probs)
-                log_out(str(cfg.test_split_number) + ' finished', log_file)
+                log_out(str(cfg.test.test_split_number) + ' finished', log_file)
                 return
           
             epoch += 1
