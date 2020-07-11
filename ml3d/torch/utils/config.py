@@ -3,6 +3,7 @@ import os.path
 import shutil
 import sys
 import tempfile
+import yaml
 from importlib import import_module
 from addict import Dict
 
@@ -57,6 +58,22 @@ class Config(object):
 
         self.cfg_dict = cfg_dict
 
+
+    def dump(self, **kwargs):
+        """Dump to a string."""
+        def convert_to_dict(cfg_node, key_list):
+            if not isinstance(cfg_node, ConfigDict):
+                return cfg_node
+            else:
+                cfg_dict = dict(cfg_node)
+                for k, v in cfg_dict.items():
+                    cfg_dict[k] = convert_to_dict(v, key_list + [k])
+                return cfg_dict
+        self_as_dict = convert_to_dict(self._cfg_dict, [])
+        print(self_as_dict)
+        return yaml.safe_dump(self_as_dict, **kwargs)
+        #return self_as_dict
+
     @staticmethod
     def load_from_file(filename):
         if not os.path.isfile(filename):
@@ -83,6 +100,13 @@ class Config(object):
                 del sys.modules[temp_module_name]
                 # close temp file
                 temp_config_file.close()
+
+        
+        if filename.endswith('.yaml'):
+            with open(filename) as f:
+                cfg_dict = yaml.safe_load(f)
+                cfg_dict = yaml.full_load(cfg_dict)
+    
 
         return Config(cfg_dict)
 

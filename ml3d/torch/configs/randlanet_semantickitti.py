@@ -1,5 +1,3 @@
-from os.path import join
-
 # model settings
 model       = dict(
     k_n             = 16,  # KNN,
@@ -24,7 +22,7 @@ pipeline    = dict(
     test_batch_size     = 3,
     max_epoch           = 100,  # maximum epoch during training
     learning_rate       = 1e-2,  # initial learning rate
-    lr_decays           = {i: 0.95 for i in range(0, 500)},
+    #lr_decays           = {0.95 for i in range(0, 500)},
     save_ckpt_freq      = 20,
     adam_lr             = 1e-2,
     scheduler_gamma     = 0.95,

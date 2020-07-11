@@ -1,4 +1,6 @@
 import torch
+import yaml
+
 # there should be pipeline. pipeline is bigger that randlanet
 from ml3d.datasets.semantickitti import SemanticKITTI
 from ml3d.torch.pipelines import SemanticSegmentation 
@@ -6,8 +8,9 @@ from ml3d.torch.models import RandLANet
 from ml3d.torch.utils import Config
 
 
-config_file = 'ml3d/torch/configs/randlanet_semantickitti.py'
-cfg         = Config.load_from_file(config_file)
+#py_config 	= 'ml3d/torch/configs/randlanet_semantickitti.py'
+yaml_config = 'ml3d/torch/configs/randlanet_semantickitti.yaml'
+cfg         = Config.load_from_file(yaml_config)
 
 dataset     = SemanticKITTI(cfg.dataset)
 

@@ -173,10 +173,10 @@ class SemanticSegmentation():
                
 
                 new_min = np.min(dataset.min_possibility)
-                log_out('Epoch {:3d}, end. Min possibility = {:.1f}'.format(epoch, new_min), log_file)
+                log_out(f'Epoch {epoch:3d}, end. Min possibility = {new_min:.1f}', log_file)
                
                 if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                    print('\nReproject Vote #{:d}'.format(int(np.floor(new_min))))
+                    log_out(f'\nReproject Vote #{int(np.floor(new_min)):d}', log_file)
                     dataset.save_test_result(test_probs, str(dataset.cfg.test_split_number))
                     log_out(str(dataset.cfg.test_split_number) + ' finished', log_file)
                     return
