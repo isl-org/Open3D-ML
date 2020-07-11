@@ -198,19 +198,13 @@ class DataProcessing:
 
 
 class SimpleSampler(IterableDataset):
-    def __init__(self, dataset, split='training'):
+    def __init__(self, dataset, batch_size, split='training'):
         cfg         = dataset.cfg
         path_list   = dataset.get_split_list(split)
 
         test = 0
-        if split == 'training':
-            num_per_epoch = int(len(path_list) / cfg.train.batch_size) 
-            dataset.train_list = path_list
-        elif split == 'validation':
-            num_per_epoch = int(len(path_list) / cfg.train.val_batch_size) 
-            dataset.val_list = path_list
-        elif split == 'test':
-            num_per_epoch = int(len(path_list) / cfg.test.batch_size) * 4
+        if split == 'test':
+            num_per_epoch = int(len(path_list) / batch_size) * 4
             dataset.test_list = path_list
             for test_file_name in path_list:
                 points = np.load(test_file_name)
@@ -220,6 +214,9 @@ class SimpleSampler(IterableDataset):
                 print(test_file_name)
                 if test == 8:
                     break
+        else:
+            num_per_epoch = int(len(path_list) / batch_size) 
+            dataset.val_list = path_list
 
         self.num_per_epoch  = num_per_epoch
         self.path_list      = path_list
@@ -236,18 +233,16 @@ class SimpleSampler(IterableDataset):
     def spatially_regular_gen(self):
         for i in range(self.num_per_epoch):
             if self.split != 'test':
-                is_test     = False
                 cloud_ind   = i
                 pc_path     = self.path_list[cloud_ind]
-                pc, tree, labels = self.dataset.get_data(pc_path, is_test)
+                pc, tree, labels = self.dataset.get_data(pc_path, is_test=False)
                 pick_idx    = np.random.choice(len(pc), 1)
                 selected_pc, selected_labels, selected_idx = \
                     self.dataset.crop_pc(pc, labels, tree, pick_idx)
             else:
-                is_test     = True
                 cloud_ind   = int(np.argmin(self.dataset.min_possibility))
                 pc_path     = self.path_list[cloud_ind]
-                pc, tree, labels = self.dataset.get_data(pc_path, is_test)
+                pc, tree, labels = self.dataset.get_data(pc_path, is_test=True)
                 pick_idx    = np.argmin(self.dataset.possibility[cloud_ind])
                 selected_pc, selected_labels, selected_idx = \
                     self.dataset.crop_pc(pc, labels, tree, pick_idx)
@@ -300,8 +295,8 @@ class SemanticKITTI:
         self.ignored_labels = np.sort([0])
         self.cfg.ignored_label_inds = [self.label_to_idx[ign_label] for ign_label in self.ignored_labels]
 
-    def get_sampler (self, split):
-        return SimpleSampler(self, split=split)
+    def get_sampler (self, batch_size, split):
+        return SimpleSampler(self, batch_size, split=split)
 
     def preprocess(self, batch_data, device):
         cfg             = self.cfg
@@ -342,27 +337,21 @@ class SemanticKITTI:
         inputs['input_inds']    = batch_pc_idx
         inputs['cloud_inds']    = batch_cloud_idx
 
-        #print(input_points)   
-        #print(input_neighbors)        
-        #features    = [torch.from_numpy(arr) for arr in inputs['features']]
-
         return inputs
 
-    def save_test_result(self, test_probs):
+    def save_test_result(self, test_probs, test_scan_name):
         cfg = self.cfg
         
-        test_path = join(cfg.general.test_result_folder, 'sequences')
+        test_path = join(cfg.test_result_folder, 'sequences')
         make_dir(test_path) 
-        save_path = join(test_path, str(cfg.test.test_split_number), 
+        save_path = join(test_path, test_scan_name, 
                                 'predictions')
         make_dir(save_path) 
-
-        test_scan_name = str(self.cfg.test.test_split_number)
 
         for j in range(len(test_probs)):
             test_file_name = self.test_list[j]
             frame = test_file_name.split('/')[-1][:-4]
-            proj_path = join(cfg.general.dataset_path, test_scan_name, 'proj')
+            proj_path = join(cfg.dataset_path, test_scan_name, 'proj')
             proj_file = join(proj_path, str(frame) + '_proj.pkl')
             if isfile(proj_file):
                 with open(proj_file, 'rb') as f:
@@ -380,7 +369,8 @@ class SemanticKITTI:
     def get_data(self, file_path, is_test=False):
         seq_id          = file_path.split('/')[-3]
         frame_id        = file_path.split('/')[-1][:-4]
-        kd_tree_path    = join(self.cfg.general.dataset_path, seq_id, 
+
+        kd_tree_path    = join(self.cfg.dataset_path, seq_id, 
                                 'KDTree', frame_id + '.pkl')
         # Read pkl with search tree
         with open(kd_tree_path, 'rb') as f:
@@ -391,7 +381,7 @@ class SemanticKITTI:
         if is_test:
             labels      = np.zeros(np.shape(points)[0], dtype=np.uint8)
         else:
-            label_path  = join(self.cfg.general.dataset_path, seq_id, 
+            label_path  = join(self.cfg.dataset_path, seq_id, 
                                 'labels', frame_id + '.npy')
             labels      = np.squeeze(np.load(label_path))
         return points, search_tree, labels
@@ -399,15 +389,15 @@ class SemanticKITTI:
 
     def get_split_list(self, split):
         cfg             = self.cfg
-        dataset_path    = cfg.general.dataset_path
+        dataset_path    = cfg.dataset_path
         file_list       = []
 
         if split == 'training':
-            seq_list = cfg.train.training_split
+            seq_list = cfg.training_split
         elif split == 'test':
-            seq_list = [str(cfg.test.test_split_number)]
+            seq_list = [str(cfg.test_split_number)]
         elif split == 'validation':
-            pass
+            seq_list = cfg.validation_split
 
         for seq_id in seq_list:
             pc_path = join(dataset_path, seq_id, 'velodyne')
@@ -424,7 +414,7 @@ class SemanticKITTI:
         # crop a fixed size point cloud for training
         center_point = points[pick_idx, :].reshape(1, -1)
         select_idx = search_tree.query(center_point, 
-                                k=self.cfg.network.num_points)[1][0]
+                                k=self.cfg.num_points)[1][0]
         select_idx = DataProcessing.shuffle_idx(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]

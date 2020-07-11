@@ -4,7 +4,7 @@ import torch.nn as nn
 import helper_torch_util 
 import numpy as np
 from pprint import pprint
-import time
+from datetime import datetime
 from tqdm import tqdm
 from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
@@ -93,10 +93,12 @@ class SemanticSegmentation():
         self.dataset    = dataset
         self.cfg        = cfg
 
-        make_dir(cfg.general.main_log_dir) 
-        cfg.general.logs_dir = join(cfg.general.main_log_dir, 
-                                    cfg.general.model_name)
-        make_dir(cfg.general.logs_dir) 
+        make_dir(cfg.main_log_dir) 
+        cfg.logs_dir = join(cfg.main_log_dir, 
+                                    cfg.model_name)
+        make_dir(cfg.logs_dir) 
+
+        dataset.cfg.num_points = model.cfg.num_points
 
     def run_inference(self, points, device):
         cfg     = self.cfg
@@ -105,10 +107,11 @@ class SemanticSegmentation():
         model.to(device)
         model.eval()
 
-        inputs  = model.preprocess_inference(points, device)
-        scores  = model(inputs)
-        pred    = torch.max(scores.squeeze(0), dim=-1).indices
-        # pred    = pred.cpu().data.numpy()
+        with torch.no_grad():
+            inputs  = model.preprocess_inference(points, device)
+            scores  = model(inputs)
+            pred    = torch.max(scores.squeeze(0), dim=-1).indices
+            # pred    = pred.cpu().data.numpy()
 
         return pred
 
@@ -121,63 +124,64 @@ class SemanticSegmentation():
         model.to(device)
         model.eval()
 
-        log_file_path   = join(cfg.general.logs_dir, 
-                                'log_test_'+ dataset.name + '.txt')
-        log_file        = open(log_file_path, 'a')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        log_file_path   = join(cfg.logs_dir, 
+                                'log_test_'+ timestamp + '.txt')
+        log_file        = open(log_file_path, 'w')
         self.log_file   = log_file
 
 
-        test_sampler    = dataset.get_sampler('test')
-        test_loader = DataLoader(test_sampler, batch_size=cfg.test.batch_size)
-        test_probs  = [np.zeros(shape=[len(l), self.cfg.network.num_classes], 
+        test_sampler    = dataset.get_sampler(cfg.test_batch_size, 'test')
+        test_loader = DataLoader(test_sampler, batch_size=cfg.test_batch_size)
+        test_probs  = [np.zeros(shape=[len(l), self.model.cfg.num_classes], 
                         dtype=np.float16) for l in dataset.possibility]
 
-        self.load_ckpt(cfg.network.ckpt_path, False)
+        self.load_ckpt(model.cfg.ckpt_path, False)
 
         test_smooth = 0.98
         epoch       = 0
 
-        while True:
-            for batch_data in tqdm(test_loader, desc='test', leave=False):
-                # loader: point_clout, label
-                inputs          = model.preprocess(batch_data, device) 
-                result_torch    = model(inputs)
-                result_torch    = torch.reshape(result_torch,
-                                                (-1, cfg.network.num_classes))
+        with torch.no_grad():
+            while True:
+                for batch_data in tqdm(test_loader, desc='test', leave=False):
+                    # loader: point_clout, label
+                    inputs          = model.preprocess(batch_data, device) 
+                    result_torch    = model(inputs)
+                    result_torch    = torch.reshape(result_torch,
+                                                    (-1, model.cfg.num_classes))
 
-                m_softmax       = nn.Softmax(dim=-1)
-                result_torch    = m_softmax(result_torch)
-                stacked_probs   = result_torch.cpu().data.numpy()
+                    m_softmax       = nn.Softmax(dim=-1)
+                    result_torch    = m_softmax(result_torch)
+                    stacked_probs   = result_torch.cpu().data.numpy()
 
-                stacked_probs = np.reshape(stacked_probs, 
-                                            [cfg.test.batch_size, 
-                                            cfg.network.num_points, 
-                                            cfg.network.num_classes])
+                    stacked_probs = np.reshape(stacked_probs, 
+                                                [cfg.test_batch_size, 
+                                                model.cfg.num_points, 
+                                                model.cfg.num_classes])
+                  
+                    point_inds  = inputs['input_inds']
+                    cloud_inds  = inputs['cloud_inds']
+
+                    for j in range(np.shape(stacked_probs)[0]):
+                        probs = stacked_probs[j, :, :]
+                        inds = point_inds[j, :]
+                        c_i = cloud_inds[j][0]
+                        test_probs[c_i][inds] = \
+                                    test_smooth * test_probs[c_i][inds] + \
+                                    (1 - test_smooth) * probs
+
+               
+
+                new_min = np.min(dataset.min_possibility)
+                log_out('Epoch {:3d}, end. Min possibility = {:.1f}'.format(epoch, new_min), log_file)
+               
+                if np.min(dataset.min_possibility) > 0.5:  # 0.5
+                    print('\nReproject Vote #{:d}'.format(int(np.floor(new_min))))
+                    dataset.save_test_result(test_probs, str(dataset.cfg.test_split_number))
+                    log_out(str(dataset.cfg.test_split_number) + ' finished', log_file)
+                    return
               
-                point_inds  = inputs['input_inds']
-                cloud_inds  = inputs['cloud_inds']
-
-                for j in range(np.shape(stacked_probs)[0]):
-                    probs = stacked_probs[j, :, :]
-                    inds = point_inds[j, :]
-                    c_i = cloud_inds[j][0]
-                    test_probs[c_i][inds] = \
-                                test_smooth * test_probs[c_i][inds] + \
-                                (1 - test_smooth) * probs
-          
-
-            new_min = np.min(dataset.min_possibility)
-            log_out('Epoch {:3d}, end. Min possibility = {:.1f}'.format(epoch, new_min), log_file)
-           
-            if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                print('\nReproject Vote #{:d}'.format(int(np.floor(new_min))))
-                dataset.save_test_result(test_probs)
-                log_out(str(cfg.test.test_split_number) + ' finished', log_file)
-                return
-          
-            epoch += 1
-            continue
-
+                epoch += 1
 
     def run_train(self, device):
         #self.device = device
@@ -185,51 +189,56 @@ class SemanticSegmentation():
         dataset = self.dataset
         cfg     = self.cfg
 
-        model.to(device)        
-        model.eval()
+        model.to(device) 
 
-
-        log_file_path = join(cfg.general.logs_dir, 
-                        'log_train_'+ dataset.name + '.txt')
-        log_file = open(log_file_path, 'a')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        log_file_path = join(cfg.logs_dir, 
+                        'log_train_'+ timestamp + '.txt')
+        log_file = open(log_file_path, 'w')
         self.log_file   = log_file
 
-        n_samples       = torch.tensor(cfg.train.class_weights, 
+        n_samples       = torch.tensor(dataset.cfg.class_weights, 
                             dtype=torch.float, device=device)
         ratio_samples   = n_samples / n_samples.sum()
         weights         = 1 / (ratio_samples + 0.02)
 
         criterion = nn.CrossEntropyLoss(weight=weights)
 
-        train_sampler   = dataset.get_sampler('training')
+
+        valid_sampler   = dataset.get_sampler(cfg.val_batch_size, 'validation')
+        valid_loader    = DataLoader(valid_sampler, 
+                                     batch_size=cfg.val_batch_size)
+        
+        train_sampler   = dataset.get_sampler(cfg.batch_size, 'training')
         train_loader    = DataLoader(train_sampler, 
-                                     batch_size=cfg.train.batch_size)
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.adam_lr)
+                                     batch_size=cfg.batch_size)
+        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 
-                                                cfg.train.scheduler_gamma)
+                                                cfg.scheduler_gamma)
 
         self.optimizer, self.scheduler = optimizer, scheduler
-        first_epoch = self.load_ckpt(cfg.network.ckpt_path, True)
+        first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
         
-        writer = SummaryWriter(join(cfg.general.logs_dir, 
-                                cfg.general.train_sum_dir))
+        writer = SummaryWriter(join(cfg.logs_dir, 
+                                cfg.train_sum_dir))
     
-        for epoch in range(0, cfg.train.max_epoch+1):
-            print(f'=== EPOCH {epoch:d}/{cfg.train.max_epoch:d} ===')
-            # metrics
-            losses      = []
-            accs        = []
-            ious        = []
-            step        = 0
+        for epoch in range(0, cfg.max_epoch+1):
+            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
 
+            # --------------------- train
+            model.train()
+            self.losses = []
+            self.accs   = []
+            self.ious   = []
+            step        = 0
             for batch_data in tqdm(train_loader, desc='Training', leave=False):
 
-                inputs = model.preprocess(batch_data, device) 
+                inputs  = model.preprocess(batch_data, device) 
                 # scores: B x N x num_classes
-                scores = model(inputs)
+                scores  = model(inputs)
 
 
-                labels = batch_data[1] 
+                labels  = batch_data[1] 
                 scores, labels = self.filter_valid(scores, labels, device)
 
 
@@ -240,55 +249,97 @@ class SemanticSegmentation():
                 acc  = accuracy(scores, labels)
                 iou  = intersection_over_union(scores, labels)
 
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                #optimizer.zero_grad()
+                #loss.backward()
+                #optimizer.step()
                 
+                self.losses.append(loss.cpu().item())
+                self.accs.append(accuracy(scores, labels))
+                self.ious.append(intersection_over_union(scores, labels))
+
                 step = step + 1
+                if step % 2 == 0:
+                    print(acc[-1])
+                if step == 5:
+                    break
 
-                losses.append(loss.cpu().item())
-                accs.append(accuracy(scores, labels))
-                ious.append(intersection_over_union(scores, labels))
+            # --------------------- validation
+            model.eval()
+            self.valid_losses    = []
+            self.valid_accs      = []
+            self.valid_ious      = []
+            step                 = 0
 
-            self.save_logs(writer, epoch, losses, accs, ious)
+            with torch.no_grad():
+                for batch_data in tqdm(valid_loader, desc='validation', leave=False):
 
-            if epoch % cfg.train.save_ckpt_freq == 0:
-                path_ckpt = join(self.cfg.general.logs_dir, 'checkpoint')
+                    inputs = model.preprocess(batch_data, device) 
+                    # scores: B x N x num_classes
+                    scores = model(inputs)
+
+                    labels = batch_data[1] 
+                    scores, labels = self.filter_valid(scores, labels, device)
+
+
+                    logp = torch.distributions.utils.probs_to_logits(scores, 
+                                                            is_binary=False)
+                    
+                    loss = criterion(logp, labels)
+                    acc  = accuracy(scores, labels)
+                    iou  = intersection_over_union(scores, labels)
+
+                    self.valid_losses.append(loss.cpu().item())
+                    self.valid_accs.append(accuracy(scores, labels))
+                    self.valid_ious.append(intersection_over_union(scores, labels))
+
+                    step = step + 1
+                    if step % 2 == 0:
+                        print(acc[-1])
+                    if step == 5:
+                        break
+
+            self.save_logs(writer, epoch)
+
+            if epoch % cfg.save_ckpt_freq == 0:
+                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
                 self.save_ckpt(path_ckpt, epoch)
 
-    def save_logs(self, writer, epoch, losses, accs, ious):
+    def save_logs(self, writer, epoch):
 
-        accs = np.nanmean(np.array(accs), axis=0)
-        ious = np.nanmean(np.array(ious), axis=0)
+        accs = np.nanmean(np.array(self.accs), axis=0)
+        ious = np.nanmean(np.array(self.ious), axis=0)
 
-        print(accs)
+        valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
+        valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
+
 
         loss_dict = {
-            'Training loss':    np.mean(losses),
-            'Validation loss':  np.mean(losses)
+            'Training loss':    np.mean(self.losses),
+            'Validation loss':  np.mean(self.valid_losses)
         }
         acc_dicts = [
             {
                 'Training accuracy': acc,
                 'Validation accuracy': val_acc
-            } for acc, val_acc in zip(accs, accs)
+            } for acc, val_acc in zip(accs, valid_accs)
         ]
         iou_dicts = [
             {
                 'Training IoU': iou,
                 'Validation IoU': val_iou
-            } for iou, val_iou in zip(ious, ious)
+            } for iou, val_iou in zip(ious, valid_ious)
         ]
 
         # send results to tensorboard
         writer.add_scalars('Loss', loss_dict, epoch)
 
-        for i in range(self.cfg.network.num_classes):
+        for i in range(self.model.cfg.num_classes):
             writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i], epoch)
             writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
         writer.add_scalars('Per-class accuracy/Overall', acc_dicts[-1], epoch)
         writer.add_scalars('Per-class IoU/Mean IoU', iou_dicts[-1], epoch)
 
+        # print(acc_dicts[-1])
 
     def load_ckpt(self, ckpt_path, is_train=True):
         if exists(ckpt_path):
@@ -324,11 +375,11 @@ class SemanticSegmentation():
         
 
     def filter_valid(self, scores, labels, device):
-        valid_scores = scores.reshape(-1, self.cfg.network.num_classes)
+        valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
         valid_labels = labels.reshape(-1).to(device)
                 
         ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
-        for ign_label in self.cfg.ignored_label_inds:
+        for ign_label in self.dataset.cfg.ignored_label_inds:
             ignored_bool = torch.logical_or(ignored_bool, 
                             torch.eq(valid_labels, ign_label))
            
@@ -336,15 +387,15 @@ class SemanticSegmentation():
             torch.logical_not(ignored_bool))[0].to(device)
 
         valid_scores = torch.gather(valid_scores, 0, 
-            valid_idx.unsqueeze(-1).expand(-1, self.cfg.network.num_classes))
+            valid_idx.unsqueeze(-1).expand(-1, self.model.cfg.num_classes))
         valid_labels = torch.gather(valid_labels, 0, valid_idx)
 
         # Reduce label values in the range of logit shape
         reducing_list = torch.arange(0, 
-                        self.cfg.network.num_classes, dtype=torch.int64)
+                        self.model.cfg.num_classes, dtype=torch.int64)
         inserted_value = torch.zeros([1], dtype=torch.int64)
         
-        for ign_label in self.cfg.ignored_label_inds:
+        for ign_label in self.dataset.cfg.ignored_label_inds:
             reducing_list = torch.cat([reducing_list[:ign_label],
                      inserted_value, reducing_list[ign_label:]], 0)
         valid_labels = torch.gather(reducing_list.to(device), 

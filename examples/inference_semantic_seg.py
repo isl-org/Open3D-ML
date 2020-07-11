@@ -11,11 +11,11 @@ import open3d as o3d
 
 config_file = 'ml3d/torch/configs/randlanet_semantickitti.py'
 cfg         = Config.load_from_file(config_file)
-dataset 	= SemanticKITTI(cfg)
+dataset 	= SemanticKITTI(cfg.dataset)
 
-model   	= RandLANet(cfg)
+model   	= RandLANet(cfg.model)
 
-pipeline 	= SemanticSegmentation(model, dataset, cfg)
+pipeline 	= SemanticSegmentation(model, dataset, cfg.pipeline)
 
 device  	= torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 #device  = torch.device('cpu')
