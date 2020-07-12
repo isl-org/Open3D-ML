@@ -39,8 +39,7 @@ def intersection_over_union(scores, labels):
         -------
         list of floats of length num_classes+1 (last item is mIoU)
     """
-    num_classes = scores.size(-2) # we use -2 instead of 1 to enable arbitrary batch dimensions
-
+    num_classes = scores.size(-2) 
     predictions = torch.max(scores, dim=-2).indices
 
     ious = []
@@ -48,7 +47,8 @@ def intersection_over_union(scores, labels):
     for label in range(num_classes):
         pred_mask = predictions == label
         labels_mask = labels == label
-        iou = (pred_mask & labels_mask).float().sum() / (pred_mask | labels_mask).float().sum()
+        iou = (pred_mask & labels_mask).float().sum() 
+        iou = iou / (pred_mask | labels_mask).float().sum()
         ious.append(iou.cpu().item())
     ious.append(np.nanmean(ious))
     return ious
@@ -56,7 +56,7 @@ def intersection_over_union(scores, labels):
 
 def accuracy(scores, labels):
     r"""
-        Compute the per-class accuracies and the overall accuracy # TODO: complete doc
+        Compute the per-class accuracies and the overall accuracy 
 
         Parameters
         ----------
@@ -67,7 +67,8 @@ def accuracy(scores, labels):
 
         Returns
         -------
-        list of floats of length num_classes+1 (last item is overall accuracy)
+        list of floats of length num_classes+1 
+        (last item is overall accuracy)
     """
     num_classes = scores.size(-2) 
 
@@ -148,7 +149,7 @@ class SemanticSegmentation():
                     inputs          = model.preprocess(batch_data, device) 
                     result_torch    = model(inputs)
                     result_torch    = torch.reshape(result_torch,
-                                                    (-1, model.cfg.num_classes))
+                                                (-1, model.cfg.num_classes))
 
                     m_softmax       = nn.Softmax(dim=-1)
                     result_torch    = m_softmax(result_torch)
@@ -173,12 +174,16 @@ class SemanticSegmentation():
                
 
                 new_min = np.min(dataset.min_possibility)
-                log_out(f'Epoch {epoch:3d}, end. Min possibility = {new_min:.1f}', log_file)
+                log_out(f"Epoch {epoch:3d}, end. "
+                        f"Min possibility = {new_min:.1f}", log_file)
                
                 if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                    log_out(f'\nReproject Vote #{int(np.floor(new_min)):d}', log_file)
-                    dataset.save_test_result(test_probs, str(dataset.cfg.test_split_number))
-                    log_out(str(dataset.cfg.test_split_number) + ' finished', log_file)
+                    log_out(f"\nReproject Vote #"
+                            f"{int(np.floor(new_min)):d}", log_file)
+                    dataset.save_test_result(test_probs, 
+                                        str(dataset.cfg.test_split_number))
+                    log_out(f"{str(dataset.cfg.test_split_number)}"
+                            f" finished", log_file)
                     return
               
                 epoch += 1
@@ -227,7 +232,8 @@ class SemanticSegmentation():
             self.accs   = []
             self.ious   = []
             step        = 0
-            for batch_data in tqdm(train_loader, desc='Training', leave=False):
+            for batch_data in tqdm(train_loader, 
+                                        desc='Training', leave=False):
 
                 inputs  = model.preprocess(batch_data, device) 
                 # scores: B x N x num_classes
@@ -241,14 +247,13 @@ class SemanticSegmentation():
                 logp = torch.distributions.utils.probs_to_logits(scores, 
                                                         is_binary=False)
                 
-                loss = criterion(logp, labels)
-                acc  = accuracy(scores, labels)
-                iou  = intersection_over_union(scores, labels)
-
                 optimizer.zero_grad()
+                loss = criterion(logp, labels)
                 loss.backward()
                 optimizer.step()
-                
+
+                acc  = accuracy(scores, labels)
+                iou  = intersection_over_union(scores, labels)
                 self.losses.append(loss.cpu().item())
                 self.accs.append(accuracy(scores, labels))
                 self.ious.append(intersection_over_union(scores, labels))
@@ -264,7 +269,8 @@ class SemanticSegmentation():
             self.valid_ious      = []
             step                 = 0
             with torch.no_grad():
-                for batch_data in tqdm(valid_loader, desc='validation', leave=False):
+                for batch_data in tqdm(valid_loader, 
+                                            desc='validation', leave=False):
 
                     inputs = model.preprocess(batch_data, device) 
                     # scores: B x N x num_classes
@@ -283,7 +289,8 @@ class SemanticSegmentation():
 
                     self.valid_losses.append(loss.cpu().item())
                     self.valid_accs.append(accuracy(scores, labels))
-                    self.valid_ious.append(intersection_over_union(scores, labels))
+                    self.valid_ious.append(intersection_over_union(scores, 
+                                                                    labels))
 
                     step = step + 1
 
@@ -324,19 +331,20 @@ class SemanticSegmentation():
         writer.add_scalars('Loss', loss_dict, epoch)
 
         for i in range(self.model.cfg.num_classes):
-            writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i], epoch)
+            writer.add_scalars(f'Per-class accuracy/{i+1:02d}', 
+                                                acc_dicts[i], epoch)
             writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
         writer.add_scalars('Per-class accuracy/Overall', acc_dicts[-1], epoch)
         writer.add_scalars('Per-class IoU/Mean IoU', iou_dicts[-1], epoch)
 
-        log_out(f"loss train: {loss_dict['Training loss']:.1f} "
-                f" eval: {loss_dict['Validation loss']:.1f}", 
+        log_out(f"loss train: {loss_dict['Training loss']:.3f} "
+                f" eval: {loss_dict['Validation loss']:.3f}", 
                                     self.log_file)
-        log_out(f"acc train: {acc_dicts[-1]['Training accuracy']:.1f} "
-                 f" eval: {acc_dicts[-1]['Validation accuracy']:.1f}", 
+        log_out(f"acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
+                 f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}", 
                                     self.log_file)
-        log_out(f"acc train: {iou_dicts[-1]['Training IoU']:.1f} "
-                f" eval: {iou_dicts[-1]['Validation IoU']:.1f}", 
+        log_out(f"acc train: {iou_dicts[-1]['Training IoU']:.3f} "
+                f" eval: {iou_dicts[-1]['Validation IoU']:.3f}", 
                                     self.log_file)
         # print(acc_dicts[-1])
 
