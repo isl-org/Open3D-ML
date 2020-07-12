@@ -25,19 +25,10 @@
     test_split_number: 11
     training_split:
     - '00'
-    - '01'
-    - '02'
-    - '03'
-    - '04'
-    - '05'
-    - '06'
-    - '07'
-    - 09
-    - '10'
     validation_split:
-    - 08
+    - '08'
   model:
-    ckpt_path: ./ml3d/torch/checkpoint/randlanet_semantickitti.pth
+    ckpt_path: ./ml3d/torch/checkpoint/randlanet_semantickitti2.pth
     d_feature: 8
     d_in: 3
     d_out:
@@ -62,13 +53,13 @@
     - 4
   pipeline:
     adam_lr: 0.01
-    batch_size: 2
+    batch_size: 6
+    val_batch_size: 24
+    test_batch_size: 2
     learning_rate: 0.01
     main_log_dir: ./logs
     max_epoch: 100
     model_name: RandLANet
-    save_ckpt_freq: 20
+    save_ckpt_freq: 5
     scheduler_gamma: 0.95
-    test_batch_size: 3
     train_sum_dir: train_log
-    val_batch_size: 2

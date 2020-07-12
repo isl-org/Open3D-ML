@@ -202,26 +202,22 @@ class SimpleSampler(IterableDataset):
         cfg         = dataset.cfg
         path_list   = dataset.get_split_list(split)
 
-        test = 0
+        num_per_epoch = int(len(path_list) / batch_size) 
+
         if split == 'test':
-            num_per_epoch = int(len(path_list) / batch_size) * 4
             dataset.test_list = path_list
             for test_file_name in path_list:
                 points = np.load(test_file_name)
                 dataset.possibility += [np.random.rand(points.shape[0]) * 1e-3]
                 dataset.min_possibility += [float(np.min(dataset.possibility[-1]))]
-                test = test + 1
-                print(test_file_name)
-                if test == 8:
-                    break
-        else:
-            num_per_epoch = int(len(path_list) / batch_size) 
-            dataset.val_list = path_list
+                
+             
 
         self.num_per_epoch  = num_per_epoch
         self.path_list      = path_list
         self.split          = split
         self.dataset        = dataset
+        self.batch_size     = batch_size
 
         
     def __iter__(self):
@@ -231,7 +227,7 @@ class SimpleSampler(IterableDataset):
         return self.num_per_epoch 
 
     def spatially_regular_gen(self):
-        for i in range(self.num_per_epoch):
+        for i in range(self.num_per_epoch * self.batch_size):
             if self.split != 'test':
                 cloud_ind   = i
                 pc_path     = self.path_list[cloud_ind]

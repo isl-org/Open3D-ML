@@ -31,7 +31,8 @@ class conv2d(nn.Module):
         self.biases  = self.conv.bias
         self.weights = self.conv.weight
 
-        self.batch_normalization = nn.BatchNorm2d(out_planes)
+        self.batch_normalization = nn.BatchNorm2d(out_planes, 
+                                            eps=1e-6, momentum=0.99)
 
         if activation:
                 self.activation_fn = nn.LeakyReLU(0.2,inplace=True)

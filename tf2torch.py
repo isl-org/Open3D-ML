@@ -16,7 +16,6 @@ def load_tf_weights(model, weight_path):
 	    array = tf.train.load_variable(tf_path, name)
 	    tf_vars.append((name, array.squeeze()))
 
-
 	# FOr each variable in the PyTorch model
 	for name, array in tf_vars:
 	    # skip the prefix ('model/') and split the path-like variable name in a list of sub-path
@@ -35,7 +34,7 @@ def load_tf_weights(model, weight_path):
 
 	    # We iterate along the scopes and move our pointer accordingly
 	    for m_name in name:
-	
+
 	        l = [m_name]
 
 	        #print(l[0])
@@ -44,8 +43,12 @@ def load_tf_weights(model, weight_path):
 	        last_pointer = pointer
 	        if l[0] == 'beta':
 	            pointer = getattr(pointer, 'bias')
+	            #print('beta')
+	            #print(pointer.shape)
 	        elif l[0] == 'gamma':
 	            pointer = getattr(pointer, 'weight')
+	            #print('gamma')
+	            #print(pointer.shape)
 	        elif l[0] == 'moving_mean':
 	            pointer = getattr(pointer, 'running_mean')
 	        elif l[0] == 'moving_variance':

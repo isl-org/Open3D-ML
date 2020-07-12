@@ -7,8 +7,8 @@ from ml3d.torch.pipelines import SemanticSegmentation
 from ml3d.torch.models import RandLANet
 from ml3d.torch.utils import Config
 
+from tf2torch import load_tf_weights
 
-#py_config 	= 'ml3d/torch/configs/randlanet_semantickitti.py'
 yaml_config = 'ml3d/torch/configs/randlanet_semantickitti.yaml'
 cfg         = Config.load_from_file(yaml_config)
 

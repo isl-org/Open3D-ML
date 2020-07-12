@@ -184,11 +184,9 @@ class SemanticSegmentation():
                 epoch += 1
 
     def run_train(self, device):
-        #self.device = device
         model   = self.model
         dataset = self.dataset
         cfg     = self.cfg
-
         model.to(device) 
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -201,17 +199,15 @@ class SemanticSegmentation():
                             dtype=torch.float, device=device)
         ratio_samples   = n_samples / n_samples.sum()
         weights         = 1 / (ratio_samples + 0.02)
-
-        criterion = nn.CrossEntropyLoss(weight=weights)
-
+        criterion       = nn.CrossEntropyLoss(weight=weights)
 
         valid_sampler   = dataset.get_sampler(cfg.val_batch_size, 'validation')
         valid_loader    = DataLoader(valid_sampler, 
                                      batch_size=cfg.val_batch_size)
-        
         train_sampler   = dataset.get_sampler(cfg.batch_size, 'training')
         train_loader    = DataLoader(train_sampler, 
                                      batch_size=cfg.batch_size)
+
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 
                                                 cfg.scheduler_gamma)
@@ -249,19 +245,17 @@ class SemanticSegmentation():
                 acc  = accuracy(scores, labels)
                 iou  = intersection_over_union(scores, labels)
 
-                #optimizer.zero_grad()
-                #loss.backward()
-                #optimizer.step()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
                 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(accuracy(scores, labels))
                 self.ious.append(intersection_over_union(scores, labels))
 
                 step = step + 1
-                if step % 2 == 0:
-                    print(acc[-1])
-                if step == 5:
-                    break
+
+            scheduler.step()
 
             # --------------------- validation
             model.eval()
@@ -269,7 +263,6 @@ class SemanticSegmentation():
             self.valid_accs      = []
             self.valid_ious      = []
             step                 = 0
-
             with torch.no_grad():
                 for batch_data in tqdm(valid_loader, desc='validation', leave=False):
 
@@ -293,16 +286,13 @@ class SemanticSegmentation():
                     self.valid_ious.append(intersection_over_union(scores, labels))
 
                     step = step + 1
-                    if step % 2 == 0:
-                        print(acc[-1])
-                    if step == 5:
-                        break
 
             self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
                 path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
                 self.save_ckpt(path_ckpt, epoch)
+
 
     def save_logs(self, writer, epoch):
 
@@ -339,6 +329,15 @@ class SemanticSegmentation():
         writer.add_scalars('Per-class accuracy/Overall', acc_dicts[-1], epoch)
         writer.add_scalars('Per-class IoU/Mean IoU', iou_dicts[-1], epoch)
 
+        log_out(f"loss train: {loss_dict['Training loss']:.1f} "
+                f" eval: {loss_dict['Validation loss']:.1f}", 
+                                    self.log_file)
+        log_out(f"acc train: {acc_dicts[-1]['Training accuracy']:.1f} "
+                 f" eval: {acc_dicts[-1]['Validation accuracy']:.1f}", 
+                                    self.log_file)
+        log_out(f"acc train: {iou_dicts[-1]['Training IoU']:.1f} "
+                f" eval: {iou_dicts[-1]['Validation IoU']:.1f}", 
+                                    self.log_file)
         # print(acc_dicts[-1])
 
     def load_ckpt(self, ckpt_path, is_train=True):
@@ -353,7 +352,7 @@ class SemanticSegmentation():
                 self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
         else:
             first_epoch = 0
-            log_out('No checkpoint', log_file)
+            log_out('No checkpoint', self.log_file)
 
         return first_epoch
 
