@@ -9,7 +9,7 @@ The file ```examples/train_semantic_seg.py``` contains a working example showing
 TODO List:
 - [x] tensorboard
 - [x] strucutred config file
-- [x] distangle config
+- [x] disentangle config
 - [x] support yaml
 - [x] validation loader
 - [ ] re-training
