@@ -12,12 +12,14 @@ TODO List:
 - [x] disentangle config
 - [x] support yaml
 - [x] validation loader
-- [ ] re-training
+- [x] re-training
+- [x] on-the-fly cached preprocessing
 - [ ] semantickitti example data for inference
+- [ ] fine-tune training
 - [ ] reorganize the strucutre 
-- [ ] alternative cached preprocessing
-- [ ] rewrite preprocessing
+- [ ] dataset class in torch 
 - [ ] number/density of point clould
+- [ ] Tensorflow pipeline
 
 ## Directories
 
