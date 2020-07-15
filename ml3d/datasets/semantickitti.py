@@ -7,6 +7,8 @@ import torch
 import utils.cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 import utils.nearest_neighbors.lib.python.nearest_neighbors as nearest_neighbors
 
+from sklearn.neighbors import KDTree
+
 from ml3d.torch.utils import make_dir
 import yaml
 
@@ -27,13 +29,6 @@ remap_dict_val = DATA["learning_map"]
 max_key = max(remap_dict_val.keys())
 remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
 remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
-
-
-
-
-# yaml
-# network
-# dataset
 
 class DataProcessing:
     @staticmethod
@@ -382,6 +377,81 @@ class SemanticKITTI:
             labels      = np.squeeze(np.load(label_path))
         return points, search_tree, labels
 
+    def prepro_randlanet(self, seq_list, split):
+        cfg = self.cfg
+        output_path = cfg.dataset_path
+        make_dir(output_path)
+        seq_list = np.sort(seq_list)
+        for seq_id in seq_list:
+            print('sequence ' + seq_id + ' start')
+            seq_path            = join(cfg.original_pc_path, seq_id)
+            pc_path             = join(seq_path, 'velodyne')
+            seq_path_out        = join(output_path, seq_id)
+            pc_path_out         = join(seq_path_out, 'velodyne')
+            KDTree_path_out     = join(seq_path_out, 'KDTree')
+            make_dir(seq_path_out)
+            make_dir(pc_path_out)
+            make_dir(KDTree_path_out)
+            if split != "test":
+                label_sequence_path = join(cfg.original_label_path, seq_id)
+                label_path          = join(label_sequence_path, 'labels')
+                label_path_out      = join(seq_path_out, 'labels')
+                make_dir(label_path_out)
+
+                scan_list = np.sort(os.listdir(pc_path))
+                for scan_id in scan_list:
+                    KDTree_save = join(KDTree_path_out, str(scan_id[:-4]) + '.pkl')
+                    proj_path   = join(seq_path_out, 'proj')
+                    proj_save   = join(proj_path, str(scan_id[:-4]) + '_proj.pkl')
+                    pc_save     = join(pc_path_out, str(scan_id[:-4]) + '.npy')
+                    label_save  = join(label_path_out, scan_id[:-4] + '.npy')
+
+                    if  (exists(pc_save) and exists(label_save) and 
+                            exists(KDTree_save)):
+                        if split == "training":
+                            continue
+                        else:
+                            if exists(proj_save):
+                                continue
+                    print(scan_id)
+                    points = DataProcessing.load_pc_kitti(join(pc_path, scan_id))
+                    labels = DataProcessing.load_label_kitti(join(label_path, str(scan_id[:-4]) + '.label'), remap_lut_val)
+                    sub_points, sub_labels = DataProcessing.grid_sub_sampling(points, labels=labels, grid_size=cfg.prepro_grid_size)
+                    search_tree = KDTree(sub_points)
+                    
+                    np.save(pc_save, sub_points)
+                    np.save(label_save, sub_labels)
+                    with open(KDTree_save, 'wb') as f:
+                        pickle.dump(search_tree, f)
+                    if split == "validation":
+                        make_dir(proj_path)
+                        proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
+                        proj_inds = proj_inds.astype(np.int32)
+                        with open(proj_save, 'wb') as f:
+                            pickle.dump([proj_inds], f)
+            else:
+                proj_path = join(seq_path_out, 'proj')
+                make_dir(proj_path)
+                scan_list = np.sort(os.listdir(pc_path))
+                for scan_id in scan_list:
+                    KDTree_save = join(KDTree_path_out, str(scan_id[:-4]) + '.pkl')
+                    proj_save = join(proj_path, str(scan_id[:-4]) + '_proj.pkl')
+                    pc_save     = join(pc_path_out, str(scan_id[:-4]) + '.npy')
+                    if (exists(pc_save) and exists(KDTree_save) and 
+                        exists(KDTree_save)):
+                        continue
+                    print(scan_id)
+                    points      = DataProcessing.load_pc_kitti(join(pc_path, scan_id))
+                    sub_points  = DataProcessing.grid_sub_sampling(points, grid_size=0.06)
+                    search_tree = KDTree(sub_points)
+                    proj_inds   = np.squeeze(search_tree.query(points, return_distance=False))
+                    proj_inds   = proj_inds.astype(np.int32)
+                    np.save(pc_save, sub_points)
+                    with open(KDTree_save, 'wb') as f:
+                        pickle.dump(search_tree, f)
+                    with open(proj_save, 'wb') as f:
+                        pickle.dump([proj_inds], f)
+
 
     def get_split_list(self, split):
         cfg             = self.cfg
@@ -395,10 +465,13 @@ class SemanticKITTI:
         elif split == 'validation':
             seq_list = cfg.validation_split
 
+        self.prepro_randlanet(seq_list, split)
+
         for seq_id in seq_list:
             pc_path = join(dataset_path, seq_id, 'velodyne')
             file_list.append([join(pc_path, f) for f in 
                                 np.sort(os.listdir(pc_path))])
+
 
         file_list = np.concatenate(file_list, axis=0)
         file_list = DataProcessing.shuffle_list(file_list)

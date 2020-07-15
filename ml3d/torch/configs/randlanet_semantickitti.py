@@ -34,8 +34,11 @@ pipeline    = dict(
     train_sum_dir       = 'train_log',
     )
 
-dataset = dict(
-    dataset_path        = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences_0.06',
+dataset = dict(   
+    original_pc_path    = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
+    original_label_path = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_labels/dataset/sequences',
+    dataset_path        = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences_cached',
+    prepro_grid_size    = 0.06,
     test_result_folder  = './test',
 
     training_split      = ['00', '01', '02', '03', '04', '05', 

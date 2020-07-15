@@ -9,7 +9,8 @@ from ml3d.torch.utils import Config
 
 from tf2torch import load_tf_weights
 
-yaml_config = 'ml3d/torch/configs/randlanet_semantickitti.yaml'
+#yaml_config = 'ml3d/torch/configs/randlanet_semantickitti.yaml'
+yaml_config = 'ml3d/torch/configs/randlanet_semantickitti.py'
 cfg         = Config.load_from_file(yaml_config)
 
 dataset     = SemanticKITTI(cfg.dataset)
