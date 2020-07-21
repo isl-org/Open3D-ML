@@ -14,7 +14,6 @@ class RandLANet(nn.Module):
     def __init__(self, cfg):
         super(RandLANet,self).__init__()
         self.cfg    = cfg
-        cfg         = self.cfg
 
         d_feature   = cfg.d_feature
 
