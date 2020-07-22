@@ -12,6 +12,7 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from os.path import exists, join, isfile, dirname, abspath
 
+from ml3d.torch.datasets import BaseDataset
 from ml3d.datasets.semantickitti import DataProcessing
 from ml3d.torch.utils import make_dir
 
@@ -99,7 +100,7 @@ class SemanticSegmentation():
                                     cfg.model_name)
         make_dir(cfg.logs_dir) 
 
-        dataset.cfg.num_points = model.cfg.num_points
+        # dataset.cfg.num_points = model.cfg.num_points
 
     def run_inference(self, points, device):
         cfg     = self.cfg
@@ -193,6 +194,7 @@ class SemanticSegmentation():
         dataset = self.dataset
         cfg     = self.cfg
         model.to(device) 
+        model.device = device
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
         log_file_path = join(cfg.logs_dir, 
@@ -206,19 +208,31 @@ class SemanticSegmentation():
         weights         = 1 / (ratio_samples + 0.02)
         criterion       = nn.CrossEntropyLoss(weight=weights)
 
+
+        train_split     = BaseDataset(dataset=dataset.get_split('training'), 
+                            preprocess=model.preprocess,
+                            transform=model.transform, shuffle=True)
+        train_loader    = DataLoader(train_split,
+                            batch_size=cfg.batch_size, shuffle=True,
+                            pin_memory=True)
+
+        '''
         valid_sampler   = dataset.get_sampler(cfg.val_batch_size, 'validation')
         valid_loader    = DataLoader(valid_sampler, 
                                      batch_size=cfg.val_batch_size)
         train_sampler   = dataset.get_sampler(cfg.batch_size, 'training')
         train_loader    = DataLoader(train_sampler, 
                                      batch_size=cfg.batch_size)
+        '''
 
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 
                                                 cfg.scheduler_gamma)
 
         self.optimizer, self.scheduler = optimizer, scheduler
-        first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
+
+        if hasattr(model.cfg, 'ckpt_path'):
+            first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
         
         writer = SummaryWriter(join(cfg.logs_dir, 
                                 cfg.train_sum_dir))
@@ -232,15 +246,13 @@ class SemanticSegmentation():
             self.accs   = []
             self.ious   = []
             step        = 0
-            for batch_data in tqdm(train_loader, 
-                                        desc='Training', leave=False):
+            #for batch_data in tqdm(train_loader, 
+            #                            desc='Training', leave=False):
+            for idx, inputs in enumerate(tqdm(train_loader)):
+                
+                scores  = model(inputs['data'])
 
-                inputs  = model.preprocess(batch_data, device) 
-                # scores: B x N x num_classes
-                scores  = model(inputs)
-
-
-                labels  = batch_data[1] 
+                labels  = inputs['data']['label'].to(device)
                 scores, labels = self.filter_valid(scores, labels, device)
 
 
@@ -405,6 +417,7 @@ class SemanticSegmentation():
         for ign_label in self.dataset.cfg.ignored_label_inds:
             reducing_list = torch.cat([reducing_list[:ign_label],
                      inserted_value, reducing_list[ign_label:]], 0)
+
         valid_labels = torch.gather(reducing_list.to(device), 
                                         0, valid_labels)
 

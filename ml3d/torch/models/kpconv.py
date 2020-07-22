@@ -4,9 +4,8 @@ import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
-from kernels.kernel_points import load_kernels
 
-from utils.ply import write_ply
+from ml3d.torch.utils.ply import write_ply, read_ply
 
 
 
@@ -15,7 +14,7 @@ class KPFCNN(nn.Module):
     Class defining KPFCNN
     """
 
-    def __init__(self, cfg, lbl_values, ign_lbls):
+    def __init__(self, cfg):
         super(KPFCNN, self).__init__()
         self.cfg    = cfg
 
@@ -64,7 +63,7 @@ class KPFCNN(nn.Module):
                                                     in_dim,
                                                     out_dim,
                                                     layer,
-                                                    config))
+                                                    cfg))
 
             # Update dimension of input from output
             if 'simple' in block:
@@ -89,16 +88,16 @@ class KPFCNN(nn.Module):
 
         # Find first upsampling block
         start_i = 0
-        for block_i, block in enumerate(config.architecture):
+        for block_i, block in enumerate(cfg.architecture):
             if 'upsample' in block:
                 start_i = block_i
                 break
 
         # Loop over consecutive blocks
-        for block_i, block in enumerate(config.architecture[start_i:]):
+        for block_i, block in enumerate(cfg.architecture[start_i:]):
 
             # Add dimension of skip connection concat
-            if block_i > 0 and 'upsample' in config.architecture[start_i + block_i - 1]:
+            if block_i > 0 and 'upsample' in cfg.architecture[start_i + block_i - 1]:
                 in_dim += self.encoder_skip_dims[layer]
                 self.decoder_concats.append(block_i)
 
@@ -108,7 +107,7 @@ class KPFCNN(nn.Module):
                                                     in_dim,
                                                     out_dim,
                                                     layer,
-                                                    config))
+                                                    cfg))
 
             # Update dimension of input from output
             in_dim = out_dim
@@ -120,8 +119,8 @@ class KPFCNN(nn.Module):
                 r *= 0.5
                 out_dim = out_dim // 2
 
-        self.head_mlp = UnaryBlock(out_dim, config.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(config.first_features_dim, self.C, False, 0)
+        self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
+        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
 
         ################
         # Network Losses
@@ -131,20 +130,22 @@ class KPFCNN(nn.Module):
         self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
 
         # Choose segmentation loss
-        if len(config.class_w) > 0:
-            class_w = torch.from_numpy(np.array(config.class_w, dtype=np.float32))
+        if len(cfg.class_w) > 0:
+            class_w = torch.from_numpy(np.array(cfg.class_w, dtype=np.float32))
             self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
         else:
             self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-        self.deform_fitting_mode = config.deform_fitting_mode
-        self.deform_fitting_power = config.deform_fitting_power
-        self.deform_lr_factor = config.deform_lr_factor
-        self.repulse_extent = config.repulse_extent
+        self.deform_fitting_mode = cfg.deform_fitting_mode
+        self.deform_fitting_power = cfg.deform_fitting_power
+        self.deform_lr_factor = cfg.deform_lr_factor
+        self.repulse_extent = cfg.repulse_extent
         self.output_loss = 0
         self.reg_loss = 0
         self.l1 = nn.L1Loss()
 
         return
+
+
 
     def forward(self, batch, config):
 
@@ -219,6 +220,34 @@ class KPFCNN(nn.Module):
         correct = (predicted == target).sum().item()
 
         return correct / total
+
+
+
+    def preprocess(self, data, attr):
+        cfg = self.cfg
+        points = data['point']
+        labels = data['label']
+        split  = attr['split']
+
+        data    = dict()
+
+        sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+                                points, labels=labels, 
+                                grid_size=cfg.grid_size)
+
+        search_tree = KDTree(sub_points)
+        
+        data['point'] = sub_points
+        data['label'] = sub_labels
+        data['search_tree'] = search_tree    
+
+        if split != "training":
+            proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
+            proj_inds = proj_inds.astype(np.int32)
+            data['proj_inds'] = proj_inds
+        return data
+
+
 
 
 #
@@ -939,8 +968,7 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
-from utils.ply import read_ply, write_ply
-from utils.config import bcolors
+from ml3d.torch.utils.kpconv_config import bcolors
 
 
 # ------------------------------------------------------------------------------------------
