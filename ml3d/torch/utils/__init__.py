@@ -1,4 +1,4 @@
 from .config import Config
-from .utils import make_dir
+from .utils import *
 
 __all__ = ['Config', 'make_dir']

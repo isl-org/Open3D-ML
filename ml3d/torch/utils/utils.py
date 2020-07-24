@@ -1,14 +1,19 @@
+import torch
+import numpy as np
 from os import makedirs
 from os.path import exists, join, isfile, dirname, abspath
 
+
 def make_dir(folder_name):
-	if not exists(folder_name):
-		makedirs(folder_name)  
+    if not exists(folder_name):
+        makedirs(folder_name)
+
 
 def log_out(out_str, f_out):
     f_out.write(out_str + '\n')
     f_out.flush()
     print(out_str)
+
 
 def intersection_over_union(scores, labels):
     r"""
@@ -25,7 +30,7 @@ def intersection_over_union(scores, labels):
         -------
         list of floats of length num_classes+1 (last item is mIoU)
     """
-    num_classes = scores.size(-2) 
+    num_classes = scores.size(-2)
     predictions = torch.max(scores, dim=-2).indices
 
     ious = []
@@ -33,11 +38,12 @@ def intersection_over_union(scores, labels):
     for label in range(num_classes):
         pred_mask = predictions == label
         labels_mask = labels == label
-        iou = (pred_mask & labels_mask).float().sum() 
+        iou = (pred_mask & labels_mask).float().sum()
         iou = iou / (pred_mask | labels_mask).float().sum()
         ious.append(iou.cpu().item())
     ious.append(np.nanmean(ious))
     return ious
+
 
 def accuracy(scores, labels):
     r"""
@@ -55,7 +61,7 @@ def accuracy(scores, labels):
         list of floats of length num_classes+1 
         (last item is overall accuracy)
     """
-    num_classes = scores.size(-2) 
+    num_classes = scores.size(-2)
     predictions = torch.max(scores, dim=-2).indices
 
     accuracies = []
