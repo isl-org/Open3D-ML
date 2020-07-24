@@ -15,7 +15,7 @@ TODO List:
 - [x] re-training
 - [x] on-the-fly cached preprocessing
 - [x] reorganize the dataloading and caching
-- [ ] dataset class in torch 
+- [x] dataset class in torch 
 - [ ] support KPConv
 - [ ] support S3DIS
 - [ ] Tensorflow pipeline

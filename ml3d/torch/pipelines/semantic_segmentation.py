@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from os.path import exists, join, isfile, dirname, abspath
 
-from ml3d.torch.datasets import BaseDataset
+from ml3d.torch.datasets import SimpleDataset, DefaultBatcher, ConcatBatcher
 from ml3d.datasets.semantickitti import DataProcessing
 from ml3d.torch.utils import make_dir
 
@@ -172,8 +172,6 @@ class SemanticSegmentation():
                                     test_smooth * test_probs[c_i][inds] + \
                                     (1 - test_smooth) * probs
 
-               
-
                 new_min = np.min(dataset.min_possibility)
                 log_out(f"Epoch {epoch:3d}, end. "
                         f"Min possibility = {new_min:.1f}", log_file)
@@ -208,13 +206,14 @@ class SemanticSegmentation():
         weights         = 1 / (ratio_samples + 0.02)
         criterion       = nn.CrossEntropyLoss(weight=weights)
 
+        train_batcher   = self.get_batcher(device)
 
-        train_split     = BaseDataset(dataset=dataset.get_split('training'), 
+        train_split     = SimpleDataset(dataset=dataset.get_split('training'), 
                             preprocess=model.preprocess,
                             transform=model.transform, shuffle=True)
         train_loader    = DataLoader(train_split,
                             batch_size=cfg.batch_size, shuffle=True,
-                            pin_memory=True)
+                            collate_fn=train_batcher.collate_fn)
 
         '''
         valid_sampler   = dataset.get_sampler(cfg.val_batch_size, 'validation')
@@ -250,20 +249,23 @@ class SemanticSegmentation():
             #                            desc='Training', leave=False):
             for idx, inputs in enumerate(tqdm(train_loader)):
                 
-                scores  = model(inputs['data'])
+                results  = model(inputs['data'])
 
-                labels  = inputs['data']['label'].to(device)
-                scores, labels = self.filter_valid(scores, labels, device)
+                loss, gt_label, predict_label = model.loss(
+                                results, inputs)
 
+                #labels  = inputs['data']['label'].to(device)
+                #scores, labels = self.filter_valid(scores, labels, device)
 
-                logp = torch.distributions.utils.probs_to_logits(scores, 
-                                                        is_binary=False)
+                #logp = torch.distributions.utils.probs_to_logits(scores, 
+                #                                        is_binary=False)
                 
                 optimizer.zero_grad()
-                loss = criterion(logp, labels)
+                #loss = criterion(logp, labels)
                 loss.backward()
                 optimizer.step()
 
+                # TODO metrics
                 acc  = accuracy(scores, labels)
                 iou  = intersection_over_union(scores, labels)
                 self.losses.append(loss.cpu().item())
@@ -311,6 +313,17 @@ class SemanticSegmentation():
             if epoch % cfg.save_ckpt_freq == 0:
                 path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
                 self.save_ckpt(path_ckpt, epoch)
+
+    def get_batcher(self, device):
+        batcher_name = getattr(self.model.cfg, 'batcher')
+        if batcher_name == 'DefaultBatcher':
+            batcher = DefaultBatcher()
+        elif batcher_name == 'ConcatBatcher':
+            batcher = ConcatBatcher(device)
+        else: 
+            batcher = None
+        return batcher
+
 
 
     def save_logs(self, writer, epoch):

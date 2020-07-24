@@ -11,7 +11,7 @@ from ml3d.torch.utils import Config
 
 # yaml_config = 'ml3d/torch/configs/randlanet_semantickitti.yaml'
 py_config = 'ml3d/torch/configs/randlanet_semantickitti.py'
-# py_config = 'ml3d/torch/configs/kpconv_semantickitti.py'
+#py_config = 'ml3d/torch/configs/kpconv_semantickitti.py'
 # py_config 	= 'ml3d/torch/configs/kpconv_semantickitti.py'
 cfg         = Config.load_from_file(py_config)
 

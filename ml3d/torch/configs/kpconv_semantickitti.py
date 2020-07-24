@@ -14,6 +14,7 @@ model       = dict(
 
     # Number of CPU threads for the input pipeline
     input_threads = 10,
+    batcher = 'ConcatBatcher',
 
     #########################
     # Architecture definition
@@ -155,6 +156,7 @@ model       = dict(
 
     # Choose weights for class (used in segmentation loss). Empty list for no weights
     class_w = [],
+    num_layers = 5,
 )
 
 pipeline    = dict(

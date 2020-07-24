@@ -14,6 +14,7 @@ model       = dict(
     d_out           = [16, 64, 128, 256] ,
 
     grid_size       = 0.06,
+    batcher         = 'DefaultBatcher',
 
     ckpt_path       = './ml3d/torch/checkpoint/randlanet_semantickitti.pth'
 )

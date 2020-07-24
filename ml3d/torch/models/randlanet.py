@@ -77,7 +77,7 @@ class RandLANet(nn.Module):
         select_labels = labels[select_idx]
         return select_points, select_labels, select_idx
 
-    def transform(self, data):
+    def transform(self, data, attr):
         cfg = self.cfg
         pc      = data['point'] 
         label   = data['label']  
@@ -129,7 +129,7 @@ class RandLANet(nn.Module):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-        points = data['point']
+        points = data['point'][:, 0:3]
         labels = data['label']
         split  = attr['split']
 
