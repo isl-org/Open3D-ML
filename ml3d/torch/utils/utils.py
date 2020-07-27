@@ -1,16 +1,20 @@
-import torch
-import numpy as np
+import logging
 from os import makedirs
 from os.path import exists, join, isfile, dirname, abspath
 
 
 def make_dir(folder_name):
-    if not exists(folder_name):
-        makedirs(folder_name)
+	if not exists(folder_name):
+		makedirs(folder_name)  
 
+class LogRecord(logging.LogRecord):
+    def getMessage(self):
+        msg = self.msg
+        if self.args:
+            if isinstance(self.args, dict):
+                msg = msg.format(**self.args)
+            else:
+                msg = msg.format(*self.args)
+        return msg
 
-def log_out(out_str, f_out):
-    f_out.write(out_str + '\n')
-    f_out.flush()
-    print(out_str)
 
