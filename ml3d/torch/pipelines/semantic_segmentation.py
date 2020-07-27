@@ -3,6 +3,9 @@ import torch, pickle
 import torch.nn as nn
 import helper_torch_util
 import numpy as np
+import logging
+import sys
+
 from pprint import pprint
 from datetime import datetime
 from tqdm import tqdm
@@ -13,9 +16,79 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 from os.path import exists, join, isfile, dirname, abspath
 
 from ml3d.datasets.semantickitti import DataProcessing
-from ml3d.torch.utils import make_dir, log_out, intersection_over_union, accuracy
+from ml3d.torch.utils import make_dir, LogRecord
 
 import yaml
+
+logging.setLogRecordFactory(LogRecord)
+logging.basicConfig(
+    level = logging.INFO,
+    format = '%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+)
+log = logging.getLogger(__name__)
+
+def intersection_over_union(scores, labels):
+    r"""
+        Compute the per-class IoU and the mean IoU # TODO: complete doc
+
+        Parameters
+        ----------
+        scores: torch.FloatTensor, shape (B?, C, N)
+            raw scores for each class
+        labels: torch.LongTensor, shape (B?, N)
+            ground truth labels
+
+        Returns
+        -------
+        list of floats of length num_classes+1 (last item is mIoU)
+    """
+    num_classes = scores.size(-2) 
+    predictions = torch.max(scores, dim=-2).indices
+
+    ious = []
+
+    for label in range(num_classes):
+        pred_mask = predictions == label
+        labels_mask = labels == label
+        iou = (pred_mask & labels_mask).float().sum() 
+        iou = iou / (pred_mask | labels_mask).float().sum()
+        ious.append(iou.cpu().item())
+    ious.append(np.nanmean(ious))
+    return ious
+
+
+def accuracy(scores, labels):
+    r"""
+        Compute the per-class accuracies and the overall accuracy 
+
+        Parameters
+        ----------
+        scores: torch.FloatTensor, shape (B?, C, N)
+            raw scores for each class
+        labels: torch.LongTensor, shape (B?, N)
+            ground truth labels
+
+        Returns
+        -------
+        list of floats of length num_classes+1 
+        (last item is overall accuracy)
+    """
+    num_classes = scores.size(-2) 
+
+    predictions = torch.max(scores, dim=-2).indices
+
+    accuracies = []
+
+    accuracy_mask = predictions == labels
+    for label in range(num_classes):
+        label_mask = labels == label
+        per_class_accuracy = (accuracy_mask & label_mask).float().sum()
+        per_class_accuracy /= label_mask.float().sum()
+        accuracies.append(per_class_accuracy.cpu().item())
+    # overall accuracy
+    accuracies.append(accuracy_mask.float().mean().cpu().item())
+    #accuracies = np.array(accuracies)
+    return accuracies
 
 
 class SemanticSegmentation():
@@ -54,9 +127,10 @@ class SemanticSegmentation():
         model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
-        log_file = open(log_file_path, 'w')
-        self.log_file = log_file
+
+        log_file_path   = join(cfg.logs_dir, 
+                                'log_test_'+ timestamp + '.txt')
+        log.addHandler(logging.FileHandler(log_file_path))
 
         test_sampler = dataset.get_sampler(cfg.test_batch_size, 'test')
         test_loader = DataLoader(test_sampler, batch_size=cfg.test_batch_size)
@@ -66,9 +140,12 @@ class SemanticSegmentation():
         ]
 
         self.load_ckpt(model.cfg.ckpt_path, False)
+        log.info("Model Loaded from : {}".format(model.cfg.ckpt_path))
 
         test_smooth = 0.98
         epoch = 0
+
+        log.info("Started testing")
 
         with torch.no_grad():
             while True:
@@ -100,19 +177,17 @@ class SemanticSegmentation():
                                     (1 - test_smooth) * probs
 
                 new_min = np.min(dataset.min_possibility)
-                log_out(
-                    f"Epoch {epoch:3d}, end. "
-                    f"Min possibility = {new_min:.1f}", log_file)
-
+                log.info(f"Epoch {epoch:3d}, end. "
+                        f"Min possibility = {new_min:.1f}")
+               
                 if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                    log_out(
-                        f"\nReproject Vote #"
-                        f"{int(np.floor(new_min)):d}", log_file)
-                    dataset.save_test_result(
-                        test_probs, str(dataset.cfg.test_split_number))
-                    log_out(
-                        f"{str(dataset.cfg.test_split_number)}"
-                        f" finished", log_file)
+                    log.info(f"\nReproject Vote #"
+                            f"{int(np.floor(new_min)):d}")
+                    dataset.save_test_result(test_probs, 
+                                        str(dataset.cfg.test_split_number))
+                    log.info(f"{str(dataset.cfg.test_split_number)}"
+                            f" finished")
+
                     return
 
                 epoch += 1
@@ -123,10 +198,16 @@ class SemanticSegmentation():
         cfg = self.cfg
         model.to(device)
 
+        log.info("DEVICE : {}".format(device))
+        log.info(model)
+
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
-        log_file = open(log_file_path, 'w')
-        self.log_file = log_file
+
+        log_file_path = join(cfg.logs_dir, 
+                        'log_train_'+ timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
 
         n_samples = torch.tensor(dataset.cfg.class_weights,
                                  dtype=torch.float,
@@ -147,9 +228,13 @@ class SemanticSegmentation():
         self.optimizer, self.scheduler = optimizer, scheduler
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
 
-        writer = SummaryWriter(join(cfg.logs_dir, cfg.train_sum_dir))
+        writer = SummaryWriter(join(cfg.logs_dir, 
+                                cfg.train_sum_dir))
+    
+        log.info("Started training")
 
-        for epoch in range(0, cfg.max_epoch + 1):
+        for epoch in range(0, cfg.max_epoch+1):
+
             print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
 
             model.train()
@@ -175,7 +260,7 @@ class SemanticSegmentation():
                 acc = accuracy(scores, labels)
                 iou = intersection_over_union(scores, labels)
                 self.losses.append(loss.cpu().item())
-                self.accs.append(accuracy(scores, labels))
+                self.accs.append(acc)
                 self.ious.append(intersection_over_union(scores, labels))
 
                 step = step + 1
@@ -245,25 +330,23 @@ class SemanticSegmentation():
             writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i],
                                epoch)
             writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
-        writer.add_scalars('Per-class accuracy/Overall', acc_dicts[-1], epoch)
-        writer.add_scalars('Per-class IoU/Mean IoU', iou_dicts[-1], epoch)
 
-        log_out(
-            f"loss train: {loss_dict['Training loss']:.3f} "
-            f" eval: {loss_dict['Validation loss']:.3f}", self.log_file)
-        log_out(
-            f"acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
-            f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}",
-            self.log_file)
-        log_out(
-            f"acc train: {iou_dicts[-1]['Training IoU']:.3f} "
-            f" eval: {iou_dicts[-1]['Validation IoU']:.3f}", self.log_file)
+        writer.add_scalars('Overall accuracy', acc_dicts[-1], epoch)
+        writer.add_scalars('Mean IoU', iou_dicts[-1], epoch)
+
+        log.info(f"loss train: {loss_dict['Training loss']:.3f} "
+                f" eval: {loss_dict['Validation loss']:.3f}")
+        log.info(f"acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
+                 f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
+        log.info(f"acc train: {iou_dicts[-1]['Training IoU']:.3f} "
+                f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
+
         # print(acc_dicts[-1])
 
     def load_ckpt(self, ckpt_path, is_train=True):
         if exists(ckpt_path):
             #path = max(list((cfg.ckpt_path).glob('*.pth')))
-            log_out(f'Loading checkpoint {ckpt_path}', self.log_file)
+            log.info(f'Loading checkpoint {ckpt_path}')
             ckpt = torch.load(ckpt_path)
             first_epoch = ckpt['epoch'] + 1
             self.model.load_state_dict(ckpt['model_state_dict'])
@@ -272,19 +355,22 @@ class SemanticSegmentation():
                 self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
         else:
             first_epoch = 0
-            log_out('No checkpoint', self.log_file)
+            log.info('No checkpoint')
 
         return first_epoch
 
     def save_ckpt(self, path_ckpt, epoch):
         make_dir(path_ckpt)
         torch.save(
-            dict(epoch=epoch,
-                 model_state_dict=self.model.state_dict(),
-                 optimizer_state_dict=self.optimizer.state_dict(),
-                 scheduler_state_dict=self.scheduler.state_dict()),
-            join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
-        log_out(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}', self.log_file)
+            dict(
+                epoch=epoch,
+                model_state_dict=self.model.state_dict(),
+                optimizer_state_dict=self.optimizer.state_dict(),
+                scheduler_state_dict=self.scheduler.state_dict()
+            ),
+            join(path_ckpt, f'ckpt_{epoch:02d}.pth')
+        )
+        log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
     def filter_valid(self, scores, labels, device):
         valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
