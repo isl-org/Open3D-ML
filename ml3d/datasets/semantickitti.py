@@ -283,11 +283,6 @@ class SemanticKITTI:
         self.possibility = []
         self.min_possibility = []
 
-        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
-        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.sort([0])
-        self.cfg.ignored_label_inds = [self.label_to_idx[ign_label] for ign_label in self.ignored_labels]
-
     def get_split (self, split):
         return SemanticKITTISplit(self, split=split)
 

@@ -7,6 +7,7 @@ from torch.nn.init import kaiming_uniform_
 
 from ml3d.torch.utils.ply import write_ply, read_ply
 
+from ml3d.torch.modules.losses import filter_valid_label
 from ml3d.datasets.semantickitti import DataProcessing
 
 import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
@@ -175,29 +176,31 @@ class KPFCNN(nn.Module):
 
         return x
 
-    def loss(self, results, inputs):
+    def loss(self, Loss, results, inputs, device):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
         :param labels: labels
         :return: loss
         """
+        cfg = self.cfg
         labels  = inputs['data'].labels
         outputs = results
+
+        
+        
+        # Reshape to have a minibatch size of 1
+        outputs = torch.transpose(results, 0, 1).unsqueeze(0)
+        labels = labels.unsqueeze(0)
+
+        scores, labels = filter_valid_label(results, labels, 
+                    cfg.num_classes, cfg.ignored_label_inds, device)
         
 
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        # Reshape to have a minibatch size of 1
-        outputs = torch.transpose(outputs, 0, 1)
-        outputs = outputs.unsqueeze(0)
-        target = target.unsqueeze(0)
-
+        logp = torch.distributions.utils.probs_to_logits(
+            scores, is_binary=False)
         # Cross entropy loss
-        self.output_loss = self.criterion(outputs, target)
+        self.output_loss = Loss.weighted_CrossEntropyLoss(logp, labels)
 
         # Regularization of deformable offsets
         if self.deform_fitting_mode == 'point2point':
@@ -210,26 +213,9 @@ class KPFCNN(nn.Module):
         # Combined loss
         loss = self.output_loss + self.reg_loss
 
-        return loss, None, None
+        return loss, labels, scores
 
-    def accuracy(self, outputs, labels):
-        """
-        Computes accuracy of the current batch
-        :param outputs: logits predicted by the network
-        :param labels: labels
-        :return: accuracy value
-        """
-
-        # Set all ignored labels to -1 and correct the other label to be in [0, C-1] range
-        target = - torch.ones_like(labels)
-        for i, c in enumerate(self.valid_labels):
-            target[labels == c] = i
-
-        predicted = torch.argmax(outputs.data, dim=1)
-        total = target.size(0)
-        correct = (predicted == target).sum().item()
-
-        return correct / total
+    
 
     def transform(self, data, attr):
 
@@ -276,7 +262,6 @@ class KPFCNN(nn.Module):
         new_points = hpoints
         #new_points[:, 3:] = points[:, 3:]
 
-        print(new_points.shape)
         # In case of validation, keep the original points in memory
         if attr['split'] in ['validation', 'test']:
             o_pts = new_points[:, :3].astype(np.float32)
@@ -292,13 +277,11 @@ class KPFCNN(nn.Module):
         mask = np.sum(np.square(new_points[:, :3] - p0), axis=1) < self.cfg.in_radius ** 2
         mask_inds = np.where(mask)[0].astype(np.int32)
 
-        print("end0 ",new_points.shape)
         # Shuffle points
         rand_order = np.random.permutation(mask_inds)
         new_points = new_points[rand_order, :3]
         sem_labels = sem_labels[rand_order]
 
-        print("end1 ",new_points.shape)
 
         # TODO
         # Place points in original frame reference to get coordinates
@@ -312,8 +295,6 @@ class KPFCNN(nn.Module):
         #    new_coords = np.hstack((new_coords, points[:, 3:]))
         new_coords = points[rand_order, :]
 
-        print("end ",merged_coords.shape)
-        print("end ",new_coords.shape)
         # Increment merge count
         merged_points = np.vstack((merged_points, new_points))
         merged_labels = sem_labels#np.hstack((merged_labels, sem_labels))
@@ -413,9 +394,6 @@ class KPFCNN(nn.Module):
             stacked_features = np.hstack((stacked_features, features))
         else:
             raise ValueError('Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)')
-
-        print(stacked_features.shape)
-  
 
 
         #######################

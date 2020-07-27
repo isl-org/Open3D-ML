@@ -4,6 +4,7 @@ model       = dict(
     num_layers      = 4,  # Number of layers
     num_points      = 4096 * 11,  # Number of input points
     num_classes     = 19,  # Number of valid classes
+    ignored_label_inds = [0],
 
     sub_grid_size   = 0.06,  # preprocess_parameter
     sub_sampling_ratio = [4, 4, 4, 4],

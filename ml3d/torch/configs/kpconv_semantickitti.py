@@ -3,11 +3,12 @@ model       = dict(
     ign_lbls = [0],
     lbl_values = [0, 1, 2, 3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
 
+    num_classes     = 19,  # Number of valid classes
+    ignored_label_inds = [0],
     # Dataset name
     dataset = 'SemanticKitti',
+    ckpt_path   = './ml3d/torch/checkpoint/kpconv_semantickitti.pth',
 
-    # Number of classes in the dataset (This value is overwritten by dataset class when Initializating dataset).
-    num_classes = None,
 
     # Type of task performed on this dataset (also overwritten)
     dataset_task = '',

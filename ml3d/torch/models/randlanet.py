@@ -8,6 +8,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
 from ml3d.datasets.semantickitti import DataProcessing
+from ml3d.torch.modules.losses import filter_valid_label
 
 
 class RandLANet(nn.Module):
@@ -114,11 +115,33 @@ class RandLANet(nn.Module):
         inputs['interp_idx']    = input_up_samples
         inputs['features']      = features
 
-        inputs['label']         = label.astype(np.int64)
+        inputs['labels']         = label.astype(np.int64)
         # inputs['input_inds']    = batch_pc_idx
         # inputs['cloud_inds']    = batch_cloud_idx
 
         return inputs
+
+
+    def loss(self, Loss, results, inputs, device):
+        """
+        Runs the loss on outputs of the model
+        :param outputs: logits
+        :param labels: labels
+        :return: loss
+        """
+        cfg     = self.cfg
+        labels  = inputs['data']['labels']
+
+        scores, labels = filter_valid_label(results, labels, 
+                    cfg.num_classes, cfg.ignored_label_inds, device)
+        
+        logp = torch.distributions.utils.probs_to_logits(
+            scores, is_binary=False)
+        loss = Loss.weighted_CrossEntropyLoss(logp, labels)
+
+        # predict_labels = torch.max(scores, dim=-2).indices
+
+        return loss, labels, scores
 
     def preprocess(self, data, attr):
         cfg = self.cfg
@@ -380,8 +403,6 @@ class RandLANet(nn.Module):
         sub_idx     = [arr.to(device) 
                             for arr in inputs['sub_idx']]
         feature     = inputs['features'].to(device) 
-
-
 
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature).transpose(-2, -1).unsqueeze(-1)  # TODO

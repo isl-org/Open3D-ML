@@ -14,7 +14,9 @@ from os.path import exists, join, isfile, dirname, abspath
 
 from ml3d.torch.datasets import SimpleDataset, DefaultBatcher, ConcatBatcher
 from ml3d.datasets.semantickitti import DataProcessing
-from ml3d.torch.utils import make_dir, log_out, intersection_over_union, accuracy
+from ml3d.torch.utils import make_dir, log_out
+from ml3d.torch.modules.losses import SemSegLoss
+from ml3d.torch.modules.metrics import SemSegMetric
 
 import yaml
 
@@ -120,6 +122,7 @@ class SemanticSegmentation():
 
     def run_train(self, device):
         model = self.model
+        model.device = device
         dataset = self.dataset
 
         cfg = self.cfg
@@ -130,12 +133,8 @@ class SemanticSegmentation():
         log_file = open(log_file_path, 'w')
         self.log_file = log_file
 
-        n_samples = torch.tensor(dataset.cfg.class_weights,
-                                 dtype=torch.float,
-                                 device=device)
-        ratio_samples = n_samples / n_samples.sum()
-        weights = 1 / (ratio_samples + 0.02)
-        criterion = nn.CrossEntropyLoss(weight=weights)
+        Loss = SemSegLoss(self, model, dataset, device)
+        Metric = SemSegMetric(self, model, dataset, device)
 
         train_batcher   = self.get_batcher(device)
 
@@ -167,43 +166,33 @@ class SemanticSegmentation():
         writer = SummaryWriter(join(cfg.logs_dir, cfg.train_sum_dir))
 
         for epoch in range(0, cfg.max_epoch + 1):
-
             print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-
             model.train()
             self.losses = []
 
             self.accs   = []
             self.ious   = []
             step        = 0
-            #for batch_data in tqdm(train_loader, 
-            #                            desc='Training', leave=False):
+            
             for idx, inputs in enumerate(tqdm(train_loader)):
                 
                 results  = model(inputs['data'])
 
-                loss, gt_label, predict_label = model.loss(
-                                results, inputs)
+                loss, gt_labels, predict_scores = model.loss(Loss, results, 
+                                                            inputs, device)
 
-                #labels  = inputs['data']['label'].to(device)
-                #scores, labels = self.filter_valid(scores, labels, device)
-
-                #logp = torch.distributions.utils.probs_to_logits(scores, 
-                #                                        is_binary=False)
                 
-
                 optimizer.zero_grad()
-                #loss = criterion(logp, labels)
                 loss.backward()
                 optimizer.step()
 
 
-                acc = accuracy(scores, labels)
-                iou = intersection_over_union(scores, labels)
+                acc = Metric.acc(predict_scores, gt_labels)
+                iou = Metric.iou(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
-                self.accs.append(accuracy(scores, labels))
-                self.ious.append(intersection_over_union(scores, labels))
+                self.accs.append(acc)
+                self.ious.append(iou)
 
                 step = step + 1
 
@@ -322,39 +311,3 @@ class SemanticSegmentation():
                  scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
         log_out(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}', self.log_file)
-
-    def filter_valid(self, scores, labels, device):
-        valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
-        valid_labels = labels.reshape(-1).to(device)
-
-        ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            ignored_bool = torch.logical_or(ignored_bool,
-                                            torch.eq(valid_labels, ign_label))
-
-        valid_idx = torch.where(torch.logical_not(ignored_bool))[0].to(device)
-
-        valid_scores = torch.gather(
-            valid_scores, 0,
-            valid_idx.unsqueeze(-1).expand(-1, self.model.cfg.num_classes))
-        valid_labels = torch.gather(valid_labels, 0, valid_idx)
-
-        # Reduce label values in the range of logit shape
-        reducing_list = torch.arange(0,
-                                     self.model.cfg.num_classes,
-                                     dtype=torch.int64)
-        inserted_value = torch.zeros([1], dtype=torch.int64)
-
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-
-            reducing_list = torch.cat([
-                reducing_list[:ign_label], inserted_value,
-                reducing_list[ign_label:]
-            ], 0)
-        valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels)
-
-
-        valid_labels = valid_labels.unsqueeze(0)
-        valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
-
-        return valid_scores, valid_labels
