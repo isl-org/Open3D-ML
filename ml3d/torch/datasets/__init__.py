@@ -1,1 +1,1 @@
-from .scannet import ScanNet
+from .s3dis import S3DIS

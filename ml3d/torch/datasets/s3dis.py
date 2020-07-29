@@ -5,14 +5,12 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
 
-#TODO : move to config
-dataset_path = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/'
-test_area_idx = 3
 
 class S3DIS:
-    def __init__(self):
+    def __init__(self, cfg):
+        self.cfg = cfg
         self.name = 'S3DIS'
-        self.dataset_path = dataset_path
+        self.dataset_path = cfg.dataset_path
         self.label_to_names = {0: 'ceiling',
                                1: 'floor',
                                2: 'wall',
@@ -31,42 +29,39 @@ class S3DIS:
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([])
 
-        self.val_split = 'Area_' + str(test_area_idx)
+        self.test_split = 'Area_' + str(cfg.test_area_idx)
 
         self.pc_path = Path(self.dataset_path) / 'original_ply'
-        # if not exists(self.pc_path):
-        self.create_ply_files(self.dataset_path, self.label_to_names)
+        if not exists(self.pc_path):
+            print("creating")
+            exit(0)
+            # self.create_ply_files(self.dataset_path, self.label_to_names)
 
-        # print(Path(self.dataset_path) / 'original_ply' / '*.ply')
-        # self.all_files = glob.glob(Path(self.path) / 'original_ply' / '*.ply')
+        # TODO : if num of ply files < 272, then create.
+
+        self.all_files = glob.glob(str(Path(self.dataset_path) / 'original_ply' / '*.ply'))
+        # print(len(self.all_files))
+
+    
+    def get_split_list(self, split):
+        cfg = self.cfg
+        dataset_path = cfg.dataset_path
+        file_list = []
+
+        if split == 'training':
+            file_list = [f for f in self.all_files if 'Area_' + str(cfg.test_area_idx) not in f]
+        else:
+            file_list = [f for f in self.all_files if 'Area_' + str(cfg.test_area_idx) in f]
+
+        self.prepro_randlanet(file_list, split)
+
+        file_list = DataProcessing.shuffle_list(file_list)
+        
+        return file_list
+
 
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
-        """
-        Write ".ply" files
-        Parameters
-        ----------
-        filename : string
-            the name of the file to which the data is saved. A '.ply' extension will be appended to the 
-            file name if it does no already have one.
-        field_list : list, tuple, numpy array
-            the fields to be saved in the ply file. Either a numpy array, a list of numpy arrays or a 
-            tuple of numpy arrays. Each 1D numpy array and each column of 2D numpy arrays are considered 
-            as one field. 
-        field_names : list
-            the name of each fields as a list of strings. Has to be the same length as the number of 
-            fields.
-        Examples
-        --------
-        >>> points = np.random.rand(10, 3)
-        >>> write_ply('example1.ply', points, ['x', 'y', 'z'])
-        >>> values = np.random.randint(2, size=10)
-        >>> write_ply('example2.ply', [points, values], ['x', 'y', 'z', 'values'])
-        >>> colors = np.random.randint(255, size=(10,3), dtype=np.uint8)
-        >>> field_names = ['x', 'y', 'z', 'red', 'green', 'blue', values']
-        >>> write_ply('example3.ply', [points, colors, values], field_names)
-        """
-
         # Format list input to the right form
         field_list = list(field_list) if (type(field_list) == list or type(field_list) == tuple) else list((field_list,))
         for i, field in enumerate(field_list):
@@ -208,6 +203,3 @@ class S3DIS:
 
 if __name__ == '__main__':
     a = S3DIS()
-    # print(a.num_classes)
-    # print(a.label_values)
-    # print(a.label_to_idx)
