@@ -1,8 +1,10 @@
 import torch
 import numpy as np
 
+
 class SemSegMetric(object):
     """docstring for SemSegLoss"""
+
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegMetric, self).__init__()
         # weighted_CrossEntropyLoss
@@ -42,7 +44,6 @@ class SemSegMetric(object):
         accuracies.append(accuracy_mask.float().mean().cpu().item())
         #accuracies = np.array(accuracies)
         return accuracies
-
 
     def iou(self, scores, labels):
         r"""

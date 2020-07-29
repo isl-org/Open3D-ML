@@ -1,5 +1,3 @@
-
-
 # Common libs
 import time
 import numpy as np
@@ -7,7 +5,6 @@ import pickle
 import torch
 import yaml
 from multiprocessing import Lock
-
 
 # OS functions
 from os import listdir
@@ -17,9 +14,9 @@ from os.path import exists, join, isdir
 from torch.utils.data import Sampler, get_worker_info
 
 
-
 class SemanticKittiCustomBatch:
     """Custom batch definition with memory pinning for SemanticKitti"""
+
     def __init__(self, input_list):
 
         # Get rid of batch dimension
@@ -30,15 +27,25 @@ class SemanticKittiCustomBatch:
 
         # Extract input tensors from the list of numpy array
         ind = 1
-        self.points = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        self.points = [
+            torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
+        ]
         ind += L
-        self.neighbors = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        self.neighbors = [
+            torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
+        ]
         ind += L
-        self.pools = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        self.pools = [
+            torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
+        ]
         ind += L
-        self.upsamples = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        self.upsamples = [
+            torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
+        ]
         ind += L
-        self.lengths = [torch.from_numpy(nparray) for nparray in input_list[ind:ind+L]]
+        self.lengths = [
+            torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
+        ]
         ind += L
         self.features = torch.from_numpy(input_list[ind])
         ind += 1
@@ -66,9 +73,13 @@ class SemanticKittiCustomBatch:
         """
 
         self.points = [in_tensor.pin_memory() for in_tensor in self.points]
-        self.neighbors = [in_tensor.pin_memory() for in_tensor in self.neighbors]
+        self.neighbors = [
+            in_tensor.pin_memory() for in_tensor in self.neighbors
+        ]
         self.pools = [in_tensor.pin_memory() for in_tensor in self.pools]
-        self.upsamples = [in_tensor.pin_memory() for in_tensor in self.upsamples]
+        self.upsamples = [
+            in_tensor.pin_memory() for in_tensor in self.upsamples
+        ]
         self.lengths = [in_tensor.pin_memory() for in_tensor in self.lengths]
         self.features = self.features.pin_memory()
         self.labels = self.labels.pin_memory()
@@ -129,7 +140,7 @@ class SemanticKittiCustomBatch:
                 i0 = 0
                 p_list = []
                 if element_name == 'pools':
-                    lengths = self.lengths[layer_i+1]
+                    lengths = self.lengths[layer_i + 1]
                 else:
                     lengths = self.lengths[layer_i]
 
@@ -141,7 +152,8 @@ class SemanticKittiCustomBatch:
                         elem[elem >= 0] -= i0
                     elif element_name == 'pools':
                         elem[elem >= self.points[layer_i].shape[0]] = -1
-                        elem[elem >= 0] -= torch.sum(self.lengths[layer_i][:b_i])
+                        elem[elem >= 0] -= torch.sum(
+                            self.lengths[layer_i][:b_i])
                     i0 += length
 
                     if to_numpy:
@@ -157,9 +169,9 @@ class SemanticKittiCustomBatch:
         return all_p_list
 
 
-
 class ConcatBatcher(object):
     """docstring for BaseBatcher"""
+
     def __init__(self, device):
         super(ConcatBatcher, self).__init__()
         self.device = device
@@ -169,4 +181,4 @@ class ConcatBatcher(object):
         batching_result.to(self.device)
         #print(batching_result['data']['features'].size())
         #exit()
-        return {'data':batching_result}
+        return {'data': batching_result}
