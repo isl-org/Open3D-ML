@@ -1,17 +1,17 @@
 # model settings
 model       = dict(
     k_n             = 16,  # KNN,
-    num_layers      = 4,  # Number of layers
-    num_points      = 4096 * 11,  # Number of input points
+    num_layers      = 5,  # Number of layers
+    num_points      = 4096 * 10,  # Number of input points
     num_classes     = 13,  # Number of valid classes
 
-    sub_grid_size   = 0.06,  # preprocess_parameter
-    sub_sampling_ratio = [4, 4, 4, 4],
-    num_sub_points = [4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64, 4096 * 11 // 256],
+    sub_grid_size   = 0.04,  # preprocess_parameter
+    sub_sampling_ratio = [4, 4, 4, 4, 2],
+    num_sub_points = [4096 * 10 // 4, 4096 * 10 // 16, 4096 * 10 // 64, 4096 * 10 // 256, 4096 * 10 // 512],
 
     d_in            = 3,
     d_feature       = 8,
-    d_out           = [16, 64, 128, 256] ,
+    d_out           = [16, 64, 128, 256, 512],
 
     ckpt_path       = './ml3d/torch/checkpoint/randlanet_s3dis.pth'
 )
@@ -37,7 +37,7 @@ pipeline    = dict(
 dataset = dict(
     dataset_path    = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/',
     cache_path        = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/cache/',
-    prepro_grid_size    = 0.06,
+    prepro_grid_size    = 0.04,
     test_result_folder  = './test',
 
     test_area_idx = 3, # Area_0 to Area_6

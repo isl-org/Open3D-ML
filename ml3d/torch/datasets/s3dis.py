@@ -4,7 +4,11 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
-
+import random
+from ml3d.datasets.semantickitti import DataProcessing
+from plyfile import PlyData, PlyElement
+from sklearn.neighbors import KDTree
+from tqdm import tqdm
 
 class S3DIS:
     def __init__(self, cfg):
@@ -55,9 +59,57 @@ class S3DIS:
 
         self.prepro_randlanet(file_list, split)
 
-        file_list = DataProcessing.shuffle_list(file_list)
-        
+        random.shuffle(file_list)
+
         return file_list
+
+    def prepro_randlanet(self, pc_list, split):
+        cfg = self.cfg
+        cache_path = cfg.cache_path
+        os.makedirs(cache_path, exist_ok=True)
+        pc_list = np.sort(pc_list)
+
+        for pc_path in tqdm(pc_list):
+            pc_name = Path(pc_path).name
+            print('Pointcloud ' + pc_name + ' start')
+
+            os.makedirs(Path(cache_path) / 'KDTree', exist_ok = True)
+            os.makedirs(Path(cache_path) / 'proj', exist_ok = True)
+            os.makedirs(Path(cache_path) / 'sub', exist_ok = True)
+
+            kdtree_path = Path(cache_path) / 'KDTree' / pc_name.replace('.ply', '.pkl')
+            proj_path = Path(cache_path) / 'proj' / pc_name.replace('.ply', '_proj.pkl')
+            sub_path = Path(cache_path) / 'sub' / pc_name.replace('.ply', '_sub.npy')
+
+            if(exists(kdtree_path) and exists(proj_path) and exists(sub_path)):
+                continue
+
+            data = PlyData.read(pc_path)['vertex']
+            points = np.zeros((data['x'].shape[0], 3), dtype = np.float32)
+            points[:, 0] = data['x']
+            points[:, 1] = data['y']
+            points[:, 2] = data['z']
+
+            feat = np.zeros(points.shape, dtype = np.float32)
+            feat[:, 0] = data['red']
+            feat[:, 1] = data['green']
+            feat[:, 2] = data['blue']
+
+            labels = np.zeros((points.shape[0],), dtype = np.int32)
+            labels = data['class']
+
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(points, features = feat, labels = labels, grid_size = cfg.prepro_grid_size)
+
+            search_tree = KDTree(sub_points)
+            np.save(sub_path, np.concatenate([sub_points, sub_feat, sub_labels], axis = 1))
+
+            with open(kdtree_path, 'wb') as f:
+                pickle.dump(search_tree, f)
+            
+            proj_idx = np.squeeze(search_tree.query(points, return_distance = False))
+            proj_idx = proj_idx.astype(np.int32)
+            with open(proj_path, 'wb') as f:
+                pickle.dump([proj_idx, labels], f)
 
 
     @staticmethod
