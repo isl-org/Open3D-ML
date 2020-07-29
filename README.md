@@ -14,12 +14,13 @@ TODO List:
 - [x] validation loader
 - [x] re-training
 - [x] on-the-fly cached preprocessing
+- [x] reorganize the dataloading and caching
+- [x] dataset class in torch 
+- [ ] support KPConv
+- [ ] support S3DIS
+- [ ] Tensorflow pipeline
 - [ ] semantickitti example data for inference
 - [ ] fine-tune training
-- [ ] reorganize the strucutre 
-- [ ] dataset class in torch 
-- [ ] number/density of point clould
-- [ ] Tensorflow pipeline
 
 ## Directories
 
