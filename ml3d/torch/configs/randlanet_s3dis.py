@@ -38,6 +38,7 @@ dataset = dict(
     dataset_path    = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/',
     cache_path        = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/cache/',
     prepro_grid_size    = 0.04,
+    num_points      = 4096 * 10,
     test_result_folder  = './test',
 
     test_area_idx = 3, # Area_0 to Area_6
