@@ -66,7 +66,7 @@ class SimpleSampler(IterableDataset):
 
             yield (selected_points_feat.astype(np.float32),
                     selected_labels.astype(np.int64),
-                    selected_idx.astype(np.int64),
+                    np.array(selected_idx).astype(np.int64),
                     np.array([cloud_ind], dtype=np.int64))
 
 

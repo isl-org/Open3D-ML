@@ -60,12 +60,12 @@ class RandLANet(nn.Module):
 
     def preprocess(self, batch_data, device):
         cfg = self.cfg
-        batch_pc = batch_data[0]
+        batch_pc = batch_data[0][:, :, :3]
         batch_label = batch_data[1]
         batch_pc_idx = batch_data[2]
         batch_cloud_idx = batch_data[3]
 
-        features = batch_pc
+        features = batch_data[0]
         input_points = []
         input_neighbors = []
         input_pools = []
@@ -207,18 +207,19 @@ class RandLANet(nn.Module):
         num_neigh = feature_set.size()[3]
         d = feature_set.size()[1]
 
-        #feature_set =
-        #f_reshaped = torch.reshape(feature_set, (-1, d, num_neigh))
+        f_reshaped = torch.reshape(feature_set.permute(0, 2, 3, 1), (-1, num_neigh, d))
 
         m_dense = getattr(self, name + 'fc')
-        att_activation = m_dense(feature_set.permute(0, 2, 3, 1))  # TODO
+        att_activation = m_dense(f_reshaped)
 
-        m_softmax = nn.Softmax(dim=-2)
-        att_scores = m_softmax(att_activation).permute(0, 3, 1, 2)
+        m_softmax = nn.Softmax(dim=1)
+        att_scores = m_softmax(att_activation)
 
-        f_agg = att_scores * feature_set
-        f_agg = torch.sum(f_agg, dim=-1, keepdim=True)
-        #f_agg = torch.reshape(f_agg, (batch_size, num_points, 1, d))
+        # print("att_scores = ", att_scores.shape)
+        f_agg = f_reshaped * att_scores
+        f_agg = torch.sum(f_agg, dim=1, keepdim=True)
+        f_agg = torch.reshape(f_agg, (batch_size, num_points, 1, d))
+        f_agg = f_agg.permute(0, 3, 1, 2)
 
         m_conv2d = getattr(self, name + 'mlp')
         f_agg = m_conv2d(f_agg)
@@ -288,7 +289,7 @@ class RandLANet(nn.Module):
         feature = inputs['features']
 
         m_dense = getattr(self, 'fc0')
-        feature = m_dense(feature).transpose(-2, -1).unsqueeze(-1)  # TODO
+        feature = m_dense(feature).transpose(-2, -1).unsqueeze(-1)
 
         m_bn = getattr(self, 'batch_normalization')
         feature = m_bn(feature)
