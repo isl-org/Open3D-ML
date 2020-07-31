@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import helper_torch_util
 import numpy as np
+import random
 from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
@@ -63,10 +64,18 @@ class RandLANet(nn.Module):
 
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point, 
-                                k=self.cfg.num_points)[1][0]
-        select_idx = DataProcessing.shuffle_idx(select_idx)
+        if(points.shape[0] < self.cfg.num_points):
+            select_idx = np.array(range(points.shape[0]))
+            diff = self.cfg.num_points - points.shape[0]
+            select_idx = list(select_idx) + list(random.choices(select_idx, k = diff))
+            random.shuffle(select_idx)
+        else:
+            center_point = points[pick_idx, :].reshape(1, -1)
+            select_idx = search_tree.query(center_point, 
+                                    k=self.cfg.num_points)[1][0]
+
+        # select_idx = DataProcessing.shuffle_idx(select_idx)
+        random.shuffle(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]
         if(feat is None):

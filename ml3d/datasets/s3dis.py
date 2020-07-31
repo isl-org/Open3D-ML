@@ -150,7 +150,6 @@ class S3DIS:
 
     def crop_pc(self, points, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        points = points[:40860]
         if(points.shape[0] < self.cfg.num_points):
             select_idx = np.array(range(points.shape[0]))
             diff = self.cfg.num_points - points.shape[0]
