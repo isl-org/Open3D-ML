@@ -17,3 +17,4 @@ class LogRecord(logging.LogRecord):
                 msg = msg.format(*self.args)
         return msg
 
+
