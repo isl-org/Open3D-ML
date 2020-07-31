@@ -61,7 +61,7 @@ class RandLANet(nn.Module):
         setattr(self, 'fc', f_layer_fc3)
 
 
-    def crop_pc(self, points, labels, search_tree, pick_idx):
+    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
         center_point = points[pick_idx, :].reshape(1, -1)
         select_idx = search_tree.query(center_point, 
@@ -69,17 +69,22 @@ class RandLANet(nn.Module):
         select_idx = DataProcessing.shuffle_idx(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]
-        return select_points, select_labels, select_idx
+        if(feat is None):
+            select_feat = None
+        else:
+            select_feat = feat[select_idx]
+        return select_points, select_feat, select_labels, select_idx
 
     def transform(self, data, attr):
         cfg = self.cfg
-        pc      = data['point'] 
-        label   = data['label']  
-        tree    = data['search_tree']   
-        pick_idx    = np.random.choice(len(pc), 1)
-        
-        pc, label, selected_idx = \
-            self.crop_pc(pc, label, tree, pick_idx)
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']   
+        pick_idx = np.random.choice(len(pc), 1)
+
+        pc, feat, label, selected_idx = \
+            self.crop_pc(pc, feat, label, tree, pick_idx)
 
         '''
         if split != "training":
@@ -88,7 +93,12 @@ class RandLANet(nn.Module):
             data['proj_inds'] = proj_inds
         '''
 
-        features         = pc
+        if(feat is not None):
+            features = np.concatenate([pc, feat], axis = 1)
+        else:
+            print("None features")
+            features         = pc
+
         input_points     = []
         input_neighbors  = []
         input_pools      = []
@@ -146,18 +156,31 @@ class RandLANet(nn.Module):
     def preprocess(self, data, attr):
         cfg = self.cfg
         points = data['point'][:, 0:3]
+        feat = data['feat']
         labels = data['label']
         split  = attr['split']
 
+        if(feat is None):
+            sub_feat = None
+
         data    = dict()
 
-        sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                                points, labels=labels, 
-                                grid_size=cfg.grid_size)
+        if(feat is None):
+            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+                                    points, labels=labels, 
+                                    grid_size=cfg.grid_size)
+
+        else:
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+                                    points, features = feat,
+                                    labels=labels, 
+                                    grid_size=cfg.grid_size)
+
 
         search_tree = KDTree(sub_points)
         
         data['point'] = sub_points
+        data['feat'] = sub_feat
         data['label'] = sub_labels
         data['search_tree'] = search_tree    
 
@@ -165,6 +188,7 @@ class RandLANet(nn.Module):
             proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
             data['proj_inds'] = proj_inds
+
         return data
 
 

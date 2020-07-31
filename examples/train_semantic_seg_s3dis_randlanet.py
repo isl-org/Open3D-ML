@@ -1,7 +1,7 @@
 import torch
 
 # there should be pipeline. pipeline is bigger that randlanet
-from ml3d.torch.datasets import S3DIS
+from ml3d.datasets import S3DIS
 from ml3d.torch.pipelines import SemanticSegmentation 
 from ml3d.torch.models import RandLANet
 from ml3d.torch.utils import Config
