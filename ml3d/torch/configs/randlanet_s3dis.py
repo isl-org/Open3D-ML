@@ -2,17 +2,22 @@
 model       = dict(
     k_n             = 16,  # KNN,
     num_layers      = 5,  # Number of layers
-    num_points      = 40960,  # Number of input points
+    num_points      = 4096 * 10,  # Number of input points
     num_classes     = 13,  # Number of valid classes
 
     sub_grid_size   = 0.04,  # preprocess_parameter
     sub_sampling_ratio = [4, 4, 4, 4, 2],
-    
-    d_in            = 3,
-    d_feature       = 8,
-    d_out           = [16, 64, 128, 256, 512] ,
+    num_sub_points = [4096 * 10 // 4, 4096 * 10 // 16, 4096 * 10 // 64, 4096 * 10 // 256, 4096 * 10 // 512],
 
-    ckpt_path       = './ml3d/torch/checkpoint/randlanet_semantickitti.pth'
+    d_in            = 6,
+    d_feature       = 8,
+    d_out           = [16, 64, 128, 256, 512],
+
+    grid_size       = 0.04,
+    batcher         = 'DefaultBatcher',
+
+    ignored_label_inds = [],
+    ckpt_path       = './ml3d/torch/checkpoint/randlanet_s3dis.pth'
 )
 
 pipeline    = dict(
@@ -33,20 +38,15 @@ pipeline    = dict(
     train_sum_dir       = 'train_log',
     )
 
-dataset = dict(   
-    original_pc_path    = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
-    original_label_path = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_labels/dataset/sequences',
-    dataset_path        = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences_cached',
-    prepro_grid_size    = 0.06,
+dataset = dict(
+    dataset_path = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/',
+    cache_dir = '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/cache/',
+    prepro_grid_size    = 0.04,
+    num_points      = 4096 * 10,
     test_result_folder  = './test',
 
-    training_split      = ['00', '01', '02', '03', '04', '05', 
-                            '06', '07', '09', '10'],
-    validation_split    = ['08'],
-    test_split_number   = 11,
-    class_weights       = [55437630, 320797, 541736, 2578735, 3274484, 552662, 
-                        184064, 78858, 240942562, 17294618, 170599734, 
-                        6369672, 230413074, 101130274, 476491114,9833174, 
-                        129609852, 4506626, 1168181],
+    test_area_idx = 3, # Area_0 to Area_6
+    class_weights = [3370714, 2856755, 4919229, 318158, 375640, 478001, 974733,
+                                      650464, 791496, 88727, 1284130, 229758, 2272837],
+    ignored_label_inds = []
     )
-

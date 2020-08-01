@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import helper_torch_util
 import numpy as np
+import random
 from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
@@ -61,25 +62,38 @@ class RandLANet(nn.Module):
         setattr(self, 'fc', f_layer_fc3)
 
 
-    def crop_pc(self, points, labels, search_tree, pick_idx):
+    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point, 
-                                k=self.cfg.num_points)[1][0]
-        select_idx = DataProcessing.shuffle_idx(select_idx)
+        if(points.shape[0] < self.cfg.num_points):
+            select_idx = np.array(range(points.shape[0]))
+            diff = self.cfg.num_points - points.shape[0]
+            select_idx = list(select_idx) + list(random.choices(select_idx, k = diff))
+            random.shuffle(select_idx)
+        else:
+            center_point = points[pick_idx, :].reshape(1, -1)
+            select_idx = search_tree.query(center_point, 
+                                    k=self.cfg.num_points)[1][0]
+
+        # select_idx = DataProcessing.shuffle_idx(select_idx)
+        random.shuffle(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]
-        return select_points, select_labels, select_idx
+        if(feat is None):
+            select_feat = None
+        else:
+            select_feat = feat[select_idx]
+        return select_points, select_feat, select_labels, select_idx
 
     def transform(self, data, attr):
         cfg = self.cfg
-        pc      = data['point'] 
-        label   = data['label']  
-        tree    = data['search_tree']   
-        pick_idx    = np.random.choice(len(pc), 1)
-        
-        pc, label, selected_idx = \
-            self.crop_pc(pc, label, tree, pick_idx)
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']   
+        pick_idx = np.random.choice(len(pc), 1)
+
+        pc, feat, label, selected_idx = \
+            self.crop_pc(pc, feat, label, tree, pick_idx)
 
         '''
         if split != "training":
@@ -88,7 +102,12 @@ class RandLANet(nn.Module):
             data['proj_inds'] = proj_inds
         '''
 
-        features         = pc
+        if(feat is not None):
+            features = np.concatenate([pc, feat], axis = 1)
+        else:
+            print("None features")
+            features         = pc
+
         input_points     = []
         input_neighbors  = []
         input_pools      = []
@@ -146,18 +165,31 @@ class RandLANet(nn.Module):
     def preprocess(self, data, attr):
         cfg = self.cfg
         points = data['point'][:, 0:3]
+        feat = data['feat']
         labels = data['label']
         split  = attr['split']
 
+        if(feat is None):
+            sub_feat = None
+
         data    = dict()
 
-        sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                                points, labels=labels, 
-                                grid_size=cfg.grid_size)
+        if(feat is None):
+            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+                                    points, labels=labels, 
+                                    grid_size=cfg.grid_size)
+
+        else:
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+                                    points, features = feat,
+                                    labels=labels, 
+                                    grid_size=cfg.grid_size)
+
 
         search_tree = KDTree(sub_points)
         
         data['point'] = sub_points
+        data['feat'] = sub_feat
         data['label'] = sub_labels
         data['search_tree'] = search_tree    
 
@@ -165,6 +197,7 @@ class RandLANet(nn.Module):
             proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
             data['proj_inds'] = proj_inds
+
         return data
 
 
@@ -177,7 +210,7 @@ class RandLANet(nn.Module):
         batch_pc_idx    = batch_data[2]
         batch_cloud_idx = batch_data[3]
 
-        features = batch_pc
+        features = batch_data[0]
         input_points = []
         input_neighbors = []
         input_pools = []
@@ -319,18 +352,19 @@ class RandLANet(nn.Module):
         num_neigh = feature_set.size()[3]
         d = feature_set.size()[1]
 
-        #feature_set =
-        #f_reshaped = torch.reshape(feature_set, (-1, d, num_neigh))
+        f_reshaped = torch.reshape(feature_set.permute(0, 2, 3, 1), (-1, num_neigh, d))
 
         m_dense = getattr(self, name + 'fc')
-        att_activation = m_dense(feature_set.permute(0, 2, 3, 1))  # TODO
+        att_activation = m_dense(f_reshaped)
 
-        m_softmax = nn.Softmax(dim=-2)
-        att_scores = m_softmax(att_activation).permute(0, 3, 1, 2)
+        m_softmax = nn.Softmax(dim=1)
+        att_scores = m_softmax(att_activation)
 
-        f_agg = att_scores * feature_set
-        f_agg = torch.sum(f_agg, dim=-1, keepdim=True)
-        #f_agg = torch.reshape(f_agg, (batch_size, num_points, 1, d))
+        # print("att_scores = ", att_scores.shape)
+        f_agg = f_reshaped * att_scores
+        f_agg = torch.sum(f_agg, dim=1, keepdim=True)
+        f_agg = torch.reshape(f_agg, (batch_size, num_points, 1, d))
+        f_agg = f_agg.permute(0, 3, 1, 2)
 
         m_conv2d = getattr(self, name + 'mlp')
         f_agg = m_conv2d(f_agg)
@@ -405,7 +439,7 @@ class RandLANet(nn.Module):
         feature     = inputs['features'].to(device) 
 
         m_dense = getattr(self, 'fc0')
-        feature = m_dense(feature).transpose(-2, -1).unsqueeze(-1)  # TODO
+        feature = m_dense(feature).transpose(-2, -1).unsqueeze(-1)
 
         m_bn = getattr(self, 'batch_normalization')
         feature = m_bn(feature)

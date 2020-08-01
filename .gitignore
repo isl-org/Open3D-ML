@@ -16,7 +16,7 @@ eggs/
 .installed.cfg
 *.egg
 *linux-gnu.so
-
+*darwin.so
 #
 logs/
 test/
