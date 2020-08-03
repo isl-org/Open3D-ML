@@ -1,4 +1,4 @@
-BASE_DIR=${1-/media/yiling/DC30502330500744/yiling/intel2020/RandLA-Net/data/semantic3d/original_data}
+export BASE_DIR="/home/sanskar_agrawal/data/Semantic3D/"
 
 # Training data
 wget -c -N http://semantic3d.net/data/point-clouds/training1/bildstein_station1_xyz_intensity_rgb.7z -P $BASE_DIR
@@ -36,11 +36,11 @@ wget -c -N http://semantic3d.net/data/point-clouds/testing1/stgallencathedral_st
 wget -c -N http://semantic3d.net/data/point-clouds/testing1/stgallencathedral_station3_intensity_rgb.7z -P $BASE_DIR
 wget -c -N http://semantic3d.net/data/point-clouds/testing1/stgallencathedral_station6_intensity_rgb.7z -P $BASE_DIR
 
-# reduced-8
-wget -c -N http://semantic3d.net/data/point-clouds/testing2/MarketplaceFeldkirch_Station4_rgb_intensity-reduced.txt.7z -P $BASE_DIR
-wget -c -N http://semantic3d.net/data/point-clouds/testing2/StGallenCathedral_station6_rgb_intensity-reduced.txt.7z -P $BASE_DIR
-wget -c -N http://semantic3d.net/data/point-clouds/testing2/sg27_station10_rgb_intensity-reduced.txt.7z -P $BASE_DIR
-wget -c -N http://semantic3d.net/data/point-clouds/testing2/sg28_Station2_rgb_intensity-reduced.txt.7z -P $BASE_DIR
+# # reduced-8
+# wget -c -N http://semantic3d.net/data/point-clouds/testing2/MarketplaceFeldkirch_Station4_rgb_intensity-reduced.txt.7z -P $BASE_DIR
+# wget -c -N http://semantic3d.net/data/point-clouds/testing2/StGallenCathedral_station6_rgb_intensity-reduced.txt.7z -P $BASE_DIR
+# wget -c -N http://semantic3d.net/data/point-clouds/testing2/sg27_station10_rgb_intensity-reduced.txt.7z -P $BASE_DIR
+# wget -c -N http://semantic3d.net/data/point-clouds/testing2/sg28_Station2_rgb_intensity-reduced.txt.7z -P $BASE_DIR
 
 
 
