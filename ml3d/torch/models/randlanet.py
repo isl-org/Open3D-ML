@@ -61,24 +61,24 @@ class RandLANet(nn.Module):
                                                activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
-
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        if(points.shape[0] < self.cfg.num_points):
+        if (points.shape[0] < self.cfg.num_points):
             select_idx = np.array(range(points.shape[0]))
             diff = self.cfg.num_points - points.shape[0]
-            select_idx = list(select_idx) + list(random.choices(select_idx, k = diff))
+            select_idx = list(select_idx) + list(
+                random.choices(select_idx, k=diff))
             random.shuffle(select_idx)
         else:
             center_point = points[pick_idx, :].reshape(1, -1)
-            select_idx = search_tree.query(center_point, 
-                                    k=self.cfg.num_points)[1][0]
+            select_idx = search_tree.query(center_point,
+                                           k=self.cfg.num_points)[1][0]
 
         # select_idx = DataProcessing.shuffle_idx(select_idx)
         random.shuffle(select_idx)
         select_points = points[select_idx]
         select_labels = labels[select_idx]
-        if(feat is None):
+        if (feat is None):
             select_feat = None
         else:
             select_feat = feat[select_idx]
@@ -89,12 +89,11 @@ class RandLANet(nn.Module):
         pc = data['point']
         label = data['label']
         feat = data['feat']
-        tree = data['search_tree']   
+        tree = data['search_tree']
         pick_idx = np.random.choice(len(pc), 1)
 
         pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
-
         '''
         if split != "training":
             proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
@@ -102,24 +101,25 @@ class RandLANet(nn.Module):
             data['proj_inds'] = proj_inds
         '''
 
-        if(feat is not None):
-            features = np.concatenate([pc, feat], axis = 1)
+        if (feat is not None):
+            features = np.concatenate([pc, feat], axis=1)
         else:
             print("None features")
-            features         = pc
+            features = pc
 
-        input_points     = []
-        input_neighbors  = []
-        input_pools      = []
+        input_points = []
+        input_neighbors = []
+        input_pools = []
         input_up_samples = []
 
         ori_pc = pc
 
         for i in range(cfg.num_layers):
             neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
-            
+
             sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] //
+                                   cfg.sub_sampling_ratio[i], :]
             up_i = DataProcessing.knn_search(sub_points, pc, 1)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx.astype(np.int64))
@@ -127,19 +127,18 @@ class RandLANet(nn.Module):
             input_up_samples.append(up_i.astype(np.int64))
             pc = sub_points
 
-        inputs                  = dict()
-        inputs['xyz']           = input_points
-        inputs['neigh_idx']     = input_neighbors
-        inputs['sub_idx']       = input_pools
-        inputs['interp_idx']    = input_up_samples
-        inputs['features']      = features
+        inputs = dict()
+        inputs['xyz'] = input_points
+        inputs['neigh_idx'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = features
 
-        inputs['labels']         = label.astype(np.int64)
+        inputs['labels'] = label.astype(np.int64)
         # inputs['input_inds']    = batch_pc_idx
         # inputs['cloud_inds']    = batch_cloud_idx
 
         return inputs
-
 
     def loss(self, Loss, results, inputs, device):
         """
@@ -148,14 +147,14 @@ class RandLANet(nn.Module):
         :param labels: labels
         :return: loss
         """
-        cfg     = self.cfg
-        labels  = inputs['data']['labels']
+        cfg = self.cfg
+        labels = inputs['data']['labels']
 
-        scores, labels = filter_valid_label(results, labels, 
-                    cfg.num_classes, cfg.ignored_label_inds, device)
-        
-        logp = torch.distributions.utils.probs_to_logits(
-            scores, is_binary=False)
+        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
+                                            cfg.ignored_label_inds, device)
+
+        logp = torch.distributions.utils.probs_to_logits(scores,
+                                                         is_binary=False)
         loss = Loss.weighted_CrossEntropyLoss(logp, labels)
 
         # predict_labels = torch.max(scores, dim=-2).indices
@@ -167,47 +166,41 @@ class RandLANet(nn.Module):
         points = data['point'][:, 0:3]
         feat = data['feat']
         labels = data['label']
-        split  = attr['split']
+        split = attr['split']
 
-        if(feat is None):
+        if (feat is None):
             sub_feat = None
 
-        data    = dict()
+        data = dict()
 
-        if(feat is None):
+        if (feat is None):
             sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                                    points, labels=labels, 
-                                    grid_size=cfg.grid_size)
+                points, labels=labels, grid_size=cfg.grid_size)
 
         else:
             sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                                    points, features = feat,
-                                    labels=labels, 
-                                    grid_size=cfg.grid_size)
-
+                points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
-        
+
         data['point'] = sub_points
         data['feat'] = sub_feat
         data['label'] = sub_labels
-        data['search_tree'] = search_tree    
+        data['search_tree'] = search_tree
 
         if split != "training":
-            proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
+            proj_inds = np.squeeze(
+                search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
             data['proj_inds'] = proj_inds
 
         return data
 
-
-      
-    
     def previous_preprocess(self, batch_data, device):
-        cfg             = self.cfg
-        batch_pc        = batch_data[0]
-        batch_label     = batch_data[1]
-        batch_pc_idx    = batch_data[2]
+        cfg = self.cfg
+        batch_pc = batch_data[0]
+        batch_label = batch_data[1]
+        batch_pc_idx = batch_data[2]
         batch_cloud_idx = batch_data[3]
 
         features = batch_data[0]
@@ -250,7 +243,7 @@ class RandLANet(nn.Module):
         inputs['cloud_inds'] = batch_cloud_idx
 
         return inputs
-    
+
     def preprocess_inference(self, pc, device):
         cfg = self.cfg
         idx = DataProcessing.shuffle_idx(np.arange(len(pc)))
@@ -352,7 +345,8 @@ class RandLANet(nn.Module):
         num_neigh = feature_set.size()[3]
         d = feature_set.size()[1]
 
-        f_reshaped = torch.reshape(feature_set.permute(0, 2, 3, 1), (-1, num_neigh, d))
+        f_reshaped = torch.reshape(feature_set.permute(0, 2, 3, 1),
+                                   (-1, num_neigh, d))
 
         m_dense = getattr(self, name + 'fc')
         att_activation = m_dense(f_reshaped)
@@ -428,15 +422,11 @@ class RandLANet(nn.Module):
 
     def forward(self, inputs):
         device = self.device
-        xyz         = [arr.to(device) 
-                            for arr in inputs['xyz']]
-        neigh_idx   = [arr.to(device) 
-                            for arr in inputs['neigh_idx']]
-        interp_idx  = [arr.to(device) 
-                            for arr in inputs['interp_idx']]
-        sub_idx     = [arr.to(device) 
-                            for arr in inputs['sub_idx']]
-        feature     = inputs['features'].to(device) 
+        xyz = [arr.to(device) for arr in inputs['xyz']]
+        neigh_idx = [arr.to(device) for arr in inputs['neigh_idx']]
+        interp_idx = [arr.to(device) for arr in inputs['interp_idx']]
+        sub_idx = [arr.to(device) for arr in inputs['sub_idx']]
+        feature = inputs['features'].to(device)
 
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature).transpose(-2, -1).unsqueeze(-1)
