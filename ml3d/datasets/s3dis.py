@@ -5,7 +5,7 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
 import random
-from ml3d.datasets.semantickitti import DataProcessing
+from ml3d.datasets.utils import DataProcessing
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
@@ -96,9 +96,8 @@ class S3DIS:
 
         self.pc_path = Path(self.dataset_path) / 'original_ply'
         if not exists(self.pc_path):
-            print("creating")
-            exit(0)
-            # self.create_ply_files(self.dataset_path, self.label_to_names)
+            print("creating dataset")
+            self.create_ply_files(self.dataset_path, self.label_to_names)
 
         # TODO : if num of ply files < 272, then create.
 
