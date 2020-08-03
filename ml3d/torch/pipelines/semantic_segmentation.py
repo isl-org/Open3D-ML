@@ -213,7 +213,7 @@ class SemanticSegmentation():
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-                
+
 
             scheduler.step()
             
@@ -289,7 +289,7 @@ class SemanticSegmentation():
                  f" eval: {loss_dict['Validation loss']:.3f}")
         log.info(f"acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
                  f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
-        log.info(f"acc train: {iou_dicts[-1]['Training IoU']:.3f} "
+        log.info(f"iou train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
 
         # print(acc_dicts[-1])

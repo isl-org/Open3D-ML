@@ -22,8 +22,8 @@ model       = dict(
 )
 
 pipeline    = dict(
-    batch_size          = 2,
-    val_batch_size      = 2,
+    batch_size          = 4,
+    val_batch_size      = 6,
     test_batch_size     = 3,
     max_epoch           = 100,  # maximum epoch during training
     learning_rate       = 1e-2,  # initial learning rate
