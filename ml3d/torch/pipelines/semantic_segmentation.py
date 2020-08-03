@@ -213,7 +213,7 @@ class SemanticSegmentation():
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-                break
+                
 
             scheduler.step()
             
