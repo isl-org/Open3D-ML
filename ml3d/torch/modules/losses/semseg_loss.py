@@ -49,4 +49,5 @@ class SemSegLoss(object):
             dataset.cfg.class_weights, dtype=torch.float, device=device)
         ratio_samples = n_samples / n_samples.sum()
         weights = 1 / (ratio_samples + 0.02)
+        
         self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(weight=weights)

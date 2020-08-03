@@ -69,6 +69,7 @@ class SimpleDataset(Dataset):
         data = (dataset.get_data(index)
                 if self.cache_convert is None else self.cache_convert(
                     attr['name']))
+        
 
         if self.transform is not None:
             data = self.transform(data, attr)

@@ -105,7 +105,7 @@ class RandLANet(nn.Module):
         if(feat is not None):
             features = np.concatenate([pc, feat], axis = 1)
         else:
-            print("None features")
+            # print("None features")
             features         = pc
 
         input_points     = []
@@ -154,9 +154,9 @@ class RandLANet(nn.Module):
         scores, labels = filter_valid_label(results, labels, 
                     cfg.num_classes, cfg.ignored_label_inds, device)
         
-        logp = torch.distributions.utils.probs_to_logits(
-            scores, is_binary=False)
-        loss = Loss.weighted_CrossEntropyLoss(logp, labels)
+        #logp = torch.distributions.utils.probs_to_logits(
+        #    scores, is_binary=False)
+        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         # predict_labels = torch.max(scores, dim=-2).indices
 

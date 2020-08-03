@@ -17,7 +17,8 @@ model       = dict(
     grid_size       = 0.06,
     batcher         = 'DefaultBatcher',
 
-    ckpt_path       = './ml3d/torch/checkpoint/randlanet_semantickitti.pth'
+    #ckpt_path       = './ml3d/torch/checkpoint/randlanet_semantickitti.pth',
+    ckpt_path       = './ml3d/torch/checkpoint/test_randlanet_semantickitti.pth'
 )
 
 pipeline    = dict(
@@ -42,13 +43,13 @@ dataset = dict(
     original_pc_path    = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
     original_label_path = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_labels/dataset/sequences',
     dataset_path        = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
-    cache_dir           = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache',
+    cache_dir           = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache1',
     
     test_result_folder  = './test',
 
-    #training_split      = ['00', '01', '02', '03', '04', '05', 
-    #                        '06', '07', '09', '10'],
-    training_split      = ['01'],
+    training_split      = ['00', '01', '02', '03', '04', '05', 
+                            '06', '07', '09', '10'],
+    #training_split      = ['01'],
     validation_split    = ['08'],
     test_split_number   = 11,
     class_weights       = [55437630, 320797, 541736, 2578735, 3274484, 552662, 

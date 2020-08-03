@@ -236,6 +236,7 @@ class SemanticKITTISplit(Dataset):
             labels      = np.zeros(np.shape(points)[0], dtype=np.uint8)
         data = {
             'point'     : points,
+            'feat'      : None,
             'label'     : labels
         }
         return data
