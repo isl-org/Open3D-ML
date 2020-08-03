@@ -21,3 +21,4 @@ eggs/
 logs/
 test/
 kernels/
+**/.fuse*
