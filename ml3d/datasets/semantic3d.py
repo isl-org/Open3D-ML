@@ -9,13 +9,20 @@ from ml3d.datasets.semantickitti import DataProcessing
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+)
+log = logging.getLogger(__name__)
 
 
 class Semantic3DSplit():
     def __init__(self, dataset, split='training'):
         self.cfg    = dataset.cfg
         path_list   = dataset.get_split_list(split)
-        print("Found {} pointclouds for {}".format(len(path_list), split))
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
         # if split == 'test':
         #     dataset.test_list = path_list
         #     for test_file_name in path_list:
@@ -32,6 +39,8 @@ class Semantic3DSplit():
 
     def get_data(self, idx):
         pc_path = self.path_list[idx]
+        log.debug("get_data called {}".format(pc_path))
+
         pc = pd.read_csv(pc_path, header=None, delim_whitespace=True, dtype = np.float32).values
 
         points = pc[:, 0:3]

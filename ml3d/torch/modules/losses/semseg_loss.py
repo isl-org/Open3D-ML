@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+from ml3d.datasets.semantickitti import DataProcessing
 
 def filter_valid_label(scores, labels, num_classes, ignored_label_inds,
                        device):
@@ -45,8 +45,9 @@ class SemSegLoss(object):
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss
+        class_wt = DataProcessing.get_class_weights('Semantic3D')
         n_samples = torch.tensor(
-            dataset.cfg.class_weights, dtype=torch.float, device=device)
+            class_wt, dtype=torch.float, device=device)
         ratio_samples = n_samples / n_samples.sum()
         weights = 1 / (ratio_samples + 0.02)
         self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(weight=weights)
