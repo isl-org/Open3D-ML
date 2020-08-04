@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """
 Several helper functions, for internal use in Kaolin.
 """
@@ -41,11 +40,11 @@ def _composedecorator(*decs):
                 pass
 
     """
-
     def deco(f):
         for dec in reversed(decs):
             f = dec(f)
         return f
+
     return deco
 
 
@@ -61,8 +60,8 @@ def _normalize_zerosafe(matrix: torch.Tensor):
     assert matrix.dim() == 2, 'Need matrix to contain exactly 2 dimensions'
     magnitude = torch.sqrt(torch.sum(torch.pow(matrix, 2), dim=1))
     valid_inds = magnitude > 0
-    matrix[valid_inds] = torch.div(
-        matrix[valid_inds], magnitude[valid_inds].unsqueeze(1))
+    matrix[valid_inds] = torch.div(matrix[valid_inds],
+                                   magnitude[valid_inds].unsqueeze(1))
     return matrix
 
 
@@ -151,8 +150,8 @@ def _assert_shape_eq(inp, tgt_shape, dim=None):
     if dim is None:
         if inp.shape != tgt_shape:
             raise ValueError('Size mismatch. Input and target have different '
-                             'shapes: {0} vs {1}.'.format(inp.shape,
-                                                          tgt_shape))
+                             'shapes: {0} vs {1}.'.format(
+                                 inp.shape, tgt_shape))
     else:
         if inp.shape[dim] != tgt_shape[dim]:
             raise ValueError('Size mismatch. Input and target have different '
@@ -187,7 +186,6 @@ class Cache(object):
             cache_dir (str): Directory where objects will be cached. Default
                              to 'cache'.
     """
-
     def __init__(self, func: Callable, cache_dir: [str, Path], cache_key: str):
         self.func = func
         self.cache_dir = Path(cache_dir) / str(cache_key)
@@ -208,7 +206,7 @@ class Cache(object):
 
         if not fpath.exists():
             output = self.func(*data)
-            
+
             self._write(output, fpath)
             self.cached_ids.append(unique_id)
         else:
@@ -219,8 +217,7 @@ class Cache(object):
 
     def _write(self, x, fpath):
         np.save(fpath, x)
-        tmp = np.load(fpath, allow_pickle = True)
-
+        tmp = np.load(fpath, allow_pickle=True)
 
     def _read(self, fpath):
-        return np.load(fpath, allow_pickle = True).item()
+        return np.load(fpath, allow_pickle=True).item()

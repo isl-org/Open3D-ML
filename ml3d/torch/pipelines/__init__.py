@@ -1,5 +1,3 @@
 from .semantic_segmentation import SemanticSegmentation
 
-__all__ = [
-    'SemanticSegmentation'
-]
+__all__ = ['SemanticSegmentation']
