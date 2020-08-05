@@ -14,43 +14,30 @@
 #      Hugues THOMAS - 10/02/2017
 #
 
-
 # ----------------------------------------------------------------------------------------------------------------------
 #
 #          Imports and global variables
 #      \**********************************/
 #
 
-
 # Basic libs
 import numpy as np
 import sys
 
-
 # Define PLY types
-ply_dtypes = dict([
-    (b'int8', 'i1'),
-    (b'char', 'i1'),
-    (b'uint8', 'u1'),
-    (b'uchar', 'u1'),
-    (b'int16', 'i2'),
-    (b'short', 'i2'),
-    (b'uint16', 'u2'),
-    (b'ushort', 'u2'),
-    (b'int32', 'i4'),
-    (b'int', 'i4'),
-    (b'uint32', 'u4'),
-    (b'uint', 'u4'),
-    (b'float32', 'f4'),
-    (b'float', 'f4'),
-    (b'float64', 'f8'),
-    (b'double', 'f8')
-])
+ply_dtypes = dict([(b'int8', 'i1'), (b'char', 'i1'), (b'uint8', 'u1'),
+                   (b'uchar', 'u1'), (b'int16', 'i2'), (b'short', 'i2'),
+                   (b'uint16', 'u2'), (b'ushort', 'u2'), (b'int32', 'i4'),
+                   (b'int', 'i4'), (b'uint32', 'u4'), (b'uint', 'u4'),
+                   (b'float32', 'f4'), (b'float', 'f4'), (b'float64', 'f8'),
+                   (b'double', 'f8')])
 
 # Numpy reader format
-valid_formats = {'ascii': '', 'binary_big_endian': '>',
-                 'binary_little_endian': '<'}
-
+valid_formats = {
+    'ascii': '',
+    'binary_big_endian': '>',
+    'binary_little_endian': '<'
+}
 
 # ----------------------------------------------------------------------------------------------------------------------
 #
@@ -87,7 +74,6 @@ def parse_mesh_header(plyfile, ext):
     num_faces = None
     current_element = None
 
-
     while b'end_header' not in line and line != b'':
         line = plyfile.readline()
 
@@ -105,7 +91,8 @@ def parse_mesh_header(plyfile, ext):
         elif b'property' in line:
             if current_element == 'vertex':
                 line = line.split()
-                vertex_properties.append((line[2].decode(), ext + ply_dtypes[line[1]]))
+                vertex_properties.append(
+                    (line[2].decode(), ext + ply_dtypes[line[1]]))
             elif current_element == 'vertex':
                 if not line.startswith('property list uchar int'):
                     raise ValueError('Unsupported faces property : ' + line)
@@ -152,7 +139,6 @@ def read_ply(filename, triangular_mesh=False):
 
     with open(filename, 'rb') as plyfile:
 
-
         # Check if the file start with ply
         if b'ply' not in plyfile.readline():
             raise ValueError('The file does not start whith the word ply')
@@ -172,17 +158,20 @@ def read_ply(filename, triangular_mesh=False):
             num_points, num_faces, properties = parse_mesh_header(plyfile, ext)
 
             # Get point data
-            vertex_data = np.fromfile(plyfile, dtype=properties, count=num_points)
+            vertex_data = np.fromfile(plyfile,
+                                      dtype=properties,
+                                      count=num_points)
 
             # Get face data
-            face_properties = [('k', ext + 'u1'),
-                               ('v1', ext + 'i4'),
-                               ('v2', ext + 'i4'),
-                               ('v3', ext + 'i4')]
-            faces_data = np.fromfile(plyfile, dtype=face_properties, count=num_faces)
+            face_properties = [('k', ext + 'u1'), ('v1', ext + 'i4'),
+                               ('v2', ext + 'i4'), ('v3', ext + 'i4')]
+            faces_data = np.fromfile(plyfile,
+                                     dtype=face_properties,
+                                     count=num_faces)
 
             # Return vertex data and concatenated faces
-            faces = np.vstack((faces_data['v1'], faces_data['v2'], faces_data['v3'])).T
+            faces = np.vstack(
+                (faces_data['v1'], faces_data['v2'], faces_data['v3'])).T
             data = [vertex_data, faces]
 
         else:
@@ -248,19 +237,21 @@ def write_ply(filename, field_list, field_names, triangular_faces=None):
     """
 
     # Format list input to the right form
-    field_list = list(field_list) if (type(field_list) == list or type(field_list) == tuple) else list((field_list,))
+    field_list = list(field_list) if (type(field_list) == list
+                                      or type(field_list) == tuple) else list(
+                                          (field_list, ))
     for i, field in enumerate(field_list):
         if field.ndim < 2:
             field_list[i] = field.reshape(-1, 1)
         if field.ndim > 2:
             print('fields have more than 2 dimensions')
-            return False    
+            return False
 
     # check all fields have the same number of data
     n_points = [field.shape[0] for field in field_list]
     if not np.all(np.equal(n_points, n_points[0])):
         print('wrong field dimensions')
-        return False    
+        return False
 
     # Check if field_names and field_list have same nb of column
     n_fields = np.sum([field.shape[1] for field in field_list])
@@ -286,7 +277,8 @@ def write_ply(filename, field_list, field_names, triangular_faces=None):
 
         # Add faces if needded
         if triangular_faces is not None:
-            header.append('element face {:d}'.format(triangular_faces.shape[0]))
+            header.append('element face {:d}'.format(
+                triangular_faces.shape[0]))
             header.append('property list uchar int vertex_indices')
 
         # End of header
@@ -317,9 +309,12 @@ def write_ply(filename, field_list, field_names, triangular_faces=None):
 
         if triangular_faces is not None:
             triangular_faces = triangular_faces.astype(np.int32)
-            type_list = [('k', 'uint8')] + [(str(ind), 'int32') for ind in range(3)]
+            type_list = [('k', 'uint8')] + [(str(ind), 'int32')
+                                            for ind in range(3)]
             data = np.empty(triangular_faces.shape[0], dtype=type_list)
-            data['k'] = np.full((triangular_faces.shape[0],), 3, dtype=np.uint8)
+            data['k'] = np.full((triangular_faces.shape[0], ),
+                                3,
+                                dtype=np.uint8)
             data['0'] = triangular_faces[:, 0]
             data['1'] = triangular_faces[:, 1]
             data['2'] = triangular_faces[:, 2]

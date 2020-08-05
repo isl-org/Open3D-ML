@@ -2,8 +2,8 @@ from os.path import join
 import numpy as np
 import colorsys, random, os, sys
 
+
 class DataProcessing:
-    
     @staticmethod
     def knn_search(support_pts, query_pts, k):
         """
@@ -13,7 +13,10 @@ class DataProcessing:
         :return: neighbor_idx: neighboring points indexes, B*N2*k
         """
 
-        neighbor_idx = nearest_neighbors.knn_batch(support_pts, query_pts, k, omp=True)
+        neighbor_idx = nearest_neighbors.knn_batch(support_pts,
+                                                   query_pts,
+                                                   k,
+                                                   omp=True)
         return neighbor_idx.astype(np.int32)
 
     @staticmethod

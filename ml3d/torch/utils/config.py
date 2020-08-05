@@ -9,7 +9,6 @@ from addict import Dict
 
 
 class ConfigDict(Dict):
-
     def __missing__(self, name):
         raise KeyError(name)
 
@@ -58,7 +57,6 @@ class Config(object):
 
         self.cfg_dict = cfg_dict
 
-
     def dump(self, **kwargs):
         """Dump to a string."""
         def convert_to_dict(cfg_node, key_list):
@@ -69,6 +67,7 @@ class Config(object):
                 for k, v in cfg_dict.items():
                     cfg_dict[k] = convert_to_dict(v, key_list + [k])
                 return cfg_dict
+
         self_as_dict = convert_to_dict(self._cfg_dict, [])
         print(self_as_dict)
         return yaml.safe_dump(self_as_dict, **kwargs)
@@ -77,16 +76,15 @@ class Config(object):
     @staticmethod
     def load_from_file(filename):
         if not os.path.isfile(filename):
-            raise FileNotFoundError(
-                f'File {filename} not found')
+            raise FileNotFoundError(f'File {filename} not found')
 
         if filename.endswith('.py'):
             with tempfile.TemporaryDirectory() as temp_config_dir:
                 temp_config_file = tempfile.NamedTemporaryFile(
                     dir=temp_config_dir, suffix='.py')
                 temp_config_name = os.path.basename(temp_config_file.name)
-                shutil.copyfile(filename,
-                                os.path.join(temp_config_dir, temp_config_name))
+                shutil.copyfile(
+                    filename, os.path.join(temp_config_dir, temp_config_name))
                 temp_module_name = os.path.splitext(temp_config_name)[0]
                 sys.path.insert(0, temp_config_dir)
                 mod = import_module(temp_module_name)
@@ -101,22 +99,15 @@ class Config(object):
                 # close temp file
                 temp_config_file.close()
 
-        
         if filename.endswith('.yaml'):
             with open(filename) as f:
                 cfg_dict = yaml.safe_load(f)
                 cfg_dict = yaml.full_load(cfg_dict)
-    
 
         return Config(cfg_dict)
-
 
     def __getattr__(self, name):
         return getattr(self._cfg_dict, name)
 
     def __getitem__(self, name):
         return self._cfg_dict.__getitem__(name)
-
-
-
-        

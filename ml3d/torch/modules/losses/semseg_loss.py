@@ -16,9 +16,9 @@ def filter_valid_label(scores, labels, num_classes, ignored_label_inds,
 
     valid_idx = torch.where(torch.logical_not(ignored_bool))[0].to(device)
 
-    valid_scores = torch.gather(valid_scores, 0,
-                                valid_idx.unsqueeze(-1).expand(
-                                    -1, num_classes))
+    valid_scores = torch.gather(
+        valid_scores, 0,
+        valid_idx.unsqueeze(-1).expand(-1, num_classes))
     valid_labels = torch.gather(valid_labels, 0, valid_idx)
 
     # Reduce label values in the range of logit shape
@@ -41,7 +41,6 @@ def filter_valid_label(scores, labels, num_classes, ignored_label_inds,
 
 class SemSegLoss(object):
     """Loss functions for semantic segmentation"""
-
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss

@@ -1,5 +1,3 @@
-
-
 from os.path import join
 import numpy as np
 
@@ -148,9 +146,9 @@ class Config:
     # 'point2point' fitting geometry by penalizing distance from deform point to input points
     # 'point2plane' fitting geometry by penalizing distance from deform point to input point triplet (not implemented)
     deform_fitting_mode = 'point2point'
-    deform_fitting_power = 1.0              # Multiplier for the fitting/repulsive loss
-    deform_lr_factor = 0.1                  # Multiplier for learning rate applied to the deformations
-    repulse_extent = 1.0                    # Distance of repulsion for deformed kernel points
+    deform_fitting_power = 1.0  # Multiplier for the fitting/repulsive loss
+    deform_lr_factor = 0.1  # Multiplier for learning rate applied to the deformations
+    repulse_extent = 1.0  # Distance of repulsion for deformed kernel points
 
     # Number of batch
     batch_num = 10
@@ -178,7 +176,10 @@ class Config:
         """
 
         # Number of layers
-        self.num_layers = len([block for block in self.architecture if 'pool' in block or 'strided' in block]) + 1
+        self.num_layers = len([
+            block for block in self.architecture
+            if 'pool' in block or 'strided' in block
+        ]) + 1
 
         ###################
         # Deform layer list
@@ -193,7 +194,8 @@ class Config:
         for block_i, block in enumerate(arch):
 
             # Get all blocks of the layer
-            if not ('pool' in block or 'strided' in block or 'global' in block or 'upsample' in block):
+            if not ('pool' in block or 'strided' in block or 'global' in block
+                    or 'upsample' in block):
                 layer_blocks += [block]
                 continue
 
@@ -231,13 +233,18 @@ class Config:
                     setattr(self, line_info[0], None)
 
                 elif line_info[0] == 'lr_decay_epochs':
-                    self.lr_decays = {int(b.split(':')[0]): float(b.split(':')[1]) for b in line_info[2:]}
+                    self.lr_decays = {
+                        int(b.split(':')[0]): float(b.split(':')[1])
+                        for b in line_info[2:]
+                    }
 
                 elif line_info[0] == 'architecture':
                     self.architecture = [b for b in line_info[2:]]
 
                 elif line_info[0] == 'augment_symmetries':
-                    self.augment_symmetries = [bool(int(b)) for b in line_info[2:]]
+                    self.augment_symmetries = [
+                        bool(int(b)) for b in line_info[2:]
+                    ]
 
                 elif line_info[0] == 'num_classes':
                     if len(line_info) > 3:
@@ -251,7 +258,8 @@ class Config:
                 elif hasattr(self, line_info[0]):
                     attr_type = type(getattr(self, line_info[0]))
                     if attr_type == bool:
-                        setattr(self, line_info[0], attr_type(int(line_info[2])))
+                        setattr(self, line_info[0],
+                                attr_type(int(line_info[2])))
                     else:
                         setattr(self, line_info[0], attr_type(line_info[2]))
 
@@ -278,11 +286,15 @@ class Config:
                     text_file.write(' {:d}'.format(n))
                 text_file.write('\n')
             else:
-                text_file.write('num_classes = {:d}\n'.format(self.num_classes))
-            text_file.write('in_points_dim = {:d}\n'.format(self.in_points_dim))
-            text_file.write('in_features_dim = {:d}\n'.format(self.in_features_dim))
+                text_file.write('num_classes = {:d}\n'.format(
+                    self.num_classes))
+            text_file.write('in_points_dim = {:d}\n'.format(
+                self.in_points_dim))
+            text_file.write('in_features_dim = {:d}\n'.format(
+                self.in_features_dim))
             text_file.write('in_radius = {:.6f}\n'.format(self.in_radius))
-            text_file.write('input_threads = {:d}\n\n'.format(self.input_threads))
+            text_file.write('input_threads = {:d}\n\n'.format(
+                self.input_threads))
 
             # Model parameters
             text_file.write('# Model parameters\n')
@@ -295,73 +307,102 @@ class Config:
             text_file.write('equivar_mode = {:s}\n'.format(self.equivar_mode))
             text_file.write('invar_mode = {:s}\n'.format(self.invar_mode))
             text_file.write('num_layers = {:d}\n'.format(self.num_layers))
-            text_file.write('first_features_dim = {:d}\n'.format(self.first_features_dim))
-            text_file.write('use_batch_norm = {:d}\n'.format(int(self.use_batch_norm)))
-            text_file.write('batch_norm_momentum = {:.6f}\n\n'.format(self.batch_norm_momentum))
-            text_file.write('segmentation_ratio = {:.6f}\n\n'.format(self.segmentation_ratio))
+            text_file.write('first_features_dim = {:d}\n'.format(
+                self.first_features_dim))
+            text_file.write('use_batch_norm = {:d}\n'.format(
+                int(self.use_batch_norm)))
+            text_file.write('batch_norm_momentum = {:.6f}\n\n'.format(
+                self.batch_norm_momentum))
+            text_file.write('segmentation_ratio = {:.6f}\n\n'.format(
+                self.segmentation_ratio))
 
             # KPConv parameters
             text_file.write('# KPConv parameters\n')
             text_file.write('# *****************\n\n')
 
-            text_file.write('first_subsampling_dl = {:.6f}\n'.format(self.first_subsampling_dl))
-            text_file.write('num_kernel_points = {:d}\n'.format(self.num_kernel_points))
+            text_file.write('first_subsampling_dl = {:.6f}\n'.format(
+                self.first_subsampling_dl))
+            text_file.write('num_kernel_points = {:d}\n'.format(
+                self.num_kernel_points))
             text_file.write('conv_radius = {:.6f}\n'.format(self.conv_radius))
-            text_file.write('deform_radius = {:.6f}\n'.format(self.deform_radius))
-            text_file.write('fixed_kernel_points = {:s}\n'.format(self.fixed_kernel_points))
+            text_file.write('deform_radius = {:.6f}\n'.format(
+                self.deform_radius))
+            text_file.write('fixed_kernel_points = {:s}\n'.format(
+                self.fixed_kernel_points))
             text_file.write('KP_extent = {:.6f}\n'.format(self.KP_extent))
             text_file.write('KP_influence = {:s}\n'.format(self.KP_influence))
-            text_file.write('aggregation_mode = {:s}\n'.format(self.aggregation_mode))
+            text_file.write('aggregation_mode = {:s}\n'.format(
+                self.aggregation_mode))
             text_file.write('modulated = {:d}\n'.format(int(self.modulated)))
             text_file.write('n_frames = {:d}\n'.format(self.n_frames))
-            text_file.write('max_in_points = {:d}\n\n'.format(self.max_in_points))
-            text_file.write('max_val_points = {:d}\n\n'.format(self.max_val_points))
+            text_file.write('max_in_points = {:d}\n\n'.format(
+                self.max_in_points))
+            text_file.write('max_val_points = {:d}\n\n'.format(
+                self.max_val_points))
             text_file.write('val_radius = {:.6f}\n\n'.format(self.val_radius))
 
             # Training parameters
             text_file.write('# Training parameters\n')
             text_file.write('# *******************\n\n')
 
-            text_file.write('learning_rate = {:f}\n'.format(self.learning_rate))
+            text_file.write('learning_rate = {:f}\n'.format(
+                self.learning_rate))
             text_file.write('momentum = {:f}\n'.format(self.momentum))
             text_file.write('lr_decay_epochs =')
             for e, d in self.lr_decays.items():
                 text_file.write(' {:d}:{:f}'.format(e, d))
             text_file.write('\n')
-            text_file.write('grad_clip_norm = {:f}\n\n'.format(self.grad_clip_norm))
-
+            text_file.write('grad_clip_norm = {:f}\n\n'.format(
+                self.grad_clip_norm))
 
             text_file.write('augment_symmetries =')
             for a in self.augment_symmetries:
                 text_file.write(' {:d}'.format(int(a)))
             text_file.write('\n')
-            text_file.write('augment_rotation = {:s}\n'.format(self.augment_rotation))
-            text_file.write('augment_noise = {:f}\n'.format(self.augment_noise))
-            text_file.write('augment_occlusion = {:s}\n'.format(self.augment_occlusion))
-            text_file.write('augment_occlusion_ratio = {:.6f}\n'.format(self.augment_occlusion_ratio))
-            text_file.write('augment_occlusion_num = {:d}\n'.format(self.augment_occlusion_num))
-            text_file.write('augment_scale_anisotropic = {:d}\n'.format(int(self.augment_scale_anisotropic)))
-            text_file.write('augment_scale_min = {:.6f}\n'.format(self.augment_scale_min))
-            text_file.write('augment_scale_max = {:.6f}\n'.format(self.augment_scale_max))
-            text_file.write('augment_color = {:.6f}\n\n'.format(self.augment_color))
+            text_file.write('augment_rotation = {:s}\n'.format(
+                self.augment_rotation))
+            text_file.write('augment_noise = {:f}\n'.format(
+                self.augment_noise))
+            text_file.write('augment_occlusion = {:s}\n'.format(
+                self.augment_occlusion))
+            text_file.write('augment_occlusion_ratio = {:.6f}\n'.format(
+                self.augment_occlusion_ratio))
+            text_file.write('augment_occlusion_num = {:d}\n'.format(
+                self.augment_occlusion_num))
+            text_file.write('augment_scale_anisotropic = {:d}\n'.format(
+                int(self.augment_scale_anisotropic)))
+            text_file.write('augment_scale_min = {:.6f}\n'.format(
+                self.augment_scale_min))
+            text_file.write('augment_scale_max = {:.6f}\n'.format(
+                self.augment_scale_max))
+            text_file.write('augment_color = {:.6f}\n\n'.format(
+                self.augment_color))
 
             text_file.write('weight_decay = {:f}\n'.format(self.weight_decay))
-            text_file.write('segloss_balance = {:s}\n'.format(self.segloss_balance))
+            text_file.write('segloss_balance = {:s}\n'.format(
+                self.segloss_balance))
             text_file.write('class_w =')
             for a in self.class_w:
                 text_file.write(' {:.6f}'.format(a))
             text_file.write('\n')
-            text_file.write('deform_fitting_mode = {:s}\n'.format(self.deform_fitting_mode))
-            text_file.write('deform_fitting_power = {:.6f}\n'.format(self.deform_fitting_power))
-            text_file.write('deform_lr_factor = {:.6f}\n'.format(self.deform_lr_factor))
-            text_file.write('repulse_extent = {:.6f}\n'.format(self.repulse_extent))
+            text_file.write('deform_fitting_mode = {:s}\n'.format(
+                self.deform_fitting_mode))
+            text_file.write('deform_fitting_power = {:.6f}\n'.format(
+                self.deform_fitting_power))
+            text_file.write('deform_lr_factor = {:.6f}\n'.format(
+                self.deform_lr_factor))
+            text_file.write('repulse_extent = {:.6f}\n'.format(
+                self.repulse_extent))
             text_file.write('batch_num = {:d}\n'.format(self.batch_num))
-            text_file.write('val_batch_num = {:d}\n'.format(self.val_batch_num))
+            text_file.write('val_batch_num = {:d}\n'.format(
+                self.val_batch_num))
             text_file.write('max_epoch = {:d}\n'.format(self.max_epoch))
             if self.epoch_steps is None:
                 text_file.write('epoch_steps = None\n')
             else:
-                text_file.write('epoch_steps = {:d}\n'.format(self.epoch_steps))
-            text_file.write('validation_size = {:d}\n'.format(self.validation_size))
-            text_file.write('checkpoint_gap = {:d}\n'.format(self.checkpoint_gap))
-
+                text_file.write('epoch_steps = {:d}\n'.format(
+                    self.epoch_steps))
+            text_file.write('validation_size = {:d}\n'.format(
+                self.validation_size))
+            text_file.write('checkpoint_gap = {:d}\n'.format(
+                self.checkpoint_gap))
