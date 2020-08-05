@@ -5,7 +5,6 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
 import random
-from ml3d.datasets.utils import DataProcessing
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
@@ -41,14 +40,20 @@ class Toronto3DSplit():
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        pc = pd.read_csv(pc_path, header=None, delim_whitespace=True, dtype = np.float32).values
+        data = PlyData.read(pc_path)['vertex']
 
-        points = pc[:, 0:3]
-        feat = pc[:, [4, 5, 6, 3]]
+        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
+        points[:, 0] = data['x']
+        points[:, 1] = data['y']
+        points[:, 2] = data['z']
 
+        feat = np.zeros(points.shape, dtype=np.float32)
+        feat[:, 0] = data['red']
+        feat[:, 1] = data['green']
+        feat[:, 2] = data['blue']
 
         if(self.split != 'test'):
-            labels = pd.read_csv(pc_path.replace(".txt", ".labels"), header=None, delim_whitespace=True, dtype = np.int32).values
+            labels = data['scalar_Label']
         else:
             labels = np.zeros((points.shape[0], ), dtype = np.int32)
         
@@ -92,27 +97,12 @@ class Toronto3D:
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
-        self.all_files = glob.glob(str(Path(self.dataset_path) / '*.txt'))
-        random.shuffle(self.all_files)
-
-        self.train_files = [f for f in self.all_files if exists(Path(f).parent / Path(f).name.replace('.txt', '.labels'))]
-        self.test_files = [f for f in self.all_files if f not in self.train_files]
-
-        self.all_split = [0, 1, 4, 5, 3, 4, 3, 0, 1, 2, 3, 4, 2, 0, 5]
-        self.val_split = cfg.val_split
-
-        self.train_files = np.sort(self.train_files)
-        self.test_files = np.sort(self.test_files)
-        self.val_files = []
-
-        for i, file_path in enumerate(self.train_files):
-            if self.all_split[i] == self.val_split:
-                self.val_files.append(file_path)
-
-        self.train_files = np.sort([f for f in self.train_files if f not in self.val_files])
+        self.train_files = [self.dataset_path + f for f in cfg.train_files]
+        self.val_files = [self.dataset_path + f for f in cfg.val_files]
+        self.test_files = [self.dataset_path + f for f in cfg.test_files]
 
     def get_split (self, split):
-        return Semantic3DSplit(self, split=split)
+        return Toronto3DSplit(self, split=split)
     
     def get_split_list(self, split):
         if split == 'test':
@@ -124,43 +114,6 @@ class Toronto3D:
         else:
             random.shuffle(self.val_files)
             return self.val_files
-
-    def get_data(self, file_path, is_test=False):
-        # print("get data = " + file_path)
-        file_path = Path(file_path)
-        kdtree_path = Path(file_path).parent.parent / 'cache' / 'KDTree' / file_path.name.replace(".ply", ".pkl")
-        
-        with open(kdtree_path, 'rb') as f:
-            search_tree = pickle.load(f)
-        points = np.array(search_tree.data, copy=False)
-
-        pc_feat_labels_path = kdtree_path.parent.parent / 'sub' / file_path.name.replace(".ply", "_sub.npy")
-        pc_feat_labels = np.load(pc_feat_labels_path)
-
-        feat = pc_feat_labels[:, 3:6]
-
-        if(is_test):
-            labels = np.zeros(np.shape(points)[0], dtype = np.uint8)
-        else:
-            labels = pc_feat_labels[:, 6]
-
-        return points, feat, search_tree, labels
-
-    def crop_pc(self, points, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        if(points.shape[0] < self.cfg.num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = self.cfg.num_points - points.shape[0]
-            select_idx = list(select_idx) + list(random.choices(select_idx, k = diff))
-            random.shuffle(select_idx)
-            return select_idx
-        center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point, 
-                                k=self.cfg.num_points)[1][0]
-
-        select_idx = DataProcessing.shuffle_idx(select_idx)
-        return select_idx
-
 
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
@@ -266,19 +219,20 @@ from ml3d.torch.utils import Config
 
 
 if __name__ == '__main__':
-    config = '../torch/configs/randlanet_semantic3d.py'
+    config = '../torch/configs/randlanet_toronto3d.py'
     cfg  = Config.load_from_file(config)
-    a = Semantic3D(cfg.dataset)
-    b = a.get_split("test")
+    a = Toronto3D(cfg.dataset)
+    b = a.get_split("training")
     c = b.get_data(1)
-    print(b.get_attr(1)['name'])
-    print(c['point'].shape)
-    print(c['feat'].shape)
-    print(c['label'].shape)
-    print(c['point'][0])
-    print(c['feat'][0])
-    print(c['label'][0])
-    print(c['label'].mean())
+    print(c)
+    # print(b.get_attr(1)['name'])
+    # print(c['point'].shape)
+    # print(c['feat'].shape)
+    # print(c['label'].shape)
+    # print(c['point'][0])
+    # print(c['feat'][0])
+    # print(c['label'][0])
+    # print(c['label'].mean())
     # print(c['label'])
     # # print(b.get_data(0))
     # print(b.get_attr(10))

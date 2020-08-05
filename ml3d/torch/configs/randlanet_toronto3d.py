@@ -7,7 +7,7 @@ model       = dict(
 
     sub_grid_size   = 0.06,  # preprocess_parameter
     sub_sampling_ratio = [4, 4, 4, 4, 2],
-    num_sub_points = [4096 * 10 // 4, 4096 * 10 // 16, 4096 * 10 // 64, 4096 * 10 // 256, 4096 * 10 // 512],
+    num_sub_points = [65536 // 4, 65536 // 16, 65536 // 64, 65536 // 256, 65536 // 512],
 
     d_in            = 6,
     d_feature       = 8,
@@ -17,13 +17,13 @@ model       = dict(
     batcher         = 'DefaultBatcher',
 
     ignored_label_inds = [0],
-    ckpt_path       = './ml3d/torch/checkpoint/randlanet_semantic3d.pth'
+    ckpt_path       = './ml3d/torch/checkpoint/randlanet_toronto3d.pth'
 )
 
 pipeline    = dict(
     batch_size          = 1,
     val_batch_size      = 1,
-    test_batch_size     = 3,
+    test_batch_size     = 1,
     max_epoch           = 100,  # maximum epoch during training
     learning_rate       = 1e-2,  # initial learning rate
     #lr_decays           = {0.95 for i in range(0, 500)},
@@ -39,13 +39,15 @@ pipeline    = dict(
     )
 
 dataset = dict(
-    dataset_path = '/home/sanskar_agrawal/data/Semantic3D/',
-    cache_dir = '/home/sanskar_agrawal/data/Semantic3D/cache/',
+    dataset_path = '/Users/sanskara/data/Toronto_3D/',
+    cache_dir = '/Users/sanskara/data/Toronto_3D/cache/',
     prepro_grid_size    = 0.06,
     num_points      = 65536,
     test_result_folder  = './test',
 
     class_weights = [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353],
     ignored_label_inds = [0],
-    val_split = 1,
+    train_files = ['L001.ply', 'L003.ply', 'L004.ply'],
+    val_files = ['L002.ply'],
+    test_files = ['L002.ply'],
     )
