@@ -7,7 +7,7 @@ model       = dict(
 
     sub_grid_size   = 0.06,  # preprocess_parameter
     sub_sampling_ratio = [4, 4, 4, 4, 2],
-    num_sub_points = [4096 * 10 // 4, 4096 * 10 // 16, 4096 * 10 // 64, 4096 * 10 // 256, 4096 * 10 // 512],
+    num_sub_points = [65536 // 4, 65536 // 16, 65536 // 64, 65536 // 256, 65536 // 512],
 
     d_in            = 6,
     d_feature       = 8,
