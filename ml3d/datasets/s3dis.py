@@ -376,62 +376,6 @@ class S3DIS:
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
 
 
-# class SimpleSampler(IterableDataset):
-#     def __init__(self, dataset, batch_size, split='training'):
-#         cfg = dataset.cfg
-#         path_list = dataset.get_split_list(split)
-#         num_per_epoch = int(len(path_list) / batch_size)
-
-#         # if split == 'test':
-#         #     dataset.test_list = path_list
-#         #     for test_file_name in path_list:
-#         #         points = np.load(test_file_name)
-#         #         dataset.possibility += [np.random.rand(points.shape[0]) * 1e-3]
-#         #         dataset.min_possibility += [float(np.min(dataset.possibility[-1]))]
-
-#         self.num_per_epoch = num_per_epoch
-#         self.path_list = path_list
-#         self.split = split
-#         self.dataset = dataset
-#         self.batch_size = batch_size
-
-#     def __iter__(self):
-#         return self.spatially_regular_gen()
-
-#     def __len__(self):
-#         return self.num_per_epoch
-
-#     def spatially_regular_gen(self):
-#         for i in range(self.num_per_epoch * self.batch_size):
-#             # if self.split != 'test':
-#             cloud_ind = i
-#             pc_path = self.path_list[cloud_ind]
-#             pc, feat, tree, labels = self.dataset.get_data(pc_path, is_test=False)
-#             pick_idx = np.random.choice(len(pc), 1)
-#             selected_idx = self.dataset.crop_pc(pc, tree, pick_idx)
-#             selected_points = pc[selected_idx]
-#             selected_labels = labels[selected_idx]
-#             selected_feat = feat[selected_idx]
-#             selected_points_feat = np.concatenate([selected_points, selected_feat], axis = 1)
-#             # else:
-#             #     cloud_ind = int(np.argmin(self.dataset.min_possibility))
-#             #     pc_path = self.path_list[cloud_ind]
-#             #     pc, tree, labels = self.dataset.get_data(pc_path, is_test=True)
-#             #     pick_idx = np.argmin(self.dataset.possibility[cloud_ind])
-#             #     selected_pc, selected_labels, selected_idx = \
-#             #         self.dataset.crop_pc(pc, labels, tree, pick_idx)
-
-#             # if self.split == 'test':
-#             #     # update the possibility of the selected pc
-#             #     dists = np.sum(np.square((selected_pc - pc[pick_idx]).astype(np.float32)), axis=1)
-#             #     delta = np.square(1 - dists / np.max(dists))
-#             #     self.dataset.possibility[cloud_ind][selected_idx] += delta
-#             #     self.dataset.min_possibility[cloud_ind] = np.min(self.dataset.possibility[cloud_ind])
-
-#             yield (selected_points_feat.astype(np.float32),
-#                     selected_labels.astype(np.int64),
-#                     np.array(selected_idx).astype(np.int64),
-#                     np.array([cloud_ind], dtype=np.int64))
 
 from ml3d.torch.utils import Config
 

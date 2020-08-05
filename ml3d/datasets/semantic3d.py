@@ -5,7 +5,7 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
 import random
-from ml3d.datasets.semantickitti import DataProcessing
+from ml3d.datasets.utils import DataProcessing
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
