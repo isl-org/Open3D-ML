@@ -9,7 +9,7 @@ model       = dict(
     sub_sampling_ratio = [4, 4, 4, 4, 2],
     num_sub_points = [65536 // 4, 65536 // 16, 65536 // 64, 65536 // 256, 65536 // 512],
 
-    d_in            = 6,
+    d_in            = 3,
     d_feature       = 8,
     d_out           = [16, 64, 128, 256, 512],
 

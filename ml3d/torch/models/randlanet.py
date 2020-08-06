@@ -163,6 +163,10 @@ class RandLANet(nn.Module):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
+
+        if 'feat' not in data.keys():
+            data['feat'] = None
+
         points = data['point'][:, 0:3]
         feat = data['feat']
         labels = data['label']
