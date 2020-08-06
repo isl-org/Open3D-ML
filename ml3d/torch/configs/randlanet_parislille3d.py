@@ -3,7 +3,7 @@ model       = dict(
     k_n             = 16,  # KNN,
     num_layers      = 5,  # Number of layers
     num_points      = 65536,  # Number of input points
-    num_classes     = 8,  # Number of valid classes
+    num_classes     = 9,  # Number of valid classes
 
     sub_grid_size   = 0.06,  # preprocess_parameter
     sub_sampling_ratio = [4, 4, 4, 4, 2],
@@ -17,7 +17,7 @@ model       = dict(
     batcher         = 'DefaultBatcher',
 
     ignored_label_inds = [0],
-    ckpt_path       = './ml3d/torch/checkpoint/randlanet_toronto3d.pth'
+    ckpt_path       = './ml3d/torch/checkpoint/randlanet_parislille3d.pth'
 )
 
 pipeline    = dict(
@@ -39,15 +39,15 @@ pipeline    = dict(
     )
 
 dataset = dict(
-    dataset_path = '/Users/sanskara/data/Toronto_3D/',
-    cache_dir = '/Users/sanskara/data/Toronto_3D/cache/',
+    dataset_path = '/Users/sanskara/data/Paris_Lille_3D/',
+    cache_dir = '/Users/sanskara/data/Paris_Lille_3D/cache/',
     prepro_grid_size    = 0.06,
     num_points      = 65536,
     test_result_folder  = './test',
 
     class_weights = [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353],
     ignored_label_inds = [0],
-    train_files = ['L001.ply', 'L003.ply', 'L004.ply'],
-    val_files = ['L002.ply'],
-    test_files = ['L002.ply'],
+    train_dir = '/Users/sanskara/data/Paris_Lille_3D/' + 'training_10_classes/',
+    val_files = ['Lille2.ply'],
+    test_dir = '/Users/sanskara/data/Paris_Lille_3D/' + 'test_10_classes/',
     )
