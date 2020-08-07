@@ -45,7 +45,7 @@ dataset = dict(
     num_points      = 65536,
     test_result_folder  = './test',
 
-    class_weights = [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353],
+    class_weights = [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353, 269353],
     ignored_label_inds = [0],
     train_dir = '/Users/sanskara/data/Paris_Lille_3D/' + 'training_10_classes/',
     val_files = ['Lille2.ply'],
