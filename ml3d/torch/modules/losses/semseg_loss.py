@@ -44,9 +44,11 @@ class SemSegLoss(object):
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss
-        class_wt = DataProcessing.get_class_weights('Semantic3D')
-        n_samples = torch.tensor(
-            class_wt, dtype=torch.float, device=device)
-        ratio_samples = n_samples / n_samples.sum()
-        weights = 1 / (ratio_samples + 0.02)
-        self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(weight=weights)
+        if 'class_weights' in dataset.cfg.keys():
+            class_wt = DataProcessing.get_class_weights(dataset.cfg.class_weights)
+            weights = torch.tensor(
+                class_wt, dtype=torch.float, device=device)
+
+            self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(weight=weights)
+        else:
+            self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss()
