@@ -1,5 +1,5 @@
 # model settings
-# Expected format of ply files : ['x', 'y', 'z', 'class', 'feat_1', 'feat_2', ........,'feat_n']
+# Expected format of npy files : ['x', 'y', 'z', 'class', 'feat_1', 'feat_2', ........,'feat_n']
 model       = dict(
     k_n             = 16,  # KNN,
     num_layers      = 5,  # Number of layers
