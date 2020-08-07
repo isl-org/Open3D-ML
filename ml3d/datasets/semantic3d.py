@@ -124,27 +124,6 @@ class Semantic3D:
             random.shuffle(self.val_files)
             return self.val_files
 
-    def get_data(self, file_path, is_test=False):
-        # print("get data = " + file_path)
-        file_path = Path(file_path)
-        kdtree_path = Path(file_path).parent.parent / 'cache' / 'KDTree' / file_path.name.replace(".ply", ".pkl")
-        
-        with open(kdtree_path, 'rb') as f:
-            search_tree = pickle.load(f)
-        points = np.array(search_tree.data, copy=False)
-
-        pc_feat_labels_path = kdtree_path.parent.parent / 'sub' / file_path.name.replace(".ply", "_sub.npy")
-        pc_feat_labels = np.load(pc_feat_labels_path)
-
-        feat = pc_feat_labels[:, 3:6]
-
-        if(is_test):
-            labels = np.zeros(np.shape(points)[0], dtype = np.uint8)
-        else:
-            labels = pc_feat_labels[:, 6]
-
-        return points, feat, search_tree, labels
-
     def crop_pc(self, points, search_tree, pick_idx):
         # crop a fixed size point cloud for training
         if(points.shape[0] < self.cfg.num_points):
