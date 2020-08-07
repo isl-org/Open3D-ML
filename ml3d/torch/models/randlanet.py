@@ -104,7 +104,6 @@ class RandLANet(nn.Module):
         if (feat is not None):
             features = np.concatenate([pc, feat], axis=1)
         else:
-            print("None features")
             features = pc
 
         input_points = []
