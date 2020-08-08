@@ -104,7 +104,6 @@ class RandLANet(nn.Module):
         if (feat is not None):
             features = np.concatenate([pc, feat], axis=1)
         else:
-            print("None features")
             features = pc
 
         input_points = []
@@ -163,6 +162,10 @@ class RandLANet(nn.Module):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
+
+        if 'feat' not in data.keys():
+            data['feat'] = None
+
         points = data['point'][:, 0:3]
         feat = data['feat'][:, 0:3]
         labels = data['label']
