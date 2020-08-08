@@ -167,7 +167,7 @@ class RandLANet(nn.Module):
             data['feat'] = None
 
         points = data['point'][:, 0:3]
-        feat = data['feat']
+        feat = data['feat'][:, 0:3]
         labels = data['label']
         split = attr['split']
 
