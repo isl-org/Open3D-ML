@@ -16,7 +16,7 @@ model       = RandLANet(cfg.model)
 
 pipeline    = SemanticSegmentation(model, dataset, cfg.pipeline)
 
-device      = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+#device      = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 #device     = torch.device('cpu')
 
-pipeline.run_train(device)
+pipeline.run_train()

@@ -7,7 +7,7 @@ import numpy as np
 from ..utils import helper_tf_util
 import time
 
-class RandLANet(object):
+class RandLANet(tf.keras.Model):
     """docstring for RandLANet"""
     def __init__(self, cfg):
         super(RandLANet, self).__init__()

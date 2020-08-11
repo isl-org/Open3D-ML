@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from os.path import exists, join, isfile, dirname, abspath
 from ml3d.utils import make_dir, LogRecord
-
+import tensorflow as tf
 import yaml
 
 logging.setLogRecordFactory(LogRecord)
@@ -118,20 +118,20 @@ class SemanticSegmentation():
 
                 epoch += 1
 
-    def run_train(self, device):
+    def run_train(self):
         model = self.model
         dataset = self.dataset
 
         cfg = self.cfg
 
         # strategy TODO
-        strategy_override = None
-        strategy = strategy_override or distribution_utils.get_distribution_strategy(
-          distribution_strategy=flags_obj.distribution_strategy,
-          num_gpus=flags_obj.num_gpus,
-          tpu_address=flags_obj.tpu)
+        # strategy_override = None
+        # strategy = strategy_override or distribution_utils.get_distribution_strategy(
+        #   distribution_strategy=flags_obj.distribution_strategy,
+        #   num_gpus=flags_obj.num_gpus,
+        #   tpu_address=flags_obj.tpu)
 
-        strategy_scope = distribution_utils.get_strategy_scope(strategy)
+        # strategy_scope = distribution_utils.get_strategy_scope(strategy)
 
         # mnist = tfds.builder('mnist', data_dir=flags_obj.data_dir)
         # if flags_obj.download:
@@ -145,16 +145,15 @@ class SemanticSegmentation():
         #   buffer_size=50000).batch(flags_obj.batch_size)
         # eval_input_dataset = mnist_test.cache().repeat().batch(flags_obj.batch_size)
 
-        with strategy_scope:
-            lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                0.05, decay_steps=100000, decay_rate=0.96)
-            optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            cfg.adam_lr, decay_steps=100000, decay_rate=cfg.scheduler_gamma)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
-            model = self.model
-            model.compile(
-                optimizer=optimizer,
-                loss='sparse_categorical_crossentropy',
-                metrics=['sparse_categorical_accuracy'])
+        model = self.model
+        model.compile(
+            optimizer=optimizer,
+            loss='sparse_categorical_crossentropy',
+            metrics=['sparse_categorical_accuracy'])
 
         num_train_examples = mnist.info.splits['train'].num_examples
         train_steps = num_train_examples // flags_obj.batch_size
@@ -188,120 +187,6 @@ class SemanticSegmentation():
         stats = common.build_stats(history, eval_output, callbacks)
         return stats
 
-
-
-        model.to(device)
-
-        log.info("DEVICE : {}".format(device))
-        log.info(model)
-
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
-        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
-
-        Loss = SemSegLoss(self, model, dataset, device)
-        Metric = SemSegMetric(self, model, dataset, device)
-
-        train_batcher = self.get_batcher(device)
-
-        train_split = SimpleDataset(dataset=dataset.get_split('training'),
-                                    preprocess=model.preprocess,
-                                    transform=model.transform,
-                                    shuffle=True)
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size,
-                                  shuffle=True,
-                                  collate_fn=train_batcher.collate_fn)
-        '''
-        valid_sampler   = dataset.get_sampler(cfg.val_batch_size, 'validation')
-        valid_loader    = DataLoader(valid_sampler, 
-                                     batch_size=cfg.val_batch_size)
-        train_sampler   = dataset.get_sampler(cfg.batch_size, 'training')
-        train_loader    = DataLoader(train_sampler, 
-                                     batch_size=cfg.batch_size)
-        '''
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer, cfg.scheduler_gamma)
-
-        self.optimizer, self.scheduler = optimizer, scheduler
-
-        first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
-
-        writer = SummaryWriter(join(cfg.logs_dir, cfg.train_sum_dir))
-
-        log.info("Started training")
-
-        for epoch in range(0, cfg.max_epoch + 1):
-
-            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-            model.train()
-            self.losses = []
-
-            self.accs = []
-            self.ious = []
-            step = 0
-
-            for idx, inputs in enumerate(tqdm(train_loader)):
-
-                results = model(inputs['data'])
-
-                loss, gt_labels, predict_scores = model.loss(
-                    Loss, results, inputs, device)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                acc = Metric.acc(predict_scores, gt_labels)
-                iou = Metric.iou(predict_scores, gt_labels)
-
-                self.losses.append(loss.cpu().item())
-                self.accs.append(acc)
-                self.ious.append(iou)
-
-                step = step + 1
-
-            scheduler.step()
-
-            # --------------------- validation
-            model.eval()
-            self.valid_losses = []
-            self.valid_accs = []
-            self.valid_ious = []
-            step = 0
-            with torch.no_grad():
-                for batch_data in tqdm(valid_loader,
-                                       desc='validation',
-                                       leave=False):
-
-                    inputs = model.preprocess(batch_data, device)
-                    # scores: B x N x num_classes
-                    scores = model(inputs)
-
-                    labels = batch_data[1]
-                    scores, labels = self.filter_valid(scores, labels, device)
-
-                    logp = torch.distributions.utils.probs_to_logits(
-                        scores, is_binary=False)
-                    loss = criterion(logp, labels)
-                    acc = accuracy(scores, labels)
-                    iou = intersection_over_union(scores, labels)
-
-                    self.valid_losses.append(loss.cpu().item())
-                    self.valid_accs.append(accuracy(scores, labels))
-                    self.valid_ious.append(
-                        intersection_over_union(scores, labels))
-                    step = step + 1
-
-            self.save_logs(writer, epoch)
-
-            if epoch % cfg.save_ckpt_freq == 0:
-                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-                self.save_ckpt(path_ckpt, epoch)
 
     def get_batcher(self, device):
         batcher_name = getattr(self.model.cfg, 'batcher')
