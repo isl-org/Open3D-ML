@@ -1,1 +1,3 @@
-from .mynet import *
+from .randlanet import RandLANet
+
+__all__ = ['RandLANet']

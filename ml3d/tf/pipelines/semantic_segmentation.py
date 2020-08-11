@@ -1,24 +1,15 @@
 #coding: future_fstrings
-import torch, pickle
-import torch.nn as nn
-import helper_torch_util
 import numpy as np
 import logging
 import sys
 
 from datetime import datetime
 from tqdm import tqdm
-from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
 from os.path import exists, join, isfile, dirname, abspath
+from ml3d.utils import make_dir, LogRecord
 
-from ml3d.torch.datasets import SimpleDataset, DefaultBatcher, ConcatBatcher
-from ml3d.datasets.semantickitti import DataProcessing
-
-from ml3d.torch.modules.losses import SemSegLoss
-from ml3d.torch.modules.metrics import SemSegMetric
-from ml3d.torch.utils import make_dir, LogRecord
+import yaml
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -129,10 +120,76 @@ class SemanticSegmentation():
 
     def run_train(self, device):
         model = self.model
-        model.device = device
         dataset = self.dataset
 
         cfg = self.cfg
+
+        # strategy TODO
+        strategy_override = None
+        strategy = strategy_override or distribution_utils.get_distribution_strategy(
+          distribution_strategy=flags_obj.distribution_strategy,
+          num_gpus=flags_obj.num_gpus,
+          tpu_address=flags_obj.tpu)
+
+        strategy_scope = distribution_utils.get_strategy_scope(strategy)
+
+        # mnist = tfds.builder('mnist', data_dir=flags_obj.data_dir)
+        # if flags_obj.download:
+        # mnist.download_and_prepare()
+
+        # mnist_train, mnist_test = datasets_override or mnist.as_dataset(
+        #   split=['train', 'test'],
+        #   decoders={'image': decode_image()},  # pylint: disable=no-value-for-parameter
+        #   as_supervised=True)
+        # train_input_dataset = mnist_train.cache().repeat().shuffle(
+        #   buffer_size=50000).batch(flags_obj.batch_size)
+        # eval_input_dataset = mnist_test.cache().repeat().batch(flags_obj.batch_size)
+
+        with strategy_scope:
+            lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+                0.05, decay_steps=100000, decay_rate=0.96)
+            optimizer = tf.keras.optimizers.SGD(learning_rate=lr_schedule)
+
+            model = self.model
+            model.compile(
+                optimizer=optimizer,
+                loss='sparse_categorical_crossentropy',
+                metrics=['sparse_categorical_accuracy'])
+
+        num_train_examples = mnist.info.splits['train'].num_examples
+        train_steps = num_train_examples // flags_obj.batch_size
+        train_epochs = flags_obj.train_epochs
+
+        ckpt_full_path = os.path.join(flags_obj.model_dir, 'model.ckpt-{epoch:04d}')
+        callbacks = [
+          tf.keras.callbacks.ModelCheckpoint(
+              ckpt_full_path, save_weights_only=True),
+          tf.keras.callbacks.TensorBoard(log_dir=flags_obj.model_dir),
+        ]
+
+        num_eval_examples = mnist.info.splits['test'].num_examples
+        num_eval_steps = num_eval_examples // flags_obj.batch_size
+
+        history = model.fit(
+          train_input_dataset,
+          epochs=train_epochs,
+          steps_per_epoch=train_steps,
+          callbacks=callbacks,
+          validation_steps=num_eval_steps,
+          validation_data=eval_input_dataset,
+          validation_freq=flags_obj.epochs_between_evals)
+
+        export_path = os.path.join(flags_obj.model_dir, 'saved_model')
+        model.save(export_path, include_optimizer=False)
+
+        eval_output = model.evaluate(
+          eval_input_dataset, steps=num_eval_steps, verbose=2)
+
+        stats = common.build_stats(history, eval_output, callbacks)
+        return stats
+
+
+
         model.to(device)
 
         log.info("DEVICE : {}".format(device))

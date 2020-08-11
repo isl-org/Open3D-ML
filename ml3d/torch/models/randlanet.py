@@ -14,9 +14,7 @@ from ml3d.torch.modules.losses import filter_valid_label
 
 class RandLANet(nn.Module):
     def __init__(self, cfg):
-
         super(RandLANet, self).__init__()
-
         self.cfg = cfg
         d_feature = cfg.d_feature
 
