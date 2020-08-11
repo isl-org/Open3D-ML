@@ -14,7 +14,7 @@ import yaml
 #BASE_DIR = './'
 BASE_DIR = dirname(abspath(__file__))
 
-data_config = join(BASE_DIR, '../../utils', 'semantic-kitti.yaml')
+data_config = join(BASE_DIR, '_resources', 'semantic-kitti.yaml')
 DATA = yaml.safe_load(open(data_config, 'r'))
 remap_dict = DATA["learning_map_inv"]
 

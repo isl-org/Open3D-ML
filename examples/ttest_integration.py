@@ -2,10 +2,10 @@ import torch
 import open3d.ml.torch as ml3d
 print(dir(ml3d))
 
-config = 'ml3d/torch/configs/randlanet_semantic3d.py'
+config = 'ml3d/torch/configs/randlanet_semantickitti.py'
 cfg         = ml3d.utils.Config.load_from_file(config)
 
-dataset     = ml3d.datasets.Semantic3D(cfg.dataset)
+dataset     = ml3d.datasets.SemanticKITTI(cfg.dataset)
 
 model       = ml3d.models.RandLANet(cfg.model)
 
