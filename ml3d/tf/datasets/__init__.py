@@ -1,1 +1,1 @@
-from .scannet import ScanNet
+from .tf_dataset import TF_Dataset
