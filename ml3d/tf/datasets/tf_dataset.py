@@ -1,10 +1,16 @@
 from abc import abstractmethod
 from tqdm import tqdm
+import random
 
 import tensorflow as tf
 import numpy as np
 from ml3d.torch.utils import dataset_helper
 
+from ml3d.datasets.utils import DataProcessing
+from sklearn.neighbors import KDTree
+
+
+# def randlanet_preprocess():
 
 class TF_Dataset():
     def __init__(self,
@@ -17,24 +23,151 @@ class TF_Dataset():
         self.dataset = dataset
         self.preprocess = preprocess
         self.transform = transform
+        if preprocess is not None:
+            cache_dir = getattr(dataset.cfg, 'cache_dir')
+            assert cache_dir is not None, 'cache directory is not given'
+
+            self.cache_convert = dataset_helper.Cache(
+                preprocess,
+                cache_dir=cache_dir,
+                cache_key=dataset_helper._get_hash(repr(preprocess)[1:20]))
+
+            uncached = [
+                idx for idx in range(len(dataset))
+                if dataset.get_attr(idx)['name'] not in
+                self.cache_convert.cached_ids
+            ]
+            if len(uncached) > 0:
+                for idx in tqdm(
+                        range(len(dataset)), desc='preprocess', disable=no_progress):
+                    attr = dataset.get_attr(idx)
+                    data = dataset.get_data(idx)
+                    name = attr['name']
+
+                    self.cache_convert(name, data, attr)
+
+        else:
+            self.cache_convert = None
 
     # def generator()
     def read_data(self, key):
-            print(key)
+        attr = self.dataset.get_attr(key)
+        # print(attr)
+        if self.cache_convert is None:
             data = self.dataset.get_data(key)
-            print(data)
-            return data['point'], data['feat'], data['label']
+        else:
+            data = self.cache_convert(attr['name'])
+
+        pick_idx = np.random.choice(len(data['point']), 1)
+        pc, feat, label, _ = crop_pc(data['point'], data['feat'], data['label'], data['search_tree'], pick_idx)
+
+        return pc, feat, label
 
     def get_loader(self):
 
-        tf_dataset = tf.data.Dataset.range(len(self.dataset))    
-        tf_dataset = tf_dataset.map(lambda x : tf.numpy_function(func = self.read_data, inp = [x], Tout = [tf.float32, tf.float32, tf.int32]))
+        tf_dataset = tf.data.Dataset.range(len(self.dataset))
+        tf_dataset = tf_dataset.map(lambda x : tf.numpy_function(func = self.read_data, inp = [x], Tout = [tf.float32, tf.float32,
+                                    tf.int32]))
 
-        for a in tf_dataset:
-            print(a)
-            print("\n")
-            break
-    #     print(tf_dataset)
+        tf_dataset = tf_dataset.map(map_func = test_transform)
+
+        return tf_dataset
+
+def crop_pc(points, feat, labels, search_tree, pick_idx):
+    # crop a fixed size point cloud for training
+    num_points = 65536
+    if (points.shape[0] < num_points):
+        select_idx = np.array(range(points.shape[0]))
+        diff = num_points - points.shape[0]
+        select_idx = list(select_idx) + list(
+            random.choices(select_idx, k=diff))
+        random.shuffle(select_idx)
+    else:
+        center_point = points[pick_idx, :].reshape(1, -1)
+        select_idx = search_tree.query(center_point,
+                                        k=num_points)[1][0]
+
+    # select_idx = DataProcessing.shuffle_idx(select_idx)
+    random.shuffle(select_idx)
+    select_points = points[select_idx]
+    select_labels = labels[select_idx]
+    if (feat is None):
+        select_feat = None
+    else:
+        select_feat = feat[select_idx]
+    return select_points, select_feat, select_labels, select_idx
+
+
+def test_transform(pc, feat, label):
+    num_layers = 5
+    k_n = 16
+    sub_sampling_ratio = [4, 4, 4, 4, 2]
+
+    if (feat is not None):
+        features = tf.concat([pc, feat], axis=1)
+    else:
+        features = pc
+
+    input_points = []
+    input_neighbors = []
+    input_pools = []
+    input_up_samples = []
+
+    for i in range(num_layers):
+        neighbour_idx = tf.py_function(DataProcessing.knn_search, [pc, pc, k_n], tf.int32)
+
+        sub_points = pc[:tf.shape(pc)[0] // sub_sampling_ratio[i], :]
+        pool_i = neighbour_idx[:tf.shape(pc)[0] //
+                                sub_sampling_ratio[i], :]
+        up_i = tf.py_function(DataProcessing.knn_search, [sub_points, pc, 1], tf.int32)
+        input_points.append(pc)
+        input_neighbors.append(neighbour_idx)
+        input_pools.append(pool_i)
+        input_up_samples.append(up_i)
+        pc = sub_points
+
+    input_list = input_points + input_neighbors + input_pools + input_up_samples
+    input_list += [features, label]
+
+    return input_list
+
+
+def test_preprocess(data, attr):
+    if 'feat' not in data.keys():
+        data['feat'] = None
+
+    points = data['point'][:, 0:3]
+    feat = data['feat'][:, 0:3]
+    labels = data['label']
+    split = attr['split']
+
+    if (feat is None):
+        sub_feat = None
+
+    data = dict()
+
+    if (feat is None):
+        sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            points, labels=labels, grid_size=0.06)
+
+    else:
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            points, features=feat, labels=labels, grid_size=0.06)
+
+    search_tree = KDTree(sub_points)
+
+    data['point'] = sub_points
+    data['feat'] = sub_feat
+    data['label'] = sub_labels
+    data['search_tree'] = search_tree
+
+    if split != "training":
+        proj_inds = np.squeeze(
+            search_tree.query(points, return_distance=False))
+        proj_inds = proj_inds.astype(np.int32)
+        data['proj_inds'] = proj_inds
+
+    return data
 
 
 
@@ -46,8 +179,11 @@ if __name__ == '__main__':
     cfg = Config.load_from_file(config)
     dataset = Toronto3D(cfg.dataset)
     
-    tf_data = TF_Dataset(dataset = dataset.get_split('training'))
+    tf_data = TF_Dataset(dataset = dataset.get_split('training'), preprocess = test_preprocess, transform = test_transform)
     loader = tf_data.get_loader()
-    # print(loader)
+    print(loader)
+    for data in loader:
+        print(data)
+        break
     # loader = SimpleDataset(dataset = dataset.get_split('training'))
     # print(loader)
