@@ -53,7 +53,7 @@ class Toronto3DSplit():
         feat[:, 2] = data['blue']
 
         if(self.split != 'test'):
-            labels = data['scalar_Label']
+            labels = np.array(data['scalar_Label'], dtype = np.int32)
         else:
             labels = np.zeros((points.shape[0], ), dtype = np.int32)
         
