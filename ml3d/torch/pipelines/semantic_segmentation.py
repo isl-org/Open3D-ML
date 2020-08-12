@@ -33,21 +33,33 @@ log = logging.getLogger(__name__)
 
 
 class SemanticSegmentation():
-    def __init__(self, model, dataset, cfg = None, batch_size = 1, val_batch_size = 1, test_batch_size = 1,max_epoch = 100,
-                learning_rate = 1e-2, save_ckpt_freq = 20, adam_lr = 1e-2, scheduler_gamma = 0.95, main_log_dir = './logs/',train_sum_dir = 'train_log'):
+    def __init__(self,
+                 model,
+                 dataset,
+                 cfg=None,
+                 batch_size=1,
+                 val_batch_size=1,
+                 test_batch_size=1,
+                 max_epoch=100,
+                 learning_rate=1e-2,
+                 save_ckpt_freq=20,
+                 adam_lr=1e-2,
+                 scheduler_gamma=0.95,
+                 main_log_dir='./logs/',
+                 train_sum_dir='train_log'):
 
         if cfg is None:
             cfg = dict(
-                batch_size = batch_size,
-                val_batch_size = val_batch_size,
-                test_batch_size = test_batch_size,
-                max_epoch = max_epoch,
-                learning_rate = learning_rate,
-                save_ckpt_freq = save_ckpt_freq,
-                adam_lr = adam_lr,
-                scheduler_gamma = scheduler_gamma,
-                main_log_dir = main_log_dir,
-                train_sum_dir = train_sum_dir,
+                batch_size=batch_size,
+                val_batch_size=val_batch_size,
+                test_batch_size=test_batch_size,
+                max_epoch=max_epoch,
+                learning_rate=learning_rate,
+                save_ckpt_freq=save_ckpt_freq,
+                adam_lr=adam_lr,
+                scheduler_gamma=scheduler_gamma,
+                main_log_dir=main_log_dir,
+                train_sum_dir=train_sum_dir,
             )
             cfg = Config(cfg)
 
