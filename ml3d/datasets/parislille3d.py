@@ -17,7 +17,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class Toronto3DSplit():
+class ParisLille3DSplit():
     def __init__(self, dataset, split='training'):
         self.cfg    = dataset.cfg
         path_list   = dataset.get_split_list(split)
@@ -47,19 +47,14 @@ class Toronto3DSplit():
         points[:, 1] = data['y']
         points[:, 2] = data['z']
 
-        feat = np.zeros(points.shape, dtype=np.float32)
-        feat[:, 0] = data['red']
-        feat[:, 1] = data['green']
-        feat[:, 2] = data['blue']
-
         if(self.split != 'test'):
-            labels = np.array(data['scalar_Label'], dtype = np.int32)
+            labels = np.array(data['class'])
         else:
             labels = np.zeros((points.shape[0], ), dtype = np.int32)
         
         data = {
             'point' : points,
-            'feat' : feat,
+            'feat' : None,
             'label' : labels
         }
 
@@ -67,7 +62,7 @@ class Toronto3DSplit():
 
     def get_attr(self, idx):
         pc_path = Path(self.path_list[idx])
-        name = pc_path.name.replace('.txt', '')
+        name = pc_path.name.replace('.ply', '')
 
         attr = {
             'name'      : name,
@@ -77,43 +72,47 @@ class Toronto3DSplit():
         return attr
 
 
-class Toronto3D:
+class ParisLille3D:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.name = 'Toronto3D'
+        self.name = 'ParisLille3D'
         self.dataset_path = cfg.dataset_path
-        self.label_to_names = {0: 'Unclassified',
-                               1: 'Ground',
-                               2: 'Road_markings',
-                               3: 'Natural',
-                               4: 'Building',
-                               5: 'Utility_line',
-                               6: 'Pole',
-                               7: 'Car',
-                               8: 'Fence'}
+        self.label_to_names = {0: 'unclassified',
+                               1: 'ground',
+                               2: 'building',
+                               3: 'pole-road_sign-traffic_light',
+                               4: 'bollard-small_pole',
+                               5: 'trash_can',
+                               6: 'barrier',
+                               7: 'pedestrian',
+                               8: 'car',
+                               9: 'natural-vegetation'
+                               }
 
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
-        self.train_files = [self.dataset_path + f for f in cfg.train_files]
-        self.val_files = [self.dataset_path + f for f in cfg.val_files]
-        self.test_files = [self.dataset_path + f for f in cfg.test_files]
+        self.train_files = glob.glob(cfg.train_dir + "*.ply")
+        self.val_files = [f for f in self.train_files if Path(f).name in cfg.val_files]
+        self.train_files = [f for f in self.train_files if f not in self.val_files]
+
+        self.test_files = glob.glob(cfg.test_dir + '*.ply')
 
     def get_split (self, split):
-        return Toronto3DSplit(self, split=split)
+        return ParisLille3DSplit(self, split=split)
     
     def get_split_list(self, split):
         if split == 'test':
             random.shuffle(self.test_files)
             return self.test_files
-        elif split == 'training':
-            random.shuffle(self.train_files)
-            return self.train_files
-        else:
+        elif split == 'val':
             random.shuffle(self.val_files)
             return self.val_files
+        else:
+            random.shuffle(self.train_files)
+            return self.train_files
 
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
@@ -219,11 +218,11 @@ from ml3d.torch.utils import Config
 
 
 if __name__ == '__main__':
-    config = '../torch/configs/randlanet_toronto3d.py'
+    config = '../torch/configs/randlanet_parislille3d.py'
     cfg  = Config.load_from_file(config)
-    a = Toronto3D(cfg.dataset)
-    b = a.get_split("training")
-    c = b.get_data(1)
+    a = ParisLille3D(cfg.dataset)
+    b = a.get_split("val")
+    c = b.get_attr(0)
     print(c)
     # print(b.get_attr(1)['name'])
     # print(c['point'].shape)

@@ -13,9 +13,20 @@ cfg = Config.load_from_file(config)
 
 dataset = Toronto3D(cfg.dataset)
 
-model = RandLANet(cfg.model)
+model = RandLANet(
+    d_in = 6,
+    d_out = [16, 64, 128, 256, 512],
+    d_feature = 8,
+    num_classes = 8,
+    num_layers = 5
+)
 
-pipeline = SemanticSegmentation(model, dataset, cfg.pipeline)
+pipeline = SemanticSegmentation(
+    model,
+    dataset,
+    batch_size = 1,
+    learning_rate = 1e-2
+    )
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 # device     = torch.device('cpu')
