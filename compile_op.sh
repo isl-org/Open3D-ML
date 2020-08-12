@@ -1,3 +1,4 @@
+#!/bin/bash
 cd utils/nearest_neighbors
 python setup.py install --home="."
 cd ../../
