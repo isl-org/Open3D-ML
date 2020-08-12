@@ -11,7 +11,7 @@ from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
-from ml3d.datasets.semantickitti import DataProcessing
+from ml3d.datasets.utils import DataProcessing
 from ml3d.torch.modules.losses import filter_valid_label
 from ml3d.torch.utils import Config
 
@@ -197,13 +197,14 @@ class RandLANet(nn.Module):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-
+        
         if 'feat' not in data.keys():
             data['feat'] = None
+            
+        points = np.array(data['point'][:, 0:3], dtype=np.float32)
+        feat = np.array(data['feat'], dtype=np.float32)
+        labels = np.array(data['label'], dtype=np.int32)
 
-        points = data['point'][:, 0:3]
-        feat = data['feat'][:, 0:3]
-        labels = data['label']
         split = attr['split']
 
         if (feat is None):
