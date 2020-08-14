@@ -162,10 +162,11 @@ class TF_Dataset():
                 input_labels = np.zeros(input_points.shape[0])
             else:
                 # input_labels = self.input_labels[data_split][cloud_ind][input_inds]
-                input_labels = data['label'][input_inds]
+                input_labels = data['label'][input_inds][:, 0]
                 # input_labels = np.array([self.label_to_idx[l] for l in input_labels])
 
             # In case batch is full, yield it and reset it
+            print("iter\n\n\n")
             if batch_n + n > batch_limit and batch_n > 0:
 
                 yield (np.concatenate(p_list, axis=0),
@@ -207,7 +208,7 @@ class TF_Dataset():
         gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32, tf.int32)
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
-        tf_dataset = tf.data.Dataset.from_generator(self.spatially_regular_gen, gen_shapes)
+        tf_dataset = tf.data.Dataset.from_generator(self.spatially_regular_gen, gen_types, gen_shapes)
         # tf_dataset = tf.data.Dataset.range(len(self.dataset))
         # tf_dataset = tf_dataset.map(lambda x : tf.numpy_function(func = self.read_data, inp = [x], Tout = [tf.float32, tf.float32,
         #                             tf.int32]))
@@ -365,10 +366,16 @@ if __name__ == '__main__':
     
     tf_data = TF_Dataset(dataset = dataset.get_split('training'), preprocess = kpconv_preprocess)
     loader = tf_data.get_loader()
-    print(loader)
+    # print(loader)
     for data in loader:
         print(data)
         break
-        print("\n\n")
+        # print("\n\n")
     # loader = SimpleDataset(dataset = dataset.get_split('training'))
     # print(loader)
+
+    # for data in tf_data.spatially_regular_gen():
+    #     for a in data:
+    #         print(a.shape)
+    #     # print(data)
+    #     break
