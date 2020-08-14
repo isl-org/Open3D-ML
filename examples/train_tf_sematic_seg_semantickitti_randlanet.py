@@ -6,7 +6,7 @@ from ml3d.tf.pipelines import SemanticSegmentation
 from ml3d.tf.models import RandLANet
 from ml3d.utils import Config
 
-py_config = 'ml3d/torch/configs/kpconv_semantickitti.py'
+py_config = 'ml3d/torch/configs/randlanet_semantickitti.py'
 # py_config 	= 'ml3d/torch/configs/kpconv_semantickitti.py'
 cfg         = Config.load_from_file(py_config)
 

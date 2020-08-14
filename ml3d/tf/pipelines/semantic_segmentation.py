@@ -150,10 +150,12 @@ class SemanticSegmentation():
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         model = self.model
+        # TODO, custom metrics and loss
         model.compile(
             optimizer=optimizer,
             loss='sparse_categorical_crossentropy',
             metrics=['sparse_categorical_accuracy'])
+
 
         num_train_examples = mnist.info.splits['train'].num_examples
         train_steps = num_train_examples // flags_obj.batch_size
