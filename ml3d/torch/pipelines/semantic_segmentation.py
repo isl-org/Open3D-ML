@@ -15,12 +15,11 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from os.path import exists, join, isfile, dirname, abspath
 
-from ml3d.torch.datasets import SimpleDataset, DefaultBatcher, ConcatBatcher
-from ml3d.datasets.semantickitti import DataProcessing
-
-from ml3d.torch.modules.losses import SemSegLoss
-from ml3d.torch.modules.metrics import SemSegMetric
-from ml3d.torch.utils import make_dir, LogRecord, Config
+from ..datasets import SimpleDataset, DefaultBatcher, ConcatBatcher
+from ..modules.losses import SemSegLoss
+from ..modules.metrics import SemSegMetric
+from ..utils import make_dir, LogRecord, Config
+from ...datasets.utils import DataProcessing
 
 import yaml
 

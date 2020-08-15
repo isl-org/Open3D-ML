@@ -214,7 +214,7 @@ class ParisLille3D:
         return lines
 
 
-from ml3d.torch.utils import Config
+from ..utils import Config
 
 
 if __name__ == '__main__':
