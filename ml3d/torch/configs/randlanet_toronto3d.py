@@ -39,8 +39,8 @@ pipeline    = dict(
     )
 
 dataset = dict(
-    dataset_path = '/Users/sanskara/data/Toronto_3D/',
-    cache_dir = '/Users/sanskara/data/Toronto_3D/cache/',
+    dataset_path = '../../data/Toronto_3D/',
+    cache_dir = '/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache1',
     prepro_grid_size    = 0.06,
     num_points      = 65536,
     test_result_folder  = './test',

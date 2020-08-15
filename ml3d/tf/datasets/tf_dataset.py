@@ -180,12 +180,12 @@ def randlanet_preprocess(data, attr):
 
 
 from ml3d.torch.utils import Config
-from ml3d.datasets import Toronto3D
+from ml3d.datasets import Toronto3D, SemanticKITTI
 
 if __name__ == '__main__':
-    config = '../../torch/configs/randlanet_toronto3d.py'
+    config = '../../torch/configs/randlanet_semantickitti.py'
     cfg = Config.load_from_file(config)
-    dataset = Toronto3D(cfg.dataset)
+    dataset = SemanticKITTI(cfg.dataset)
     
     tf_data = TF_Dataset(dataset = dataset.get_split('training'), preprocess = randlanet_preprocess, transform = randlanet_transform)
     loader = tf_data.get_loader()
