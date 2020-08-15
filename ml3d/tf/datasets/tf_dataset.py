@@ -88,7 +88,7 @@ def crop_pc(points, feat, labels, search_tree, pick_idx):
         select_idx = np.array(range(points.shape[0]))
         diff = num_points - points.shape[0]
         select_idx = list(select_idx) + list(
-            random.choices(select_idx, k=diff))
+            np.random.choice(select_idx, size=diff))
         random.shuffle(select_idx)
     else:
         center_point = points[pick_idx, :].reshape(1, -1)
@@ -191,9 +191,10 @@ if __name__ == '__main__':
     loader = tf_data.get_loader()
     # print(loader)
     for data in loader:
-        print(data)
-        for a in data:
-            print(a.shape)
         # print(data)
-        break
+        print(len(data))
+        # for a in data:
+        #     print(a.shape)
+        # # print(data)
+        # break
         # print("\n\n")
