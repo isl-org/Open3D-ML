@@ -72,13 +72,18 @@ class SemanticSegmentation():
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.addHandler(logging.FileHandler(log_file_path))
 
-        test_sampler = dataset.get_sampler(cfg.test_batch_size, 'test')
-        test_loader = DataLoader(test_sampler, batch_size=cfg.test_batch_size)
-        test_probs = [
-            np.zeros(
-                shape=[len(l), self.model.cfg.num_classes], dtype=np.float16)
-            for l in dataset.possibility
-        ]
+        
+        test_split = SimpleDataset(
+            dataset=dataset.get_split('test'),
+            preprocess=model.preprocess,
+            transform=model.transform,
+            shuffle=True)
+        test_loader = DataLoader(
+            train_split,
+            batch_size=cfg.val_batch_size,
+            shuffle=True,
+            collate_fn=batcher.collate_fn)
+
 
         self.load_ckpt(model.cfg.ckpt_path, False)
         log.info("Model Loaded from : {}".format(model.cfg.ckpt_path))
@@ -90,6 +95,11 @@ class SemanticSegmentation():
 
         with torch.no_grad():
             while True:
+                # for idx, inputs in enumerate(tqdm(test_loader, 
+                #                             desc='test')):
+                #     results = model(inputs['data'])
+                    
+
                 for batch_data in tqdm(test_loader, desc='test', leave=False):
                     # loader: point_clout, label
                     inputs = model.preprocess(batch_data, device)
@@ -193,12 +203,13 @@ class SemanticSegmentation():
         for epoch in range(0, cfg.max_epoch + 1):
 
             print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+
+            # --------------------- training
             model.train()
             self.losses = []
             self.accs = []
             self.ious = []
             step = 0
-
             for idx, inputs in enumerate(tqdm(train_loader, 
                                         desc='training')):
                 results = model(inputs['data'])
@@ -215,9 +226,6 @@ class SemanticSegmentation():
                 step = step + 1
 
 
-            scheduler.step()
-            
-
             # --------------------- validation
             model.eval()
             self.valid_losses = []
@@ -225,7 +233,6 @@ class SemanticSegmentation():
             self.valid_ious = []
             step = 0
             with torch.no_grad():
-
                 for idx, inputs in enumerate(tqdm(valid_loader, 
                                             desc='validation')):
                     results = model(inputs['data'])
@@ -238,8 +245,9 @@ class SemanticSegmentation():
                     self.valid_ious.append(iou)
                     step = step + 1
 
-            self.save_logs(writer, epoch)
 
+            scheduler.step()
+            self.save_logs(writer, epoch)
             if epoch % cfg.save_ckpt_freq == 0:
                 path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
                 self.save_ckpt(path_ckpt, epoch)

@@ -49,7 +49,7 @@ dataset = dict(
 
     training_split      = ['00', '01', '02', '03', '04', '05', 
                             '06', '07', '09', '10'],
-    #training_split      = ['01'],
+    # training_split      = ['01'],
     validation_split    = ['08'],
     test_split_number   = 11,
     class_weights       = [55437630, 320797, 541736, 2578735, 3274484, 552662, 

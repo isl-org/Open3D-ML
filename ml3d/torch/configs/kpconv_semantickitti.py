@@ -7,8 +7,8 @@ model       = dict(
     ignored_label_inds = [0],
     # Dataset name
     dataset = 'SemanticKitti',
-    ckpt_path   = './ml3d/torch/checkpoint/kpconv_semantickitti.pth',
-
+    # ckpt_path   = './ml3d/torch/checkpoint/kpconv_semantickitti.pth',
+    ckpt_path = '/home/yiling/Downloads/chkp_0450.tar',
 
     # Type of task performed on this dataset (also overwritten)
     dataset_task = '',
