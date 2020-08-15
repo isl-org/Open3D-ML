@@ -21,6 +21,11 @@ TODO List:
 - [ ] Tensorflow pipeline
 - [ ] semantickitti example data for inference
 - [ ] fine-tune training
+- [ ] rename ml3d.torch.datasets -> ml3d.torch.dataloaders same for tf
+- [ ] replace custom compiled ops with functionality in o3d if possible
+- [ ] storage solution for network weights and other large binary data (Git LFS, Google, AWS)
+- [ ] check code origins for all files 
+  - [ ] ml3d/torch/utils/dataset_helper.py is a copy from Kaolin
 
 ## Directories
 
