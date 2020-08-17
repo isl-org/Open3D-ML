@@ -98,7 +98,7 @@ class TF_Dataset():
 
         gen_func, gen_types, gen_shapes = self.get_batch_gen(self, self.model_cfg)
 
-        tf_dataset = tf.data.Dataset.from_generator(self.spatially_regular_gen, gen_types, gen_shapes)
+        tf_dataset = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
 
         # tf_dataset = tf.data.Dataset.range(len(self.dataset))
         # tf_dataset = tf_dataset.map(lambda x : tf.numpy_function(func = self.read_data, inp = [x], Tout = [tf.float32, tf.float32,

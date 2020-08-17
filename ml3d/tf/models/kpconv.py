@@ -4,7 +4,9 @@ import time
 import tensorflow as tf
 import numpy as np
 import random
+from os.path import exists, join, isfile, dirname, abspath, split
 import sys
+from pathlib import Path
 from sklearn.neighbors import KDTree
 
 from ...datasets.utils.dataprocessing import DataProcessing
@@ -13,6 +15,21 @@ from ...datasets.utils.dataprocessing import DataProcessing
 # import network_blocks
 from .network_blocks import assemble_FCNN_blocks, segmentation_head, multi_segmentation_head
 from .network_blocks import segmentation_loss, multi_segmentation_loss
+
+# Load custom operation
+BASE_DIR = Path(abspath(__file__))
+
+tf_neighbors_module = tf.load_op_library(str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' / 'tf_neighbors.so'))
+tf_batch_neighbors_module = tf.load_op_library(str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' / 'tf_batch_neighbors.so'))
+tf_subsampling_module = tf.load_op_library(str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' / 'tf_subsampling.so'))
+tf_batch_subsampling_module = tf.load_op_library(str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' / 'tf_batch_subsampling.so'))
+
+def tf_batch_subsampling(points, batches_len, sampleDl):
+    return tf_batch_subsampling_module.batch_grid_subsampling(points, batches_len, sampleDl)
+
+def tf_batch_neighbors(queries, supports, q_batches, s_batches, radius):
+    return tf_batch_neighbors_module.batch_ordered_neighbors(queries, supports, q_batches, s_batches, radius)
+
 
 class KPFCNN:
 
@@ -359,7 +376,7 @@ class KPFCNN:
         return batch_inds
 
 
-    def augment_input(self, stacked_points, batch_inds, config):
+    def augment_input(self, stacked_points, batch_inds):
 
         augment_scale_anisotropic = True
         augment_symmetries = [True, False, False]
@@ -437,7 +454,6 @@ class KPFCNN:
         return stacked_points, s, R
 
     def segmentation_inputs(self,
-                               config,
                                stacked_points,
                                stacked_features,
                                point_labels,
@@ -551,9 +567,10 @@ class KPFCNN:
                 up_i = tf.zeros((0, 1), dtype=tf.int32)
 
             # Reduce size of neighbors matrices by eliminating furthest point
-            conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
-            pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
-            up_i = self.big_neighborhood_filter(up_i, len(input_points))
+            # TODO : 
+            # conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
+            # pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
+            # up_i = self.big_neighborhood_filter(up_i, len(input_points))
 
             # Updating input lists
             input_points += [stacked_points]
@@ -575,10 +592,10 @@ class KPFCNN:
         ###############
 
         # Batch unstacking (with last layer indices for optionnal classif loss)
-        stacked_batch_inds_0 = self.tf_stack_batch_inds(input_batches_len[0])
+        stacked_batch_inds_0 = self.stack_batch_inds(input_batches_len[0])
 
         # Batch unstacking (with last layer indices for optionnal classif loss)
-        stacked_batch_inds_1 = self.tf_stack_batch_inds(input_batches_len[-1])
+        stacked_batch_inds_1 = self.stack_batch_inds(input_batches_len[-1])
 
         if object_labels is None:
 
@@ -609,12 +626,12 @@ class KPFCNN:
         augment_color = 0.8
 
         # Get batch indice for each point
-        batch_inds = self.tf_get_batch_inds(stacks_lengths)
+        batch_inds = self.get_batch_inds(stacks_lengths)
 
         # Augment input points
-        stacked_points, scales, rots = self.tf_augment_input(stacked_points,
-                                                                batch_inds,
-                                                                config)
+        stacked_points, scales, rots = self.augment_input(stacked_points,
+                                                                batch_inds
+                                                                )
 
         # First add a column of 1 as feature for the network to be able to learn 3D shapes
         stacked_features = tf.ones((tf.shape(stacked_points)[0], 1), dtype=tf.float32)
@@ -647,8 +664,7 @@ class KPFCNN:
             raise ValueError('Only accepted input dimensions are 1, 3, 4 and 7 (without and with rgb/xyz)')
 
         # Get the whole input list
-        input_list = self.tf_segmentation_inputs(config,
-                                                    stacked_points,
+        input_list = self.segmentation_inputs(stacked_points,
                                                     stacked_features,
                                                     point_labels,
                                                     stacks_lengths,
@@ -760,7 +776,7 @@ class KPFCNN:
             for i in range(epoch_n):
                 # Choose a random cloud
                 # cloud_ind = int(np.argmin(self.min_potentials[split]))
-                cloud_ind = random.randint(0, self.num_pc - 1)
+                cloud_ind = random.randint(0, dataset.num_pc - 1)
                 
                 data, attr = dataset.read_data(cloud_ind)
 
