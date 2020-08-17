@@ -17,6 +17,7 @@ eggs/
 *.egg
 *linux-gnu.so
 *darwin.so
+*.so
 #
 logs/
 test/
