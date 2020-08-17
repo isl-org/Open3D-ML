@@ -2,11 +2,17 @@ from os import makedirs
 from os.path import exists
 import time
 import tensorflow as tf
+import numpy as np
+import random
 import sys
+from sklearn.neighbors import KDTree
+
+from ...datasets.utils.dataprocessing import DataProcessing
 
 # Convolution functions
-from models.network_blocks import assemble_FCNN_blocks, segmentation_head, multi_segmentation_head
-from models.network_blocks import segmentation_loss, multi_segmentation_loss
+# import network_blocks
+from .network_blocks import assemble_FCNN_blocks, segmentation_head, multi_segmentation_head
+from .network_blocks import segmentation_loss, multi_segmentation_loss
 
 class KPFCNN:
 
@@ -595,7 +601,7 @@ class KPFCNN:
 
             return li
 
-    def tf_map(self, stacked_points, stacked_colors, point_labels, stacks_lengths, point_inds, cloud_inds):
+    def transform(self, stacked_points, stacked_colors, point_labels, stacks_lengths, point_inds, cloud_inds):
         """
         [None, 3], [None, 3], [None], [None]
         """
@@ -716,6 +722,7 @@ class KPFCNN:
         return select_points, select_feat, select_labels, select_idx
 
     def get_batch_gen(self, dataset, cfg):
+
         def spatially_regular_gen():
             random_pick_n = None
             epoch_n = dataset.epoch_n
@@ -755,12 +762,7 @@ class KPFCNN:
                 # cloud_ind = int(np.argmin(self.min_potentials[split]))
                 cloud_ind = random.randint(0, self.num_pc - 1)
                 
-                attr = self.dataset.get_attr(cloud_ind)
-                if self.cache_convert is None:
-                    data = self.dataset.get_data(cloud_ind)
-                else:
-                    data = self.cache_convert(attr['name'])
-
+                data, attr = dataset.read_data(cloud_ind)
 
                 # Choose point ind as minimum of potentials
                 # point_ind = np.argmin(self.potentials[split][cloud_ind])

@@ -34,11 +34,16 @@ class TF_Dataset():
                  dataset=None,
                  preprocess=None,
                  transform=None,
+                 generator = None,
+                 cfg = None,
                  no_progress: bool = False,
                  **kwargs):
         self.dataset = dataset
         self.preprocess = preprocess
         self.transform = transform
+        self.get_batch_gen = generator
+        self.model_cfg = cfg
+
         if preprocess is not None:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
             assert cache_dir is not None, 'cache directory is not given'
@@ -47,6 +52,7 @@ class TF_Dataset():
                 preprocess,
                 cache_dir=cache_dir,
                 cache_key=dataset_helper._get_hash(repr(preprocess)[:-15]))
+            print("cache key : {}".format(repr(preprocess)[:-15]))
 
             uncached = [
                 idx for idx in range(len(dataset))
@@ -80,159 +86,26 @@ class TF_Dataset():
         else:
             data = self.cache_convert(attr['name'])
 
-        pick_idx = np.random.choice(len(data['point']), 1)
-        pc, feat, label, _ = crop_pc(data['point'], data['feat'], data['label'], data['search_tree'], pick_idx)
+        # pick_idx = np.random.choice(len(data['point']), 1)
+        # pc, feat, label, _ = crop_pc(data['point'], data['feat'], data['label'], data['search_tree'], pick_idx)
 
-        return pc, feat, label
+        return data, attr
+        # return pc, feat, label
 
-
-    def spatially_regular_gen(self):
-        random_pick_n = None
-        epoch_n = self.epoch_n
-        split = self.split
-
-        # TODO : read from config
-        in_radius = 2.0
-        batch_limit = 500 # read from calibrate_batch
-
-        # Initiate potentials for regular generation
-        if not hasattr(self, 'potentials'):
-            self.potentials = {}
-            self.min_potentials = {}
-
-        # Reset potentials
-        self.potentials[split] = []
-        self.min_potentials[split] = []
-        data_split = split
-
-        #TODO : 
-        # for i, tree in enumerate(self.input_trees[data_split]):
-        #     self.potentials[split] += [np.random.rand(tree.data.shape[0]) * 1e-3]
-        #     self.min_potentials[split] += [float(np.min(self.potentials[split][-1]))]
-
-        # Initiate concatanation lists
-        p_list = []
-        c_list = []
-        pl_list = []
-        pi_list = []
-        ci_list = []
-
-        batch_n = 0
-
-        # Generator loop
-        for i in range(epoch_n):
-            # Choose a random cloud
-            # cloud_ind = int(np.argmin(self.min_potentials[split]))
-            cloud_ind = random.randint(0, self.num_pc - 1)
-            
-            attr = self.dataset.get_attr(cloud_ind)
-            if self.cache_convert is None:
-                data = self.dataset.get_data(cloud_ind)
-            else:
-                data = self.cache_convert(attr['name'])
-
-
-            # Choose point ind as minimum of potentials
-            # point_ind = np.argmin(self.potentials[split][cloud_ind])
-            point_ind = np.random.choice(len(data['point']), 1)
-
-            # Get points from tree structure
-            # points = np.array(self.input_trees[data_split][cloud_ind].data, copy=False)
-            points = np.array(data['search_tree'].data, copy=False)
-
-            # Center point of input region
-            center_point = points[point_ind, :].reshape(1, -1)
-            # Add noise to the center point
-            # if split != 'ERF':
-            #     noise = np.random.normal(scale=config.in_radius/10, size=center_point.shape)
-            #     pick_point = center_point + noise.astype(center_point.dtype)
-            # else:
-            #     pick_point = center_point
-            pick_point = center_point
-
-            # Indices of points in input region
-            # input_inds = self.input_trees[data_split][cloud_ind].query_radius(pick_point,
-            #                                                                 r=config.in_radius)[0]
-            input_inds = data['search_tree'].query_radius(pick_point, r = in_radius)[0]
-
-            # Number collected
-            n = input_inds.shape[0]
-
-            # Update potentials (Tuckey weights)
-            # if split != 'ERF':
-            #     dists = np.sum(np.square((points[input_inds] - pick_point).astype(np.float32)), axis=1)
-            #     tukeys = np.square(1 - dists / np.square(in_radius))
-            #     tukeys[dists > np.square(in_radius)] = 0
-            #     self.potentials[split][cloud_ind][input_inds] += tukeys
-            #     self.min_potentials[split][cloud_ind] = float(np.min(self.potentials[split][cloud_ind]))
-
-            # Safe check for very dense areas
-            if n > batch_limit:
-                input_inds = np.random.choice(input_inds, size=int(batch_limit)-1, replace=False)
-                n = input_inds.shape[0]
-
-            # Collect points and colors
-            input_points = (points[input_inds] - pick_point).astype(np.float32)
-            # input_colors = self.input_colors[data_split][cloud_ind][input_inds]
-            input_colors = data['feat'][input_inds]
-
-            if split in ['test']:
-                input_labels = np.zeros(input_points.shape[0])
-            else:
-                # input_labels = self.input_labels[data_split][cloud_ind][input_inds]
-                input_labels = data['label'][input_inds][:, 0]
-                # input_labels = np.array([self.label_to_idx[l] for l in input_labels])
-
-            # In case batch is full, yield it and reset it
-            print("iter\n\n\n")
-            if batch_n + n > batch_limit and batch_n > 0:
-
-                yield (np.concatenate(p_list, axis=0),
-                        np.concatenate(c_list, axis=0),
-                        np.concatenate(pl_list, axis=0),
-                        np.array([tp.shape[0] for tp in p_list]),
-                        np.concatenate(pi_list, axis=0),
-                        np.array(ci_list, dtype=np.int32))
-
-                p_list = []
-                c_list = []
-                pl_list = []
-                pi_list = []
-                ci_list = []
-                batch_n = 0
-
-            # Add data to current batch
-            if n > 0:
-                p_list += [input_points]
-                c_list += [np.hstack((input_colors, input_points + pick_point))]
-                pl_list += [input_labels]
-                pi_list += [input_inds]
-                ci_list += [cloud_ind]
-
-            # Update batch size
-            batch_n += n
-
-        if batch_n > 0:
-            yield (np.concatenate(p_list, axis=0),
-                    np.concatenate(c_list, axis=0),
-                    np.concatenate(pl_list, axis=0),
-                    np.array([tp.shape[0] for tp in p_list]),
-                    np.concatenate(pi_list, axis=0),
-                    np.array(ci_list, dtype=np.int32))
 
 
     def get_loader(self):
 
-        gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32, tf.int32)
-        gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
+        gen_func, gen_types, gen_shapes = self.get_batch_gen(self, self.model_cfg)
 
         tf_dataset = tf.data.Dataset.from_generator(self.spatially_regular_gen, gen_types, gen_shapes)
+
         # tf_dataset = tf.data.Dataset.range(len(self.dataset))
         # tf_dataset = tf_dataset.map(lambda x : tf.numpy_function(func = self.read_data, inp = [x], Tout = [tf.float32, tf.float32,
         #                             tf.int32]))
 
         # tf_dataset = tf_dataset.map(map_func = self.transform)
-        tf_dataset = tf_dataset.map(map_func=self.tf_map, num_parallel_calls=self.num_threads)
+        tf_dataset = tf_dataset.map(map_func=self.transform, num_parallel_calls=self.num_threads)
 
 
         return tf_dataset
