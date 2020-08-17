@@ -22,21 +22,32 @@ model = dict(
     #########################
 
     # Define layers
-    architecture=[
-        'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb',
-        'resnetb_strided', 'resnetb', 'resnetb', 'resnetb_strided', 'resnetb',
-        'resnetb', 'resnetb_strided', 'resnetb', 'nearest_upsample', 'unary',
-        'nearest_upsample', 'unary', 'nearest_upsample', 'unary',
-        'nearest_upsample', 'unary'
-    ],
+    architecture = ['simple',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary'],
 
     ###################
     # KPConv parameters
     ###################
 
     # Radius of the input sphere
-    in_radius=4.0,
-    val_radius=4.0,
+    in_radius=2.0,
+    val_radius=2.0,
     n_frames=1,
     max_in_points=100000,
     max_val_points=100000,
@@ -45,11 +56,14 @@ model = dict(
     batch_num=8,
     val_batch_num=8,
 
+    # Number of steps per epochs
+    epoch_steps = 500,
+
     # Number of kernel points
     num_kernel_points=15,
 
     # Size of the first subsampling grid in meter
-    first_subsampling_dl=0.06,
+    first_subsampling_dl=0.04,
 
     # Radius of convolution in "number grid cell". (2.5 is the standard value)
     conv_radius=2.5,
@@ -58,7 +72,7 @@ model = dict(
     deform_radius=6.0,
 
     # Radius of the area of influence of each kernel point in "number grid cell". (1.0 is the standard value)
-    KP_extent=1.2,
+    KP_extent=1.0,
 
     # Behavior of convolutions in ('constant', 'linear', 'gaussian')
     KP_influence='linear',
@@ -68,7 +82,7 @@ model = dict(
 
     # Choice of input features
     first_features_dim=128,
-    in_features_dim=2,
+    in_features_dim=5,
 
     # Can the network learn modulations
     modulated=False,
@@ -82,8 +96,7 @@ model = dict(
     # 'point2plane' fitting geometry by penalizing distance from deform point to input point triplet (not implemented)
     deform_fitting_mode='point2point',
     deform_fitting_power=1.0,  # Multiplier for the fitting/repulsive loss
-    deform_lr_factor=
-    0.1,  # Multiplier for learning rate applied to the deformations
+    deform_lr_factor=0.1,  # Multiplier for learning rate applied to the deformations
     repulse_extent=1.2,  # Distance of repulsion for deformed kernel points
 
     #####################
@@ -99,9 +112,6 @@ model = dict(
     lr_decays={i: 0.1**(1 / 150)
                for i in range(1, 800)},
     grad_clip_norm=100.0,
-
-    # Number of steps per epochs
-    epoch_steps=500,
 
     # Number of validation examples per epoch
     validation_size=200,

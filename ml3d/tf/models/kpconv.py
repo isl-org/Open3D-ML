@@ -184,7 +184,7 @@ class KPFCNN:
                 layer = int(v.name.split('/')[1].split('_')[-1])
 
                 # Radius of convolution for this layer
-                conv_radius = self.config.first_subsampling_dl * self.config.density_parameter * (2 ** (layer - 1))
+                conv_radius = cfg.first_subsampling_dl * self.config.density_parameter * (2 ** (layer - 1))
 
                 # Target extent
                 target_extent = conv_radius / 1.5
@@ -213,7 +213,7 @@ class KPFCNN:
                     layer = int(op.name.split('/')[1].split('_')[-1])
 
                     # Radius of deformed convolution for this layer
-                    conv_radius = self.config.first_subsampling_dl * self.config.density_parameter * (2 ** layer)
+                    conv_radius = cfg.first_subsampling_dl * self.config.density_parameter * (2 ** layer)
 
                     # Normalized KP locations
                     KP_locs = deformed_positions/conv_radius
@@ -237,7 +237,7 @@ class KPFCNN:
                     layer = int(op.name.split('/')[1].split('_')[-1])
 
                     # Radius of deformed convolution for this layer
-                    KP_extent = self.config.first_subsampling_dl * self.config.KP_extent * (2 ** layer)
+                    KP_extent = cfg.first_subsampling_dl * cfg.KP_extent * (2 ** layer)
 
                     # Get the distance to closest input point
                     KP_min_d2 = tf.reduce_min(deformed_d2, axis=1)
@@ -258,13 +258,13 @@ class KPFCNN:
                     layer = int(op.name.split('/')[1].split('_')[-1])
 
                     # Radius of deformed convolution for this layer
-                    KP_extent = self.config.first_subsampling_dl * self.config.KP_extent * (2 ** layer)
+                    KP_extent = cfg.first_subsampling_dl * cfg.KP_extent * (2 ** layer)
 
                     # Normalized KP locations
                     KP_locs = deformed_KP/KP_extent
 
                     # Point should not be close to each other
-                    for i in range(self.config.num_kernel_points):
+                    for i in range(cfg.num_kernel_points):
                         other_KP = tf.stop_gradient(tf.concat([KP_locs[:, :i, :], KP_locs[:, i + 1:, :]], axis=1))
                         distances = tf.sqrt(tf.reduce_sum(tf.square(other_KP - KP_locs[:, i:i+1, :]), axis=2))
                         repulsive_losses = tf.reduce_sum(tf.square(tf.maximum(0.0, 1.5 - distances)), axis=1)
@@ -378,14 +378,7 @@ class KPFCNN:
 
     def augment_input(self, stacked_points, batch_inds):
 
-        augment_scale_anisotropic = True
-        augment_symmetries = [True, False, False]
-        augment_rotation = 'vertical'
-        augment_scale_min = 0.8
-        augment_scale_max = 1.2
-        augment_noise = 0.001
-        augment_occlusion = 'none'
-        augment_color = 0.8
+        cfg = self.cfg
         # Parameter
         num_batches = batch_inds[-1] + 1
 
@@ -393,7 +386,7 @@ class KPFCNN:
         # Rotation
         ##########
 
-        if augment_rotation == 'vertical':
+        if cfg.augment_rotation == 'vertical':
 
             # Choose a random angle for each element
             theta = tf.random.uniform((num_batches,), minval=0, maxval=2*np.pi)
@@ -411,28 +404,28 @@ class KPFCNN:
             # Apply rotations
             stacked_points = tf.reshape(tf.matmul(tf.expand_dims(stacked_points, axis=1), stacked_rots), [-1, 3])
 
-        elif augment_rotation == 'none':
+        elif cfg.augment_rotation == 'none':
             R = tf.eye(3, batch_shape=(num_batches,))
 
         else:
-            raise ValueError('Unknown rotation augmentation : ' + augment_rotation)
+            raise ValueError('Unknown rotation augmentation : ' + cfg.augment_rotation)
 
         #######
         # Scale
         #######
 
         # Choose random scales for each example
-        min_s = augment_scale_min
-        max_s = augment_scale_max
+        min_s = cfg.augment_scale_min
+        max_s = cfg.augment_scale_max
 
-        if augment_scale_anisotropic:
+        if cfg.augment_scale_anisotropic:
             s = tf.random.uniform((num_batches, 3), minval=min_s, maxval=max_s)
         else:
             s = tf.random.uniform((num_batches, 1), minval=min_s, maxval=max_s)
 
         symmetries = []
         for i in range(3):
-            if augment_symmetries[i]:
+            if cfg.augment_symmetries[i]:
                 symmetries.append(tf.round(tf.random.uniform((num_batches, 1))) * 2 - 1)
             else:
                 symmetries.append(tf.ones([num_batches, 1], dtype=tf.float32))
@@ -448,7 +441,7 @@ class KPFCNN:
         # Noise
         #######
 
-        noise = tf.random.normal(tf.shape(stacked_points), stddev=augment_noise)
+        noise = tf.random.normal(tf.shape(stacked_points), stddev=cfg.augment_noise)
         stacked_points = stacked_points + noise
 
         return stacked_points, s, R
@@ -461,39 +454,17 @@ class KPFCNN:
                                batch_inds,
                                object_labels=None):
 
+        cfg = self.cfg
         # Batch weight at each point for loss (inverse of stacks_lengths for each point)
         min_len = tf.reduce_min(stacks_lengths, keepdims=True)
         batch_weights = tf.cast(min_len, tf.float32) / tf.cast(stacks_lengths, tf.float32)
         stacked_weights = tf.gather(batch_weights, batch_inds)
 
-        architecture = ['simple',
-                        'resnetb',
-                        'resnetb_strided',
-                        'resnetb',
-                        'resnetb_strided',
-                        'resnetb',
-                        'resnetb_strided',
-                        'resnetb',
-                        'resnetb_strided',
-                        'resnetb',
-                        'nearest_upsample',
-                        'unary',
-                        'nearest_upsample',
-                        'unary',
-                        'nearest_upsample',
-                        'unary',
-                        'nearest_upsample',
-                        'unary']
-
         # KPConv specific parameters
-        num_kernel_points = 15
-        first_subsampling_dl = 0.04
-        KP_influence = 'linear'
-        KP_extent = 1.0
         density_parameter = 5.0
 
         # Starting radius of convolutions
-        r_normal = first_subsampling_dl * KP_extent * 2.5
+        r_normal = cfg.first_subsampling_dl * cfg.KP_extent * 2.5
 
         # Starting layer
         layer_blocks = []
@@ -509,7 +480,7 @@ class KPFCNN:
         # Loop over the blocks
         ######################
 
-        for block_i, block in enumerate(architecture):
+        for block_i, block in enumerate(cfg.architecture):
 
             # Stop when meeting a global pooling or upsampling
             if 'global' in block or 'upsample' in block:
@@ -518,7 +489,7 @@ class KPFCNN:
             # Get all blocks of the layer
             if not ('pool' in block or 'strided' in block):
                 layer_blocks += [block]
-                if block_i < len(architecture) - 1 and not ('upsample' in architecture[block_i + 1]):
+                if block_i < len(cfg.architecture) - 1 and not ('upsample' in cfg.architecture[block_i + 1]):
                     continue
 
             # Convolution neighbors indices
@@ -527,7 +498,7 @@ class KPFCNN:
             if layer_blocks:
                 # Convolutions are done in this layer, compute the neighbors with the good radius
                 if np.any(['deformable' in blck for blck in layer_blocks[:-1]]):
-                    r = r_normal * density_parameter / (KP_extent * 2.5)
+                    r = r_normal * density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
                 conv_i = tf_batch_neighbors(stacked_points, stacked_points, stacks_lengths, stacks_lengths, r)
@@ -542,14 +513,14 @@ class KPFCNN:
             if 'pool' in block or 'strided' in block:
 
                 # New subsampling length
-                dl = 2 * r_normal / (KP_extent * 2.5)
+                dl = 2 * r_normal / (cfg.KP_extent * 2.5)
 
                 # Subsampled points
                 pool_p, pool_b = tf_batch_subsampling(stacked_points, stacks_lengths, sampleDl=dl)
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
-                    r = r_normal * density_parameter / (KP_extent * 2.5)
+                    r = r_normal * density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
 
@@ -622,9 +593,7 @@ class KPFCNN:
         """
         [None, 3], [None, 3], [None], [None]
         """
-        in_features_dim = 5 # TODO : read from config
-        augment_color = 0.8
-
+        cfg = self.cfg
         # Get batch indice for each point
         batch_inds = self.get_batch_inds(stacks_lengths)
 
@@ -641,24 +610,24 @@ class KPFCNN:
         stacked_colors = stacked_colors[:, :3]
 
         # Augmentation : randomly drop colors
-        if in_features_dim in [4, 5]:
+        if cfg.in_features_dim in [4, 5]:
             num_batches = batch_inds[-1] + 1
-            s = tf.cast(tf.less(tf.random.uniform((num_batches,)), augment_color), tf.float32)
+            s = tf.cast(tf.less(tf.random.uniform((num_batches,)), cfg.augment_color), tf.float32)
             stacked_s = tf.gather(s, batch_inds)
             stacked_colors = stacked_colors * tf.expand_dims(stacked_s, axis=1)
 
         # Then use positions or not
-        if in_features_dim == 1:
+        if cfg.in_features_dim == 1:
             pass
-        elif in_features_dim == 2:
+        elif cfg.in_features_dim == 2:
             stacked_features = tf.concat((stacked_features, stacked_original_coordinates[:, 2:]), axis=1)
-        elif in_features_dim == 3:
+        elif cfg.in_features_dim == 3:
             stacked_features = stacked_colors
-        elif in_features_dim == 4:
+        elif cfg.in_features_dim == 4:
             stacked_features = tf.concat((stacked_features, stacked_colors), axis=1)
-        elif in_features_dim == 5:
+        elif cfg.in_features_dim == 5:
             stacked_features = tf.concat((stacked_features, stacked_colors, stacked_original_coordinates[:, 2:]), axis=1)
-        elif in_features_dim == 7:
+        elif cfg.in_features_dim == 7:
             stacked_features = tf.concat((stacked_features, stacked_colors, stacked_points), axis=1)
         else:
             raise ValueError('Only accepted input dimensions are 1, 3, 4 and 7 (without and with rgb/xyz)')
@@ -677,6 +646,7 @@ class KPFCNN:
         return input_list
 
     def preprocess(self, data, attr):
+        cfg = self.cfg
         if 'feat' not in data.keys():
             data['feat'] = None
 
@@ -692,11 +662,11 @@ class KPFCNN:
 
         if (feat is None):
             sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                points, labels=labels, grid_size=0.06)
+                points, labels=labels, grid_size=cfg.first_subsampling_dl)
 
         else:
             sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                points, features=feat, labels=labels, grid_size=0.06)
+                points, features=feat, labels=labels, grid_size=cfg.first_subsampling_dl)
 
         search_tree = KDTree(sub_points)
 
@@ -737,15 +707,16 @@ class KPFCNN:
             select_feat = feat[select_idx]
         return select_points, select_feat, select_labels, select_idx
 
-    def get_batch_gen(self, dataset, cfg):
+    def get_batch_gen(self, dataset):
 
+        cfg = self.cfg
         def spatially_regular_gen():
+
             random_pick_n = None
-            epoch_n = dataset.epoch_n
+            epoch_n = cfg.epoch_steps * cfg.batch_num
             split = dataset.split
 
             # TODO : read from config
-            in_radius = 2.0
             batch_limit = 500 # read from calibrate_batch
 
             # Initiate potentials for regular generation
@@ -801,7 +772,7 @@ class KPFCNN:
                 # Indices of points in input region
                 # input_inds = self.input_trees[data_split][cloud_ind].query_radius(pick_point,
                 #                                                                 r=config.in_radius)[0]
-                input_inds = data['search_tree'].query_radius(pick_point, r = in_radius)[0]
+                input_inds = data['search_tree'].query_radius(pick_point, r = cfg.in_radius)[0]
 
                 # Number collected
                 n = input_inds.shape[0]
@@ -873,3 +844,11 @@ class KPFCNN:
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
+
+    # def big_neighborhood_filter(self, neighbors, layer):
+    #     """
+    #     Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
+    #     Limit is computed at initialization
+    #     """
+    #     # crop neighbors matrix
+    #     return neighbors[:, :neighborhood_limits[layer]]
