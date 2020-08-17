@@ -1,13 +1,12 @@
-export BASE_DIR="/Users/sanskara/data/"
+export BASE_DIR="/home/sanskar_agrawal/data/test/"
+export url="https://xx9lca.sn.files.1drv.com/y4mUm9-LiY3vULTW79zlB3xp0wzCPASzteId4wdUZYpzWiw6Jp4IFoIs6ADjLREEk1-IYH8KRGdwFZJrPlIebwytHBYVIidsCwkHhW39aQkh3Vh0OWWMAcLVxYwMTjXwDxHl-CDVDau420OG4iMiTzlsK_RTC_ypo3z-Adf-h0gp2O8j5bOq-2TZd9FD1jPLrkf3759rB-BWDGFskF3AsiB3g"
 
 mkdir -p $BASE_DIR
 
-url = "https://1drv.ms/u/s!Amlc6yZnF87psX6hKS8VOQllVvj4?e=yWhrYX"
-
-wget -c -N url -P $BASE_DIR
+wget -c -N -O $BASE_DIR'/Toronto_3D.zip' $url
 
 cd $BASE_DIR
 
-tar -xvzf Toronto_3D.zip
+unzip Toronto_3D.zip
 
 rm Toronto_3D.zip
