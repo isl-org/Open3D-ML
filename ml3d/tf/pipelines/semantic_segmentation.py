@@ -10,8 +10,12 @@ from os.path import exists, join, isfile, dirname, abspath
 import tensorflow as tf
 import yaml
 
+
+from ml3d.tf.modules.losses import SemSegLoss
 from ...utils import make_dir, LogRecord
 from ..datasets import TF_Dataset
+
+
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -151,6 +155,9 @@ class SemanticSegmentation():
             cfg.adam_lr, decay_steps=100000, decay_rate=cfg.scheduler_gamma)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
+        Loss = SemSegLoss(self, model, dataset)
+        Metric = SemSegMetric(self, model, dataset, device)
+
 
         train_split = TF_Dataset(dataset=dataset.get_split('training'), 
                                  model = model)
@@ -158,7 +165,7 @@ class SemanticSegmentation():
 
         model.compile(
             optimizer=optimizer,
-            loss='sparse_categorical_crossentropy',
+            loss_fn=model.get_loss(Loss),
             metrics=['sparse_categorical_accuracy'])
 
         for data in train_loader:

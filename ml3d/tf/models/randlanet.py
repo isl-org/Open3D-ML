@@ -102,16 +102,7 @@ class RandLANet(tf.keras.Model):
                                          activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
-    def get_loss(self, logits, labels, pre_cal_weights):
-        # calculate the weighted cross entropy according to the inverse frequency
-        class_weights = tf.convert_to_tensor(pre_cal_weights, dtype=tf.float32)
-        one_hot_labels = tf.one_hot(labels, depth=self.config.num_classes)
-        weights = tf.reduce_sum(class_weights * one_hot_labels, axis=1)
-        unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=one_hot_labels)
-        weighted_losses = unweighted_losses * weights
-       
-        output_loss = tf.reduce_mean(weighted_losses)
-        return output_loss
+
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
         # pc:           BxNxd
@@ -272,6 +263,49 @@ class RandLANet(tf.keras.Model):
 
         return f_out
 
+    def get_loss(self, Loss):
+
+        def compute_loss(results, labels):
+
+            class_weights = Loss.class_weights
+            one_hot_labels = tf.one_hot(labels, depth=self.config.num_classes)
+            weights = tf.reduce_sum(class_weights * one_hot_labels, axis=1)
+            unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=one_hot_labels)
+            weighted_losses = unweighted_losses * weights
+           
+            output_loss = tf.reduce_mean(weighted_losses)
+            return output_loss
+
+        return compute_loss
+
+    def loss(self, Loss, results, inputs, device):
+        """
+        Runs the loss on outputs of the model
+        :param outputs: logits
+        :param labels: labels
+        :return: loss
+        """
+        cfg = self.cfg
+        labels = inputs['data']['labels']
+
+        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
+                                            cfg.ignored_label_inds, device)
+
+        logp = torch.distributions.utils.probs_to_logits(scores,
+                                                         is_binary=False)
+        loss = Loss.weighted_CrossEntropyLoss(logp, labels)
+
+        # predict_labels = torch.max(scores, dim=-2).indices
+
+        
+        one_hot_labels = tf.one_hot(labels, depth=self.config.num_classes)
+        weights = tf.reduce_sum(class_weights * one_hot_labels, axis=1)
+        unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=one_hot_labels)
+        weighted_losses = unweighted_losses * weights
+       
+        output_loss = tf.reduce_mean(weighted_losses)
+
+        return loss, labels, scores
 
     def train_step(self, data):
         # Unpack the data. Its structure depends on your model and
@@ -288,6 +322,8 @@ class RandLANet(tf.keras.Model):
                 # sample_weight=sample_weight,
                 # regularization_losses=self.losses,
             )
+
+
 
         # Compute gradients
         trainable_vars = self.trainable_variables
