@@ -13,7 +13,6 @@ from ...datasets.utils.dataprocessing import DataProcessing
 
 
 class RandLANet:
-
     def __init__(self, cfg):
         # Model parameters
         self.cfg = cfg
@@ -30,8 +29,7 @@ class RandLANet:
                 random.choices(select_idx, k=diff))
             random.shuffle(select_idx)
         else:
-            select_idx = search_tree.query(center_point,
-                                            k=num_points)[1][0]
+            select_idx = search_tree.query(center_point, k=num_points)[1][0]
 
         # select_idx = DataProcessing.shuffle_idx(select_idx)
         random.shuffle(select_idx)
@@ -41,8 +39,8 @@ class RandLANet:
             select_feat = None
         else:
             select_feat = feat[select_idx]
-        
-        select_points = select_points - center_point # TODO : add noise to center point
+
+        select_points = select_points - center_point  # TODO : add noise to center point
 
         return select_points, select_feat, select_labels, select_idx
 
@@ -53,13 +51,15 @@ class RandLANet:
             for i in range(dataset.num_pc):
                 data, attr = dataset.read_data(i)
                 pick_idx = np.random.choice(len(data['point']), 1)
-                
-                pc, feat, label, _ = self.crop_pc(data['point'], data['feat'], data['label'], data['search_tree'], pick_idx)
+
+                pc, feat, label, _ = self.crop_pc(data['point'], data['feat'],
+                                                  data['label'],
+                                                  data['search_tree'],
+                                                  pick_idx)
 
                 label = label[:, 0]
 
-                yield (pc.astype(np.float32),
-                       feat.astype(np.float32),
+                yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
 
         gen_func = gen
@@ -67,7 +67,6 @@ class RandLANet:
         gen_shapes = ([None, 3], [None, 3], [None])
 
         return gen_func, gen_types, gen_shapes
-
 
     def transform(self, pc, feat, label):
         cfg = self.cfg
@@ -83,12 +82,14 @@ class RandLANet:
         input_up_samples = []
 
         for i in range(cfg.num_layers):
-            neighbour_idx = tf.py_function(DataProcessing.knn_search, [pc, pc, cfg.k_n], tf.int32)
+            neighbour_idx = tf.py_function(DataProcessing.knn_search,
+                                           [pc, pc, cfg.k_n], tf.int32)
 
             sub_points = pc[:tf.shape(pc)[0] // cfg.sub_sampling_ratio[i], :]
             pool_i = neighbour_idx[:tf.shape(pc)[0] //
-                                    cfg.sub_sampling_ratio[i], :]
-            up_i = tf.py_function(DataProcessing.knn_search, [sub_points, pc, 1], tf.int32)
+                                   cfg.sub_sampling_ratio[i], :]
+            up_i = tf.py_function(DataProcessing.knn_search,
+                                  [sub_points, pc, 1], tf.int32)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx)
             input_pools.append(pool_i)
@@ -137,4 +138,3 @@ class RandLANet:
             data['proj_inds'] = proj_inds
 
         return data
-

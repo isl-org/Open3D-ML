@@ -26,5 +26,7 @@ tf_data = TF_Dataset(dataset = dataset.get_split('training'), model = model)# pr
 loader = tf_data.get_loader()
 # print(loader)
 for data in loader:
-    print(data)
+    # print(data)
+    for a in data:
+        print(a.shape)
     break
