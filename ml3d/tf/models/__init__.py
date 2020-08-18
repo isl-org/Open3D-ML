@@ -1,3 +1,5 @@
-from .randlanet import RandLANet
+from .kpconv import *
+from .randlanet import *
 
-__all__ = ['RandLANet']
+
+# __all__ = ['RandLANet', 'KPFCNN']
