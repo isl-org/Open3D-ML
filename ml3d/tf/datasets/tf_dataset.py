@@ -28,6 +28,7 @@ class TF_Dataset():
 
         if self.preprocess is not None:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
+            
             assert cache_dir is not None, 'cache directory is not given'
 
             self.cache_convert = dataset_helper.Cache(
@@ -61,7 +62,6 @@ class TF_Dataset():
 
     def read_data(self, key):
         attr = self.dataset.get_attr(key)
-        # print(attr)
         if self.cache_convert is None:
             data = self.dataset.get_data(key)
         else:

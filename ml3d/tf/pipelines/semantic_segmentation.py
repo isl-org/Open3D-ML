@@ -7,9 +7,11 @@ from datetime import datetime
 from tqdm import tqdm
 
 from os.path import exists, join, isfile, dirname, abspath
-from ml3d.utils import make_dir, LogRecord
 import tensorflow as tf
 import yaml
+
+from ...utils import make_dir, LogRecord
+from ..datasets import TF_Dataset
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -149,12 +151,32 @@ class SemanticSegmentation():
             cfg.adam_lr, decay_steps=100000, decay_rate=cfg.scheduler_gamma)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
-        model = self.model
-        # TODO, custom metrics and loss
+
+        train_split = TF_Dataset(dataset=dataset.get_split('training'), 
+                                 model = model)
+        train_loader = train_split.get_loader()
+
         model.compile(
             optimizer=optimizer,
             loss='sparse_categorical_crossentropy',
             metrics=['sparse_categorical_accuracy'])
+
+        for data in train_loader:
+            # print(data[0])
+            # print(data[-1])
+            # model.fit(data[0].numpy(), data[-1].numpy())
+            x = [tf.expand_dims(t, 0) for t in data[:-1]]
+            y = [tf.expand_dims(t, 0) for t in data[-1:]]
+            # print(x)
+            model.fit(x, y)
+
+            # result = model(x)
+        
+        # for data in train_loader:
+        #     print(data)
+        exit()
+
+        # TODO, custom metrics and loss
 
 
         num_train_examples = mnist.info.splits['train'].num_examples

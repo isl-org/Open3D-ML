@@ -33,20 +33,22 @@ class conv2d(tf.keras.layers.Layer):
         else: 
             self.activation_fn = None
 
-    def build(self, input_shape):
-        super(conv2d, self).build(input_shape)
-        self.conv.build(input_shape)        
-        self.biases  = self.conv.bias
-        self.weights = self.conv.kernel
+    # def build(self, input_shape):
+    #     super(conv2d, self).build(input_shape)
+    #     self.conv.build(input_shape)        
+    #     self._biases  = self.conv.bias
+    #     self._weights = self.conv.kernel
 
 
-    def forward(self, x):
+    def call(self, x):
         x = self.conv(x)
         if self.batchNorm:
             x = self.batch_normalization(x)
         if self.activation_fn:
             x = self.activation_fn(x)
+
         return x
+
 
 
 class conv2d_transpose(tf.keras.layers.Layer):
@@ -67,14 +69,14 @@ class conv2d_transpose(tf.keras.layers.Layer):
         else: 
             self.activation_fn = None
 
-    def build(self, input_shape):
-        super(conv2d_transpose, self).build(input_shape)
-        self.conv.build(input_shape)        
-        self.biases  = self.conv.bias
-        self.weights = self.conv.kernel
+    # def build(self, input_shape):
+    #     super(conv2d_transpose, self).build(input_shape)
+    #     self.conv.build(input_shape)        
+    #     self.biases  = self.conv.bias
+    #     self.weights = self.conv.kernel
 
 
-    def forward(self, x):
+    def call(self, x):
         x = self.conv(x)
         if self.batchNorm:
             x = self.batch_normalization(x)
@@ -83,3 +85,25 @@ class conv2d_transpose(tf.keras.layers.Layer):
         return x
 
 
+def dropout(inputs,
+            is_training,
+            scope,
+            keep_prob=0.5,
+            noise_shape=None):
+    """ Dropout layer.
+
+    Args:
+      inputs: tensor
+      is_training: boolean tf.Variable
+      scope: string
+      keep_prob: float in [0,1]
+      noise_shape: list of ints
+
+    Returns:
+      tensor variable
+    """
+    with tf.variable_scope(scope) as sc:
+        outputs = tf.cond(is_training,
+                          lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
+                          lambda: inputs)
+        return outputs

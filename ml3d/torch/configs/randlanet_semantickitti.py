@@ -44,9 +44,9 @@ dataset = dict(
     cache_dir='/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache1',
     test_result_folder='./test',
 
-    training_split      = ['00', '01', '02', '03', '04', '05',
-                           '06', '07', '09', '10'],
-    # training_split=['01'],
+    # training_split      = ['00', '01', '02', '03', '04', '05',
+                           # '06', '07', '09', '10'],
+    training_split=['01'],
     validation_split=['08'],
     test_split_number=11,
     class_weights=[
