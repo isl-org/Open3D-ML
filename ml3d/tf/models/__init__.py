@@ -1,1 +1,2 @@
-from .mynet import *
+from .kpconv import *
+from .randlanet import *
