@@ -53,7 +53,7 @@ class TF_Dataset():
         else:
             self.cache_convert = None
 
-        self.num_threads = 3 # read from config
+        self.num_threads = 3 # TODO : read from config
         self.split = dataset.split
         self.pc_list = dataset.path_list
         self.num_pc = len(self.pc_list)
@@ -81,12 +81,12 @@ class TF_Dataset():
 
         tf_dataset = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
 
-        tf_dataset = tf.data.Dataset.range(len(self.dataset))
+        # tf_dataset = tf.data.Dataset.range(len(self.dataset))
         # tf_dataset = tf_dataset.map(lambda x : tf.numpy_function(func = self.read_data, inp = [x], Tout = [tf.float32, tf.float32,
         #                             tf.int32]))
 
         # tf_dataset = tf_dataset.map(map_func = self.transform)
-        # tf_dataset = tf_dataset.map(map_func=self.transform, num_parallel_calls=self.num_threads)
+        tf_dataset = tf_dataset.map(map_func=self.transform, num_parallel_calls=self.num_threads)
 
 
         return tf_dataset

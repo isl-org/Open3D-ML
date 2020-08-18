@@ -18,17 +18,59 @@ class RandLANet:
         # Model parameters
         self.cfg = cfg
 
+    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
+        # crop a fixed size point cloud for training
+        num_points = self.cfg.num_points
+        center_point = points[pick_idx, :].reshape(1, -1)
+
+        if (points.shape[0] < num_points):
+            select_idx = np.array(range(points.shape[0]))
+            diff = num_points - points.shape[0]
+            select_idx = list(select_idx) + list(
+                random.choices(select_idx, k=diff))
+            random.shuffle(select_idx)
+        else:
+            select_idx = search_tree.query(center_point,
+                                            k=num_points)[1][0]
+
+        # select_idx = DataProcessing.shuffle_idx(select_idx)
+        random.shuffle(select_idx)
+        select_points = points[select_idx]
+        select_labels = labels[select_idx]
+        if (feat is None):
+            select_feat = None
+        else:
+            select_feat = feat[select_idx]
+        
+        select_points = select_points - center_point # TODO : add noise to center point
+
+        return select_points, select_feat, select_labels, select_idx
+
     def get_batch_gen(self, dataset):
+        cfg = self.cfg
+
         def gen():
             for i in range(dataset.num_pc):
-                yield i
-        return gen, tf.int64, []
+                data, attr = dataset.read_data(i)
+                pick_idx = np.random.choice(len(data['point']), 1)
+                
+                pc, feat, label, _ = self.crop_pc(data['point'], data['feat'], data['label'], data['search_tree'], pick_idx)
+
+                label = label[:, 0]
+
+                yield (pc.astype(np.float32),
+                       feat.astype(np.float32),
+                       label.astype(np.float32))
+
+        gen_func = gen
+        gen_types = (tf.float32, tf.float32, tf.int32)
+        gen_shapes = ([None, 3], [None, 3], [None])
+
+        return gen_func, gen_types, gen_shapes
 
 
-    def transform(pc, feat, label):
-        num_layers = 5
-        k_n = 16
-        sub_sampling_ratio = [4, 4, 4, 4, 2]
+    def transform(self, pc, feat, label):
+        cfg = self.cfg
 
         if (feat is not None):
             features = tf.concat([pc, feat], axis=1)
@@ -40,12 +82,12 @@ class RandLANet:
         input_pools = []
         input_up_samples = []
 
-        for i in range(num_layers):
-            neighbour_idx = tf.py_function(DataProcessing.knn_search, [pc, pc, k_n], tf.int32)
+        for i in range(cfg.num_layers):
+            neighbour_idx = tf.py_function(DataProcessing.knn_search, [pc, pc, cfg.k_n], tf.int32)
 
-            sub_points = pc[:tf.shape(pc)[0] // sub_sampling_ratio[i], :]
+            sub_points = pc[:tf.shape(pc)[0] // cfg.sub_sampling_ratio[i], :]
             pool_i = neighbour_idx[:tf.shape(pc)[0] //
-                                    sub_sampling_ratio[i], :]
+                                    cfg.sub_sampling_ratio[i], :]
             up_i = tf.py_function(DataProcessing.knn_search, [sub_points, pc, 1], tf.int32)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx)
@@ -95,28 +137,4 @@ class RandLANet:
             data['proj_inds'] = proj_inds
 
         return data
-
-    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        num_points = 65536
-        if (points.shape[0] < num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = num_points - points.shape[0]
-            select_idx = list(select_idx) + list(
-                random.choices(select_idx, k=diff))
-            random.shuffle(select_idx)
-        else:
-            center_point = points[pick_idx, :].reshape(1, -1)
-            select_idx = search_tree.query(center_point,
-                                            k=num_points)[1][0]
-
-        # select_idx = DataProcessing.shuffle_idx(select_idx)
-        random.shuffle(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        if (feat is None):
-            select_feat = None
-        else:
-            select_feat = feat[select_idx]
-        return select_points, select_feat, select_labels, select_idx
 
