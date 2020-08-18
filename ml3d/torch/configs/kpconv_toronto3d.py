@@ -17,6 +17,9 @@ model = dict(
     input_threads=10,
     batcher='ConcatBatcher',
 
+    # Density of neighborhoods for deformable convs (which need bigger radiuses). For normal conv we use KP_extent
+    density_parameter = 5.0,
+
     #########################
     # Architecture definition
     #########################
@@ -170,7 +173,7 @@ pipeline = dict(
 
     # logs
     main_log_dir='./logs',
-    model_name='RandLANet',
+    model_name='KPConv',
     train_sum_dir='train_log',
 )
 

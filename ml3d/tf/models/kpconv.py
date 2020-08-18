@@ -48,6 +48,20 @@ class KPFCNN:
         # Model parameters
         self.cfg = cfg
 
+        # From config parameter, compute higher bound of neighbors number in a neighborhood
+        hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1) ** 3))
+
+        # Initiate neighbors limit with higher bound
+        self.neighborhood_limits = np.full(cfg.num_layers, hist_n, dtype=np.int32)
+
+    def big_neighborhood_filter(self, neighbors, layer):
+        """
+        Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
+        Limit is computed at initialization
+        """
+        # crop neighbors matrix
+        return neighbors[:, :self.neighborhood_limits[layer]]
+
     def init_input(flat_inputs):
         # Path of the result folder
         if self.config.saving:
@@ -622,9 +636,9 @@ class KPFCNN:
 
             # Reduce size of neighbors matrices by eliminating furthest point
             # TODO :
-            # conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
-            # pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
-            # up_i = self.big_neighborhood_filter(up_i, len(input_points))
+            conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
+            pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
+            up_i = self.big_neighborhood_filter(up_i, len(input_points))
 
             # Updating input lists
             input_points += [stacked_points]
@@ -817,8 +831,7 @@ class KPFCNN:
             epoch_n = cfg.epoch_steps * cfg.batch_num
             split = dataset.split
 
-            # TODO : read from config
-            batch_limit = 500  # read from calibrate_batch
+            batch_limit = 5000  # TODO : read from calibrate_batch, typically 100 * batch_size required
 
             # Initiate potentials for regular generation
             if not hasattr(self, 'potentials'):
@@ -953,10 +966,3 @@ class KPFCNN:
 
         return gen_func, gen_types, gen_shapes
 
-    # def big_neighborhood_filter(self, neighbors, layer):
-    #     """
-    #     Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
-    #     Limit is computed at initialization
-    #     """
-    #     # crop neighbors matrix
-    #     return neighbors[:, :neighborhood_limits[layer]]

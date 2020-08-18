@@ -22,7 +22,7 @@ model = KPFCNN(cfg.model)
 
 # pipeline.run_train(device)
 
-tf_data = TF_Dataset(dataset = dataset.get_split('training'), model = model)# preprocess = model.preprocess, transform = model.transform, generator = model.get_batch_gen, cfg = model.cfg)
+tf_data = TF_Dataset(dataset = dataset.get_split('training'), model = model)
 loader = tf_data.get_loader()
 # print(loader)
 for data in loader:
