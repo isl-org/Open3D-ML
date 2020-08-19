@@ -7,6 +7,7 @@ import numpy as np
 import time
 import random
 from sklearn.neighbors import KDTree
+
 from ..utils import helper_tf_util
 from ...datasets.utils.dataprocessing import DataProcessing
 
@@ -278,7 +279,7 @@ class RandLANet(tf.keras.Model):
 
         return compute_loss
 
-    def loss(self, Loss, results, inputs, device):
+    def loss(self, Loss, results, inputs):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
@@ -286,60 +287,13 @@ class RandLANet(tf.keras.Model):
         :return: loss
         """
         cfg = self.cfg
-        labels = inputs['data']['labels']
+        labels = inputs[-1]
 
-        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
-                                            cfg.ignored_label_inds, device)
+        scores, labels = Loss.filter_valid_label(results, labels)
 
-        logp = torch.distributions.utils.probs_to_logits(scores,
-                                                         is_binary=False)
         loss = Loss.weighted_CrossEntropyLoss(logp, labels)
 
-        # predict_labels = torch.max(scores, dim=-2).indices
-
-        
-        one_hot_labels = tf.one_hot(labels, depth=self.config.num_classes)
-        weights = tf.reduce_sum(class_weights * one_hot_labels, axis=1)
-        unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=one_hot_labels)
-        weighted_losses = unweighted_losses * weights
-       
-        output_loss = tf.reduce_mean(weighted_losses)
-
         return loss, labels, scores
-
-    def train_step(self, data):
-        # Unpack the data. Its structure depends on your model and
-        # on what you pass to `fit()`.
-        x, y = data
-     
-        with tf.GradientTape() as tape:
-            y_pred = self(x, training=True)  # Forward pass
-            # Compute the loss value.
-            # The loss function is configured in `compile()`.
-            loss = self.compiled_loss(
-                y,
-                y_pred,
-                # sample_weight=sample_weight,
-                # regularization_losses=self.losses,
-            )
-
-
-
-        # Compute gradients
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
-
-        # Update weights
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-
-        # Update the metrics.
-        # Metrics are configured in `compile()`.
-        self.compiled_metrics.update_state(y, y_pred)
-        # self.compiled_metrics.update_state(y, y_pred, sample_weight=sample_weight)
-
-        # Return a dict mapping metric names to current value.
-        # Note that it will include the loss (tracked in self.metrics).
-        return {m.name: m.result() for m in self.metrics}
 
     @staticmethod
     def random_sample(feature, pool_idx):

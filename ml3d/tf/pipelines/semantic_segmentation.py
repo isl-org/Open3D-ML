@@ -130,27 +130,6 @@ class SemanticSegmentation():
 
         cfg = self.cfg
 
-        # strategy TODO
-        # strategy_override = None
-        # strategy = strategy_override or distribution_utils.get_distribution_strategy(
-        #   distribution_strategy=flags_obj.distribution_strategy,
-        #   num_gpus=flags_obj.num_gpus,
-        #   tpu_address=flags_obj.tpu)
-
-        # strategy_scope = distribution_utils.get_strategy_scope(strategy)
-
-        # mnist = tfds.builder('mnist', data_dir=flags_obj.data_dir)
-        # if flags_obj.download:
-        # mnist.download_and_prepare()
-
-        # mnist_train, mnist_test = datasets_override or mnist.as_dataset(
-        #   split=['train', 'test'],
-        #   decoders={'image': decode_image()},  # pylint: disable=no-value-for-parameter
-        #   as_supervised=True)
-        # train_input_dataset = mnist_train.cache().repeat().shuffle(
-        #   buffer_size=50000).batch(flags_obj.batch_size)
-        # eval_input_dataset = mnist_test.cache().repeat().batch(flags_obj.batch_size)
-
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
             cfg.adam_lr, decay_steps=100000, decay_rate=cfg.scheduler_gamma)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
@@ -158,65 +137,34 @@ class SemanticSegmentation():
         Loss = SemSegLoss(self, model, dataset)
         Metric = SemSegMetric(self, model, dataset, device)
 
-
         train_split = TF_Dataset(dataset=dataset.get_split('training'), 
                                  model = model)
         train_loader = train_split.get_loader()
 
-        model.compile(
-            optimizer=optimizer,
-            loss_fn=model.get_loss(Loss),
-            metrics=['sparse_categorical_accuracy'])
 
-        for data in train_loader:
-            # print(data[0])
-            # print(data[-1])
-            # model.fit(data[0].numpy(), data[-1].numpy())
-            x = [tf.expand_dims(t, 0) for t in data[:-1]]
-            y = [tf.expand_dims(t, 0) for t in data[-1:]]
-            # print(x)
-            model.fit(x, y)
+        for epoch in range(0, cfg.max_epoch + 1): 
+            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            self.accs = []
+            self.ious = []
+            self.losses = []
+            step = 0
 
-            # result = model(x)
-        
-        # for data in train_loader:
-        #     print(data)
-        exit()
+            #for inputs in train_loader:
+            for idx, inputs in enumerate(tqdm(train_loader)):
+                with tf.GradientTape() as tape:
+                    results = model(inputs, training=True)  
+                    loss, gt_labels, predict_scores = model.loss(
+                        Loss, results, inputs)
 
-        # TODO, custom metrics and loss
+                grads = tape.gradient(loss_value, model.trainable_weights)
+                optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-
-        num_train_examples = mnist.info.splits['train'].num_examples
-        train_steps = num_train_examples // flags_obj.batch_size
-        train_epochs = flags_obj.train_epochs
-
-        ckpt_full_path = os.path.join(flags_obj.model_dir, 'model.ckpt-{epoch:04d}')
-        callbacks = [
-          tf.keras.callbacks.ModelCheckpoint(
-              ckpt_full_path, save_weights_only=True),
-          tf.keras.callbacks.TensorBoard(log_dir=flags_obj.model_dir),
-        ]
-
-        num_eval_examples = mnist.info.splits['test'].num_examples
-        num_eval_steps = num_eval_examples // flags_obj.batch_size
-
-        history = model.fit(
-          train_input_dataset,
-          epochs=train_epochs,
-          steps_per_epoch=train_steps,
-          callbacks=callbacks,
-          validation_steps=num_eval_steps,
-          validation_data=eval_input_dataset,
-          validation_freq=flags_obj.epochs_between_evals)
-
-        export_path = os.path.join(flags_obj.model_dir, 'saved_model')
-        model.save(export_path, include_optimizer=False)
-
-        eval_output = model.evaluate(
-          eval_input_dataset, steps=num_eval_steps, verbose=2)
-
-        stats = common.build_stats(history, eval_output, callbacks)
-        return stats
+                acc = Metric.acc(predict_scores, gt_labels)
+                iou = Metric.iou(predict_scores, gt_labels)
+                self.losses.append(loss)
+                self.accs.append(acc)
+                self.ious.append(iou)
+                step = step + 1
 
 
     def get_batcher(self, device):
