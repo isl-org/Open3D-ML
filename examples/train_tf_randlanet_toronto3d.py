@@ -3,7 +3,7 @@ import tensorflow as tf
 # there should be pipeline. pipeline is bigger that randlanet
 from ml3d.datasets import Toronto3D
 from ml3d.tf.models import RandLANet
-from ml3d.tf.datasets import TF_Dataset
+from ml3d.tf.dataloaders import TF_Dataloader
 from ml3d.torch.utils import Config
 from os.path import abspath, dirname
 
@@ -22,7 +22,7 @@ model = RandLANet(cfg.model)
 
 # pipeline.run_train(device)
 
-tf_data = TF_Dataset(dataset = dataset.get_split('training'), model = model)# preprocess = model.preprocess, transform = model.transform, generator = model.get_batch_gen, cfg = model.cfg)
+tf_data = TF_Dataloader(dataset = dataset.get_split('training'), model = model)# preprocess = model.preprocess, transform = model.transform, generator = model.get_batch_gen, cfg = model.cfg)
 loader = tf_data.get_loader()
 # print(loader)
 for data in loader:
