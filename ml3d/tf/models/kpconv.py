@@ -11,6 +11,8 @@ from sklearn.neighbors import KDTree
 
 from ...datasets.utils.dataprocessing import DataProcessing
 
+from .utils.kernels.kernel_points import load_kernels as create_kernel_points
+
 # Convolution functions
 # import network_blocks
 from .network_blocks import assemble_FCNN_blocks, segmentation_head, multi_segmentation_head
@@ -116,13 +118,105 @@ class KPConv(tf.keras.layers.Layer):
         return
 
     def init_KP(self):
-        K_points_numpy = load_kernels(self.radius,
+        K_points_numpy = create_kernel_points self.radius,
                                       self.K,
                                       dimension=self.p_dim,
                                       fixed=self.fixed_kernel_points)
 
-        return Parameter(torch.tensor(K_points_numpy, dtype=torch.float32),
-                         requires_grad=False)
+        # TODO : reshape to (num_kernel_points, points_dim)
+        return tf.Variable(K_points_numpy.astype(np.float32), trainable=False, name='kernel_points')
+
+    def forward(self, query_points, support_points, neighbors_indices, features):
+        # Get variables
+        n_kp = int(self.kernel_points.shape[0])
+
+         if self.deformable:
+            # Get offsets with a KPConv that only takes part of the features
+            self.offset_features = self.offset_conv(query_points, support_points, neighbors_indices, features) + self.offset_bias
+
+            if self.modulated:
+                # Get offset (in normalized scale) from features
+                unscaled_offsets = self.offset_features[:, :self.p_dim * self.K]
+                unscaled_offsets = unscaled_offsets.view(-1, self.K, self.p_dim)
+
+                # Get modulations
+                modulations = 2 * torch.sigmoid(self.offset_features[:, self.p_dim * self.K:])
+
+            else:
+                # Get offset (in normalized scale) from features
+                unscaled_offsets = self.offset_features.view(-1, self.K, self.p_dim)
+
+                # No modulations
+                modulations = None
+
+            # Rescale offset for this layer
+            offsets = unscaled_offsets * self.KP_extent
+
+        else:
+            offsets = None
+            modulations = None
+
+        # Add a fake point in the last row for shadow neighbors
+        shadow_point = tf.ones_like(support_points[:1, :]) * 1e6
+        support_points = tf.concat([support_points, shadow_point], axis=0)
+
+        # Get neighbor points [n_points, n_neighbors, dim]
+        neighbors = tf.gather(support_points, neighbors_indices, axis=0)
+
+        # Center every neighborhood
+        neighbors = neighbors - tf.expand_dims(query_points, 1)
+
+        # Get all difference matrices [n_points, n_neighbors, n_kpoints, dim]
+        neighbors = tf.expand_dims(neighbors, 2)
+        neighbors = tf.tile(neighbors, [1, 1, n_kp, 1])
+        differences = neighbors - K_points
+
+        # Get the square distances [n_points, n_neighbors, n_kpoints]
+        sq_distances = tf.reduce_sum(tf.square(differences), axis=3)
+
+        # Get Kernel point influences [n_points, n_kpoints, n_neighbors]
+        if KP_influence == 'constant':
+            # Every point get an influence of 1.
+            all_weights = tf.ones_like(sq_distances)
+            all_weights = tf.transpose(all_weights, [0, 2, 1])
+
+        elif KP_influence == 'linear':
+            # Influence decrease linearly with the distance, and get to zero when d = KP_extent.
+            all_weights = tf.maximum(1 - tf.sqrt(sq_distances) / KP_extent, 0.0)
+            all_weights = tf.transpose(all_weights, [0, 2, 1])
+
+        elif KP_influence == 'gaussian':
+            # Influence in gaussian of the distance.
+            sigma = KP_extent * 0.3
+            all_weights = radius_gaussian(sq_distances, sigma)
+            all_weights = tf.transpose(all_weights, [0, 2, 1])
+        else:
+            raise ValueError('Unknown influence function type (config.KP_influence)')
+
+        # In case of closest mode, only the closest KP can influence each point
+        if aggregation_mode == 'closest':
+            neighbors_1nn = tf.argmin(sq_distances, axis=2, output_type=tf.int32)
+            all_weights *= tf.one_hot(neighbors_1nn, n_kp, axis=1, dtype=tf.float32)
+
+        elif aggregation_mode != 'sum':
+            raise ValueError("Unknown convolution mode. Should be 'closest' or 'sum'")
+
+        features = tf.concat([features, tf.zeros_like(features[:1, :])], axis=0)
+
+        # Get the features of each neighborhood [n_points, n_neighbors, in_fdim]
+        neighborhood_features = tf.gather(features, neighbors_indices, axis=0)
+
+        # Apply distance weights [n_points, n_kpoints, in_fdim]
+        weighted_features = tf.matmul(all_weights, neighborhood_features)
+
+        # Apply network weights [n_kpoints, n_points, out_fdim]
+        weighted_features = tf.transpose(weighted_features, [1, 0, 2])
+        kernel_outputs = tf.matmul(weighted_features, K_values)
+
+        # Convolution sum to get [n_points, out_fdim]
+        output_features = tf.reduce_sum(kernel_outputs, axis=0)
+
+        return output_features
 
 
 
