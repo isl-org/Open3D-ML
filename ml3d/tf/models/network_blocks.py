@@ -37,14 +37,18 @@ from .utils.kernels import convolution_ops as conv_ops
 
 def weight_variable(shape):
     # tf.set_random_seed(42)
-    initial = tf.truncated_normal(shape, stddev=np.sqrt(2 / shape[-1]))
-    initial = tf.round(initial * tf.constant(1000, dtype=tf.float32)) / tf.constant(1000, dtype=tf.float32)
-    return tf.Variable(initial, name='weights')
+    initial = tf.keras.initializers.TruncatedNormal(
+        mean = 0.0, stddev = np.sqrt(2 / shape[-1])
+    )
+    weight = initial(shape = shape, dtype=tf.float32)
+    weight = tf.round(weight * tf.constant(1000, dtype=tf.float32)) / tf.constant(1000, dtype=tf.float32)
+
+    return tf.Variable(initial_value=weight, trainable=True, name='weight')
 
 
 def bias_variable(shape):
-    initial = tf.constant(0., shape=shape)
-    return tf.Variable(initial, name='bias')
+    initial = tf.zeros_initializer()
+    return tf.Variable(initial_value=initial(shape=shape, dtype="float32"), trainable=True, name='bias')
 
 
 def ind_max_pool(x, inds):

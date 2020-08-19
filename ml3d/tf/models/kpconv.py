@@ -42,9 +42,96 @@ def tf_batch_neighbors(queries, supports, q_batches, s_batches, radius):
     return tf_batch_neighbors_module.batch_ordered_neighbors(
         queries, supports, q_batches, s_batches, radius)
 
+def get_weight(shape):
+    # tf.set_random_seed(42)
+    initial = tf.keras.initializers.TruncatedNormal(
+        mean = 0.0, stddev = np.sqrt(2 / shape[-1])
+    )
+    weight = initial(shape = shape, dtype=tf.float32)
+    weight = tf.round(weight * tf.constant(1000, dtype=tf.float32)) / tf.constant(1000, dtype=tf.float32)
 
-class KPFCNN:
+    return tf.Variable(initial_value=weight, trainable=True, name='weight')
+
+def get_bias(shape):
+    initial = tf.zeros_initializer()
+    return tf.Variable(initial_value=initial(shape=shape, dtype="float32"), trainable=True, name='bias')
+
+class KPConv(tf.keras.layers.Layer):
+    def __init__(self, kernel_size, p_dim, in_channels, out_channels, KP_extent, radius, 
+                fixed_kernel_points='center', KP_influence='linear', aggregation_mode='sum',
+                deformable=False, modulated=False, **kwargs):
+
+        super(KPConv, self).__init__(**kwargs)
+
+        self.KP_extent = KP_extent # TODO : verify correct kp extent
+        self.K = kernel_size
+        self.p_dim = p_dim
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.radius = radius
+        self.fixed_kernel_points = fixed_kernel_points
+        self.KP_influence = KP_influence
+        self.aggregation_mode = convolution_mode
+        self.deformable = deformable
+        self.modulated = modulated
+
+        self.min_d2 = None
+        self.deformed_KP = None
+        self.offset_features = None
+
+        self.weights = get_weight((self.K, self.in_channels, self.out_channels))
+
+       if deformable:
+            if modulated:
+                self.offset_dim = (self.p_dim + 1) * self.K
+            else:
+                self.offset_dim = self.p_dim * self.K
+            self.offset_conv = KPConv(self.K,
+                                      self.p_dim,
+                                      self.in_channels,
+                                      self.offset_dim,
+                                      KP_extent,
+                                      radius,
+                                      fixed_kernel_points=fixed_kernel_points,
+                                      KP_influence=KP_influence,
+                                      aggregation_mode=aggregation_mode)
+            self.offset_bias = get_bias(self.offset_dim)
+
+        else:
+            self.offset_dim = None
+            self.offset_conv = None
+            self.offset_bias = None
+
+        self.reset_parameters()
+
+        self.kernel_points = self.init_KP()
+        return
+
+    def reset_parameters(self):
+        init = tf.keras.initializers.HeUniform() # TODO : kaining initializer
+        self.weights = tf.Variable(init(shape = self.weights.shape))
+
+        if self.deformable:
+            self.offset_bias = get_bias(self.offset_bias.shape)
+        return
+
+    def init_KP(self):
+        K_points_numpy = load_kernels(self.radius,
+                                      self.K,
+                                      dimension=self.p_dim,
+                                      fixed=self.fixed_kernel_points)
+
+        return Parameter(torch.tensor(K_points_numpy, dtype=torch.float32),
+                         requires_grad=False)
+
+
+
+
+class KPFCNN(tf.keras.Model):
+
     def __init__(self, cfg):
+        super(KPFCNN, self).__init__()
+
         # Model parameters
         self.cfg = cfg
 
@@ -53,6 +140,50 @@ class KPFCNN:
 
         # Initiate neighbors limit with higher bound
         self.neighborhood_limits = np.full(cfg.num_layers, hist_n, dtype=np.int32)
+
+        # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
+        self.dropout_prob = tf.constant(0.2, name='dropout_prob')
+
+
+    def call(self, flat_inputs):
+        cfg = self.cfg
+
+        inputs = dict()
+        inputs['points'] = flat_inputs[:cfg.num_layers]
+        inputs['neighbors'] = flat_inputs[cfg.num_layers:2 * cfg.num_layers]
+        inputs['pools'] = flat_inputs[2 * cfg.num_layers:3 * cfg.num_layers]
+        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 * cfg.num_layers]
+
+        ind = 4 * cfg.num_layers
+        inputs['features'] = flat_inputs[ind]
+        ind += 1
+        inputs['batch_weights'] = flat_inputs[ind]
+        ind += 1
+        inputs['in_batches'] = flat_inputs[ind]
+        ind += 1
+        inputs['out_batches'] = flat_inputs[ind]
+        ind += 1
+        inputs['point_labels'] = flat_inputs[ind]
+        ind += 1
+        labels = inputs['point_labels']
+
+        inputs['augment_scales'] = flat_inputs[ind]
+        ind += 1
+        inputs['augment_rotations'] = flat_inputs[ind]
+
+        ind += 1
+        inputs['point_inds'] = flat_inputs[ind]
+        ind += 1
+        inputs['cloud_inds'] = flat_inputs[ind]
+
+        output_features = assemble_FCNN_blocks(inputs, cfg,
+                                                self.dropout_prob)
+
+        self.logits = segmentation_head(output_features, self.cfg,
+                                        self.dropout_prob)
+
+
+        # print(inputs)
 
     def big_neighborhood_filter(self, neighbors, layer):
         """
@@ -63,69 +194,69 @@ class KPFCNN:
         return neighbors[:, :self.neighborhood_limits[layer]]
 
     def init_input(flat_inputs):
-        # Path of the result folder
-        if self.config.saving:
-            if self.config.saving_path == None:
-                self.saving_path = time.strftime(
-                    'results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
-            else:
-                self.saving_path = self.config.saving_path
-            if not exists(self.saving_path):
-                makedirs(self.saving_path)
+        # # Path of the result folder
+        # if self.cfg.saving:
+        #     if self.cfg.saving_path == None:
+        #         self.saving_path = time.strftime(
+        #             'results/Log_%Y-%m-%d_%H-%M-%S', time.gmtime())
+        #     else:
+        #         self.saving_path = self.cfg.saving_path
+        #     if not exists(self.saving_path):
+        #         makedirs(self.saving_path)
 
-        ########
-        # Inputs
-        ########
+        # ########
+        # # Inputs
+        # ########
 
-        # Sort flatten inputs in a dictionary
-        with tf.variable_scope('inputs'):
-            self.inputs = dict()
-            self.inputs['points'] = flat_inputs[:config.num_layers]
-            self.inputs['neighbors'] = flat_inputs[config.num_layers:2 *
-                                                   config.num_layers]
-            self.inputs['pools'] = flat_inputs[2 * config.num_layers:3 *
-                                               config.num_layers]
-            self.inputs['upsamples'] = flat_inputs[3 * config.num_layers:4 *
-                                                   config.num_layers]
-            ind = 4 * config.num_layers
-            self.inputs['features'] = flat_inputs[ind]
-            ind += 1
-            self.inputs['batch_weights'] = flat_inputs[ind]
-            ind += 1
-            self.inputs['in_batches'] = flat_inputs[ind]
-            ind += 1
-            self.inputs['out_batches'] = flat_inputs[ind]
-            ind += 1
-            self.inputs['point_labels'] = flat_inputs[ind]
-            ind += 1
-            self.labels = self.inputs['point_labels']
+        # # Sort flatten inputs in a dictionary
+        # with tf.variable_scope('inputs'):
+        #     self.inputs = dict()
+        #     self.inputs['points'] = flat_inputs[:cfg.num_layers]
+        #     self.inputs['neighbors'] = flat_inputs[cfg.num_layers:2 *
+        #                                            cfg.num_layers]
+        #     self.inputs['pools'] = flat_inputs[2 * cfg.num_layers:3 *
+        #                                        cfg.num_layers]
+        #     self.inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 *
+        #                                            cfg.num_layers]
+        #     ind = 4 * cfg.num_layers
+        #     self.inputs['features'] = flat_inputs[ind]
+        #     ind += 1
+        #     self.inputs['batch_weights'] = flat_inputs[ind]
+        #     ind += 1
+        #     self.inputs['in_batches'] = flat_inputs[ind]
+        #     ind += 1
+        #     self.inputs['out_batches'] = flat_inputs[ind]
+        #     ind += 1
+        #     self.inputs['point_labels'] = flat_inputs[ind]
+        #     ind += 1
+        #     self.labels = self.inputs['point_labels']
 
-            if config.network_model in [
-                    'multi_segmentation', 'multi_cloud_segmentation'
-            ]:
-                self.inputs['super_labels'] = flat_inputs[ind]
-                ind += 1
+        #     if cfg.network_model in [
+        #             'multi_segmentation', 'multi_cloud_segmentation'
+        #     ]:
+        #         self.inputs['super_labels'] = flat_inputs[ind]
+        #         ind += 1
 
-            self.inputs['augment_scales'] = flat_inputs[ind]
-            ind += 1
-            self.inputs['augment_rotations'] = flat_inputs[ind]
+        #     self.inputs['augment_scales'] = flat_inputs[ind]
+        #     ind += 1
+        #     self.inputs['augment_rotations'] = flat_inputs[ind]
 
-            if config.network_model in [
-                    "cloud_segmentation", 'multi_cloud_segmentation'
-            ]:
-                ind += 1
-                self.inputs['point_inds'] = flat_inputs[ind]
-                ind += 1
-                self.inputs['cloud_inds'] = flat_inputs[ind]
+        #     if cfg.network_model in [
+        #             "cloud_segmentation", 'multi_cloud_segmentation'
+        #     ]:
+        #         ind += 1
+        #         self.inputs['point_inds'] = flat_inputs[ind]
+        #         ind += 1
+        #         self.inputs['cloud_inds'] = flat_inputs[ind]
 
-            elif config.network_model in [
-                    'multi_segmentation', 'segmentation'
-            ]:
-                ind += 1
-                self.inputs['object_inds'] = flat_inputs[ind]
+        #     elif cfg.network_model in [
+        #             'multi_segmentation', 'segmentation'
+        #     ]:
+        #         ind += 1
+        #         self.inputs['object_inds'] = flat_inputs[ind]
 
             # Dropout placeholder
-            self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
+            # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
 
         ########
         # Layers
@@ -133,18 +264,11 @@ class KPFCNN:
 
         # Create layers
         with tf.variable_scope('KernelPointNetwork'):
-            output_features = assemble_FCNN_blocks(self.inputs, self.config,
+            output_features = assemble_FCNN_blocks(self.inputs, self.cfg,
                                                    self.dropout_prob)
 
-            if config.network_model in [
-                    "multi_segmentation", 'multi_cloud_segmentation'
-            ]:
-                self.logits = multi_segmentation_head(
-                    output_features, self.inputs['super_labels'], self.config,
-                    self.dropout_prob)
-            else:
-                self.logits = segmentation_head(output_features, self.config,
-                                                self.dropout_prob)
+            self.logits = segmentation_head(output_features, self.cfg,
+                                            self.dropout_prob)
 
         ########
         # Losses
@@ -152,19 +276,19 @@ class KPFCNN:
 
         with tf.variable_scope('loss'):
 
-            if config.network_model in [
+            if cfg.network_model in [
                     "multi_segmentation", 'multi_cloud_segmentation'
             ]:
                 self.output_loss = multi_segmentation_loss(
                     self.logits,
                     self.inputs,
-                    batch_average=self.config.batch_averaged_loss)
+                    batch_average=self.cfg.batch_averaged_loss)
 
-            elif len(self.config.ignored_label_inds) > 0:
+            elif len(self.cfg.ignored_label_inds) > 0:
 
                 # Boolean mask of points that should be ignored
                 ignored_bool = tf.zeros_like(self.labels, dtype=tf.bool)
-                for ign_label in self.config.ignored_label_inds:
+                for ign_label in self.cfg.ignored_label_inds:
                     ignored_bool = tf.logical_or(
                         ignored_bool, tf.equal(self.labels, ign_label))
 
@@ -176,10 +300,10 @@ class KPFCNN:
                 }
 
                 # Reduce label values in the range of logit shape
-                reducing_list = tf.range(self.config.num_classes,
+                reducing_list = tf.range(self.cfg.num_classes,
                                          dtype=tf.int32)
                 inserted_value = tf.zeros((1, ), dtype=tf.int32)
-                for ign_label in self.config.ignored_label_inds:
+                for ign_label in self.cfg.ignored_label_inds:
                     reducing_list = tf.concat([
                         reducing_list[:ign_label], inserted_value,
                         reducing_list[ign_label:]
@@ -188,20 +312,20 @@ class KPFCNN:
                                                      new_dict['point_labels'])
 
                 # Add batch weigths to dict if needed
-                if self.config.batch_averaged_loss:
+                if self.cfg.batch_averaged_loss:
                     new_dict['batch_weights'] = self.inputs['batch_weights']
 
                 # Output loss
                 self.output_loss = segmentation_loss(
                     new_logits,
                     new_dict,
-                    batch_average=self.config.batch_averaged_loss)
+                    batch_average=self.cfg.batch_averaged_loss)
 
             else:
                 self.output_loss = segmentation_loss(
                     self.logits,
                     self.inputs,
-                    batch_average=self.config.batch_averaged_loss)
+                    batch_average=self.cfg.batch_averaged_loss)
 
             # Add regularization
             self.loss = self.regularization_losses() + self.output_loss
@@ -219,7 +343,7 @@ class KPFCNN:
             tf.nn.l2_loss(v) for v in tf.global_variables()
             if 'weights' in v.name
         ]
-        self.regularization_loss = self.config.weights_decay * tf.add_n(
+        self.regularization_loss = self.cfg.weights_decay * tf.add_n(
             regularization_losses)
 
         ##############################
@@ -234,7 +358,7 @@ class KPFCNN:
                 layer = int(v.name.split('/')[1].split('_')[-1])
 
                 # Radius of convolution for this layer
-                conv_radius = cfg.first_subsampling_dl * self.config.density_parameter * (
+                conv_radius = cfg.first_subsampling_dl * self.cfg.density_parameter * (
                     2**(layer - 1))
 
                 # Target extent
@@ -242,7 +366,7 @@ class KPFCNN:
                 gaussian_losses += [tf.nn.l2_loss(v - target_extent)]
 
         if len(gaussian_losses) > 0:
-            self.gaussian_loss = self.config.gaussian_decay * tf.add_n(
+            self.gaussian_loss = self.cfg.gaussian_decay * tf.add_n(
                 gaussian_losses)
         else:
             self.gaussian_loss = tf.constant(0, dtype=tf.float32)
@@ -253,7 +377,7 @@ class KPFCNN:
 
         offset_losses = []
 
-        if self.config.offsets_loss == 'permissive':
+        if self.cfg.offsets_loss == 'permissive':
 
             for op in tf.get_default_graph().get_operations():
                 if op.name.endswith('deformed_KP'):
@@ -265,7 +389,7 @@ class KPFCNN:
                     layer = int(op.name.split('/')[1].split('_')[-1])
 
                     # Radius of deformed convolution for this layer
-                    conv_radius = cfg.first_subsampling_dl * self.config.density_parameter * (
+                    conv_radius = cfg.first_subsampling_dl * self.cfg.density_parameter * (
                         2**layer)
 
                     # Normalized KP locations
@@ -277,7 +401,7 @@ class KPFCNN:
                                                 tf.norm(KP_locs, axis=2) - 1.0)
                     offset_losses += [tf.reduce_mean(radius_outside)]
 
-        elif self.config.offsets_loss == 'fitting':
+        elif self.cfg.offsets_loss == 'fitting':
 
             for op in tf.get_default_graph().get_operations():
 
@@ -333,11 +457,11 @@ class KPFCNN:
                                                          axis=1)
                         offset_losses += [tf.reduce_mean(repulsive_losses)]
 
-        elif self.config.offsets_loss != 'none':
+        elif self.cfg.offsets_loss != 'none':
             raise ValueError('Unknown offset loss')
 
         if len(offset_losses) > 0:
-            self.offsets_loss = self.config.offsets_decay * tf.add_n(
+            self.offsets_loss = self.cfg.offsets_decay * tf.add_n(
                 offset_losses)
         else:
             self.offsets_loss = tf.constant(0, dtype=tf.float32)
@@ -346,7 +470,7 @@ class KPFCNN:
 
     def parameters_log(self):
 
-        self.config.save(self.saving_path)
+        self.cfg.save(self.saving_path)
 
     def get_batch_inds(self, stacks_len):
         """
@@ -877,7 +1001,7 @@ class KPFCNN:
                 center_point = points[point_ind, :].reshape(1, -1)
                 # Add noise to the center point
                 # if split != 'ERF':
-                #     noise = np.random.normal(scale=config.in_radius/10, size=center_point.shape)
+                #     noise = np.random.normal(scale=cfg.in_radius/10, size=center_point.shape)
                 #     pick_point = center_point + noise.astype(center_point.dtype)
                 # else:
                 #     pick_point = center_point
@@ -885,7 +1009,7 @@ class KPFCNN:
 
                 # Indices of points in input region
                 # input_inds = self.input_trees[data_split][cloud_ind].query_radius(pick_point,
-                #                                                                 r=config.in_radius)[0]
+                #                                                                 r=cfg.in_radius)[0]
                 input_inds = data['search_tree'].query_radius(
                     pick_point, r=cfg.in_radius)[0]
 
