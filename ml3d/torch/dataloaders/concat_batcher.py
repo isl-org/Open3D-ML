@@ -4,9 +4,6 @@ import numpy as np
 import pickle
 import torch
 import yaml
-from multiprocessing import Lock
-
-# OS functions
 from os import listdir
 from os.path import exists, join, isdir
 

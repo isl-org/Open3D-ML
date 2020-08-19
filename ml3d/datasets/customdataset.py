@@ -111,7 +111,8 @@ class Custom3D:
 
 
 
-from ml3d.utils import Config
+
+from ..utils import Config
 
 
 if __name__ == '__main__':

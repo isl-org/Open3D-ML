@@ -5,15 +5,12 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 
-from ml3d.utils.ply import write_ply, read_ply
-
-from ml3d.torch.modules.losses import filter_valid_label
-from ml3d.datasets.semantickitti import DataProcessing
-
 import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 
-
+from ...utils.ply import write_ply, read_ply
+from ..modules.losses import filter_valid_label
+from ...datasets.utils import DataProcessing
 class KPFCNN(nn.Module):
     """
     Class defining KPFCNN
@@ -1404,7 +1401,8 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
-from ml3d.utils.kpconv_config import bcolors
+
+from ...utils.kpconv_config import bcolors
 
 # ------------------------------------------------------------------------------------------
 #

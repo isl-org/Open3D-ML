@@ -13,6 +13,7 @@ from ml3d.utils import Config
 py_config = 'ml3d/configs/randlanet_semantickitti.py'
 # py_config = 'ml3d/configs/kpconv_semantickitti.py'
 # py_config 	= 'ml3d/configs/kpconv_semantickitti.py'
+
 cfg         = Config.load_from_file(py_config)
 
 dataset    	= SemanticKITTI(cfg.dataset)

@@ -5,11 +5,11 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
 import random
-from ml3d.datasets.utils import DataProcessing
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
+from .utils import DataProcessing
 
 class S3DISSplit():
     def __init__(self, dataset, split='training'):
@@ -376,8 +376,7 @@ class S3DIS:
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
 
 
-
-from ml3d.utils import Config
+from ..utils import Config
 
 if __name__ == '__main__':
     config = '../configs/randlanet_s3dis.py'
