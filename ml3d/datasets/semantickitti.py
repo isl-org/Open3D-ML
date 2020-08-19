@@ -59,7 +59,7 @@ class SemanticKITTISplit(Dataset):
             labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
         else:
             labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
-        data = {'point': points, 'label': labels}
+        data = {'point': points, 'feat': points, 'label': labels}
         return data
 
     def get_attr(self, idx):

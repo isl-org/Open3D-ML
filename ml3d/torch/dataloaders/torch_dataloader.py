@@ -24,7 +24,7 @@ from ml3d.torch.utils import dataset_helper
 from collections import namedtuple
 
 
-class SimpleDataset(Dataset):
+class Torch_Dataloader(Dataset):
     def __init__(self,
                  *args,
                  dataset=None,
