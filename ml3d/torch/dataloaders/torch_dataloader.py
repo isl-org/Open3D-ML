@@ -19,7 +19,7 @@ import torch
 from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
 
-from ml3d.torch.utils import dataset_helper
+from ml3d.utils import dataset_helper
 
 from collections import namedtuple
 

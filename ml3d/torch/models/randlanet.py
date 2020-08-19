@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from ml3d.datasets.utils import DataProcessing
 from ml3d.torch.modules.losses import filter_valid_label
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 
 
 class RandLANet(nn.Module):

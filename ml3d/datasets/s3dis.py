@@ -377,10 +377,10 @@ class S3DIS:
 
 
 
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 
 if __name__ == '__main__':
-    config = '../torch/configs/randlanet_s3dis.py'
+    config = '../configs/randlanet_s3dis.py'
     cfg = Config.load_from_file(config)
     a = S3DIS(cfg.dataset)
     b = a.get_split("training")

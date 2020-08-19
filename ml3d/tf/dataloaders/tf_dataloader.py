@@ -6,7 +6,7 @@ import random
 
 import tensorflow as tf
 import numpy as np
-from ml3d.torch.utils import dataset_helper
+from ml3d.utils import dataset_helper
 
 from ml3d.datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
@@ -81,11 +81,11 @@ class TF_Dataloader():
         return tf_dataloader
 
 
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 from ml3d.datasets import Toronto3D
 
 if __name__ == '__main__':
-    config = '../../torch/configs/kpconv_toronto3d.py'
+    config = '../../configs/kpconv_toronto3d.py'
     cfg = Config.load_from_file(config)
     dataset = Toronto3D(cfg.dataset)
 

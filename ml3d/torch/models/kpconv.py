@@ -5,7 +5,7 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 
-from ml3d.torch.utils.ply import write_ply, read_ply
+from ml3d.utils.ply import write_ply, read_ply
 
 from ml3d.torch.modules.losses import filter_valid_label
 from ml3d.datasets.semantickitti import DataProcessing
@@ -1404,7 +1404,7 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
-from ml3d.torch.utils.kpconv_config import bcolors
+from ml3d.utils.kpconv_config import bcolors
 
 # ------------------------------------------------------------------------------------------
 #

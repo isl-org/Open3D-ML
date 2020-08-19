@@ -20,7 +20,7 @@ from ml3d.datasets.semantickitti import DataProcessing
 
 from ml3d.torch.modules.losses import SemSegLoss
 from ml3d.torch.modules.metrics import SemSegMetric
-from ml3d.torch.utils import make_dir, LogRecord, Config
+from ml3d.utils import make_dir, LogRecord, Config
 
 import yaml
 

@@ -8,7 +8,7 @@ from ml3d.datasets.utils import DataProcessing
 
 from sklearn.neighbors import KDTree
 
-from ml3d.torch.utils import make_dir
+from ml3d.utils import make_dir
 import yaml
 
 BASE_DIR = './'

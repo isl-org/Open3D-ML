@@ -111,11 +111,11 @@ class Custom3D:
 
 
 
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 
 
 if __name__ == '__main__':
-    config = '../torch/configs/randlanet_custom3d.py'
+    config = '../configs/randlanet_custom3d.py'
     cfg  = Config.load_from_file(config)
     a = Custom3D(cfg.dataset)
     b = a.get_split("test")
