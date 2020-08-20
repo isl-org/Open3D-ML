@@ -15,24 +15,24 @@ from .utils.kernels.kernel_points import load_kernels as create_kernel_points
 
 # Convolution functions
 # import network_blocks
-from .network_blocks import assemble_FCNN_blocks, segmentation_head, multi_segmentation_head
-from .network_blocks import segmentation_loss, multi_segmentation_loss
+# from .network_blocks import assemble_FCNN_blocks, segmentation_head, multi_segmentation_head
+# from .network_blocks import segmentation_loss, multi_segmentation_loss
 
 # Load custom operation
-BASE_DIR = Path(abspath(__file__))
+# BASE_DIR = Path(abspath(__file__))
 
-tf_neighbors_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
-        'tf_neighbors.so'))
-tf_batch_neighbors_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
-        'tf_batch_neighbors.so'))
-tf_subsampling_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
-        'tf_subsampling.so'))
-tf_batch_subsampling_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
-        'tf_batch_subsampling.so'))
+# tf_neighbors_module = tf.load_op_library(
+#     str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+#         'tf_neighbors.so'))
+# tf_batch_neighbors_module = tf.load_op_library(
+#     str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+#         'tf_batch_neighbors.so'))
+# tf_subsampling_module = tf.load_op_library(
+#     str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+#         'tf_subsampling.so'))
+# tf_batch_subsampling_module = tf.load_op_library(
+#     str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+#         'tf_batch_subsampling.so'))
 
 
 def tf_batch_subsampling(points, batches_len, sampleDl):
@@ -123,6 +123,47 @@ def global_average(x, batch_lengths):
     # Average features in each batch
     return tf.stack(averaged_features)
 
+def block_decider(block_name,
+                  radius,
+                  in_dim,
+                  out_dim,
+                  layer_ind,
+                  cfg):
+
+    if block_name == 'unary':
+        return UnaryBlock(in_dim, out_dim, cfg.use_batch_norm, cfg.batch_norm_momentum)
+
+    elif block_name in ['simple',
+                        'simple_deformable',
+                        'simple_invariant',
+                        'simple_equivariant',
+                        'simple_strided',
+                        'simple_deformable_strided',
+                        'simple_invariant_strided',
+                        'simple_equivariant_strided']:
+        return SimpleBlock(block_name, in_dim, out_dim, radius, layer_ind, cfg)
+
+    elif block_name in ['resnetb',
+                        'resnetb_invariant',
+                        'resnetb_equivariant',
+                        'resnetb_deformable',
+                        'resnetb_strided',
+                        'resnetb_deformable_strided',
+                        'resnetb_equivariant_strided',
+                        'resnetb_invariant_strided']:
+        return ResnetBottleneckBlock(block_name, in_dim, out_dim, radius, layer_ind, cfg)
+
+    elif block_name == 'max_pool' or block_name == 'max_pool_wide':
+        return MaxPoolBlock(layer_ind)
+
+    elif block_name == 'global_average':
+        return GlobalAverageBlock()
+
+    elif block_name == 'nearest_upsample':
+        return NearestUpsampleBlock(layer_ind)
+
+    else:
+        raise ValueError('Unknown block name in the architecture definition : ' + block_name)
 
 
 class KPConv(tf.keras.layers.Layer):
@@ -141,7 +182,7 @@ class KPConv(tf.keras.layers.Layer):
         self.radius = radius
         self.fixed_kernel_points = fixed_kernel_points
         self.KP_influence = KP_influence
-        self.aggregation_mode = convolution_mode
+        self.aggregation_mode = aggregation_mode
         self.deformable = deformable
         self.modulated = modulated
 
@@ -149,9 +190,9 @@ class KPConv(tf.keras.layers.Layer):
         self.deformed_KP = None
         self.offset_features = None
 
-        self.weights = get_weight((self.K, self.in_channels, self.out_channels))
+        self.wts = get_weight((self.K, self.in_channels, self.out_channels))
 
-       if deformable:
+        if deformable:
             if modulated:
                 self.offset_dim = (self.p_dim + 1) * self.K
             else:
@@ -179,7 +220,7 @@ class KPConv(tf.keras.layers.Layer):
 
     def reset_parameters(self):
         init = tf.keras.initializers.HeUniform() # TODO : kaining initializer
-        self.weights = tf.Variable(init(shape = self.weights.shape))
+        self.wts = tf.Variable(init(shape = self.wts.shape))
 
         if self.deformable:
             self.offset_bias = get_bias(self.offset_bias.shape)
@@ -198,7 +239,7 @@ class KPConv(tf.keras.layers.Layer):
         # Get variables
         n_kp = int(self.kernel_points.shape[0])
 
-         if self.deformable:
+        if self.deformable:
             # Get offsets with a KPConv that only takes part of the features
             self.offset_features = self.offset_conv(query_points, support_points, neighbors_indices, features) + self.offset_bias
 
@@ -318,7 +359,7 @@ class KPConv(tf.keras.layers.Layer):
 
         # Apply network weights [n_kpoints, n_points, out_fdim]
         weighted_features = tf.transpose(weighted_features, [1, 0, 2])
-        kernel_outputs = tf.matmul(weighted_features, self.weights)
+        kernel_outputs = tf.matmul(weighted_features, self.wts)
 
         # Convolution sum to get [n_points, out_fdim]
         output_features = tf.reduce_sum(kernel_outputs, axis=0)
@@ -381,7 +422,7 @@ class UnaryBlock(tf.keras.layers.Layer):
             x = self.leaky_relu(x)
         return x
 
-     def __repr__(self):
+    def __repr__(self):
         return 'UnaryBlock(in_feat: {:d}, out_feat: {:d}, BN: {:s}, ReLU: {:s})'.format(self.in_dim,
                                                                                         self.out_dim,
                                                                                         str(self.use_bn),
@@ -404,6 +445,7 @@ class SimpleBlock(tf.keras.layers.Layer):
         self.KPConv = KPConv(
             cfg.num_kernel_points,
             cfg.in_points_dim,
+            in_dim,
             out_dim // 2,
             current_extent,
             radius,
@@ -429,6 +471,14 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
         return self.leaky_relu(self.batch_norm(x))
+
+class IdentityBlock(tf.keras.layers.Layer):
+
+    def __init__(self):
+        super(IdentityBlock, self).__init__()
+
+    def call(self, x):
+        return tf.identity(x)
 
 class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
@@ -475,10 +525,10 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
         if in_dim != out_dim:
             self.unary_shortcut = UnaryBlock(in_dim, out_dim, self.use_bn, self.bn_momentum, no_relu=True)
         else:
-            self.unary_shortcut = tf.identity()
+            self.unary_shortcut = IdentityBlock()
 
         # Other operations
-        self.leaky_relu = nn.LeakyReLU(0.1)
+        self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
 
         return
 
@@ -566,6 +616,70 @@ class KPFCNN(tf.keras.Model):
 
         # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
         self.dropout_prob = tf.constant(0.2, name='dropout_prob')
+
+        lbl_values = cfg.num_classes
+        ign_lbls = cfg.ignored_label_inds
+
+      # Current radius of convolution and feature dimension
+        layer = 0
+        r = cfg.first_subsampling_dl * cfg.conv_radius
+        in_dim = cfg.in_features_dim
+        out_dim = cfg.first_features_dim
+        self.K = cfg.num_kernel_points
+        self.C = len(lbl_values) - len(ign_lbls)
+
+        # Save all block operations in a list of modules
+        self.encoder_ops = tf.Keras.Sequential()
+        self.decoder_ops = tf.Keras.Sequential()        
+        self.block_ops = tf.keras.Sequential()
+
+        # Loop over consecutive blocks
+        block_in_layer = 0
+
+        arch = []
+
+        for block_i, block in enumerate(cfg.architecture):
+
+            # Check equivariance
+            if ('equivariant' in block) and (not out_dim % 3 == 0):
+                raise ValueError('Equivariant block but features dimension is not a factor of 3')
+
+            # Detect upsampling block to stop
+            if 'upsample' in block:
+                break
+
+            # Apply the good block function defining tf ops
+            arch.append(repr(block_decider(block,
+                                                r,
+                                                in_dim,
+                                                out_dim,
+                                                layer,
+                                                cfg)))
+            self.block_ops.add(block_decider(block,
+                                                r,
+                                                in_dim,
+                                                out_dim,
+                                                layer,
+                                                cfg))
+
+
+            # Index of block in this layer
+            block_in_layer += 1
+
+            # Update dimension of input from output
+            if 'simple' in block:
+                in_dim = out_dim // 2
+            else:
+                in_dim = out_dim
+
+
+            # Detect change to a subsampled layer
+            if 'pool' in block or 'strided' in block:
+                # Update radius and feature dimension for next layer
+                layer += 1
+                r *= 2
+                out_dim *= 2
+                block_in_layer = 0
 
 
     def call(self, flat_inputs):
