@@ -67,6 +67,24 @@ def radius_gaussian(sq_r, sig, eps=1e-9):
     """
     return tf.exp(-sq_r / (2 * tf.square(sig) + eps))
 
+def max_pool(x, inds):
+    """
+    Pools features with the maximum values.
+    :param x: [n1, d] features matrix
+    :param inds: [n2, max_num] pooling indices
+    :return: [n2, d] pooled features matrix
+    """
+
+    # Add a last row with minimum features for shadow pools
+    x = tf.concat([x, tf.zeros_like(x[:1, :])], axis=0)
+
+    # Get all features for each pooling location [n2, max_num, d]
+    pool_features = tf.gather(x, inds, axis=0)
+
+    # Pool the maximum [n2, d]
+    max_features = tf.reduce_max(pool_features, axis=1)
+    return max_features
+
 
 class KPConv(tf.keras.layers.Layer):
   
@@ -372,6 +390,88 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
         return self.leaky_relu(self.batch_norm(x))
+
+class ResnetBottleneckBlock(tf.keras.layers.Layer):
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
+
+        super(ResnetBottleneckBlock, self).__init__()
+
+        # get KP_extent from current radius
+        current_extent = radius * cfg.KP_extent / cfg.conv_radius
+
+        # Get other parameters
+        self.bn_momentum = cfg.batch_norm_momentum
+        self.use_bn = cfg.use_batch_norm
+        self.block_name = block_name
+        self.layer_ind = layer_ind
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+
+        # First downscaling mlp
+        if in_dim != out_dim // 4:
+            self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn, self.bn_momentum)
+        else:
+            self.unary1 = tf.identity()
+
+        # KPConv block
+        self.KPConv = KPConv(cfg.num_kernel_points,
+                             cfg.in_points_dim,
+                             out_dim // 4,
+                             out_dim // 4,
+                             current_extent,
+                             radius,
+                             fixed_kernel_points=cfg.fixed_kernel_points,
+                             KP_influence=cfg.KP_influence,
+                             aggregation_mode=cfg.aggregation_mode,
+                             deformable='deform' in block_name,
+                             modulated=cfg.modulated)
+
+        self.batch_norm_conv = BatchNormBlock(out_dim // 4, self.use_bn, self.bn_momentum)
+
+        # Second upscaling mlp
+        self.unary2 = UnaryBlock(out_dim // 4, out_dim, self.use_bn, self.bn_momentum, no_relu=True)
+
+        # Shortcut optional mpl
+        if in_dim != out_dim:
+            self.unary_shortcut = UnaryBlock(in_dim, out_dim, self.use_bn, self.bn_momentum, no_relu=True)
+        else:
+            self.unary_shortcut = tf.identity()
+
+        # Other operations
+        self.leaky_relu = nn.LeakyReLU(0.1)
+
+        return
+
+    def call(self, features, batch):
+
+        if 'strided' in self.block_name:
+            q_pts = batch.points[self.layer_ind + 1]
+            s_pts = batch.points[self.layer_ind]
+            neighb_inds = batch.pools[self.layer_ind]
+        else:
+            q_pts = batch.points[self.layer_ind]
+            s_pts = batch.points[self.layer_ind]
+            neighb_inds = batch.neighbors[self.layer_ind]
+
+        # First downscaling mlp
+        x = self.unary1(features)
+
+        # Convolution
+        x = self.KPConv(q_pts, s_pts, neighb_inds, x)
+        x = self.leaky_relu(self.batch_norm_conv(x))
+
+        # Second upscaling mlp
+        x = self.unary2(x)
+
+        # Shortcut
+        if 'strided' in self.block_name:
+            shortcut = max_pool(features, neighb_inds) # TODO : test max_pool
+        else:
+            shortcut = features
+        shortcut = self.unary_shortcut(shortcut)
+
+        return self.leaky_relu(x + shortcut)
 
 
 
