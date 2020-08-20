@@ -4,11 +4,11 @@ import torch
 from ml3d.datasets import Semantic3D
 from ml3d.torch.pipelines import SemanticSegmentation 
 from ml3d.torch.models import RandLANet
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 
 # from tf2torch import load_tf_weights
 
-config = 'ml3d/torch/configs/randlanet_semantic3d.py'
+config = 'ml3d/configs/randlanet_semantic3d.py'
 cfg         = Config.load_from_file(config)
 
 dataset     = Semantic3D(cfg.dataset)

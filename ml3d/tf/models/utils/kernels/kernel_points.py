@@ -29,7 +29,7 @@ from os import makedirs
 from os.path import join, exists
 
 from .....torch.utils.ply import read_ply, write_ply
-# from ml3d.torch.utils.ply import read_ply, write_ply
+# from ml3d.utils.ply import read_ply, write_ply
 
 
 # ------------------------------------------------------------------------------------------
