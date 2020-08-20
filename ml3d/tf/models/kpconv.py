@@ -617,7 +617,7 @@ class KPFCNN(tf.keras.Model):
         # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
         self.dropout_prob = tf.constant(0.2, name='dropout_prob')
 
-        lbl_values = cfg.num_classes
+        lbl_values = cfg.lbl_values
         ign_lbls = cfg.ignored_label_inds
 
       # Current radius of convolution and feature dimension
@@ -628,15 +628,10 @@ class KPFCNN(tf.keras.Model):
         self.K = cfg.num_kernel_points
         self.C = len(lbl_values) - len(ign_lbls)
 
-        # Save all block operations in a list of modules
-        self.encoder_ops = tf.Keras.Sequential()
-        self.decoder_ops = tf.Keras.Sequential()        
-        self.block_ops = tf.keras.Sequential()
-
-        # Loop over consecutive blocks
-        block_in_layer = 0
-
-        arch = []
+       # Save all block operations in a list of modules
+        self.encoder_blocks = tf.Keras.Sequential()
+        self.encoder_skip_dims = []
+        self.encoder_skips = []
 
         for block_i, block in enumerate(cfg.architecture):
 
@@ -644,27 +639,23 @@ class KPFCNN(tf.keras.Model):
             if ('equivariant' in block) and (not out_dim % 3 == 0):
                 raise ValueError('Equivariant block but features dimension is not a factor of 3')
 
+            # Detect change to next layer for skip connection
+            if np.any([tmp in block for tmp in ['pool', 'strided', 'upsample', 'global']]):
+                self.encoder_skips.append(block_i)
+                self.encoder_skip_dims.append(in_dim)
+
             # Detect upsampling block to stop
             if 'upsample' in block:
                 break
 
             # Apply the good block function defining tf ops
-            arch.append(repr(block_decider(block,
-                                                r,
-                                                in_dim,
-                                                out_dim,
-                                                layer,
-                                                cfg)))
-            self.block_ops.add(block_decider(block,
+            self.encoder_blocks.add(block_decider(block,
                                                 r,
                                                 in_dim,
                                                 out_dim,
                                                 layer,
                                                 cfg))
 
-
-            # Index of block in this layer
-            block_in_layer += 1
 
             # Update dimension of input from output
             if 'simple' in block:
@@ -679,7 +670,66 @@ class KPFCNN(tf.keras.Model):
                 layer += 1
                 r *= 2
                 out_dim *= 2
-                block_in_layer = 0
+        
+        # Decoder blocks
+        self.decoder_blocks = tf.Keras.Sequential()
+        self.decoder_concats = []
+
+        start_i = 0
+        for block_i, block in enumerate(cfg.architecture):
+            if 'upsample' in block:
+                start_i = block_i
+                break
+        
+        # Loop over consecutive blocks
+        for block_i, block in enumerate(cfg.architecture[start_i:]):
+
+            # Add dimension of skip connection concat
+            if block_i > 0 and 'upsample' in cfg.architecture[start_i + block_i - 1]:
+                in_dim += self.encoder_skip_dims[layer]
+                self.decoder_concats.append(block_i)
+
+            # Apply the good block function defining tf ops
+            self.decoder_blocks.append(block_decider(block,
+                                                    r,
+                                                    in_dim,
+                                                    out_dim,
+                                                    layer,
+                                                    cfg))
+
+            # Update dimension of input from output
+            in_dim = out_dim
+
+            # Detect change to a subsampled layer
+            if 'upsample' in block:
+                # Update radius and feature dimension for next layer
+                layer -= 1
+                r *= 0.5
+                out_dim = out_dim // 2
+
+        self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
+        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
+
+        # Network Losses
+
+        # List of valid labels (those not ignored in loss)
+        self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
+
+        # Choose segmentation loss
+        if len(cfg.class_w) > 0:
+            class_w = tf.convert_to_tensor(class_w, dtype=tf.float32)
+            self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
+        else:
+            self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+        self.deform_fitting_mode = config.deform_fitting_mode
+        self.deform_fitting_power = config.deform_fitting_power
+        self.deform_lr_factor = config.deform_lr_factor
+        self.repulse_extent = config.repulse_extent
+        self.output_loss = 0
+        self.reg_loss = 0
+        self.l1 = nn.L1Loss()
+
+        return
 
 
     def call(self, flat_inputs):
