@@ -58,6 +58,16 @@ def get_bias(shape):
     initial = tf.zeros_initializer()
     return tf.Variable(initial_value=initial(shape=shape, dtype="float32"), trainable=True, name='bias')
 
+def radius_gaussian(sq_r, sig, eps=1e-9):
+    """
+    Compute a radius gaussian (gaussian of distance)
+    :param sq_r: input radiuses [dn, ..., d1, d0]
+    :param sig: extents of gaussians [d1, d0] or [d0] or float
+    :return: gaussian of sq_r [dn, ..., d1, d0]
+    """
+    return tf.exp(-sq_r / (2 * tf.square(sig) + eps))
+
+
 class KPConv(tf.keras.layers.Layer):
     def __init__(self, kernel_size, p_dim, in_channels, out_channels, KP_extent, radius, 
                 fixed_kernel_points='center', KP_influence='linear', aggregation_mode='sum',
@@ -118,7 +128,7 @@ class KPConv(tf.keras.layers.Layer):
         return
 
     def init_KP(self):
-        K_points_numpy = create_kernel_points self.radius,
+        K_points_numpy = create_kernel_points(self.radius,
                                       self.K,
                                       dimension=self.p_dim,
                                       fixed=self.fixed_kernel_points)
@@ -137,14 +147,14 @@ class KPConv(tf.keras.layers.Layer):
             if self.modulated:
                 # Get offset (in normalized scale) from features
                 unscaled_offsets = self.offset_features[:, :self.p_dim * self.K]
-                unscaled_offsets = unscaled_offsets.view(-1, self.K, self.p_dim)
+                unscaled_offsets = tf.reshape(unscaled_offsets, (-1, self.K, self.p_dim))
 
                 # Get modulations
-                modulations = 2 * torch.sigmoid(self.offset_features[:, self.p_dim * self.K:])
+                modulations = 2 * tf.sigmoid(self.offset_features[:, self.p_dim * self.K:])
 
             else:
                 # Get offset (in normalized scale) from features
-                unscaled_offsets = self.offset_features.view(-1, self.K, self.p_dim)
+                unscaled_offsets = tf.reshape(self.offset_features, (-1, self.K, self.p_dim))
 
                 # No modulations
                 modulations = None
@@ -166,13 +176,48 @@ class KPConv(tf.keras.layers.Layer):
         # Center every neighborhood
         neighbors = neighbors - tf.expand_dims(query_points, 1)
 
+        if(self.deformable):
+            self.deformed_KP = offsets + self.kernel_points
+            deformed_K_points = tf.expand_dims(self.deformed_KP, 1)
+        else:
+            deformed_K_points = self.kernel_points
+
         # Get all difference matrices [n_points, n_neighbors, n_kpoints, dim]
         neighbors = tf.expand_dims(neighbors, 2)
-        neighbors = tf.tile(neighbors, [1, 1, n_kp, 1])
-        differences = neighbors - K_points
+        neighbors = tf.tile(neighbors, [1, 1, n_kp, 1]) # TODO : not in pytorch ?
+        differences = neighbors - deformed_K_points
 
         # Get the square distances [n_points, n_neighbors, n_kpoints]
         sq_distances = tf.reduce_sum(tf.square(differences), axis=3)
+
+
+        # Optimization by ignoring points outside a deformed KP range
+        if self.deformable:
+
+            # Save distances for loss
+            self.min_d2, _ = torch.min(sq_distances, dim=1)
+
+            # Boolean of the neighbors in range of a kernel point [n_points, n_neighbors]
+            in_range = tf.cast(tf.reduce_any(tf.less(sq_distances, self.KP_extent**2), axis=2), tf.int32)
+
+            # New value of max neighbors
+            new_max_neighb = tf.reduce_max(tf.reduce_sum(in_range, axis=1))
+
+            # For each row of neighbors, indices of the ones that are in range [n_points, new_max_neighb]
+            new_neighb_bool, new_neighb_inds = tf.math.top_k(in_range, k=new_max_neighb)
+
+            # Gather new neighbor indices [n_points, new_max_neighb]
+            new_neighbors_indices = tf.batch_gather(neighbors_indices, new_neighb_inds)
+
+            # Gather new distances to KP [n_points, new_max_neighb, n_kpoints]
+            new_sq_distances = tf.batch_gather(sq_distances, new_neighb_inds)
+
+            # New shadow neighbors have to point to the last shadow point
+            new_neighbors_indices *= new_neighb_bool
+            new_neighbors_indices += (1 - new_neighb_bool) * int(support_points.shape[0])
+
+        else:
+            new_neighbors_indices = neighbors_indices
 
         # Get Kernel point influences [n_points, n_kpoints, n_neighbors]
         if KP_influence == 'constant':
@@ -191,12 +236,12 @@ class KPConv(tf.keras.layers.Layer):
             all_weights = radius_gaussian(sq_distances, sigma)
             all_weights = tf.transpose(all_weights, [0, 2, 1])
         else:
-            raise ValueError('Unknown influence function type (config.KP_influence)')
+            raise ValueError('Unknown influence function type (cfg.KP_influence)')
 
         # In case of closest mode, only the closest KP can influence each point
         if aggregation_mode == 'closest':
             neighbors_1nn = tf.argmin(sq_distances, axis=2, output_type=tf.int32)
-            all_weights *= tf.one_hot(neighbors_1nn, n_kp, axis=1, dtype=tf.float32)
+            all_weights *= tf.one_hot(neighbors_1nn, self.K, axis=1, dtype=tf.float32) # TODO : transpose in pytorch not here ?
 
         elif aggregation_mode != 'sum':
             raise ValueError("Unknown convolution mode. Should be 'closest' or 'sum'")
@@ -204,21 +249,28 @@ class KPConv(tf.keras.layers.Layer):
         features = tf.concat([features, tf.zeros_like(features[:1, :])], axis=0)
 
         # Get the features of each neighborhood [n_points, n_neighbors, in_fdim]
-        neighborhood_features = tf.gather(features, neighbors_indices, axis=0)
+        neighborhood_features = tf.gather(features, new_neighbors_indices, axis=0)
 
         # Apply distance weights [n_points, n_kpoints, in_fdim]
         weighted_features = tf.matmul(all_weights, neighborhood_features)
 
+       # Apply modulations
+        if self.deformable and self.modulated:
+            weighted_features *= tf.expand_dims(modulations, 2)
+
         # Apply network weights [n_kpoints, n_points, out_fdim]
         weighted_features = tf.transpose(weighted_features, [1, 0, 2])
-        kernel_outputs = tf.matmul(weighted_features, K_values)
+        kernel_outputs = tf.matmul(weighted_features, self.weights)
 
         # Convolution sum to get [n_points, out_fdim]
         output_features = tf.reduce_sum(kernel_outputs, axis=0)
 
         return output_features
 
-
+    def __repr__(self):
+        return 'KPConv(radius: {:.2f}, in_feat: {:d}, out_feat: {:d})'.format(self.radius,
+                                                                              self.in_channels,
+                                                                              self.out_channels)
 
 
 class KPFCNN(tf.keras.Model):
