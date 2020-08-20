@@ -12,8 +12,9 @@ import yaml
 
 
 from ml3d.tf.modules.losses import SemSegLoss
+from ml3d.tf.modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord
-from ..datasets import TF_Dataset
+from ..datasets import TFDataset
 
 
 
@@ -135,11 +136,11 @@ class SemanticSegmentation():
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         Loss = SemSegLoss(self, model, dataset)
-        Metric = SemSegMetric(self, model, dataset, device)
+        Metric = SemSegMetric(self, model, dataset)
 
-        train_split = TF_Dataset(dataset=dataset.get_split('training'), 
+        train_split = TFDataset(dataset=dataset.get_split('training'), 
                                  model = model)
-        train_loader = train_split.get_loader()
+        train_loader = train_split.get_loader().batch(cfg.batch_size)
 
 
         for epoch in range(0, cfg.max_epoch + 1): 
@@ -156,26 +157,17 @@ class SemanticSegmentation():
                     loss, gt_labels, predict_scores = model.loss(
                         Loss, results, inputs)
 
-                grads = tape.gradient(loss_value, model.trainable_weights)
+                grads = tape.gradient(loss, model.trainable_weights)
                 optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
-                self.losses.append(loss)
+                self.losses.append(loss.numpy())
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
 
 
-    def get_batcher(self, device):
-        batcher_name = getattr(self.model.cfg, 'batcher')
-        if batcher_name == 'DefaultBatcher':
-            batcher = DefaultBatcher()
-        elif batcher_name == 'ConcatBatcher':
-            batcher = ConcatBatcher(device)
-        else:
-            batcher = None
-        return batcher
 
     def save_logs(self, writer, epoch):
         accs = np.nanmean(np.array(self.accs), axis=0)

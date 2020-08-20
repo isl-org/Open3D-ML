@@ -12,7 +12,7 @@ from ml3d.datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
 
 
-class TF_Dataset():
+class TFDataset():
     def __init__(self,
                  *args,
                  dataset=None,
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     cfg = Config.load_from_file(config)
     dataset = SemanticKITTI(cfg.dataset)
     
-    tf_data = TF_Dataset(dataset = dataset.get_split('training'), preprocess = randlanet_preprocess, transform = randlanet_transform)
+    tf_data = TFDataset(dataset = dataset.get_split('training'), preprocess = randlanet_preprocess, transform = randlanet_transform)
     loader = tf_data.get_loader()
     # print(loader)
     for data in loader:

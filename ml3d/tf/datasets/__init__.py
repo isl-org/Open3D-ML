@@ -1,3 +1,3 @@
-from .tf_dataset import TF_Dataset
+from .tf_dataset import TFDataset
 
-__all__ = ['TF_Dataset']
+__all__ = ['TFDataset']

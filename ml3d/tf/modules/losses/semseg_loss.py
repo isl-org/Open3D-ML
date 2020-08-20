@@ -1,5 +1,4 @@
-import torch
-import torch.nn as nn
+import tensorflow as tf
 import numpy as np
 from ....datasets.semantickitti import DataProcessing
 
@@ -8,14 +7,14 @@ class SemSegLoss(object):
     def __init__(self, pipeline, model, dataset):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss
-        self.num_classes = model.num_classes
-        self.ignored_label_inds = model.ignored_label_inds
+        self.num_classes = model.cfg.num_classes
+        self.ignored_label_inds = model.cfg.ignored_label_inds
 
         if 'class_weights' in dataset.cfg.keys():
             weights = DataProcessing.get_class_weights(dataset.cfg.class_weights)
             self.class_weights = tf.convert_to_tensor(weights, dtype=tf.float32)
 
-    def weighted_CrossEntropyLoss(self, logp, labels):
+    def weighted_CrossEntropyLoss(self, logits, labels):
         # calculate the weighted cross entropy according to the inverse frequency
         one_hot_labels = tf.one_hot(labels, depth=self.num_classes)
         weights = tf.reduce_sum(self.class_weights * one_hot_labels, axis=1)
@@ -28,7 +27,7 @@ class SemSegLoss(object):
 
     def filter_valid_label(self, scores, labels):
         """filter out invalid points"""
-        logits = tf.reshape(results, [-1, self.num_classes])
+        logits = tf.reshape(scores, [-1, self.num_classes])
         labels = tf.reshape(labels, [-1])
 
         # Boolean mask of points that should be ignored
@@ -46,7 +45,8 @@ class SemSegLoss(object):
         inserted_value = tf.zeros((1,), dtype=tf.int32)
         for ign_label in self.ignored_label_inds:
             reducing_list = tf.concat([reducing_list[:ign_label], inserted_value, reducing_list[ign_label:]], 0)
+        
         valid_labels = tf.gather(reducing_list, valid_labels_init)
 
-        return valid_scores, valid_labels
+        return valid_logits, valid_labels
 

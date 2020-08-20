@@ -190,13 +190,14 @@ class RandLANet(tf.keras.Model):
 
     def call(self, inputs, training=True):
 
+
         num_layers = self.cfg.num_layers
         xyz = inputs[:num_layers]
         neigh_idx = inputs[num_layers: 2 * num_layers]
         sub_idx = inputs[2 * num_layers:3 * num_layers]
         interp_idx = inputs[3 * num_layers:4 * num_layers]
         feature = inputs[4 * num_layers]
-       
+        
 
         # print("inputs")
         # print(xyz)
@@ -291,7 +292,7 @@ class RandLANet(tf.keras.Model):
 
         scores, labels = Loss.filter_valid_label(results, labels)
 
-        loss = Loss.weighted_CrossEntropyLoss(logp, labels)
+        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
 
