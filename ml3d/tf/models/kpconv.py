@@ -69,6 +69,7 @@ def radius_gaussian(sq_r, sig, eps=1e-9):
 
 
 class KPConv(tf.keras.layers.Layer):
+  
     def __init__(self, kernel_size, p_dim, in_channels, out_channels, KP_extent, radius, 
                 fixed_kernel_points='center', KP_influence='linear', aggregation_mode='sum',
                 deformable=False, modulated=False, **kwargs):
@@ -136,7 +137,7 @@ class KPConv(tf.keras.layers.Layer):
         # TODO : reshape to (num_kernel_points, points_dim)
         return tf.Variable(K_points_numpy.astype(np.float32), trainable=False, name='kernel_points')
 
-    def forward(self, query_points, support_points, neighbors_indices, features):
+    def call(self, query_points, support_points, neighbors_indices, features):
         # Get variables
         n_kp = int(self.kernel_points.shape[0])
 
@@ -271,6 +272,108 @@ class KPConv(tf.keras.layers.Layer):
         return 'KPConv(radius: {:.2f}, in_feat: {:d}, out_feat: {:d})'.format(self.radius,
                                                                               self.in_channels,
                                                                               self.out_channels)
+
+class BatchNormBlock(tf.keras.layers.Layer):
+
+    def __init__(self, in_dim, use_bn, bn_momentum):
+        super(BatchNormBlock, self).__init__()
+        self.bn_momentum = bn_momentum
+        self.use_bn = use_bn
+        self.in_dim = in_dim
+
+        if(self.use_bn):
+            self.batch_norm = tf.keras.layers.BatchNormalization(momentum=bn_momentum)
+        else:
+            self.bias = get_bias(shape=in_dim)
+
+    def call(self, x):
+        if(self.use_bn):
+            return self.batch_norm(x)
+        else:
+            return x + self.bias
+
+    def __repr__(self):
+        return 'BatchNormBlock(in_feat: {:d}, momentum: {:.3f}, only_bias: {:s})'.format(self.in_dim,
+                                                                                         self.bn_momentum,
+                                                                                         str(not self.use_bn))
+
+class UnaryBlock(tf.keras.layers.Layer):
+
+    def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False):
+
+        super(UnaryBlock, self).__init__()
+        self.bn_momentum = bn_momentum
+        self.use_bn = use_bn
+        self.no_relu = no_relu
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+        # self.mlp = tf.keras.models.Sequential(
+        #     tf.keras.Input(shape=(in_dim,),
+        #     tf.keras.layers.Dense(out_dim, use_bias=False)
+        # )
+        self.mlp = tf.keras.layers.Dense(out_dim, use_bias=False)
+        self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
+
+        if not no_relu:
+            self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+
+    def call(self, x):
+        x = self.mlp(x) # TODO : check correct dimension is getting modified
+        x = self.batch_norm(x)
+        if not self.no_relu:
+            x = self.leaky_relu(x)
+        return x
+
+     def __repr__(self):
+        return 'UnaryBlock(in_feat: {:d}, out_feat: {:d}, BN: {:s}, ReLU: {:s})'.format(self.in_dim,
+                                                                                        self.out_dim,
+                                                                                        str(self.use_bn),
+                                                                                        str(not self.no_relu))
+
+class SimpleBlock(tf.keras.layers.Layer):
+
+    def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
+        super(SimpleBlock, self).__init__()
+
+        current_extent = radius * cfg.KP_extent / cfg.conv_radius
+
+        self.bn_momentum = cfg.batch_norm_momentum
+        self.use_bn = cfg.use_batch_norm
+        self.layer_ind = layer_ind
+        self.block_name = block_name
+        self.in_dim = in_dim
+        self.out_dim = out_dim
+
+        self.KPConv = KPConv(
+            cfg.num_kernel_points,
+            cfg.in_points_dim,
+            out_dim // 2,
+            current_extent,
+            radius,
+            fixed_kernel_points=cfg.fixed_kernel_points,
+            aggregation_mode=cfg.aggregation_mode,
+            modulated=cfg.modulated
+        )
+
+        self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn, self.bn_momentum)
+        self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+
+    def call(self, x, batch):
+
+        # TODO : check x, batch
+        if 'strided' in self.block_name:
+            q_pts = batch.points[self.layer_ind + 1] # TODO : 1 will not come here.
+            s_pts = batch.points[self.layer_ind]
+            neighb_inds = batch.pools[self.layer_ind]
+        else:
+            q_pts = batch.points[self.layer_ind]
+            s_pts = batch.points[self.layer_ind]
+            neighb_inds = batch.neighbors[self.layer_ind]
+
+        x = self.KPConv(q_pts, s_pts, neighb_inds, x)
+        return self.leaky_relu(self.batch_norm(x))
+
+
 
 
 class KPFCNN(tf.keras.Model):
