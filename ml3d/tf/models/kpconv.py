@@ -76,14 +76,53 @@ def max_pool(x, inds):
     """
 
     # Add a last row with minimum features for shadow pools
-    x = tf.concat([x, tf.zeros_like(x[:1, :])], axis=0)
+    x = tf.concat([x, tf.reduce_min(x, axis=0, keep_dims=True)], axis=0)
 
     # Get all features for each pooling location [n2, max_num, d]
     pool_features = tf.gather(x, inds, axis=0)
 
     # Pool the maximum [n2, d]
-    max_features = tf.reduce_max(pool_features, axis=1)
-    return max_features
+    return tf.reduce_max(pool_features, axis=1)
+
+
+def closest_pool(x, inds):
+    """
+    This tensorflow operation compute a pooling according to the list of indices 'inds'.
+    > x = [n1, d] features matrix
+    > inds = [n2, max_num] We only use the first column of this which should be the closest points too pooled positions
+    >> output = [n2, d] pooled features matrix
+    """
+
+    # Add a last row with minimum features for shadow pools
+    x = tf.concat([x, tf.zeros((1, int(x.shape[1])), x.dtype)], axis=0)
+
+    # Get features for each pooling cell [n2, d]
+    pool_features = tf.gather(x, inds[:, 0], axis=0)
+
+    return pool_features
+
+def global_average(x, batch_lengths):
+    """
+    Block performing a global average over batch pooling
+    :param x: [N, D] input features
+    :param batch_lengths: [B] list of batch lengths
+    :return: [B, D] averaged features
+    """
+
+    # Loop over the clouds of the batch
+    averaged_features = []
+    i = 0
+    for b_i, length in enumerate(batch_lengths):
+
+        # Average features for each batch cloud
+        averaged_features.append(tf.reduce_mean(x[i:i + length], axis=0))
+
+        # Increment for next cloud
+        i += length
+
+    # Average features in each batch
+    return tf.stack(averaged_features)
+
 
 
 class KPConv(tf.keras.layers.Layer):
@@ -473,7 +512,42 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         return self.leaky_relu(x + shortcut)
 
+class NearestUpsampleBlock(tf.keras.layers.Layer):
 
+    def __init__(self, layer_ind):
+
+        super(NearestUpsampleBlock, self).__init__()
+        self.layer_ind = layer_ind
+        return
+
+    def call(self, x, batch):
+        return closest_pool(x, batch.upsamples[self.layer_ind - 1])
+
+    def __repr__(self):
+        return 'NearestUpsampleBlock(layer: {:d} -> {:d})'.format(self.layer_ind,
+                                                                  self.layer_ind - 1)
+
+class MaxPoolBlock(tf.keras.layers.Layer):
+
+    def __init__(self, layer_ind):
+
+        super(MaxPoolBlock, self).__init__()
+        self.layer_ind = layer_ind
+        return
+
+    def forward(self, x, batch):
+        return max_pool(x, batch['pools'][self.layer_ind + 1]) # TODO : check 1 here
+
+
+class GlobalAverageBlock(tf.keras.layers.Layer):
+
+    def __init__(self):
+
+        super(GlobalAverageBlock, self).__init__()
+        return
+
+    def forward(self, x, batch):
+        return global_average(x, batch.lengths[-1])
 
 
 class KPFCNN(tf.keras.Model):
