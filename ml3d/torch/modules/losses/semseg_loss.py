@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from ml3d.datasets.semantickitti import DataProcessing
+from ....datasets.utils import DataProcessing
 
 def filter_valid_label(scores, labels, num_classes, ignored_label_inds,
                        device):

@@ -6,13 +6,13 @@ import random
 
 import tensorflow as tf
 import numpy as np
-from ml3d.torch.utils import dataset_helper
+from ml3d.utils import dataset_helper
 
 from ml3d.datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
 
 
-class TF_Dataset():
+class TF_Dataloader():
     def __init__(self,
                  *args,
                  dataset=None,
@@ -72,24 +72,24 @@ class TF_Dataset():
     def get_loader(self):
         gen_func, gen_types, gen_shapes = self.get_batch_gen(self)
 
-        tf_dataset = tf.data.Dataset.from_generator(gen_func, gen_types,
+        tf_dataloader = tf.data.Dataset.from_generator(gen_func, gen_types,
                                                     gen_shapes)
 
-        tf_dataset = tf_dataset.map(map_func=self.transform,
+        tf_dataloader = tf_dataloader.map(map_func=self.transform,
                                     num_parallel_calls=self.num_threads)
 
-        return tf_dataset
+        return tf_dataloader
 
 
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 from ml3d.datasets import Toronto3D
 
 if __name__ == '__main__':
-    config = '../../torch/configs/kpconv_toronto3d.py'
+    config = '../../configs/kpconv_toronto3d.py'
     cfg = Config.load_from_file(config)
     dataset = Toronto3D(cfg.dataset)
 
-    tf_data = TF_Dataset(dataset=dataset.get_split('training'),
+    tf_data = TF_Dataloader(dataset=dataset.get_split('training'),
                          preprocess=kpconv_preprocess)
     loader = tf_data.get_loader()
     # print(loader)

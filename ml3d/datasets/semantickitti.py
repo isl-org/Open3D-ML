@@ -1,18 +1,16 @@
 import numpy as np
 import os, argparse, pickle, sys
 from os.path import exists, join, isfile, dirname, abspath, split
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 import torch
-
-from ml3d.datasets.utils import DataProcessing
-
+from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 from sklearn.neighbors import KDTree
-
-from ml3d.torch.utils import make_dir
 import yaml
 
-BASE_DIR = './'
-#BASE_DIR = dirname(abspath(__file__))
+from .utils import DataProcessing
+from ..utils import make_dir
+
+#BASE_DIR = './'
+BASE_DIR = dirname(abspath(__file__))
 
 data_config = join(BASE_DIR, 'utils', 'semantic-kitti.yaml')
 DATA = yaml.safe_load(open(data_config, 'r'))
@@ -59,7 +57,7 @@ class SemanticKITTISplit(Dataset):
             labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
         else:
             labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
-        data = {'point': points, 'label': labels}
+        data = {'point': points, 'feat': points, 'label': labels}
         return data
 
     def get_attr(self, idx):

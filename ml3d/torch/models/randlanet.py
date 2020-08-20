@@ -11,9 +11,10 @@ from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
-from ml3d.datasets.utils import DataProcessing
-from ml3d.torch.modules.losses import filter_valid_label
-from ml3d.torch.utils import Config
+
+from ..modules.losses import filter_valid_label
+from ...datasets.utils import DataProcessing
+from ...utils import Config
 
 
 class RandLANet(nn.Module):

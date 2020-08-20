@@ -214,11 +214,12 @@ class ParisLille3D:
         return lines
 
 
-from ml3d.torch.utils import Config
+
+from ..utils import Config
 
 
 if __name__ == '__main__':
-    config = '../torch/configs/randlanet_parislille3d.py'
+    config = '../configs/randlanet_parislille3d.py'
     cfg  = Config.load_from_file(config)
     a = ParisLille3D(cfg.dataset)
     b = a.get_split("val")
