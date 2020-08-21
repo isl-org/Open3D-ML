@@ -157,7 +157,7 @@ class KPConv(tf.keras.layers.Layer):
   
     def __init__(self, kernel_size, p_dim, in_channels, out_channels, KP_extent, radius, 
                 fixed_kernel_points='center', KP_influence='linear', aggregation_mode='sum',
-                deformable=False, modulated=False, **kwargs):
+                deformable=False, modulated=False, repulse_extent = 1.2, deform_fitting_power = 1.0, **kwargs):
 
         super(KPConv, self).__init__(**kwargs)
 
@@ -178,6 +178,9 @@ class KPConv(tf.keras.layers.Layer):
         self.offset_features = None
 
         self.wts = get_weight((self.K, self.in_channels, self.out_channels))
+
+        self.repulse_extent = repulse_extent
+        self.deform_fitting_power = deform_fitting_power
 
         if deformable:
             if modulated:
@@ -222,8 +225,29 @@ class KPConv(tf.keras.layers.Layer):
         # TODO : reshape to (num_kernel_points, points_dim)
         return tf.Variable(K_points_numpy.astype(np.float32), trainable=False, name='kernel_points')
 
+    def regular_loss(self):
+
+        fitting_loss = 0
+        repulsive_loss = 0
+
+        if self.deformable:
+            KP_min_d2 = self.min_d2 / (self.KP_extent ** 2)
+
+            fitting_loss += tf.sqrt(tf.nn.l2_loss(KP_min_d2))
+
+            KP_locs = self.deformed_KP / self.KP_extent
+
+            for i in range(self.K):
+                other_KP = tf.stop_gradient(tf.concat([KP_locs[:, :i, :], KP_locs[:, i + 1:, :]], axis=1))
+                distances = tf.sqrt(tf.reduce_sum(tf.square(other_KP - KP_locs[:, i:i+1, :]), axis=2))
+                rep_loss = tf.reduce_sum(tf.square(tf.maximum(0.0, self.repulse_extent - distances)), axis=1)
+                repulsive_loss += tf.sqrt(tf.nn.l2_loss(rep_loss)) / self.K
+
+        return self.deform_fitting_power * (2 * fitting_loss + repulsive_loss)
+
+
     def call(self, query_points, support_points, neighbors_indices, features):
-        # Get variables
+
         n_kp = int(self.kernel_points.shape[0])
 
         if self.deformable:
@@ -281,7 +305,7 @@ class KPConv(tf.keras.layers.Layer):
         if self.deformable:
 
             # Save distances for loss
-            self.min_d2, _ = torch.min(sq_distances, dim=1)
+            self.min_d2 = tf.reduce_min(sq_distances, axis=1)
 
             # Boolean of the neighbors in range of a kernel point [n_points, n_neighbors]
             in_range = tf.cast(tf.reduce_any(tf.less(sq_distances, self.KP_extent**2), axis=2), tf.int32)
@@ -293,10 +317,10 @@ class KPConv(tf.keras.layers.Layer):
             new_neighb_bool, new_neighb_inds = tf.math.top_k(in_range, k=new_max_neighb)
 
             # Gather new neighbor indices [n_points, new_max_neighb]
-            new_neighbors_indices = tf.batch_gather(neighbors_indices, new_neighb_inds)
+            new_neighbors_indices = tf.gather(neighbors_indices, new_neighb_inds, batch_dims=-1)
 
             # Gather new distances to KP [n_points, new_max_neighb, n_kpoints]
-            new_sq_distances = tf.batch_gather(sq_distances, new_neighb_inds)
+            new_sq_distances = tf.gather(sq_distances, new_neighb_inds, batch_dims=-1)
 
             # New shadow neighbors have to point to the last shadow point
             new_neighbors_indices *= new_neighb_bool
@@ -350,6 +374,8 @@ class KPConv(tf.keras.layers.Layer):
 
         # Convolution sum to get [n_points, out_fdim]
         output_features = tf.reduce_sum(kernel_outputs, axis=0)
+
+        self.add_loss(self.regular_loss())
 
         return output_features
 
@@ -501,7 +527,9 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
                              KP_influence=cfg.KP_influence,
                              aggregation_mode=cfg.aggregation_mode,
                              deformable='deform' in block_name,
-                             modulated=cfg.modulated)
+                             modulated=cfg.modulated,
+                             repulse_extent=cfg.repulse_extent,
+                             deform_fitting_power=cfg.deform_fitting_power)
 
         self.batch_norm_conv = BatchNormBlock(out_dim // 4, self.use_bn, self.bn_momentum)
 
