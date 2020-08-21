@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-
-
+#
+# The following environment variables are required:
+# - NPROC
+#
 TENSORFLOW_VER="2.3.0"
 TORCH_GLNX_VER=("1.5.0+cu101" "1.4.0+cpu")
 YAPF_VER="0.30.0"
+
+set -euo pipefail
 
 # 1. Prepare the Open3D-ML repo and install dependencies
 PATH_TO_OPEN3D_ML=$(pwd)
@@ -46,7 +50,7 @@ cmake -DBUNDLE_OPEN3D_ML=ON \
 make -j"$NPROC" install-pip-package
 
 #
-# 4. run examples/tests in the Open3D-ML repo outside of the repo directory to 
+# 5. run examples/tests in the Open3D-ML repo outside of the repo directory to 
 #    make sure that the installed package works.
 #
 popd
