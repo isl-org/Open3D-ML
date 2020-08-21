@@ -24,6 +24,7 @@ git clone --recursive --branch o3dml_integration  https://github.com/intel-isl/O
 python -m pip install -U tensorflow==$TENSORFLOW_VER
 python -m pip install -U torch==${TORCH_GLNX_VER[1]} -f https://download.pytorch.org/whl/torch_stable.html
 python -m pip install -U pytest
+python -m pip install -U yapf=="$YAPF_VER"
 
 #
 # 3. Configure for bundling the Open3D-ML part
