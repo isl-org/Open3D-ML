@@ -1,1 +1,3 @@
-from .tf_dataloader import TF_Dataloader
+from .tf_dataloader import TFDataloader
+
+__all__ = ['TFDataloader']
