@@ -21,7 +21,7 @@ from collections import namedtuple
 
 from ...utils import dataset_helper
 
-class Torch_Dataloader(Dataset):
+class TorchDataloader(Dataset):
     def __init__(self,
                  *args,
                  dataset=None,

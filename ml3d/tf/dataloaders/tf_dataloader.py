@@ -12,7 +12,7 @@ from ml3d.datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
 
 
-class TF_Dataloader():
+class TFDataloader():
     def __init__(self,
                  *args,
                  dataset=None,
@@ -28,6 +28,7 @@ class TF_Dataloader():
 
         if self.preprocess is not None:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
+            
             assert cache_dir is not None, 'cache directory is not given'
 
             self.cache_convert = dataset_helper.Cache(
@@ -61,11 +62,11 @@ class TF_Dataloader():
 
     def read_data(self, key):
         attr = self.dataset.get_attr(key)
-        # print(attr)
         if self.cache_convert is None:
             data = self.dataset.get_data(key)
         else:
             data = self.cache_convert(attr['name'])
+
 
         return data, attr
 
@@ -80,20 +81,3 @@ class TF_Dataloader():
 
         return tf_dataloader
 
-
-from ml3d.utils import Config
-from ml3d.datasets import Toronto3D
-
-if __name__ == '__main__':
-    config = '../../configs/kpconv_toronto3d.py'
-    cfg = Config.load_from_file(config)
-    dataset = Toronto3D(cfg.dataset)
-
-    tf_data = TF_Dataloader(dataset=dataset.get_split('training'),
-                         preprocess=kpconv_preprocess)
-    loader = tf_data.get_loader()
-    # print(loader)
-    for data in loader:
-        print(data)
-        # break
-        # print("\n\n")

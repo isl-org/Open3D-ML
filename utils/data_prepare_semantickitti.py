@@ -7,7 +7,7 @@ BASE_DIR = dirname(abspath(__file__))
 ROOT_DIR = dirname(BASE_DIR)
 sys.path.append(BASE_DIR)
 sys.path.append(ROOT_DIR)
-from helper_tool import DataProcessing as DP
+from ..datasets.utils import DataProcessing as DP
 
 data_config = os.path.join(BASE_DIR, 'semantic-kitti.yaml')
 DATA = yaml.safe_load(open(data_config, 'r'))
