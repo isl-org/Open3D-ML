@@ -102,8 +102,7 @@ def dropout(inputs,
     Returns:
       tensor variable
     """
-    with tf.variable_scope(scope) as sc:
-        outputs = tf.cond(is_training,
-                          lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
-                          lambda: inputs)
-        return outputs
+    outputs = tf.cond(is_training,
+                      lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
+                      lambda: inputs)
+    return outputs

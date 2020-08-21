@@ -39,91 +39,12 @@ class SemanticSegmentation():
         # dataset.cfg.num_points = model.cfg.num_points
 
     def run_inference(self, points, device):
-        cfg = self.cfg
-        model = self.model
-
-        model.to(device)
-        model.eval()
-
-        with torch.no_grad():
-            inputs = model.preprocess_inference(points, device)
-            scores = model(inputs)
-            pred = torch.max(scores.squeeze(0), dim=-1).indices
-            # pred    = pred.cpu().data.numpy()
-
-        return pred
+        # TODO
+        pass
 
     def run_test(self, device):
-        #self.device = device
-        model = self.model
-        dataset = self.dataset
-        cfg = self.cfg
-        model.to(device)
-        model.eval()
-
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
-        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
-        log.addHandler(logging.FileHandler(log_file_path))
-
-        test_sampler = dataset.get_sampler(cfg.test_batch_size, 'test')
-        test_loader = DataLoader(test_sampler, batch_size=cfg.test_batch_size)
-        test_probs = [
-            np.zeros(shape=[len(l), self.model.cfg.num_classes],
-                     dtype=np.float16) for l in dataset.possibility
-        ]
-
-        self.load_ckpt(model.cfg.ckpt_path, False)
-        log.info("Model Loaded from : {}".format(model.cfg.ckpt_path))
-
-        test_smooth = 0.98
-        epoch = 0
-
-        log.info("Started testing")
-
-        with torch.no_grad():
-            while True:
-                for batch_data in tqdm(test_loader, desc='test', leave=False):
-                    # loader: point_clout, label
-                    inputs = model.preprocess(batch_data, device)
-                    result_torch = model(inputs)
-                    result_torch = torch.reshape(result_torch,
-                                                 (-1, model.cfg.num_classes))
-
-                    m_softmax = nn.Softmax(dim=-1)
-                    result_torch = m_softmax(result_torch)
-                    stacked_probs = result_torch.cpu().data.numpy()
-
-                    stacked_probs = np.reshape(stacked_probs, [
-                        cfg.test_batch_size, model.cfg.num_points,
-                        model.cfg.num_classes
-                    ])
-
-                    point_inds = inputs['input_inds']
-                    cloud_inds = inputs['cloud_inds']
-
-                    for j in range(np.shape(stacked_probs)[0]):
-                        probs = stacked_probs[j, :, :]
-                        inds = point_inds[j, :]
-                        c_i = cloud_inds[j][0]
-                        test_probs[c_i][inds] = test_smooth * test_probs[c_i][
-                            inds] + (1 - test_smooth) * probs
-
-                new_min = np.min(dataset.min_possibility)
-                log.info(f"Epoch {epoch:3d}, end. "
-                         f"Min possibility = {new_min:.1f}")
-
-                if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                    log.info(f"\nReproject Vote #"
-                             f"{int(np.floor(new_min)):d}")
-                    dataset.save_test_result(
-                        test_probs, str(dataset.cfg.test_split_number))
-                    log.info(f"{str(dataset.cfg.test_split_number)}"
-                             f" finished")
-
-                    return
-
-                epoch += 1
+        # TODO
+        pass
 
     def run_train(self):
         model = self.model
@@ -210,61 +131,10 @@ class SemanticSegmentation():
         # print(acc_dicts[-1])
 
     def load_ckpt(self, ckpt_path, is_train=True):
-        if exists(ckpt_path):
-            #path = max(list((cfg.ckpt_path).glob('*.pth')))
-            log.info(f'Loading checkpoint {ckpt_path}')
-            ckpt = torch.load(ckpt_path)
-            first_epoch = ckpt['epoch'] + 1
-            self.model.load_state_dict(ckpt['model_state_dict'])
-            if is_train:
-                self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-                self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
-        else:
-            first_epoch = 0
-            log.info('No checkpoint')
+        # TODO
+        pass
 
-        return first_epoch
 
     def save_ckpt(self, path_ckpt, epoch):
-        make_dir(path_ckpt)
-        torch.save(
-            dict(epoch=epoch,
-                 model_state_dict=self.model.state_dict(),
-                 optimizer_state_dict=self.optimizer.state_dict(),
-                 scheduler_state_dict=self.scheduler.state_dict()),
-            join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
-        log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
-
-    def filter_valid(self, scores, labels, device):
-        valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
-        valid_labels = labels.reshape(-1).to(device)
-
-        ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            ignored_bool = torch.logical_or(ignored_bool,
-                                            torch.eq(valid_labels, ign_label))
-
-        valid_idx = torch.where(torch.logical_not(ignored_bool))[0].to(device)
-
-        valid_scores = torch.gather(
-            valid_scores, 0,
-            valid_idx.unsqueeze(-1).expand(-1, self.model.cfg.num_classes))
-        valid_labels = torch.gather(valid_labels, 0, valid_idx)
-
-        # Reduce label values in the range of logit shape
-        reducing_list = torch.arange(0,
-                                     self.model.cfg.num_classes,
-                                     dtype=torch.int64)
-        inserted_value = torch.zeros([1], dtype=torch.int64)
-
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            reducing_list = torch.cat([
-                reducing_list[:ign_label], inserted_value,
-                reducing_list[ign_label:]
-            ], 0)
-        valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels)
-
-        valid_labels = valid_labels.unsqueeze(0)
-        valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
-
-        return valid_scores, valid_labels
+        # TODO
+        pass
