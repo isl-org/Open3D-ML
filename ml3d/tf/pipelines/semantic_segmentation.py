@@ -11,10 +11,10 @@ import tensorflow as tf
 import yaml
 
 
-from ml3d.tf.modules.losses import SemSegLoss
-from ml3d.tf.modules.metrics import SemSegMetric
+from ..modules.losses import SemSegLoss
+from ..modules.metrics import SemSegMetric
+from ..dataloaders import TFDataloader
 from ...utils import make_dir, LogRecord
-from ..datasets import TFDataset
 
 
 
@@ -138,7 +138,7 @@ class SemanticSegmentation():
         Loss = SemSegLoss(self, model, dataset)
         Metric = SemSegMetric(self, model, dataset)
 
-        train_split = TFDataset(dataset=dataset.get_split('training'), 
+        train_split = TFDataloader(dataset=dataset.get_split('training'), 
                                  model = model)
         train_loader = train_split.get_loader().batch(cfg.batch_size)
 

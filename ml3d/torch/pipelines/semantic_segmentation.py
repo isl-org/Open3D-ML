@@ -1,7 +1,6 @@
 #coding: future_fstrings
 import torch, pickle
 import torch.nn as nn
-import helper_torch_util
 import numpy as np
 import logging
 import sys
@@ -14,7 +13,7 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 from os.path import exists, join, isfile, dirname, abspath
 
 
-from ..dataloaders import Torch_Dataloader, DefaultBatcher, ConcatBatcher
+from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord, Config
@@ -178,7 +177,7 @@ class SemanticSegmentation():
 
         train_batcher = self.get_batcher(device)
 
-        train_split = Torch_Dataloader(dataset=dataset.get_split('training'),
+        train_split = TorchDataloader(dataset=dataset.get_split('training'),
                                     preprocess=model.preprocess,
                                     transform=model.transform,
                                     shuffle=True)

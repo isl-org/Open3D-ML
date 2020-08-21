@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from ....datasets.semantickitti import DataProcessing
+from ....datasets.utils import DataProcessing as DP
 
 class SemSegLoss(object):
     """Loss functions for semantic segmentation"""
@@ -11,7 +11,7 @@ class SemSegLoss(object):
         self.ignored_label_inds = model.cfg.ignored_label_inds
 
         if 'class_weights' in dataset.cfg.keys():
-            weights = DataProcessing.get_class_weights(dataset.cfg.class_weights)
+            weights = DP.get_class_weights(dataset.cfg.class_weights)
             self.class_weights = tf.convert_to_tensor(weights, dtype=tf.float32)
 
     def weighted_CrossEntropyLoss(self, logits, labels):

@@ -1,15 +1,14 @@
 from os.path import exists, join
 from os import makedirs
 from sklearn.metrics import confusion_matrix
-from ml3d.datasets.semantickitti import DataProcessing as DP
 import tensorflow as tf
 import numpy as np
 import time
 import random
 from sklearn.neighbors import KDTree
 
-from ..utils import helper_tf_util
-from ...datasets.utils.dataprocessing import DataProcessing
+from ..utils import helper_tf
+from ...datasets.utils import DataProcessing
 
 # class RandLANet(tf.keras.Model):
 #     """docstring for RandLANet"""
@@ -40,7 +39,7 @@ class RandLANet(tf.keras.Model):
                 d_encoder_list.append(d_feature)
             d_encoder_list.append(d_feature)
 
-        feature = helper_tf_util.conv2d(True, d_feature)
+        feature = helper_tf.conv2d(True, d_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
@@ -49,20 +48,20 @@ class RandLANet(tf.keras.Model):
             d_in = d_encoder_list[-j - 2] + d_feature
             d_out = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_tf_util.conv2d_transpose(True, d_out)
+            f_decoder_i = helper_tf.conv2d_transpose(True, d_out)
             setattr(self, name, f_decoder_i)
             d_feature = d_encoder_list[-j - 2]
 
-        f_layer_fc1 = helper_tf_util.conv2d(True, 64)
+        f_layer_fc1 = helper_tf.conv2d(True, 64)
         setattr(self, 'fc1', f_layer_fc1)
 
-        f_layer_fc2 = helper_tf_util.conv2d(True, 32)
+        f_layer_fc2 = helper_tf.conv2d(True, 32)
         setattr(self, 'fc2', f_layer_fc2)
         
         f_dropout = tf.keras.layers.Dropout(0.5)
         setattr(self, 'dropout1', f_dropout)
 
-        f_layer_fc3 = helper_tf_util.conv2d(False,
+        f_layer_fc3 = helper_tf.conv2d(False,
                                             cfg.num_classes,
                                             activation=False)
         setattr(self, 'fc', f_layer_fc3)
@@ -72,33 +71,33 @@ class RandLANet(tf.keras.Model):
         att_activation = tf.keras.layers.Dense(d, activation=None)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_tf_util.conv2d(True, d_out)
+        f_agg = helper_tf.conv2d(True, d_out)
         setattr(self, name + 'mlp', f_agg)
 
     def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_tf_util.conv2d(True, d_in)
+        f_pc = helper_tf.conv2d(True, d_in)
        
         setattr(self, name + 'bdmlp1', f_pc)
 
         self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
 
-        f_xyz = helper_tf_util.conv2d(True, d_out // 2)
+        f_xyz = helper_tf.conv2d(True, d_out // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
         self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
 
     def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_tf_util.conv2d(True, d_out // 2)
+        f_pc = helper_tf.conv2d(True, d_out // 2)
         setattr(self, name + 'mlp1', f_pc)
 
         self.init_building_block(d_out // 2, d_out, name + 'LFA')
 
-        f_pc = helper_tf_util.conv2d(True,
+        f_pc = helper_tf.conv2d(True,
                                      d_out * 2,
                                      activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_tf_util.conv2d(True,
+        shortcut = helper_tf.conv2d(True,
                                          d_out * 2,
                                          activation=False)
         setattr(self, name + 'shortcut', shortcut)

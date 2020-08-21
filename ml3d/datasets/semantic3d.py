@@ -5,11 +5,12 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from tqdm import tqdm
 import random
-from ml3d.datasets.utils import DataProcessing
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
+
+from .utils import DataProcessing as DP
 
 logging.basicConfig(
     level=logging.INFO,
@@ -136,7 +137,7 @@ class Semantic3D:
         select_idx = search_tree.query(center_point, 
                                 k=self.cfg.num_points)[1][0]
 
-        select_idx = DataProcessing.shuffle_idx(select_idx)
+        select_idx = DP.shuffle_idx(select_idx)
         return select_idx
 
 

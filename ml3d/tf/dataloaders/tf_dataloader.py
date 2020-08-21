@@ -12,7 +12,7 @@ from ml3d.datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
 
 
-class TFDataset():
+class TFDataloader():
     def __init__(self,
                  *args,
                  dataset=None,

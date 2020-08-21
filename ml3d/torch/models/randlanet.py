@@ -1,7 +1,6 @@
 #coding: future_fstrings
 import torch
 import torch.nn as nn
-import helper_torch_util
 import numpy as np
 import random
 
@@ -12,6 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
 
+from ..utils import helper_torch
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
 from ...utils import Config
@@ -72,7 +72,7 @@ class RandLANet(nn.Module):
                 d_encoder_list.append(d_feature)
             d_encoder_list.append(d_feature)
 
-        feature = helper_torch_util.conv2d(True, d_feature, d_feature)
+        feature = helper_torch.conv2d(True, d_feature, d_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
@@ -81,17 +81,17 @@ class RandLANet(nn.Module):
             d_in = d_encoder_list[-j - 2] + d_feature
             d_out = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_torch_util.conv2d_transpose(True, d_in, d_out)
+            f_decoder_i = helper_torch.conv2d_transpose(True, d_in, d_out)
             setattr(self, name, f_decoder_i)
             d_feature = d_encoder_list[-j - 2]
 
-        f_layer_fc1 = helper_torch_util.conv2d(True, d_feature, 64)
+        f_layer_fc1 = helper_torch.conv2d(True, d_feature, 64)
         setattr(self, 'fc1', f_layer_fc1)
 
-        f_layer_fc2 = helper_torch_util.conv2d(True, 64, 32)
+        f_layer_fc2 = helper_torch.conv2d(True, 64, 32)
         setattr(self, 'fc2', f_layer_fc2)
 
-        f_layer_fc3 = helper_torch_util.conv2d(False,
+        f_layer_fc3 = helper_torch.conv2d(False,
                                                32,
                                                cfg.num_classes,
                                                activation=False)
@@ -334,33 +334,33 @@ class RandLANet(nn.Module):
         att_activation = nn.Linear(d, d)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_torch_util.conv2d(True, d, d_out)
+        f_agg = helper_torch.conv2d(True, d, d_out)
         setattr(self, name + 'mlp', f_agg)
 
     def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_torch_util.conv2d(True, 10, d_in)
+        f_pc = helper_torch.conv2d(True, 10, d_in)
         setattr(self, name + 'mlp1', f_pc)
 
         self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
 
-        f_xyz = helper_torch_util.conv2d(True, d_in, d_out // 2)
+        f_xyz = helper_torch.conv2d(True, d_in, d_out // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
         self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
 
     def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_torch_util.conv2d(True, d_in, d_out // 2)
+        f_pc = helper_torch.conv2d(True, d_in, d_out // 2)
         setattr(self, name + 'mlp1', f_pc)
 
         self.init_building_block(d_out // 2, d_out, name + 'LFA')
 
-        f_pc = helper_torch_util.conv2d(True,
+        f_pc = helper_torch.conv2d(True,
                                         d_out,
                                         d_out * 2,
                                         activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_torch_util.conv2d(True,
+        shortcut = helper_torch.conv2d(True,
                                             d_in,
                                             d_out * 2,
                                             activation=False)

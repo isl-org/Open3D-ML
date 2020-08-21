@@ -1,4 +1,4 @@
-from .kpconv import *
+# from .kpconv import *
 from .randlanet import *
 
 
