@@ -14,17 +14,14 @@
 
 from abc import abstractmethod
 from tqdm import tqdm
-
 import torch
 from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
-
-from ml3d.torch.utils import dataset_helper
-
 from collections import namedtuple
 
+from ...utils import dataset_helper
 
-class SimpleDataset(Dataset):
+class Torch_Dataloader(Dataset):
     def __init__(self,
                  *args,
                  dataset=None,

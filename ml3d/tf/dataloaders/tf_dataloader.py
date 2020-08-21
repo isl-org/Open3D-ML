@@ -6,7 +6,7 @@ import random
 
 import tensorflow as tf
 import numpy as np
-from ml3d.torch.utils import dataset_helper
+from ml3d.utils import dataset_helper
 
 from ml3d.datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
@@ -73,31 +73,11 @@ class TFDataset():
     def get_loader(self):
         gen_func, gen_types, gen_shapes = self.get_batch_gen(self)
 
-        tf_dataset = tf.data.Dataset.from_generator(gen_func, gen_types,
+        tf_dataloader = tf.data.Dataset.from_generator(gen_func, gen_types,
                                                     gen_shapes)
 
-        tf_dataset = tf_dataset.map(map_func=self.transform,
+        tf_dataloader = tf_dataloader.map(map_func=self.transform,
                                     num_parallel_calls=self.num_threads)
 
+        return tf_dataloader
 
-        return tf_dataset
-
-
-from ml3d.torch.utils import Config
-from ml3d.datasets import Toronto3D, SemanticKITTI
-
-if __name__ == '__main__':
-
-    config = '../../torch/configs/randlanet_semantickitti.py'
-    cfg = Config.load_from_file(config)
-    dataset = SemanticKITTI(cfg.dataset)
-    
-    tf_data = TFDataset(dataset = dataset.get_split('training'), preprocess = randlanet_preprocess, transform = randlanet_transform)
-    loader = tf_data.get_loader()
-    # print(loader)
-    for data in loader:
-        # print(data)
-        print(len(data))
-        # for a in data:
-        #     print(a.shape)
-        # # print(data)

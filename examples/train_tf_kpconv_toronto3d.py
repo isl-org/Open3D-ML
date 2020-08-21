@@ -3,13 +3,15 @@ import tensorflow as tf
 # there should be pipeline. pipeline is bigger that randlanet
 from ml3d.datasets import Toronto3D
 from ml3d.tf.models import KPFCNN
-from ml3d.tf.datasets import TFDataset
-from ml3d.torch.utils import Config
+
+from ml3d.tf.dataloaders import TF_Dataloader
+from ml3d.utils import Config
+
 from os.path import abspath, dirname
 
 # from tf2torch import load_tf_weights
 
-config = dirname(abspath(__file__)) + '/../ml3d/torch/configs/kpconv_toronto3d.py'
+config = dirname(abspath(__file__)) + '/../ml3d/configs/kpconv_toronto3d.py'
 cfg = Config.load_from_file(config)
 
 dataset = Toronto3D(cfg.dataset)
@@ -22,7 +24,11 @@ model = KPFCNN(cfg.model)
 
 # pipeline.run_train(device)
 
+<<<<<<< HEAD
 tf_data = TFDataset(dataset = dataset.get_split('training'), model = model)
+=======
+tf_data = TF_Dataloader(dataset = dataset.get_split('training'), model = model)
+>>>>>>> master
 loader = tf_data.get_loader()
 # print(loader)
 for data in loader:

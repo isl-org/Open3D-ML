@@ -4,12 +4,12 @@ import numpy as np
 from ml3d.datasets.semantickitti import SemanticKITTI
 from ml3d.torch.pipelines import SemanticSegmentation 
 from ml3d.torch.models import RandLANet
-from ml3d.torch.utils import Config
+from ml3d.utils import Config
 
 
 import open3d as o3d
 
-config_file = 'ml3d/torch/configs/randlanet_semantickitti.py'
+config_file = 'ml3d/configs/randlanet_semantickitti.py'
 cfg         = Config.load_from_file(config_file)
 dataset 	= SemanticKITTI(cfg.dataset)
 
