@@ -10,6 +10,8 @@ YAPF_VER="0.30.0"
 # 1. clone Open3D-ML repo (done by the CI system, this is just for testing locally)
 #git clone git@github.com:intel-isl/Open3D-ML.git
 PATH_TO_OPEN3D_ML=$(pwd)
+# the build system of the main repo expects a master branch. make sure master exists
+git checkout -b master || true
 echo $PATH_TO_OPEN3D_ML
 cd ..
 #
