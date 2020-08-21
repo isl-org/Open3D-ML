@@ -94,6 +94,14 @@ model = dict(
     # Choose weights for class (used in segmentation loss). Empty list for no weights
     class_w=[],
     num_layers=5,
+    # Augmentations
+    augment_scale_anisotropic=True,
+    augment_symmetries=[True, False, False],
+    augment_rotation='vertical',
+    augment_scale_min=0.8,
+    augment_scale_max=1.2,
+    augment_noise=0.001,
+    augment_color=0.8,
 )
 
 pipeline = dict(
@@ -138,14 +146,6 @@ pipeline = dict(
     # Number of epoch between each checkpoint
     checkpoint_gap=50,
 
-    # Augmentations
-    augment_scale_anisotropic=True,
-    augment_symmetries=[True, False, False],
-    augment_rotation='vertical',
-    augment_scale_min=0.8,
-    augment_scale_max=1.2,
-    augment_noise=0.001,
-    augment_color=0.8,
 
     # Choose weights for class (used in segmentation loss). Empty list for no weights
     # class proportion for R=10.0 and dl=0.08 (first is unlabeled)

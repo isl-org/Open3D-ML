@@ -53,7 +53,7 @@ class SemanticKITTISplit(Dataset):
             labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
 
         data = {'point': points, 
-                'feat' : points,
+                'feat' : None,
                 'label': labels,
                 }
 
@@ -136,7 +136,8 @@ class SemanticKITTI:
         if split == 'training':
             seq_list = cfg.training_split
         elif split == 'test':
-            seq_list = [str(cfg.test_split_number)]
+            # seq_list = [str(cfg.test_split_number)]
+            seq_list = cfg.test_split
         elif split == 'validation':
             seq_list = cfg.validation_split
 

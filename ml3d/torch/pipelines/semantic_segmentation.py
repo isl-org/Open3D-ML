@@ -88,6 +88,9 @@ class SemanticSegmentation():
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
+        model.device = device
+        model.to(device)
+        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
@@ -97,18 +100,7 @@ class SemanticSegmentation():
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-
         batcher = self.get_batcher(device)
-
-        train_split = TorchDataloader(dataset=dataset.get_split('training'),
-                                    preprocess=model.preprocess,
-                                    transform=model.transform,
-                                    shuffle=True)
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size,
-                                  shuffle=True,
-                                  collate_fn=batcher.collate_fn)
-
 
         test_split = TorchDataloader(
             dataset=dataset.get_split('test'),
@@ -117,7 +109,7 @@ class SemanticSegmentation():
             shuffle=True)
         test_loader = DataLoader(
             test_split,
-            batch_size=cfg.val_batch_size,
+            batch_size=cfg.test_batch_size,
             shuffle=True,
             collate_fn=batcher.collate_fn)
 
@@ -125,54 +117,14 @@ class SemanticSegmentation():
         epoch = 0
 
         log.info("Started testing")
-
-        model.to(device)
-        model.eval()
         
         with torch.no_grad():
-            while True:
-                for idx, inputs  in tqdm(test_loader, desc='test', leave=False):
-                    # loader: point_clout, label
-                    results = model(inputs['data'])
+            for idx, inputs  in enumerate(tqdm(test_loader, 
+                                desc='test')):
+                results = model(inputs['data'])
+                dataset.save_test_result(results, inputs['attr'])
 
-
-                    inputs = model.preprocess(batch_data, device)
-                    result_torch = model(inputs)
-                    result_torch = torch.reshape(result_torch,
-                                                 (-1, model.cfg.num_classes))
-
-                    m_softmax = nn.Softmax(dim=-1)
-                    result_torch = m_softmax(result_torch)
-                    stacked_probs = result_torch.cpu().data.numpy()
-
-                    stacked_probs = np.reshape(stacked_probs, [
-                        cfg.test_batch_size, model.cfg.num_points,
-                        model.cfg.num_classes
-                    ])
-
-                    point_inds = inputs['input_inds']
-                    cloud_inds = inputs['cloud_inds']
-
-                    for j in range(np.shape(stacked_probs)[0]):
-                        probs = stacked_probs[j, :, :]
-                        inds = point_inds[j, :]
-                        c_i = cloud_inds[j][0]
-                        test_probs[c_i][inds] = test_smooth * test_probs[c_i][
-                            inds] + (1 - test_smooth) * probs
-
-                new_min = np.min(dataset.min_possibility)
-                log.info(f"Epoch {epoch:3d}, end. "
-                         f"Min possibility = {new_min:.1f}")
-
-                if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                    log.info(f"\nReproject Vote #"
-                             f"{int(np.floor(new_min)):d}")
-                    dataset.save_test_result(
-                        test_probs, str(dataset.cfg.test_split_number))
-                    log.info(f"{str(dataset.cfg.test_split_number)}"
-                             f" finished")
-                    return
-                epoch += 1
+                
 
     def run_train(self, device):
         model = self.model
@@ -265,7 +217,7 @@ class SemanticSegmentation():
                 for idx, inputs in enumerate(tqdm(valid_loader, 
                                             desc='validation')):
                     results = model(inputs['data'])
-                    loss, gt_labels, predict_scores = model.loss(
+                    loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
                     acc = Metric.acc(predict_scores, gt_labels)
                     iou = Metric.iou(predict_scores, gt_labels)
@@ -340,8 +292,12 @@ class SemanticSegmentation():
             first_epoch = ckpt['epoch'] + 1
             self.model.load_state_dict(ckpt['model_state_dict'])
             if is_train:
-                self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-                self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+                if 'optimizer_state_dict' in ckpt:
+                    log.info(f'Loading checkpoint optimizer_state_dict')
+                    self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+                if 'scheduler_state_dict' in ckpt:
+                    log.info(f'Loading checkpoint scheduler_state_dict')
+                    self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
         else:
             first_epoch = 0
             log.info('No checkpoint')

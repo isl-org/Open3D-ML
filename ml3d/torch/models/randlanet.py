@@ -126,7 +126,8 @@ class RandLANet(nn.Module):
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
 
-    def transform(self, data, attr):
+
+    def transform_crop(self, data, attr):
         cfg = self.cfg
         pc = data['point']
         label = data['label']
@@ -136,24 +137,13 @@ class RandLANet(nn.Module):
 
         pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
-        '''
-        if split != "training":
-            proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
-            proj_inds = proj_inds.astype(np.int32)
-            data['proj_inds'] = proj_inds
-        '''
+        
 
-        if (feat is not None):
-            features = np.concatenate([pc, feat], axis=1)
-        else:
-            features = pc
-
+        features = feat
         input_points = []
         input_neighbors = []
         input_pools = []
         input_up_samples = []
-
-        ori_pc = pc
 
         for i in range(cfg.num_layers):
             neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
@@ -181,6 +171,52 @@ class RandLANet(nn.Module):
 
         return inputs
 
+    def transform_whole(self, data, attr):
+        cfg = self.cfg
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']
+        features = feat
+
+        input_points = []
+        input_neighbors = []
+        input_pools = []
+        input_up_samples = []
+
+        for i in range(cfg.num_layers):
+            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] //
+                                   cfg.sub_sampling_ratio[i], :]
+            up_i = DataProcessing.knn_search(sub_points, pc, 1)
+            input_points.append(pc)
+            input_neighbors.append(neighbour_idx.astype(np.int64))
+            input_pools.append(pool_i.astype(np.int64))
+            input_up_samples.append(up_i.astype(np.int64))
+            pc = sub_points
+
+        inputs = dict()
+        inputs['xyz'] = input_points
+        inputs['neigh_idx'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = features
+
+        inputs['labels'] = label.astype(np.int64)
+        if attr['split'] == "test":
+            inputs['labels'] = data['proj_inds'] 
+      
+        return inputs
+
+    def transform(self, data, attr):
+        if attr['split'] == 'test':
+            return self.transform_whole(data, attr) 
+        else: 
+            return self.transform_crop(data, attr)
+
+
     def get_loss(self, Loss, results, inputs, device):
         """
         Runs the loss on outputs of the model
@@ -204,28 +240,23 @@ class RandLANet(nn.Module):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-        
-        if 'feat' not in data.keys():
-            data['feat'] = None
-            
+        # print(attr)
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
-        feat = np.array(data['feat'], dtype=np.float32)
         labels = np.array(data['label'], dtype=np.int32)
+
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = points
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+            feat = np.concatenate([points, feat], axis=1)
 
         split = attr['split']
 
-        if (feat is None):
-            sub_feat = None
-
         data = dict()
 
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                points, labels=labels, grid_size=cfg.grid_size)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                points, features=feat, labels=labels, grid_size=cfg.grid_size)
+    
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
@@ -234,7 +265,7 @@ class RandLANet(nn.Module):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split == "test":
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -242,53 +273,6 @@ class RandLANet(nn.Module):
 
         return data
 
-    def previous_preprocess(self, batch_data, device):
-        cfg = self.cfg
-        batch_pc = batch_data[0]
-        batch_label = batch_data[1]
-        batch_pc_idx = batch_data[2]
-        batch_cloud_idx = batch_data[3]
-
-        features = batch_data[0]
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
-
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(batch_pc, batch_pc,
-                                                      cfg.k_n)
-            sub_points = batch_pc[:, :batch_pc.size(1) //
-                                  cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:, :batch_pc.size(1) //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, batch_pc, 1)
-            input_points.append(batch_pc)
-            input_neighbors.append(neighbour_idx)
-            input_pools.append(pool_i)
-            input_up_samples.append(up_i)
-            batch_pc = sub_points
-
-        inputs = dict()
-        #print(features)
-        inputs['xyz'] = [arr.to(device) for arr in input_points]
-        inputs['neigh_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_neighbors
-        ]
-        inputs['sub_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_pools
-        ]
-        inputs['interp_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_up_samples
-        ]
-        inputs['features'] = features.to(device)
-        inputs['input_inds'] = batch_pc_idx
-        inputs['cloud_inds'] = batch_cloud_idx
-
-        return inputs
 
     def preprocess_inference(self, pc, device):
         cfg = self.cfg
