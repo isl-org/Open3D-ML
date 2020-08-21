@@ -25,6 +25,11 @@ git clone --recursive --branch o3dml_integration  https://github.com/intel-isl/O
 #       -DBUILD_EXAMPLES=OFF \
 # 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
+
+python -m pip install tensorflow==2.3.0
+python -m pip install torch==1.5.0
+python -m pip install pytest
+
 mkdir Open3D/build
 pushd Open3D/build
 cmake -DBUNDLE_OPEN3D_ML=ON \
