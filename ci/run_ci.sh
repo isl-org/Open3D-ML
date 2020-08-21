@@ -50,7 +50,7 @@ cmake -DBUNDLE_OPEN3D_ML=ON \
       ..
 
 # 3. install wheel
-make -j install-pip-package
+make -j"$NPROC" install-pip-package
 
 #
 # 4. run examples/tests in the Open3D-ML repo outside of the repo directory to 
