@@ -11,12 +11,14 @@ import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 from ...utils.ply import write_ply, read_ply
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
+
 class KPFCNN(nn.Module):
     """
     Class defining KPFCNN
     """
     def __init__(self, cfg):
         super(KPFCNN, self).__init__()
+        self.name = 'KPFCNN'
         self.cfg = cfg
 
         ############
@@ -141,7 +143,6 @@ class KPFCNN(nn.Module):
             self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
         self.deform_fitting_mode = cfg.deform_fitting_mode
         self.deform_fitting_power = cfg.deform_fitting_power
-        self.deform_lr_factor = cfg.deform_lr_factor
         self.repulse_extent = cfg.repulse_extent
         self.output_loss = 0
         self.reg_loss = 0
@@ -172,7 +173,23 @@ class KPFCNN(nn.Module):
 
         return x
 
-    def loss(self, Loss, results, inputs, device):
+    def get_optimizer(self, cfg_pipeline):
+        # Optimizer with specific learning rate for deformable KPConv
+        deform_params = [v for k, v in self.named_parameters() if 'offset' in k]
+        other_params = [v for k, v in self.named_parameters() if 'offset' not in k]
+        deform_lr = cfg_pipeline.learning_rate * cfg_pipeline.deform_lr_factor
+        optimizer = torch.optim.SGD([{'params': other_params},
+                                          {'params': deform_params, 'lr': deform_lr}],
+                                         lr=cfg_pipeline.learning_rate,
+                                         momentum=cfg_pipeline.momentum,
+                                         weight_decay=cfg_pipeline.weight_decay)
+      
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
+        
+        return optimizer, scheduler
+
+    def get_loss(self, Loss, results, inputs, device):
         """
         Runs the loss on outputs of the model
         :param outputs: logits

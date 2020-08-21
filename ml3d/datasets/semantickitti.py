@@ -34,12 +34,6 @@ class SemanticKITTISplit(Dataset):
 
         if split == 'test':
             dataset.test_list = path_list
-            for test_file_name in path_list:
-                points = np.load(test_file_name)
-                dataset.possibility += [np.random.rand(points.shape[0]) * 1e-3]
-                dataset.min_possibility += [
-                    float(np.min(dataset.possibility[-1]))
-                ]
 
         self.path_list = path_list
         self.split = split

@@ -8,7 +8,7 @@ model = dict(
     ignored_label_inds=[0],
     # Dataset name
     dataset='SemanticKitti',
-    ckpt_path='./ml3d/torch/checkpoint/kpconv_semantickitti.pth',
+    ckpt_path='/home/yiling/d2T/intel2020/datasets/kpconv_450.tar',
 
     # Type of task performed on this dataset (also overwritten)
     dataset_task='',
@@ -82,9 +82,34 @@ model = dict(
     # 'point2plane' fitting geometry by penalizing distance from deform point to input point triplet (not implemented)
     deform_fitting_mode='point2point',
     deform_fitting_power=1.0,  # Multiplier for the fitting/repulsive loss
-    deform_lr_factor=
-    0.1,  # Multiplier for learning rate applied to the deformations
     repulse_extent=1.2,  # Distance of repulsion for deformed kernel points
+
+
+    # Dimension of input points
+    in_points_dim=3,
+
+    # Fixed points in the kernel : 'none', 'center' or 'verticals'
+    fixed_kernel_points='center',
+
+    # Choose weights for class (used in segmentation loss). Empty list for no weights
+    class_w=[],
+    num_layers=5,
+)
+
+pipeline = dict(
+    batch_size=2,
+    val_batch_size=2,
+    test_batch_size=3,
+    #lr_decays           = {0.95 for i in range(0, 500)},
+    save_ckpt_freq=20,
+    adam_lr=1e-2,
+    scheduler_gamma= 0.1**(1 / 150),
+
+    # logs
+    main_log_dir='./logs',
+    model_name='KPConv',
+    train_sum_dir='train_log',
+
 
     #####################
     # Training parameters
@@ -96,9 +121,13 @@ model = dict(
     # Learning rate management
     learning_rate=1e-2,
     momentum=0.98,
+    weight_decay = 0.001000,
     lr_decays={i: 0.1**(1 / 150)
                for i in range(1, 800)},
     grad_clip_norm=100.0,
+
+    deform_lr_factor=
+    0.1,  # Multiplier for learning rate applied to the deformations
 
     # Number of steps per epochs
     epoch_steps=500,
@@ -135,33 +164,6 @@ model = dict(
     # Do we nee to save convergence
     saving=True,
     saving_path=None,
-
-    # Dimension of input points
-    in_points_dim=3,
-
-    # Fixed points in the kernel : 'none', 'center' or 'verticals'
-    fixed_kernel_points='center',
-
-    # Choose weights for class (used in segmentation loss). Empty list for no weights
-    class_w=[],
-    num_layers=5,
-)
-
-pipeline = dict(
-    batch_size=2,
-    val_batch_size=2,
-    test_batch_size=3,
-    max_epoch=100,  # maximum epoch during training
-    learning_rate=1e-2,  # initial learning rate
-    #lr_decays           = {0.95 for i in range(0, 500)},
-    save_ckpt_freq=20,
-    adam_lr=1e-2,
-    scheduler_gamma=0.95,
-
-    # logs
-    main_log_dir='./logs',
-    model_name='RandLANet',
-    train_sum_dir='train_log',
 )
 
 dataset = dict(

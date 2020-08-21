@@ -88,33 +88,54 @@ class SemanticSegmentation():
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
-        model.to(device)
-        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
+        log.info("DEVICE : {}".format(device))
+        log.info(model)
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        test_sampler = dataset.get_sampler(cfg.test_batch_size, 'test')
-        test_loader = DataLoader(test_sampler, batch_size=cfg.test_batch_size)
-        test_probs = [
-            np.zeros(shape=[len(l), self.model.cfg.num_classes],
-                     dtype=np.float16) for l in dataset.possibility
-        ]
+
+        batcher = self.get_batcher(device)
+
+        train_split = TorchDataloader(dataset=dataset.get_split('training'),
+                                    preprocess=model.preprocess,
+                                    transform=model.transform,
+                                    shuffle=True)
+        train_loader = DataLoader(train_split,
+                                  batch_size=cfg.batch_size,
+                                  shuffle=True,
+                                  collate_fn=batcher.collate_fn)
+
+
+        test_split = TorchDataloader(
+            dataset=dataset.get_split('test'),
+            preprocess=model.preprocess,
+            transform=model.transform,
+            shuffle=True)
+        test_loader = DataLoader(
+            test_split,
+            batch_size=cfg.val_batch_size,
+            shuffle=True,
+            collate_fn=batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
-        log.info("Model Loaded from : {}".format(model.cfg.ckpt_path))
-
-        test_smooth = 0.98
         epoch = 0
 
         log.info("Started testing")
 
+        model.to(device)
+        model.eval()
+        
         with torch.no_grad():
             while True:
-                for batch_data in tqdm(test_loader, desc='test', leave=False):
+                for idx, inputs  in tqdm(test_loader, desc='test', leave=False):
                     # loader: point_clout, label
+                    results = model(inputs['data'])
+
+
                     inputs = model.preprocess(batch_data, device)
                     result_torch = model(inputs)
                     result_torch = torch.reshape(result_torch,
@@ -196,11 +217,7 @@ class SemanticSegmentation():
             shuffle=True,
             collate_fn=batcher.collate_fn)
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer, cfg.scheduler_gamma)
-
-        self.optimizer, self.scheduler = optimizer, scheduler
+        self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
 
@@ -221,12 +238,12 @@ class SemanticSegmentation():
                                         desc='training')):
 
                 results = model(inputs['data'])
-                loss, gt_labels, predict_scores = model.loss(
+                loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
 
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
@@ -236,7 +253,7 @@ class SemanticSegmentation():
 
                 step = step + 1
 
-            scheduler.step()
+            self.scheduler.step()
 
             # --------------------- validation
             model.eval()

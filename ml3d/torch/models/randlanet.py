@@ -120,6 +120,12 @@ class RandLANet(nn.Module):
             select_feat = feat[select_idx]
         return select_points, select_feat, select_labels, select_idx
 
+    def get_optimizer(self, cfg_pipeline):
+        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
+        return optimizer, scheduler
+
     def transform(self, data, attr):
         cfg = self.cfg
         pc = data['point']
@@ -175,7 +181,7 @@ class RandLANet(nn.Module):
 
         return inputs
 
-    def loss(self, Loss, results, inputs, device):
+    def get_loss(self, Loss, results, inputs, device):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
