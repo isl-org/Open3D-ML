@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+
+TENSORFLOW_VER="2.3.0"
+TORCH_GLNX_VER=("1.5.0+cu101" "1.4.0+cpu")
+YAPF_VER="0.30.0"
+
 #
 #
 # 1. clone Open3D-ML repo (done by the CI system, this is just for testing locally)
@@ -26,9 +32,9 @@ git clone --recursive --branch o3dml_integration  https://github.com/intel-isl/O
 # 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 
-python -m pip install tensorflow==2.3.0
-python -m pip install torch==1.5.0
-python -m pip install pytest
+python -m pip install -U tensorflow==$TENSORFLOW_VER
+python -m pip install -U torch==${TORCH_GLNX_VER[1]}
+python -m pip install -U pytest
 
 mkdir Open3D/build
 pushd Open3D/build
