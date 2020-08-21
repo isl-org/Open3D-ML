@@ -2,8 +2,10 @@
 #
 #
 # 1. clone Open3D-ML repo (done by the CI system, this is just for testing locally)
-git clone git@github.com:intel-isl/Open3D-ML.git
-PATH_TO_OPEN3D_ML=$(pwd)/Open3D-ML
+#git clone git@github.com:intel-isl/Open3D-ML.git
+PATH_TO_OPEN3D_ML=$(pwd)
+echo $PATH_TO_OPEN3D_ML
+cd ..
 #
 # 2. clone and build Open3D
 # For now we have to clone the o3dml_integration branch of open3d
@@ -22,6 +24,7 @@ git clone --recursive --branch o3dml_integration  https://github.com/intel-isl/O
 #       -DBUILD_BENCHMARKS=OFF \
 #       -DBUILD_EXAMPLES=OFF \
 # 
+./Open3D/util/install_deps_ubuntu.sh assume-yes
 mkdir Open3D/build
 pushd Open3D/build
 cmake -DBUNDLE_OPEN3D_ML=ON \
