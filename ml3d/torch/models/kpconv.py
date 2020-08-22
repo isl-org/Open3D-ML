@@ -228,6 +228,168 @@ class KPFCNN(nn.Module):
         return loss, labels, scores
 
     def transform(self, data, attr):
+        if attr['split'] == 'test':
+            return self.transform_test(data, attr)
+        else:
+            return self.transform_train(data, attr)
+
+    def transform_test(self, data, attr):
+
+        p_list = []
+        f_list = []
+        l_list = []
+        fi_list = []
+        p0_list = []
+        s_list = []
+        R_list = []
+        r_inds_list = []
+        r_mask_list = []
+        val_labels_list = []
+        batch_n = 0
+
+        # Initiate merged points
+        merged_points = np.zeros((0, 3), dtype=np.float32)
+        merged_labels = np.zeros((0, ), dtype=np.int32)
+        merged_coords = np.zeros((0, 4), dtype=np.float32)
+
+        # Get center of the first frame in world coordinates
+        p_origin = np.zeros((1, 4))
+        p_origin[0, 3] = 1
+        #pose0 = self.poses[s_ind][f_ind]
+        #p0 = p_origin.dot(pose0.T)[:, :3]
+        p0 = p_origin[:, :3]
+        p0 = np.squeeze(p0)
+        o_pts = None
+        o_labels = None
+
+        num_merged = 0
+        f_inc = 0
+
+        # Read points
+        points = data['point']
+        sem_labels = data['label']
+
+        # Apply pose (without np.dot to avoid multi-threading)
+        hpoints = np.hstack((points, np.ones_like(points[:, :1])))
+        #new_points = hpoints.dot(pose.T)
+        #new_points = np.sum(np.expand_dims(hpoints, 2) * pose.T, axis=1)
+        # TODO pose
+        new_points = hpoints
+        #new_points[:, 3:] = points[:, 3:]
+
+        # In case of validation, keep the original points in memory
+        o_pts = new_points[:, :3].astype(np.float32)
+        o_labels = sem_labels.astype(np.int32)
+
+        # In case radius smaller than 50m, chose new center on a point of the wanted class or not
+        # TODO balance
+
+        wanted_ind = np.random.choice(new_points.shape[0])
+        p0 = new_points[wanted_ind, :3]
+
+        new_points = new_points[:, :3]
+        sem_labels = sem_labels[:]
+
+        new_coords = points[:, :]
+
+        # Increment merge count
+        merged_points = np.vstack((merged_points, new_points))
+        merged_labels = sem_labels  #np.hstack((merged_labels, sem_labels))
+        merged_coords = np.vstack((merged_coords, new_coords))
+
+        in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
+            merged_points,
+            features=merged_coords,
+            labels=merged_labels,
+            sampleDl=self.cfg.first_subsampling_dl)
+
+        # Number collected
+        n = in_pts.shape[0]
+
+        # Safe check
+        if n < 2:
+            print("sample n < 2!")
+            exit()
+
+        # Project predictions on the frame points
+        search_tree = KDTree(in_pts, leaf_size=50)
+        proj_inds = search_tree.query(o_pts[:, :],
+                                      return_distance=False)
+        proj_inds = np.squeeze(proj_inds).astype(np.int32)
+  
+
+        # Data augmentation
+        in_pts, scale, R = self.augmentation_transform(in_pts)
+
+        # Stack batch
+        p_list += [in_pts]
+        f_list += [in_fts]
+        l_list += [np.squeeze(in_lbls)]
+        #fi_list += [[s_ind, f_ind]]
+        p0_list += [p0]
+        s_list += [scale]
+        R_list += [R]
+        r_inds_list += [proj_inds]
+        r_mask_list += [None]
+        val_labels_list += [o_labels]
+
+        ###################
+        # Concatenate batch
+        ###################
+
+        stacked_points = np.concatenate(p_list, axis=0)
+        features = np.concatenate(f_list, axis=0)
+        labels = np.concatenate(l_list, axis=0)
+        frame_inds = np.array(fi_list, dtype=np.int32)
+        frame_centers = np.stack(p0_list, axis=0)
+        stack_lengths = np.array([pp.shape[0] for pp in p_list],
+                                 dtype=np.int32)
+        scales = np.array(s_list, dtype=np.float32)
+        rots = np.stack(R_list, axis=0)
+
+        # Input features (Use reflectance, input height or all coordinates)
+        stacked_features = np.ones_like(stacked_points[:, :1],
+                                        dtype=np.float32)
+        if self.cfg.in_features_dim == 1:
+            pass
+        elif self.cfg.in_features_dim == 2:
+            # Use original height coordinate
+            stacked_features = np.hstack((stacked_features, features[:, 2:3]))
+        elif self.cfg.in_features_dim == 3:
+            # Use height + reflectance
+            stacked_features = np.hstack((stacked_features, features[:, 2:]))
+        elif self.cfg.in_features_dim == 4:
+            # Use all coordinates
+            stacked_features = np.hstack((stacked_features, features[:3]))
+        elif self.cfg.in_features_dim == 5:
+            # Use all coordinates + reflectance
+            stacked_features = np.hstack((stacked_features, features))
+        else:
+            raise ValueError(
+                'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
+            )
+
+        #######################
+        # Create network inputs
+        #######################
+        #
+        #   Points, neighbors, pooling indices for each layers
+        #
+
+        # Get the whole input list
+        input_list = self.segmentation_inputs(stacked_points, stacked_features,
+                                              labels.astype(np.int64),
+                                              stack_lengths)
+
+        # Add scale and rotation for testing
+        input_list += [
+            scales, rots, frame_inds, frame_centers, r_inds_list, r_mask_list,
+            val_labels_list
+        ]
+
+        return [self.cfg.num_layers] + input_list
+
+    def transform_train(self, data, attr):
 
         p_list = []
         f_list = []

@@ -103,30 +103,34 @@ class SemanticKITTI:
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)
 
-    def save_test_result(self, test_probs, test_scan_name):
+    def save_test_result(self, results, inputs):
         cfg = self.cfg
+        for j in range(1):
+            # name = inputs['attr']['name']
+            name = inputs['attr']['name']
+            # print(name)
+            name_seq, name_points = name.split("_")
 
-        test_path = join(cfg.test_result_folder, 'sequences')
-        make_dir(test_path)
-        save_path = join(test_path, test_scan_name, 'predictions')
-        make_dir(save_path)
+            test_path = join(cfg.test_result_folder, 'sequences')
+            make_dir(test_path)
+            save_path = join(test_path, name_seq, 'predictions')
+            make_dir(save_path)
 
-        for j in range(len(test_probs)):
-            test_file_name = self.test_list[j]
-            frame = test_file_name.split('/')[-1][:-4]
-            proj_path = join(cfg.dataset_path, test_scan_name, 'proj')
-            proj_file = join(proj_path, str(frame) + '_proj.pkl')
-            if isfile(proj_file):
-                with open(proj_file, 'rb') as f:
-                    proj_inds = pickle.load(f)
-            probs = test_probs[j][proj_inds[0], :]
+            test_file_name = name_points
+            # proj_inds = inputs['data']['proj_inds'][j].cpu().numpy()
+            
+            proj_inds = inputs['data'].reproj_inds[0]
+            # proj_inds = inputs.proj_inds
+            probs = results[proj_inds, :]
+            # probs = results[j][proj_inds, :]
+          
             pred = np.argmax(probs, 1)
 
-            store_path = join(test_path, test_scan_name, 'predictions',
-                              str(frame) + '.label')
+            store_path = join(save_path, name_points + '.label')
             pred = pred + 1
             pred = remap_lut[pred].astype(np.uint32)
             pred.tofile(store_path)
+
 
     def get_split_list(self, split):
         cfg = self.cfg
@@ -149,7 +153,7 @@ class SemanticKITTI:
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
         file_list = np.concatenate(file_list, axis=0)
-        file_list = DataProcessing.shuffle_list(file_list)
+        # file_list = DataProcessing.shuffle_list(file_list)
 
         return file_list
 

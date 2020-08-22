@@ -206,7 +206,7 @@ class RandLANet(nn.Module):
 
         inputs['labels'] = label.astype(np.int64)
         if attr['split'] == "test":
-            inputs['labels'] = data['proj_inds'] 
+            inputs['proj_inds'] = data['proj_inds'] 
       
         return inputs
 

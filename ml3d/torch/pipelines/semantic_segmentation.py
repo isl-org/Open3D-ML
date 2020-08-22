@@ -100,17 +100,17 @@ class SemanticSegmentation():
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        batcher = self.get_batcher(device)
+        batcher = self.get_batcher(device,split='test')
 
         test_split = TorchDataloader(
             dataset=dataset.get_split('test'),
             preprocess=model.preprocess,
             transform=model.transform,
-            shuffle=True)
+            shuffle=False)
         test_loader = DataLoader(
             test_split,
             batch_size=cfg.test_batch_size,
-            shuffle=True,
+            shuffle=False,
             collate_fn=batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
@@ -122,7 +122,8 @@ class SemanticSegmentation():
             for idx, inputs  in enumerate(tqdm(test_loader, 
                                 desc='test')):
                 results = model(inputs['data'])
-                dataset.save_test_result(results, inputs['attr'])
+                dataset.save_test_result(results.cpu().numpy(), 
+                            inputs)
 
                 
 
@@ -234,8 +235,8 @@ class SemanticSegmentation():
                 path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
                 self.save_ckpt(path_ckpt, epoch)
 
-    def get_batcher(self, device):
-        batcher_name = getattr(self.model.cfg, 'batcher')
+    def get_batcher(self, device, split='training'):
+        batcher_name = getattr(self.model.cfg, split+'_batcher')
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':

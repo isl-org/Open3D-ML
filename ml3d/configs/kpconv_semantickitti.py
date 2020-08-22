@@ -15,7 +15,8 @@ model = dict(
 
     # Number of CPU threads for the input pipeline
     input_threads=10,
-    batcher='ConcatBatcher',
+    training_batcher='ConcatBatcher',
+    test_batcher='ConcatBatcher',
 
     #########################
     # Architecture definition
@@ -107,7 +108,7 @@ model = dict(
 pipeline = dict(
     batch_size=2,
     val_batch_size=2,
-    test_batch_size=3,
+    test_batch_size=1,
     #lr_decays           = {0.95 for i in range(0, 500)},
     save_ckpt_freq=20,
     adam_lr=1e-2,
@@ -174,11 +175,13 @@ dataset = dict(
     dataset_path=
     '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
     prepro_grid_size=0.06,
-    test_result_folder='./test',
+    test_result_folder='./test_kpconv',
     training_split=[
         '00', '01', '02', '03', '04', '05', '06', '07', '09', '10'
     ],
     validation_split=['08'],
+    test_split=['11', '12', '13', '14', '15', '16', '17', 
+                '18', '19', '20', '21'],
     test_split_number=11,
     class_weights=[
         55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 78858,

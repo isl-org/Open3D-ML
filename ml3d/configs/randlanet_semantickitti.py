@@ -14,7 +14,8 @@ model = dict(
     d_feature=8,
     d_out=[16, 64, 128, 256],
     grid_size=0.06,
-    batcher='DefaultBatcher',
+    training_batcher='DefaultBatcher',
+    test_batcher='DefaultBatcher',
     ckpt_path='./ml3d/torch/checkpoint/randlanet_semantickitti.pth')
 
 pipeline = dict(

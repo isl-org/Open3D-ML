@@ -178,4 +178,4 @@ class ConcatBatcher(object):
         batching_result.to(self.device)
         #print(batching_result['data']['features'].size())
         #exit()
-        return {'data': batching_result}
+        return {'data': batching_result, 'attr':batch[0]['attr']}
