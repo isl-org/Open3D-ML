@@ -110,26 +110,3 @@ class Custom3D:
             return self.train_files
 
 
-
-
-from ..utils import Config
-
-
-if __name__ == '__main__':
-    config = '../configs/randlanet_custom3d.py'
-    cfg  = Config.load_from_file(config)
-    a = Custom3D(cfg.dataset)
-    b = a.get_split("test")
-    # c = b.get_data(1)
-    print(b.get_attr(0))
-    # print(b.get_attr(1)['name'])
-    # print(c['point'].shape)
-    # print(c['feat'].shape)
-    # print(c['label'].shape)
-    # print(c['point'][0])
-    # print(c['feat'][0])
-    # print(c['label'][0])
-    # print(c['label'].mean())
-    # print(c['label'])
-    # # print(b.get_data(0))
-    # print(b.get_attr(10))

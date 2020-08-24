@@ -2,6 +2,7 @@ import numpy as np
 import os, argparse, pickle, sys
 from os.path import exists, join, isfile, dirname, abspath, split
 import torch
+import logging
 
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 from sklearn.neighbors import KDTree
@@ -26,20 +27,17 @@ max_key = max(remap_dict_val.keys())
 remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
 remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+)
+log = logging.getLogger(__name__)
 
 class SemanticKITTISplit(Dataset):
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
-
-        if split == 'test':
-            dataset.test_list = path_list
-            for test_file_name in path_list:
-                points = np.load(test_file_name)
-                dataset.possibility += [np.random.rand(points.shape[0]) * 1e-3]
-                dataset.min_possibility += [
-                    float(np.min(dataset.possibility[-1]))
-                ]
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
 
         self.path_list = path_list
         self.split = split
@@ -103,9 +101,6 @@ class SemanticKITTI:
         }
         self.num_classes = len(self.label_to_names)
 
-        self.possibility = []
-        self.min_possibility = []
-
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)
 
@@ -146,8 +141,6 @@ class SemanticKITTI:
         elif split == 'validation':
             seq_list = cfg.validation_split
 
-        # self.prepro_randlanet(seq_list, split)
-
         for seq_id in seq_list:
             pc_path = join(dataset_path, seq_id, 'velodyne')
             file_list.append(
@@ -157,13 +150,3 @@ class SemanticKITTI:
         file_list = DataProcessing.shuffle_list(file_list)
 
         return file_list
-
-    def crop_pc(self, points, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point,
-                                       k=self.cfg.num_points)[1][0]
-        select_idx = DataProcessing.shuffle_idx(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        return select_points, select_labels, select_idx
