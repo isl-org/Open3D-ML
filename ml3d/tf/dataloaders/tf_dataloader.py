@@ -28,7 +28,7 @@ class TFDataloader():
 
         if self.preprocess is not None:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
-            
+
             assert cache_dir is not None, 'cache directory is not given'
 
             self.cache_convert = dataset_helper.Cache(
@@ -67,17 +67,15 @@ class TFDataloader():
         else:
             data = self.cache_convert(attr['name'])
 
-
         return data, attr
 
     def get_loader(self):
         gen_func, gen_types, gen_shapes = self.get_batch_gen(self)
 
         tf_dataloader = tf.data.Dataset.from_generator(gen_func, gen_types,
-                                                    gen_shapes)
+                                                       gen_shapes)
 
         tf_dataloader = tf_dataloader.map(map_func=self.transform,
-                                    num_parallel_calls=self.num_threads)
+                                          num_parallel_calls=self.num_threads)
 
         return tf_dataloader
-

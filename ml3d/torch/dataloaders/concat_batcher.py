@@ -13,7 +13,6 @@ from torch.utils.data import Sampler, get_worker_info
 
 class SemanticKittiCustomBatch:
     """Custom batch definition with memory pinning for SemanticKitti"""
-
     def __init__(self, input_list):
 
         # Get rid of batch dimension
@@ -168,7 +167,6 @@ class SemanticKittiCustomBatch:
 
 class ConcatBatcher(object):
     """docstring for BaseBatcher"""
-
     def __init__(self, device):
         super(ConcatBatcher, self).__init__()
         self.device = device

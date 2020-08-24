@@ -14,13 +14,11 @@
 #      Hugues THOMAS - 11/06/2018
 #
 
-
 # ------------------------------------------------------------------------------------------
 #
 #          Imports and global variables
 #      \**********************************/
 #
-
 
 # Import numpy package and name it "np"
 import time
@@ -32,13 +30,13 @@ from os.path import join, exists
 
 from .....utils.ply import read_ply, write_ply
 
-
 # ------------------------------------------------------------------------------------------
 #
 #           Functions
 #       \***************/
 #
 #
+
 
 def create_3D_rotations(axis, angle):
     """
@@ -61,21 +59,24 @@ def create_3D_rotations(axis, angle):
     t19 = t2 * axis[:, 1] * axis[:, 2]
     t20 = t8 * axis[:, 0]
     t24 = axis[:, 2] * axis[:, 2]
-    R = np.stack([t1 + t2 * t3,
-                  t7 - t9,
-                  t11 + t12,
-                  t7 + t9,
-                  t1 + t2 * t15,
-                  t19 - t20,
-                  t11 - t12,
-                  t19 + t20,
-                  t1 + t2 * t24], axis=1)
+    R = np.stack([
+        t1 + t2 * t3, t7 - t9, t11 + t12, t7 + t9, t1 + t2 * t15, t19 - t20,
+        t11 - t12, t19 + t20, t1 + t2 * t24
+    ],
+                 axis=1)
 
     return np.reshape(R, (-1, 3, 3))
 
 
-def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximation='monte-carlo',
-                    approx_n=5000, max_iter=500, momentum=0.9, verbose=0):
+def spherical_Lloyd(radius,
+                    num_cells,
+                    dimension=3,
+                    fixed='center',
+                    approximation='monte-carlo',
+                    approx_n=5000,
+                    max_iter=500,
+                    momentum=0.9,
+                    verbose=0):
     """
     Creation of kernel point via Lloyd algorithm. We use an approximation of the algorithm, and compute the Voronoi
     cell centers with discretization  of space. The exact formula is not trivial with part of the sphere as sides.
@@ -105,10 +106,13 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
     # Random kernel points (Uniform distribution in a sphere)
     kernel_points = np.zeros((0, dimension))
     while kernel_points.shape[0] < num_cells:
-        new_points = np.random.rand(num_cells, dimension) * 2 * radius0 - radius0
+        new_points = np.random.rand(num_cells,
+                                    dimension) * 2 * radius0 - radius0
         kernel_points = np.vstack((kernel_points, new_points))
         d2 = np.sum(np.power(kernel_points, 2), axis=1)
-        kernel_points = kernel_points[np.logical_and(d2 < radius0 ** 2, (0.9 * radius0) ** 2 < d2), :]
+        kernel_points = kernel_points[np.logical_and(d2 < radius0**2,
+                                                     (0.9 *
+                                                      radius0)**2 < d2), :]
     kernel_points = kernel_points[:num_cells, :].reshape((num_cells, -1))
 
     # Optional fixing
@@ -129,9 +133,9 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
 
     # Initialize discretization in this method is chosen
     if approximation == 'discretization':
-        side_n = int(np.floor(approx_n ** (1. / dimension)))
+        side_n = int(np.floor(approx_n**(1. / dimension)))
         dl = 2 * radius0 / side_n
-        coords = np.arange(-radius0 + dl/2, radius0, dl)
+        coords = np.arange(-radius0 + dl / 2, radius0, dl)
         if dimension == 2:
             x, y = np.meshgrid(coords, coords)
             X = np.vstack((np.ravel(x), np.ravel(y))).T
@@ -140,13 +144,15 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
             X = np.vstack((np.ravel(x), np.ravel(y), np.ravel(z))).T
         elif dimension == 4:
             x, y, z, t = np.meshgrid(coords, coords, coords, coords)
-            X = np.vstack((np.ravel(x), np.ravel(y), np.ravel(z), np.ravel(t))).T
+            X = np.vstack(
+                (np.ravel(x), np.ravel(y), np.ravel(z), np.ravel(t))).T
         else:
             raise ValueError('Unsupported dimension (max is 4)')
     elif approximation == 'monte-carlo':
         X = np.zeros((0, dimension))
     else:
-        raise ValueError('Wrong approximation method chosen: "{:s}"'.format(approximation))
+        raise ValueError(
+            'Wrong approximation method chosen: "{:s}"'.format(approximation))
 
     # Only points inside the sphere are used
     d2 = np.sum(np.power(X, 2), axis=1)
@@ -160,7 +166,7 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
     warning = False
 
     # moving vectors of kernel points saved to detect convergence
-    max_moves = np.zeros((0,))
+    max_moves = np.zeros((0, ))
 
     for iter in range(max_iter):
 
@@ -202,13 +208,19 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
             kernel_points[:3, :-1] *= 0
 
         if verbose:
-            print('iter {:5d} / max move = {:f}'.format(iter, np.max(np.linalg.norm(moves, axis=1))))
+            print('iter {:5d} / max move = {:f}'.format(
+                iter, np.max(np.linalg.norm(moves, axis=1))))
             if warning:
-                print('{:}WARNING: at least one point has no cell{:}'.format(bcolors.WARNING, bcolors.ENDC))
+                print('{:}WARNING: at least one point has no cell{:}'.format(
+                    bcolors.WARNING, bcolors.ENDC))
         if verbose > 1:
             plt.clf()
-            plt.scatter(X[:, 0], X[:, 1], c=cell_inds, s=20.0,
-                        marker='.', cmap=plt.get_cmap('tab20'))
+            plt.scatter(X[:, 0],
+                        X[:, 1],
+                        c=cell_inds,
+                        s=20.0,
+                        marker='.',
+                        cmap=plt.get_cmap('tab20'))
             #plt.scatter(kernel_points[:, 0], kernel_points[:, 1], c=np.arange(num_cells), s=100.0,
             #            marker='+', cmap=plt.get_cmap('tab20'))
             plt.plot(kernel_points[:, 0], kernel_points[:, 1], 'k+')
@@ -230,8 +242,12 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
         if dimension == 2:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=[10.4, 4.8])
             ax1.plot(max_moves)
-            ax2.scatter(X[:, 0], X[:, 1], c=cell_inds, s=20.0,
-                        marker='.', cmap=plt.get_cmap('tab20'))
+            ax2.scatter(X[:, 0],
+                        X[:, 1],
+                        c=cell_inds,
+                        s=20.0,
+                        marker='.',
+                        cmap=plt.get_cmap('tab20'))
             # plt.scatter(kernel_points[:, 0], kernel_points[:, 1], c=np.arange(num_cells), s=100.0,
             #            marker='+', cmap=plt.get_cmap('tab20'))
             ax2.plot(kernel_points[:, 0], kernel_points[:, 1], 'k+')
@@ -254,8 +270,13 @@ def spherical_Lloyd(radius, num_cells, dimension=3, fixed='center', approximatio
     return kernel_points * radius
 
 
-def kernel_point_optimization_debug(radius, num_points, num_kernels=1, dimension=3,
-                                    fixed='center', ratio=0.66, verbose=0):
+def kernel_point_optimization_debug(radius,
+                                    num_points,
+                                    num_kernels=1,
+                                    dimension=3,
+                                    fixed='center',
+                                    ratio=0.66,
+                                    verbose=0):
     """
     Creation of kernel point via optimization of potentials.
     :param radius: Radius of the kernels
@@ -291,13 +312,16 @@ def kernel_point_optimization_debug(radius, num_points, num_kernels=1, dimension
     #######################
 
     # Random kernel points
-    kernel_points = np.random.rand(num_kernels * num_points - 1, dimension) * diameter0 - radius0
+    kernel_points = np.random.rand(num_kernels * num_points - 1,
+                                   dimension) * diameter0 - radius0
     while (kernel_points.shape[0] < num_kernels * num_points):
-        new_points = np.random.rand(num_kernels * num_points - 1, dimension) * diameter0 - radius0
+        new_points = np.random.rand(num_kernels * num_points - 1,
+                                    dimension) * diameter0 - radius0
         kernel_points = np.vstack((kernel_points, new_points))
         d2 = np.sum(np.power(kernel_points, 2), axis=1)
         kernel_points = kernel_points[d2 < 0.5 * radius0 * radius0, :]
-    kernel_points = kernel_points[:num_kernels * num_points, :].reshape((num_kernels, num_points, -1))
+    kernel_points = kernel_points[:num_kernels * num_points, :].reshape(
+        (num_kernels, num_points, -1))
 
     # Optionnal fixing
     if fixed == 'center':
@@ -312,7 +336,7 @@ def kernel_point_optimization_debug(radius, num_points, num_kernels=1, dimension
     #####################
 
     # Initialize figure
-    if verbose>1:
+    if verbose > 1:
         fig = plt.figure()
 
     saved_gradient_norms = np.zeros((10000, num_kernels))
@@ -326,11 +350,12 @@ def kernel_point_optimization_debug(radius, num_points, num_kernels=1, dimension
         A = np.expand_dims(kernel_points, axis=2)
         B = np.expand_dims(kernel_points, axis=1)
         interd2 = np.sum(np.power(A - B, 2), axis=-1)
-        inter_grads = (A - B) / (np.power(np.expand_dims(interd2, -1), 3/2) + 1e-6)
+        inter_grads = (A - B) / (np.power(np.expand_dims(interd2, -1), 3 / 2) +
+                                 1e-6)
         inter_grads = np.sum(inter_grads, axis=1)
 
         # Derivative of the radius potential
-        circle_grads = 10*kernel_points
+        circle_grads = 10 * kernel_points
 
         # All gradients
         gradients = inter_grads + circle_grads
@@ -347,9 +372,13 @@ def kernel_point_optimization_debug(radius, num_points, num_kernels=1, dimension
 
         # Stop if all moving points are gradients fixed (low gradients diff)
 
-        if fixed == 'center' and np.max(np.abs(old_gradient_norms[:, 1:] - gradients_norms[:, 1:])) < thresh:
+        if fixed == 'center' and np.max(
+                np.abs(old_gradient_norms[:, 1:] -
+                       gradients_norms[:, 1:])) < thresh:
             break
-        elif fixed == 'verticals' and np.max(np.abs(old_gradient_norms[:, 3:] - gradients_norms[:, 3:])) < thresh:
+        elif fixed == 'verticals' and np.max(
+                np.abs(old_gradient_norms[:, 3:] -
+                       gradients_norms[:, 3:])) < thresh:
             break
         elif np.max(np.abs(old_gradient_norms - gradients_norms)) < thresh:
             break
@@ -368,17 +397,20 @@ def kernel_point_optimization_debug(radius, num_points, num_kernels=1, dimension
             moving_dists[:, 0] = 0
 
         # Move points
-        kernel_points -= np.expand_dims(moving_dists, -1) * gradients / np.expand_dims(gradients_norms + 1e-6, -1)
+        kernel_points -= np.expand_dims(moving_dists,
+                                        -1) * gradients / np.expand_dims(
+                                            gradients_norms + 1e-6, -1)
 
         if verbose:
-            print('iter {:5d} / max grad = {:f}'.format(iter, np.max(gradients_norms[:, 3:])))
+            print('iter {:5d} / max grad = {:f}'.format(
+                iter, np.max(gradients_norms[:, 3:])))
         if verbose > 1:
             plt.clf()
             plt.plot(kernel_points[0, :, 0], kernel_points[0, :, 1], '.')
             circle = plt.Circle((0, 0), radius, color='r', fill=False)
             fig.axes[0].add_artist(circle)
-            fig.axes[0].set_xlim((-radius*1.1, radius*1.1))
-            fig.axes[0].set_ylim((-radius*1.1, radius*1.1))
+            fig.axes[0].set_xlim((-radius * 1.1, radius * 1.1))
+            fig.axes[0].set_ylim((-radius * 1.1, radius * 1.1))
             fig.axes[0].set_aspect('equal')
             plt.draw()
             plt.pause(0.001)
@@ -408,7 +440,9 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
         lloyd = True
 
     # Kernel_file
-    kernel_file = join(kernel_dir, 'k_{:03d}_{:s}_{:d}D.ply'.format(num_kpoints, fixed, dimension))
+    kernel_file = join(
+        kernel_dir, 'k_{:03d}_{:s}_{:d}D.ply'.format(num_kpoints, fixed,
+                                                     dimension))
 
     # Check if already done
     if not exists(kernel_file):
@@ -422,12 +456,13 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
 
         else:
             # Create kernels
-            kernel_points, grad_norms = kernel_point_optimization_debug(1.0,
-                                                                        num_kpoints,
-                                                                        num_kernels=100,
-                                                                        dimension=dimension,
-                                                                        fixed=fixed,
-                                                                        verbose=0)
+            kernel_points, grad_norms = kernel_point_optimization_debug(
+                1.0,
+                num_kpoints,
+                num_kernels=100,
+                dimension=dimension,
+                fixed=fixed,
+                verbose=0)
 
             # Find best candidate
             best_k = np.argmin(grad_norms[-1, :])
@@ -459,18 +494,24 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
             phi = (np.random.rand() - 0.5) * np.pi
 
             # Create the first vector in carthesian coordinates
-            u = np.array([np.cos(theta) * np.cos(phi), np.sin(theta) * np.cos(phi), np.sin(phi)])
+            u = np.array([
+                np.cos(theta) * np.cos(phi),
+                np.sin(theta) * np.cos(phi),
+                np.sin(phi)
+            ])
 
             # Choose a random rotation angle
             alpha = np.random.rand() * 2 * np.pi
 
             # Create the rotation matrix with this vector and angle
-            R = create_3D_rotations(np.reshape(u, (1, -1)), np.reshape(alpha, (1, -1)))[0]
+            R = create_3D_rotations(np.reshape(u, (1, -1)),
+                                    np.reshape(alpha, (1, -1)))[0]
 
             R = R.astype(np.float32)
 
     # Add a small noise
-    kernel_points = kernel_points + np.random.normal(scale=0.01, size=kernel_points.shape)
+    kernel_points = kernel_points + np.random.normal(scale=0.01,
+                                                     size=kernel_points.shape)
 
     # Scale kernels
     kernel_points = radius * kernel_points

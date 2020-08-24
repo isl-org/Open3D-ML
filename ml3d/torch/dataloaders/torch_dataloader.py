@@ -21,6 +21,7 @@ from collections import namedtuple
 
 from ...utils import dataset_helper
 
+
 class TorchDataloader(Dataset):
     def __init__(self,
                  *args,
@@ -41,13 +42,13 @@ class TorchDataloader(Dataset):
                 cache_key=dataset_helper._get_hash(repr(preprocess)))
 
             uncached = [
-                idx for idx in range(len(dataset))
-                if dataset.get_attr(idx)['name'] not in
-                self.cache_convert.cached_ids
+                idx for idx in range(len(dataset)) if dataset.get_attr(idx)
+                ['name'] not in self.cache_convert.cached_ids
             ]
             if len(uncached) > 0:
-                for idx in tqdm(
-                        range(len(dataset)), desc=desc, disable=no_progress):
+                for idx in tqdm(range(len(dataset)),
+                                desc=desc,
+                                disable=no_progress):
                     attr = dataset.get_attr(idx)
                     data = dataset.get_data(idx)
                     name = attr['name']
@@ -63,9 +64,8 @@ class TorchDataloader(Dataset):
         """Returns the item at index idx. """
         dataset = self.dataset
         attr = dataset.get_attr(index)
-        data = (dataset.get_data(index)
-                if self.cache_convert is None else self.cache_convert(
-                    attr['name']))
+        data = (dataset.get_data(index) if self.cache_convert is None else
+                self.cache_convert(attr['name']))
 
         if self.transform is not None:
             data = self.transform(data, attr)

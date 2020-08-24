@@ -14,13 +14,11 @@
 #      Hugues THOMAS - 11/06/2018
 #
 
-
 # ------------------------------------------------------------------------------------------
 #
 #          Imports and global variables
 #      \**********************************/
 #
-
 
 import numpy as np
 import tensorflow as tf
@@ -34,6 +32,7 @@ from .kernel_points import load_kernels as create_kernel_points
 #      \**********************/
 #
 
+
 def broadcast_matmul(A, B):
     """
     Compute A @ B, broadcasting over the first `N-2` ranks
@@ -43,7 +42,9 @@ def broadcast_matmul(A, B):
     """
     """"""
     with tf.variable_scope("broadcast_matmul"):
-        return tf.reduce_sum(A[..., tf.newaxis] * B[..., tf.newaxis, :, :], axis=-2)
+        return tf.reduce_sum(A[..., tf.newaxis] * B[..., tf.newaxis, :, :],
+                             axis=-2)
+
 
 def radius_gaussian(sq_r, sig, eps=1e-9):
     """
@@ -53,6 +54,7 @@ def radius_gaussian(sq_r, sig, eps=1e-9):
     :return: gaussian of sq_r [dn, ..., d1, d0]
     """
     return tf.exp(-sq_r / (2 * tf.square(sig) + eps))
+
 
 def general_gaussian(xyz, L):
     """
@@ -72,10 +74,12 @@ def general_gaussian(xyz, L):
     elif len(L.shape) == 4:
         A = tf.matmul(L, tf.transpose(L, [0, 1, 3, 2]))
     else:
-        raise ValueError('Matrix L in general gaussian have a wrong number of dimension')
+        raise ValueError(
+            'Matrix L in general gaussian have a wrong number of dimension')
 
     # Multiply by xyz from both sides
-    quad = broadcast_matmul(tf.expand_dims(xyz, -2), tf.expand_dims(tf.expand_dims(A, 0), 0))
+    quad = broadcast_matmul(tf.expand_dims(xyz, -2),
+                            tf.expand_dims(tf.expand_dims(A, 0), 0))
     quad = broadcast_matmul(quad, tf.expand_dims(xyz, -1))
 
     return tf.exp(-tf.squeeze(quad))
@@ -87,8 +91,8 @@ def general_gaussian(xyz, L):
 #      \******************************/
 #
 
-def unary_convolution(features,
-                      K_values):
+
+def unary_convolution(features, K_values):
     """
     Simple unary convolution in tensorflow. Equivalent to matrix multiplication (space projection) for each features
     :param features: float32[n_points, in_fdim] - input features
@@ -147,26 +151,13 @@ def KPConv(query_points,
                            trainable=False,
                            dtype=tf.float32)
 
-    return KPConv_ops(query_points,
-                      support_points,
-                      neighbors_indices,
-                      features,
-                      K_points,
-                      K_values,
-                      KP_extent,
-                      KP_influence,
+    return KPConv_ops(query_points, support_points, neighbors_indices,
+                      features, K_points, K_values, KP_extent, KP_influence,
                       aggregation_mode)
 
 
-def KPConv_ops(query_points,
-               support_points,
-               neighbors_indices,
-               features,
-               K_points,
-               K_values,
-               KP_extent,
-               KP_influence,
-               aggregation_mode):
+def KPConv_ops(query_points, support_points, neighbors_indices, features,
+               K_points, K_values, KP_extent, KP_influence, aggregation_mode):
     """
     This function creates a graph of operations to define Kernel Point Convolution in tensorflow. See KPConv function
     above for a description of each parameter
@@ -221,15 +212,20 @@ def KPConv_ops(query_points,
         all_weights = radius_gaussian(sq_distances, sigma)
         all_weights = tf.transpose(all_weights, [0, 2, 1])
     else:
-        raise ValueError('Unknown influence function type (config.KP_influence)')
+        raise ValueError(
+            'Unknown influence function type (config.KP_influence)')
 
     # In case of closest mode, only the closest KP can influence each point
     if aggregation_mode == 'closest':
         neighbors_1nn = tf.argmin(sq_distances, axis=2, output_type=tf.int32)
-        all_weights *= tf.one_hot(neighbors_1nn, n_kp, axis=1, dtype=tf.float32)
+        all_weights *= tf.one_hot(neighbors_1nn,
+                                  n_kp,
+                                  axis=1,
+                                  dtype=tf.float32)
 
     elif aggregation_mode != 'sum':
-        raise ValueError("Unknown convolution mode. Should be 'closest' or 'sum'")
+        raise ValueError(
+            "Unknown convolution mode. Should be 'closest' or 'sum'")
 
     features = tf.concat([features, tf.zeros_like(features[:1, :])], axis=0)
 
@@ -318,19 +314,15 @@ def KPConv_deformable(query_points,
         offset_dim = points_dim * num_kpoints
     shape0 = K_values.shape.as_list()
     shape0[-1] = offset_dim
-    K_values0 = tf.Variable(tf.zeros(shape0, dtype=tf.float32), name='offset_conv_weights')
-    b0 = tf.Variable(tf.zeros(offset_dim, dtype=tf.float32), name='offset_conv_bias')
+    K_values0 = tf.Variable(tf.zeros(shape0, dtype=tf.float32),
+                            name='offset_conv_weights')
+    b0 = tf.Variable(tf.zeros(offset_dim, dtype=tf.float32),
+                     name='offset_conv_bias')
 
     # Get features from standard convolution
-    features0 = KPConv_ops(query_points,
-                           support_points,
-                           neighbors_indices,
-                           features,
-                           K_points,
-                           K_values0,
-                           KP_extent,
-                           KP_influence,
-                           aggregation_mode) + b0
+    features0 = KPConv_ops(query_points, support_points, neighbors_indices,
+                           features, K_points, K_values0, KP_extent,
+                           KP_influence, aggregation_mode) + b0
 
     if modulated:
 
@@ -357,30 +349,15 @@ def KPConv_deformable(query_points,
     ###############################
 
     # Apply deformed convolution
-    return KPConv_deform_ops(query_points,
-                             support_points,
-                             neighbors_indices,
-                             features,
-                             K_points,
-                             offsets,
-                             modulations,
-                             K_values,
-                             KP_extent,
-                             KP_influence,
+    return KPConv_deform_ops(query_points, support_points, neighbors_indices,
+                             features, K_points, offsets, modulations,
+                             K_values, KP_extent, KP_influence,
                              aggregation_mode)
 
 
-def KPConv_deform_ops(query_points,
-                      support_points,
-                      neighbors_indices,
-                      features,
-                      K_points,
-                      offsets,
-                      modulations,
-                      K_values,
-                      KP_extent,
-                      KP_influence,
-                      mode):
+def KPConv_deform_ops(query_points, support_points, neighbors_indices,
+                      features, K_points, offsets, modulations, K_values,
+                      KP_extent, KP_influence, mode):
     """
     This function creates a graph of operations to define Deformable Kernel Point Convolution in tensorflow. See
     KPConv_deformable function above for a description of each parameter
@@ -423,16 +400,20 @@ def KPConv_deform_ops(query_points,
     differences = neighbors - tf.expand_dims(deformed_K_points, 1)
 
     # Get the square distances [n_points, n_neighbors, n_kpoints]
-    sq_distances = tf.reduce_sum(tf.square(differences), axis=3, name='deformed_d2')
+    sq_distances = tf.reduce_sum(tf.square(differences),
+                                 axis=3,
+                                 name='deformed_d2')
 
     # Boolean of the neighbors in range of a kernel point [n_points, n_neighbors]
-    in_range = tf.cast(tf.reduce_any(tf.less(sq_distances, KP_extent**2), axis=2), tf.int32)
+    in_range = tf.cast(
+        tf.reduce_any(tf.less(sq_distances, KP_extent**2), axis=2), tf.int32)
 
     # New value of max neighbors
     new_max_neighb = tf.reduce_max(tf.reduce_sum(in_range, axis=1))
 
     # For each row of neighbors, indices of the ones that are in range [n_points, new_max_neighb]
-    new_neighb_bool, new_neighb_inds = tf.math.top_k(in_range, k=new_max_neighb)
+    new_neighb_bool, new_neighb_inds = tf.math.top_k(in_range,
+                                                     k=new_max_neighb)
 
     # Gather new neighbor indices [n_points, new_max_neighb]
     new_neighbors_indices = tf.batch_gather(neighbors_indices, new_neighb_inds)
@@ -447,12 +428,13 @@ def KPConv_deform_ops(query_points,
     # Get Kernel point influences [n_points, n_kpoints, n_neighbors]
     if KP_influence == 'constant':
         # Every point get an influence of 1.
-        all_weights = tf.cast(new_sq_distances < KP_extent ** 2, tf.float32)
+        all_weights = tf.cast(new_sq_distances < KP_extent**2, tf.float32)
         all_weights = tf.transpose(all_weights, [0, 2, 1])
 
     elif KP_influence == 'linear':
         # Influence decrease linearly with the distance, and get to zero when d = KP_extent.
-        all_weights = tf.maximum(1 - tf.sqrt(new_sq_distances) / KP_extent, 0.0)
+        all_weights = tf.maximum(1 - tf.sqrt(new_sq_distances) / KP_extent,
+                                 0.0)
         all_weights = tf.transpose(all_weights, [0, 2, 1])
 
     elif KP_influence == 'gaussian':
@@ -461,15 +443,22 @@ def KPConv_deform_ops(query_points,
         all_weights = radius_gaussian(new_sq_distances, sigma)
         all_weights = tf.transpose(all_weights, [0, 2, 1])
     else:
-        raise ValueError('Unknown influence function type (config.KP_influence)')
+        raise ValueError(
+            'Unknown influence function type (config.KP_influence)')
 
     # In case of closest mode, only the closest KP can influence each point
     if mode == 'closest':
-        neighbors_1nn = tf.argmin(new_sq_distances, axis=2, output_type=tf.int32)
-        all_weights *= tf.one_hot(neighbors_1nn, n_kp, axis=1, dtype=tf.float32)
+        neighbors_1nn = tf.argmin(new_sq_distances,
+                                  axis=2,
+                                  output_type=tf.int32)
+        all_weights *= tf.one_hot(neighbors_1nn,
+                                  n_kp,
+                                  axis=1,
+                                  dtype=tf.float32)
 
     elif mode != 'sum':
-        raise ValueError("Unknown convolution mode. Should be 'closest' or 'sum'")
+        raise ValueError(
+            "Unknown convolution mode. Should be 'closest' or 'sum'")
 
     features = tf.concat([features, tf.zeros_like(features[:1, :])], axis=0)
 
@@ -549,8 +538,10 @@ def KPConv_deformable_v2(query_points,
         offset_dim = points_dim * (num_kpoints - 1)
     shape0 = K_values.shape.as_list()
 
-    w0 = tf.Variable(tf.zeros([shape0[1], offset_dim], dtype=tf.float32), name='offset_mlp_weights')
-    b0 = tf.Variable(tf.zeros([offset_dim], dtype=tf.float32), name='offset_mlp_bias')
+    w0 = tf.Variable(tf.zeros([shape0[1], offset_dim], dtype=tf.float32),
+                     name='offset_mlp_weights')
+    b0 = tf.Variable(tf.zeros([offset_dim], dtype=tf.float32),
+                     name='offset_mlp_bias')
 
     # Get features from mlp
     features0 = unary_convolution(features, w0) + b0
@@ -562,11 +553,14 @@ def KPConv_deformable_v2(query_points,
         offsets = tf.reshape(offsets, [-1, (num_kpoints - 1), points_dim])
 
         # Get modulations
-        modulations = 2 * tf.sigmoid(features0[:, points_dim * (num_kpoints - 1):])
+        modulations = 2 * tf.sigmoid(features0[:, points_dim *
+                                               (num_kpoints - 1):])
 
         #  No offset for the first Kernel points
-        offsets = tf.concat([tf.zeros_like(offsets[:, :1, :]), offsets], axis=1)
-        modulations = tf.concat([tf.zeros_like(modulations[:, :1]), modulations], axis=1)
+        offsets = tf.concat([tf.zeros_like(offsets[:, :1, :]), offsets],
+                            axis=1)
+        modulations = tf.concat(
+            [tf.zeros_like(modulations[:, :1]), modulations], axis=1)
 
     else:
 
@@ -574,7 +568,8 @@ def KPConv_deformable_v2(query_points,
         offsets = tf.reshape(features0, [-1, (num_kpoints - 1), points_dim])
 
         # No offset for the first Kernel points
-        offsets = tf.concat([tf.zeros_like(offsets[:, :1, :]), offsets], axis=1)
+        offsets = tf.concat([tf.zeros_like(offsets[:, :1, :]), offsets],
+                            axis=1)
 
         # No modulations
         modulations = None
@@ -608,19 +603,7 @@ def KPConv_deformable_v2(query_points,
     ###############################
 
     # Apply deformed convolution
-    return KPConv_deform_ops(query_points,
-                             support_points,
-                             neighbors_indices,
-                             features,
-                             K_points,
-                             offsets,
-                             modulations,
-                             K_values,
-                             KP_extent,
-                             KP_influence,
+    return KPConv_deform_ops(query_points, support_points, neighbors_indices,
+                             features, K_points, offsets, modulations,
+                             K_values, KP_extent, KP_influence,
                              aggregation_mode)
-
-
-
-
-

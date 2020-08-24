@@ -31,19 +31,25 @@ def tf_batch_neighbors(queries, supports, q_batches, s_batches, radius):
     return tf_batch_neighbors_module.batch_ordered_neighbors(
         queries, supports, q_batches, s_batches, radius)
 
+
 def get_weight(shape):
     # tf.set_random_seed(42)
-    initial = tf.keras.initializers.TruncatedNormal(
-        mean = 0.0, stddev = np.sqrt(2 / shape[-1])
-    )
-    weight = initial(shape = shape, dtype=tf.float32)
-    weight = tf.round(weight * tf.constant(1000, dtype=tf.float32)) / tf.constant(1000, dtype=tf.float32)
+    initial = tf.keras.initializers.TruncatedNormal(mean=0.0,
+                                                    stddev=np.sqrt(2 /
+                                                                   shape[-1]))
+    weight = initial(shape=shape, dtype=tf.float32)
+    weight = tf.round(weight * tf.constant(
+        1000, dtype=tf.float32)) / tf.constant(1000, dtype=tf.float32)
 
     return tf.Variable(initial_value=weight, trainable=True, name='weight')
 
+
 def get_bias(shape):
     initial = tf.zeros_initializer()
-    return tf.Variable(initial_value=initial(shape=shape, dtype="float32"), trainable=True, name='bias')
+    return tf.Variable(initial_value=initial(shape=shape, dtype="float32"),
+                       trainable=True,
+                       name='bias')
+
 
 def radius_gaussian(sq_r, sig, eps=1e-9):
     """
@@ -53,6 +59,7 @@ def radius_gaussian(sq_r, sig, eps=1e-9):
     :return: gaussian of sq_r [dn, ..., d1, d0]
     """
     return tf.exp(-sq_r / (2 * tf.square(sig) + eps))
+
 
 def max_pool(x, inds):
     """
@@ -88,6 +95,7 @@ def closest_pool(x, inds):
 
     return pool_features
 
+
 def global_average(x, batch_lengths):
     """
     Block performing a global average over batch pooling
@@ -110,35 +118,29 @@ def global_average(x, batch_lengths):
     # Average features in each batch
     return tf.stack(averaged_features)
 
-def block_decider(block_name,
-                  radius,
-                  in_dim,
-                  out_dim,
-                  layer_ind,
-                  cfg):
+
+def block_decider(block_name, radius, in_dim, out_dim, layer_ind, cfg):
 
     if block_name == 'unary':
-        return UnaryBlock(in_dim, out_dim, cfg.use_batch_norm, cfg.batch_norm_momentum)
+        return UnaryBlock(in_dim, out_dim, cfg.use_batch_norm,
+                          cfg.batch_norm_momentum)
 
-    elif block_name in ['simple',
-                        'simple_deformable',
-                        'simple_invariant',
-                        'simple_equivariant',
-                        'simple_strided',
-                        'simple_deformable_strided',
-                        'simple_invariant_strided',
-                        'simple_equivariant_strided']:
+    elif block_name in [
+            'simple', 'simple_deformable', 'simple_invariant',
+            'simple_equivariant', 'simple_strided',
+            'simple_deformable_strided', 'simple_invariant_strided',
+            'simple_equivariant_strided'
+    ]:
         return SimpleBlock(block_name, in_dim, out_dim, radius, layer_ind, cfg)
 
-    elif block_name in ['resnetb',
-                        'resnetb_invariant',
-                        'resnetb_equivariant',
-                        'resnetb_deformable',
-                        'resnetb_strided',
-                        'resnetb_deformable_strided',
-                        'resnetb_equivariant_strided',
-                        'resnetb_invariant_strided']:
-        return ResnetBottleneckBlock(block_name, in_dim, out_dim, radius, layer_ind, cfg)
+    elif block_name in [
+            'resnetb', 'resnetb_invariant', 'resnetb_equivariant',
+            'resnetb_deformable', 'resnetb_strided',
+            'resnetb_deformable_strided', 'resnetb_equivariant_strided',
+            'resnetb_invariant_strided'
+    ]:
+        return ResnetBottleneckBlock(block_name, in_dim, out_dim, radius,
+                                     layer_ind, cfg)
 
     elif block_name == 'max_pool' or block_name == 'max_pool_wide':
         return MaxPoolBlock(layer_ind)
@@ -150,18 +152,31 @@ def block_decider(block_name,
         return NearestUpsampleBlock(layer_ind)
 
     else:
-        raise ValueError('Unknown block name in the architecture definition : ' + block_name)
+        raise ValueError(
+            'Unknown block name in the architecture definition : ' +
+            block_name)
 
 
 class KPConv(tf.keras.layers.Layer):
-  
-    def __init__(self, kernel_size, p_dim, in_channels, out_channels, KP_extent, radius, 
-                fixed_kernel_points='center', KP_influence='linear', aggregation_mode='sum',
-                deformable=False, modulated=False, repulse_extent = 1.2, deform_fitting_power = 1.0, **kwargs):
+    def __init__(self,
+                 kernel_size,
+                 p_dim,
+                 in_channels,
+                 out_channels,
+                 KP_extent,
+                 radius,
+                 fixed_kernel_points='center',
+                 KP_influence='linear',
+                 aggregation_mode='sum',
+                 deformable=False,
+                 modulated=False,
+                 repulse_extent=1.2,
+                 deform_fitting_power=1.0,
+                 **kwargs):
 
         super(KPConv, self).__init__(**kwargs)
 
-        self.KP_extent = KP_extent # TODO : verify correct kp extent
+        self.KP_extent = KP_extent  # TODO : verify correct kp extent
         self.K = kernel_size
         self.p_dim = p_dim
         self.in_channels = in_channels
@@ -209,8 +224,8 @@ class KPConv(tf.keras.layers.Layer):
         return
 
     def reset_parameters(self):
-        init = tf.keras.initializers.HeUniform() # TODO : kaining initializer
-        self.wts = tf.Variable(init(shape = self.wts.shape))
+        init = tf.keras.initializers.HeUniform()  # TODO : kaining initializer
+        self.wts = tf.Variable(init(shape=self.wts.shape))
 
         if self.deformable:
             self.offset_bias = get_bias(self.offset_bias.shape)
@@ -218,12 +233,14 @@ class KPConv(tf.keras.layers.Layer):
 
     def init_KP(self):
         K_points_numpy = create_kernel_points(self.radius,
-                                      self.K,
-                                      dimension=self.p_dim,
-                                      fixed=self.fixed_kernel_points)
+                                              self.K,
+                                              dimension=self.p_dim,
+                                              fixed=self.fixed_kernel_points)
 
         # TODO : reshape to (num_kernel_points, points_dim)
-        return tf.Variable(K_points_numpy.astype(np.float32), trainable=False, name='kernel_points')
+        return tf.Variable(K_points_numpy.astype(np.float32),
+                           trainable=False,
+                           name='kernel_points')
 
     def regular_loss(self):
 
@@ -231,20 +248,25 @@ class KPConv(tf.keras.layers.Layer):
         repulsive_loss = 0
 
         if self.deformable:
-            KP_min_d2 = self.min_d2 / (self.KP_extent ** 2)
+            KP_min_d2 = self.min_d2 / (self.KP_extent**2)
 
             fitting_loss += tf.sqrt(tf.nn.l2_loss(KP_min_d2))
 
             KP_locs = self.deformed_KP / self.KP_extent
 
             for i in range(self.K):
-                other_KP = tf.stop_gradient(tf.concat([KP_locs[:, :i, :], KP_locs[:, i + 1:, :]], axis=1))
-                distances = tf.sqrt(tf.reduce_sum(tf.square(other_KP - KP_locs[:, i:i+1, :]), axis=2))
-                rep_loss = tf.reduce_sum(tf.square(tf.maximum(0.0, self.repulse_extent - distances)), axis=1)
+                other_KP = tf.stop_gradient(
+                    tf.concat([KP_locs[:, :i, :], KP_locs[:, i + 1:, :]],
+                              axis=1))
+                distances = tf.sqrt(
+                    tf.reduce_sum(tf.square(other_KP - KP_locs[:, i:i + 1, :]),
+                                  axis=2))
+                rep_loss = tf.reduce_sum(tf.square(
+                    tf.maximum(0.0, self.repulse_extent - distances)),
+                                         axis=1)
                 repulsive_loss += tf.sqrt(tf.nn.l2_loss(rep_loss)) / self.K
 
         return self.deform_fitting_power * (2 * fitting_loss + repulsive_loss)
-
 
     def call(self, query_points, support_points, neighbors_indices, features):
 
@@ -252,19 +274,25 @@ class KPConv(tf.keras.layers.Layer):
 
         if self.deformable:
             # Get offsets with a KPConv that only takes part of the features
-            self.offset_features = self.offset_conv(query_points, support_points, neighbors_indices, features) + self.offset_bias
+            self.offset_features = self.offset_conv(
+                query_points, support_points, neighbors_indices,
+                features) + self.offset_bias
 
             if self.modulated:
                 # Get offset (in normalized scale) from features
-                unscaled_offsets = self.offset_features[:, :self.p_dim * self.K]
-                unscaled_offsets = tf.reshape(unscaled_offsets, (-1, self.K, self.p_dim))
+                unscaled_offsets = self.offset_features[:, :self.p_dim *
+                                                        self.K]
+                unscaled_offsets = tf.reshape(unscaled_offsets,
+                                              (-1, self.K, self.p_dim))
 
                 # Get modulations
-                modulations = 2 * tf.sigmoid(self.offset_features[:, self.p_dim * self.K:])
+                modulations = 2 * tf.sigmoid(
+                    self.offset_features[:, self.p_dim * self.K:])
 
             else:
                 # Get offset (in normalized scale) from features
-                unscaled_offsets = tf.reshape(self.offset_features, (-1, self.K, self.p_dim))
+                unscaled_offsets = tf.reshape(self.offset_features,
+                                              (-1, self.K, self.p_dim))
 
                 # No modulations
                 modulations = None
@@ -286,7 +314,7 @@ class KPConv(tf.keras.layers.Layer):
         # Center every neighborhood
         neighbors = neighbors - tf.expand_dims(query_points, 1)
 
-        if(self.deformable):
+        if (self.deformable):
             self.deformed_KP = offsets + self.kernel_points
             deformed_K_points = tf.expand_dims(self.deformed_KP, 1)
         else:
@@ -294,12 +322,12 @@ class KPConv(tf.keras.layers.Layer):
 
         # Get all difference matrices [n_points, n_neighbors, n_kpoints, dim]
         neighbors = tf.expand_dims(neighbors, 2)
-        neighbors = tf.tile(neighbors, [1, 1, n_kp, 1]) # TODO : not in pytorch ?
+        neighbors = tf.tile(neighbors,
+                            [1, 1, n_kp, 1])  # TODO : not in pytorch ?
         differences = neighbors - deformed_K_points
 
         # Get the square distances [n_points, n_neighbors, n_kpoints]
         sq_distances = tf.reduce_sum(tf.square(differences), axis=3)
-
 
         # Optimization by ignoring points outside a deformed KP range
         if self.deformable:
@@ -308,23 +336,31 @@ class KPConv(tf.keras.layers.Layer):
             self.min_d2 = tf.reduce_min(sq_distances, axis=1)
 
             # Boolean of the neighbors in range of a kernel point [n_points, n_neighbors]
-            in_range = tf.cast(tf.reduce_any(tf.less(sq_distances, self.KP_extent**2), axis=2), tf.int32)
+            in_range = tf.cast(
+                tf.reduce_any(tf.less(sq_distances, self.KP_extent**2),
+                              axis=2), tf.int32)
 
             # New value of max neighbors
             new_max_neighb = tf.reduce_max(tf.reduce_sum(in_range, axis=1))
 
             # For each row of neighbors, indices of the ones that are in range [n_points, new_max_neighb]
-            new_neighb_bool, new_neighb_inds = tf.math.top_k(in_range, k=new_max_neighb)
+            new_neighb_bool, new_neighb_inds = tf.math.top_k(in_range,
+                                                             k=new_max_neighb)
 
             # Gather new neighbor indices [n_points, new_max_neighb]
-            new_neighbors_indices = tf.gather(neighbors_indices, new_neighb_inds, batch_dims=-1)
+            new_neighbors_indices = tf.gather(neighbors_indices,
+                                              new_neighb_inds,
+                                              batch_dims=-1)
 
             # Gather new distances to KP [n_points, new_max_neighb, n_kpoints]
-            sq_distances = tf.gather(sq_distances, new_neighb_inds, batch_dims=1)
+            sq_distances = tf.gather(sq_distances,
+                                     new_neighb_inds,
+                                     batch_dims=1)
 
             # New shadow neighbors have to point to the last shadow point
             new_neighbors_indices *= new_neighb_bool
-            new_neighbors_indices += (1 - new_neighb_bool) * int(support_points.shape[0] - 1)
+            new_neighbors_indices += (
+                1 - new_neighb_bool) * int(support_points.shape[0] - 1)
 
         else:
             new_neighbors_indices = neighbors_indices
@@ -337,7 +373,8 @@ class KPConv(tf.keras.layers.Layer):
 
         elif self.KP_influence == 'linear':
             # Influence decrease linearly with the distance, and get to zero when d = KP_extent.
-            all_weights = tf.maximum(1 - tf.sqrt(sq_distances) / self.KP_extent, 0.0)
+            all_weights = tf.maximum(
+                1 - tf.sqrt(sq_distances) / self.KP_extent, 0.0)
             all_weights = tf.transpose(all_weights, [0, 2, 1])
 
         elif self.KP_influence == 'gaussian':
@@ -346,25 +383,34 @@ class KPConv(tf.keras.layers.Layer):
             all_weights = radius_gaussian(sq_distances, sigma)
             all_weights = tf.transpose(all_weights, [0, 2, 1])
         else:
-            raise ValueError('Unknown influence function type (cfg.KP_influence)')
+            raise ValueError(
+                'Unknown influence function type (cfg.KP_influence)')
 
         # In case of closest mode, only the closest KP can influence each point
         if self.aggregation_mode == 'closest':
-            neighbors_1nn = tf.argmin(sq_distances, axis=2, output_type=tf.int32)
-            all_weights *= tf.one_hot(neighbors_1nn, self.K, axis=1, dtype=tf.float32) # TODO : transpose in pytorch not here ?
+            neighbors_1nn = tf.argmin(sq_distances,
+                                      axis=2,
+                                      output_type=tf.int32)
+            all_weights *= tf.one_hot(
+                neighbors_1nn, self.K, axis=1,
+                dtype=tf.float32)  # TODO : transpose in pytorch not here ?
 
         elif self.aggregation_mode != 'sum':
-            raise ValueError("Unknown convolution mode. Should be 'closest' or 'sum'")
+            raise ValueError(
+                "Unknown convolution mode. Should be 'closest' or 'sum'")
 
-        features = tf.concat([features, tf.zeros_like(features[:1, :])], axis=0)
+        features = tf.concat(
+            [features, tf.zeros_like(features[:1, :])], axis=0)
 
         # Get the features of each neighborhood [n_points, n_neighbors, in_fdim]
-        neighborhood_features = tf.gather(features, new_neighbors_indices, axis=0)
+        neighborhood_features = tf.gather(features,
+                                          new_neighbors_indices,
+                                          axis=0)
 
         # Apply distance weights [n_points, n_kpoints, in_fdim]
         weighted_features = tf.matmul(all_weights, neighborhood_features)
 
-       # Apply modulations
+        # Apply modulations
         if self.deformable and self.modulated:
             weighted_features *= tf.expand_dims(modulations, 2)
 
@@ -380,36 +426,35 @@ class KPConv(tf.keras.layers.Layer):
         return output_features
 
     def __repr__(self):
-        return 'KPConv(radius: {:.2f}, in_feat: {:d}, out_feat: {:d})'.format(self.radius,
-                                                                              self.in_channels,
-                                                                              self.out_channels)
+        return 'KPConv(radius: {:.2f}, in_feat: {:d}, out_feat: {:d})'.format(
+            self.radius, self.in_channels, self.out_channels)
+
 
 class BatchNormBlock(tf.keras.layers.Layer):
-
     def __init__(self, in_dim, use_bn, bn_momentum):
         super(BatchNormBlock, self).__init__()
         self.bn_momentum = bn_momentum
         self.use_bn = use_bn
         self.in_dim = in_dim
 
-        if(self.use_bn):
-            self.batch_norm = tf.keras.layers.BatchNormalization(momentum=bn_momentum)
+        if (self.use_bn):
+            self.batch_norm = tf.keras.layers.BatchNormalization(
+                momentum=bn_momentum)
         else:
             self.bias = get_bias(shape=in_dim)
 
     def call(self, x):
-        if(self.use_bn):
+        if (self.use_bn):
             return self.batch_norm(x)
         else:
             return x + self.bias
 
     def __repr__(self):
-        return 'BatchNormBlock(in_feat: {:d}, momentum: {:.3f}, only_bias: {:s})'.format(self.in_dim,
-                                                                                         self.bn_momentum,
-                                                                                         str(not self.use_bn))
+        return 'BatchNormBlock(in_feat: {:d}, momentum: {:.3f}, only_bias: {:s})'.format(
+            self.in_dim, self.bn_momentum, str(not self.use_bn))
+
 
 class UnaryBlock(tf.keras.layers.Layer):
-
     def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False):
 
         super(UnaryBlock, self).__init__()
@@ -423,26 +468,25 @@ class UnaryBlock(tf.keras.layers.Layer):
         #     tf.keras.layers.Dense(out_dim, use_bias=False)
         # )
         self.mlp = tf.keras.layers.Dense(out_dim, use_bias=False)
-        self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
+        self.batch_norm = BatchNormBlock(out_dim, self.use_bn,
+                                         self.bn_momentum)
 
         if not no_relu:
             self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
 
     def call(self, x, batch=None):
-        x = self.mlp(x) # TODO : check correct dimension is getting modified
+        x = self.mlp(x)  # TODO : check correct dimension is getting modified
         x = self.batch_norm(x)
         if not self.no_relu:
             x = self.leaky_relu(x)
         return x
 
     def __repr__(self):
-        return 'UnaryBlock(in_feat: {:d}, out_feat: {:d}, BN: {:s}, ReLU: {:s})'.format(self.in_dim,
-                                                                                        self.out_dim,
-                                                                                        str(self.use_bn),
-                                                                                        str(not self.no_relu))
+        return 'UnaryBlock(in_feat: {:d}, out_feat: {:d}, BN: {:s}, ReLU: {:s})'.format(
+            self.in_dim, self.out_dim, str(self.use_bn), str(not self.no_relu))
+
 
 class SimpleBlock(tf.keras.layers.Layer):
-
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
         super(SimpleBlock, self).__init__()
 
@@ -455,26 +499,26 @@ class SimpleBlock(tf.keras.layers.Layer):
         self.in_dim = in_dim
         self.out_dim = out_dim
 
-        self.KPConv = KPConv(
-            cfg.num_kernel_points,
-            cfg.in_points_dim,
-            in_dim,
-            out_dim // 2,
-            current_extent,
-            radius,
-            fixed_kernel_points=cfg.fixed_kernel_points,
-            aggregation_mode=cfg.aggregation_mode,
-            modulated=cfg.modulated
-        )
+        self.KPConv = KPConv(cfg.num_kernel_points,
+                             cfg.in_points_dim,
+                             in_dim,
+                             out_dim // 2,
+                             current_extent,
+                             radius,
+                             fixed_kernel_points=cfg.fixed_kernel_points,
+                             aggregation_mode=cfg.aggregation_mode,
+                             modulated=cfg.modulated)
 
-        self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn, self.bn_momentum)
+        self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
+                                         self.bn_momentum)
         self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
 
     def call(self, x, batch):
 
         # TODO : check x, batch
         if 'strided' in self.block_name:
-            q_pts = batch['points'][self.layer_ind + 1] # TODO : 1 will not come here.
+            q_pts = batch['points'][self.layer_ind +
+                                    1]  # TODO : 1 will not come here.
             s_pts = batch['points'][self.layer_ind]
             neighb_inds = batch['pools'][self.layer_ind]
         else:
@@ -485,16 +529,16 @@ class SimpleBlock(tf.keras.layers.Layer):
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
         return self.leaky_relu(self.batch_norm(x))
 
-class IdentityBlock(tf.keras.layers.Layer):
 
+class IdentityBlock(tf.keras.layers.Layer):
     def __init__(self):
         super(IdentityBlock, self).__init__()
 
     def call(self, x):
         return tf.identity(x)
 
-class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
+class ResnetBottleneckBlock(tf.keras.layers.Layer):
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
 
         super(ResnetBottleneckBlock, self).__init__()
@@ -512,7 +556,8 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         # First downscaling mlp
         if in_dim != out_dim // 4:
-            self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn, self.bn_momentum)
+            self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn,
+                                     self.bn_momentum)
         else:
             self.unary1 = tf.identity()
 
@@ -531,14 +576,23 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
                              repulse_extent=cfg.repulse_extent,
                              deform_fitting_power=cfg.deform_fitting_power)
 
-        self.batch_norm_conv = BatchNormBlock(out_dim // 4, self.use_bn, self.bn_momentum)
+        self.batch_norm_conv = BatchNormBlock(out_dim // 4, self.use_bn,
+                                              self.bn_momentum)
 
         # Second upscaling mlp
-        self.unary2 = UnaryBlock(out_dim // 4, out_dim, self.use_bn, self.bn_momentum, no_relu=True)
+        self.unary2 = UnaryBlock(out_dim // 4,
+                                 out_dim,
+                                 self.use_bn,
+                                 self.bn_momentum,
+                                 no_relu=True)
 
         # Shortcut optional mpl
         if in_dim != out_dim:
-            self.unary_shortcut = UnaryBlock(in_dim, out_dim, self.use_bn, self.bn_momentum, no_relu=True)
+            self.unary_shortcut = UnaryBlock(in_dim,
+                                             out_dim,
+                                             self.use_bn,
+                                             self.bn_momentum,
+                                             no_relu=True)
         else:
             self.unary_shortcut = IdentityBlock()
 
@@ -570,7 +624,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         # Shortcut
         if 'strided' in self.block_name:
-            shortcut = max_pool(features, neighb_inds) # TODO : test max_pool
+            shortcut = max_pool(features, neighb_inds)  # TODO : test max_pool
         else:
             shortcut = features
         shortcut = self.unary_shortcut(shortcut)
@@ -578,12 +632,11 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
         return self.leaky_relu(x + shortcut)
 
     def __repr__(self):
-        return 'ResnetBlock(in_feat: {:d}, out_feat: {:d})'.format(self.in_dim,
-                                                                                        self.out_dim)
+        return 'ResnetBlock(in_feat: {:d}, out_feat: {:d})'.format(
+            self.in_dim, self.out_dim)
 
 
 class NearestUpsampleBlock(tf.keras.layers.Layer):
-
     def __init__(self, layer_ind):
 
         super(NearestUpsampleBlock, self).__init__()
@@ -594,11 +647,11 @@ class NearestUpsampleBlock(tf.keras.layers.Layer):
         return closest_pool(x, batch['upsamples'][self.layer_ind - 1])
 
     def __repr__(self):
-        return 'NearestUpsampleBlock(layer: {:d} -> {:d})'.format(self.layer_ind,
-                                                                  self.layer_ind - 1)
+        return 'NearestUpsampleBlock(layer: {:d} -> {:d})'.format(
+            self.layer_ind, self.layer_ind - 1)
+
 
 class MaxPoolBlock(tf.keras.layers.Layer):
-
     def __init__(self, layer_ind):
 
         super(MaxPoolBlock, self).__init__()
@@ -606,11 +659,11 @@ class MaxPoolBlock(tf.keras.layers.Layer):
         return
 
     def forward(self, x, batch):
-        return max_pool(x, batch['pools'][self.layer_ind + 1]) # TODO : check 1 here
+        return max_pool(x, batch['pools'][self.layer_ind +
+                                          1])  # TODO : check 1 here
 
 
 class GlobalAverageBlock(tf.keras.layers.Layer):
-
     def __init__(self):
 
         super(GlobalAverageBlock, self).__init__()

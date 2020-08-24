@@ -10,7 +10,6 @@ from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
-
 from ..utils import helper_torch
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
@@ -92,9 +91,9 @@ class RandLANet(nn.Module):
         setattr(self, 'fc2', f_layer_fc2)
 
         f_layer_fc3 = helper_torch.conv2d(False,
-                                               32,
-                                               cfg.num_classes,
-                                               activation=False)
+                                          32,
+                                          cfg.num_classes,
+                                          activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
@@ -198,10 +197,10 @@ class RandLANet(nn.Module):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-        
+
         if 'feat' not in data.keys():
             data['feat'] = None
-            
+
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
         feat = np.array(data['feat'], dtype=np.float32)
         labels = np.array(data['label'], dtype=np.int32)
@@ -354,16 +353,10 @@ class RandLANet(nn.Module):
 
         self.init_building_block(d_out // 2, d_out, name + 'LFA')
 
-        f_pc = helper_torch.conv2d(True,
-                                        d_out,
-                                        d_out * 2,
-                                        activation=False)
+        f_pc = helper_torch.conv2d(True, d_out, d_out * 2, activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_torch.conv2d(True,
-                                            d_in,
-                                            d_out * 2,
-                                            activation=False)
+        shortcut = helper_torch.conv2d(True, d_in, d_out * 2, activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
