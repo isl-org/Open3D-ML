@@ -320,11 +320,11 @@ class KPConv(tf.keras.layers.Layer):
             new_neighbors_indices = tf.gather(neighbors_indices, new_neighb_inds, batch_dims=-1)
 
             # Gather new distances to KP [n_points, new_max_neighb, n_kpoints]
-            new_sq_distances = tf.gather(sq_distances, new_neighb_inds, batch_dims=-1)
+            sq_distances = tf.gather(sq_distances, new_neighb_inds, batch_dims=1)
 
             # New shadow neighbors have to point to the last shadow point
             new_neighbors_indices *= new_neighb_bool
-            new_neighbors_indices += (1 - new_neighb_bool) * int(support_points.shape[0])
+            new_neighbors_indices += (1 - new_neighb_bool) * int(support_points.shape[0] - 1)
 
         else:
             new_neighbors_indices = neighbors_indices
