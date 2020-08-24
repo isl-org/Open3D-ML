@@ -15,7 +15,7 @@ cfg = Config.load_from_file(config)
 
 dataset = Toronto3D(cfg.dataset)
 model = KPFCNN(cfg.model)
-
+print(model)
 # pipeline = SemanticSegmentation(model, dataset, cfg.pipeline)
 
 # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -28,7 +28,8 @@ tf_data = TFDataloader(dataset = dataset.get_split('training'), model = model)
 loader = tf_data.get_loader()
 # print(loader)
 for data in loader:
-    # print(data)
-    for a in data:
-        print(a.shape)
+#     # print(data)
+    model(data)
+    # for a in data:
+#         print(a.shape)
     break

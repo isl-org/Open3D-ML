@@ -36,13 +36,13 @@ class TFDataloader():
                 cache_dir=cache_dir,
                 cache_key=dataset_helper._get_hash(
                     repr(self.preprocess)[:-15]))
-            print("cache key : {}".format(repr(self.preprocess)[:-15]))
 
             uncached = [
                 idx for idx in range(len(dataset)) if dataset.get_attr(idx)
                 ['name'] not in self.cache_convert.cached_ids
             ]
             if len(uncached) > 0:
+                print("cache key : {}".format(repr(self.preprocess)[:-15]))
                 for idx in tqdm(range(len(dataset)),
                                 desc='preprocess',
                                 disable=no_progress):
