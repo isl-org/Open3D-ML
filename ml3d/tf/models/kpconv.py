@@ -124,24 +124,7 @@ class KPFCNN(tf.keras.Model):
         self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
         self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
 
-        # Network Losses
-
-        # List of valid labels (those not ignored in loss)
         self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
-
-        # # Choose segmentation loss
-        # if len(cfg.class_w) > 0:
-        #     class_w = tf.convert_to_tensor(class_w, dtype=tf.float32)
-        #     self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
-        # else:
-        #     self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-        # self.deform_fitting_mode = config.deform_fitting_mode
-        # self.deform_fitting_power = config.deform_fitting_power
-        # self.deform_lr_factor = config.deform_lr_factor
-        # self.repulse_extent = config.repulse_extent
-        # self.output_loss = 0
-        # self.reg_loss = 0
-        # self.l1 = nn.L1Loss()
 
         return
 
@@ -188,13 +171,11 @@ class KPFCNN(tf.keras.Model):
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_conn.append(x)
-            print("{}".format(block_op))
             x = block_op(x, inputs)
 
         for block_i, block_op in enumerate(self.decoder_blocks):
             if block_i in self.decoder_concats:
                 x = tf.concat([x, skip_conn.pop()], axis=1)
-            print("{}".format(block_op))
             x = block_op(x, inputs)
 
         x = self.head_mlp(x, inputs)
@@ -215,6 +196,7 @@ class KPFCNN(tf.keras.Model):
         scores, labels = Loss.filter_valid_label(logits, labels)
 
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        loss += sum(self.losses)
 
         return loss, labels, scores
         
