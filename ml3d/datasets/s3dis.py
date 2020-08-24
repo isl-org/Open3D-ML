@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from .utils import DataProcessing
 
+
 class S3DISSplit():
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
@@ -277,7 +278,8 @@ class S3DIS:
                 data_list.append(np.concatenate([pc, labels], 1))
 
             pc_label = np.concatenate(data_list, 0)
-            xyz_min = np.amin(pc_label[:, 0:3], axis=0) # TODO : can be moved to preprocess
+            xyz_min = np.amin(pc_label[:, 0:3],
+                              axis=0)  # TODO : can be moved to preprocess
             pc_label[:, 0:3] -= xyz_min
 
             xyz = pc_label[:, :3].astype(np.float32)

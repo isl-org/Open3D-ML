@@ -19,10 +19,10 @@ log = logging.getLogger(__name__)
 
 class Toronto3DSplit():
     def __init__(self, dataset, split='training'):
-        self.cfg    = dataset.cfg
-        path_list   = dataset.get_split_list(split)
+        self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))
-                
+
         self.path_list = path_list
         self.split = split
         self.dataset = dataset
@@ -46,16 +46,12 @@ class Toronto3DSplit():
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
 
-        if(self.split != 'test'):
-            labels = np.array(data['scalar_Label'], dtype = np.int32)
+        if (self.split != 'test'):
+            labels = np.array(data['scalar_Label'], dtype=np.int32)
         else:
-            labels = np.zeros((points.shape[0], ), dtype = np.int32)
-        
-        data = {
-            'point' : points,
-            'feat' : feat,
-            'label' : labels
-        }
+            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+
+        data = {'point': points, 'feat': feat, 'label': labels}
 
         return data
 
@@ -63,11 +59,7 @@ class Toronto3DSplit():
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.txt', '')
 
-        attr = {
-            'name'      : name,
-            'path'      : str(pc_path),
-            'split'     : self.split
-        }
+        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
 
@@ -76,18 +68,21 @@ class Toronto3D:
         self.cfg = cfg
         self.name = 'Toronto3D'
         self.dataset_path = cfg.dataset_path
-        self.label_to_names = {0: 'Unclassified',
-                               1: 'Ground',
-                               2: 'Road_markings',
-                               3: 'Natural',
-                               4: 'Building',
-                               5: 'Utility_line',
-                               6: 'Pole',
-                               7: 'Car',
-                               8: 'Fence'}
+        self.label_to_names = {
+            0: 'Unclassified',
+            1: 'Ground',
+            2: 'Road_markings',
+            3: 'Natural',
+            4: 'Building',
+            5: 'Utility_line',
+            6: 'Pole',
+            7: 'Car',
+            8: 'Fence'
+        }
 
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort(
+            [k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
@@ -95,9 +90,9 @@ class Toronto3D:
         self.val_files = [self.dataset_path + f for f in cfg.val_files]
         self.test_files = [self.dataset_path + f for f in cfg.test_files]
 
-    def get_split (self, split):
+    def get_split(self, split):
         return Toronto3DSplit(self, split=split)
-    
+
     def get_split_list(self, split):
         if split in ['test', 'testing']:
             random.shuffle(self.test_files)
@@ -110,4 +105,3 @@ class Toronto3D:
             return self.train_files
         else:
             raise ValueError("Invalid split {}".format(split))
-

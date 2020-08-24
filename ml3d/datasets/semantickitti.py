@@ -33,6 +33,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
 class SemanticKITTISplit(Dataset):
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
@@ -56,10 +57,11 @@ class SemanticKITTISplit(Dataset):
         else:
             labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
 
-        data = {'point': points, 
-                'feat' : points,
-                'label': labels,
-                }
+        data = {
+            'point': points,
+            'feat': points,
+            'label': labels,
+        }
 
         return data
 
