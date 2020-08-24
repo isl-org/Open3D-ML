@@ -1,28 +1,23 @@
 #coding: future_fstrings
 import torch, pickle
 import torch.nn as nn
-import helper_torch_util
 import numpy as np
 import logging
 import sys
 
-from pprint import pprint
 from datetime import datetime
 from tqdm import tqdm
-from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
 from os.path import exists, join, isfile, dirname, abspath
 
 
-from ..dataloaders import Torch_Dataloader, DefaultBatcher, ConcatBatcher
+from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord, Config
 from ...datasets.utils import DataProcessing
-
-import yaml
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -155,9 +150,7 @@ class SemanticSegmentation():
                         test_probs, str(dataset.cfg.test_split_number))
                     log.info(f"{str(dataset.cfg.test_split_number)}"
                              f" finished")
-
                     return
-
                 epoch += 1
 
     def run_train(self, device):
@@ -180,24 +173,28 @@ class SemanticSegmentation():
         Loss = SemSegLoss(self, model, dataset, device)
         Metric = SemSegMetric(self, model, dataset, device)
 
-        train_batcher = self.get_batcher(device)
+        batcher = self.get_batcher(device)
 
-        train_split = Torch_Dataloader(dataset=dataset.get_split('training'),
+        train_split = TorchDataloader(dataset=dataset.get_split('training'),
                                     preprocess=model.preprocess,
                                     transform=model.transform,
                                     shuffle=True)
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
-                                  collate_fn=train_batcher.collate_fn)
-        '''
-        valid_sampler   = dataset.get_sampler(cfg.val_batch_size, 'validation')
-        valid_loader    = DataLoader(valid_sampler, 
-                                     batch_size=cfg.val_batch_size)
-        train_sampler   = dataset.get_sampler(cfg.batch_size, 'training')
-        train_loader    = DataLoader(train_sampler, 
-                                     batch_size=cfg.batch_size)
-        '''
+                                  collate_fn=batcher.collate_fn)
+
+
+        valid_split = TorchDataloader(
+            dataset=dataset.get_split('validation'),
+            preprocess=model.preprocess,
+            transform=model.transform,
+            shuffle=True)
+        valid_loader = DataLoader(
+            train_split,
+            batch_size=cfg.val_batch_size,
+            shuffle=True,
+            collate_fn=batcher.collate_fn)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
@@ -216,15 +213,14 @@ class SemanticSegmentation():
             print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
             self.losses = []
-
             self.accs = []
             self.ious = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader)):
+            for idx, inputs in enumerate(tqdm(train_loader, 
+                                        desc='training')):
 
                 results = model(inputs['data'])
-
                 loss, gt_labels, predict_scores = model.loss(
                     Loss, results, inputs, device)
 
@@ -234,7 +230,6 @@ class SemanticSegmentation():
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
-
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
                 self.ious.append(iou)
@@ -250,27 +245,18 @@ class SemanticSegmentation():
             self.valid_ious = []
             step = 0
             with torch.no_grad():
-                for batch_data in tqdm(valid_loader,
-                                       desc='validation',
-                                       leave=False):
-
-                    inputs = model.preprocess(batch_data, device)
-                    # scores: B x N x num_classes
-                    scores = model(inputs)
-
-                    labels = batch_data[1]
-                    scores, labels = self.filter_valid(scores, labels, device)
-
-                    logp = torch.distributions.utils.probs_to_logits(
-                        scores, is_binary=False)
-                    loss = criterion(logp, labels)
-                    acc = accuracy(scores, labels)
-                    iou = intersection_over_union(scores, labels)
+                for idx, inputs in enumerate(tqdm(valid_loader, 
+                                            desc='validation')):
+                    results = model(inputs['data'])
+                    loss, gt_labels, predict_scores = model.loss(
+                        Loss, results, inputs, device)
+                    acc = Metric.acc(predict_scores, gt_labels)
+                    iou = Metric.iou(predict_scores, gt_labels)
 
                     self.valid_losses.append(loss.cpu().item())
-                    self.valid_accs.append(accuracy(scores, labels))
-                    self.valid_ious.append(
-                        intersection_over_union(scores, labels))
+                    self.valid_accs.append(acc)
+                    self.valid_ious.append(iou)
+
                     step = step + 1
 
             self.save_logs(writer, epoch)
@@ -324,7 +310,7 @@ class SemanticSegmentation():
                  f" eval: {loss_dict['Validation loss']:.3f}")
         log.info(f"acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
                  f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
-        log.info(f"acc train: {iou_dicts[-1]['Training IoU']:.3f} "
+        log.info(f"iou train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
 
         # print(acc_dicts[-1])
