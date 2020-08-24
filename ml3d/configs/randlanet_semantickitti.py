@@ -43,6 +43,7 @@ dataset = dict(
     dataset_path=
     '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
     cache_dir='/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache1',
+    use_cache=False,
     test_result_folder='./test',
 
     # training_split      = ['00', '01', '02', '03', '04', '05',

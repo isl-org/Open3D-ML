@@ -103,7 +103,46 @@ class SemanticKITTI:
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)
 
+
+    def is_tested(self, inputs):
+        cfg = self.cfg
+        for j in range(1):
+            name = inputs['attr']['name'][j]
+            name_seq, name_points = name.split("_")
+            test_path = join(cfg.test_result_folder, 'sequences')
+            save_path = join(test_path, name_seq, 'predictions')
+            test_file_name = name_points
+            store_path = join(save_path, name_points + '.label')
+            if exists(store_path):
+                return True 
+            else:
+                return False
+
+
     def save_test_result(self, results, inputs):
+        cfg = self.cfg
+        for j in range(1):
+            # name = inputs['attr']['name']
+            name = inputs['attr']['name'][j]
+            # print(name)
+            name_seq, name_points = name.split("_")
+
+            test_path = join(cfg.test_result_folder, 'sequences')
+            make_dir(test_path)
+            save_path = join(test_path, name_seq, 'predictions')
+            make_dir(save_path)
+
+            test_file_name = name_points
+            proj_inds = inputs['data']['proj_inds'][j].cpu().numpy()
+            
+            pred = results[proj_inds]
+
+            store_path = join(save_path, name_points + '.label')
+            pred = pred + 1
+            pred = remap_lut[pred].astype(np.uint32)
+            pred.tofile(store_path)
+
+    def save_test_result_kpconv(self, results, inputs):
         cfg = self.cfg
         for j in range(1):
             # name = inputs['attr']['name']
