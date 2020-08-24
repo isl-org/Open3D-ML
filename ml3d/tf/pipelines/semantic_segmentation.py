@@ -58,8 +58,7 @@ class SemanticSegmentation():
 
         train_split = TFDataloader(dataset=dataset.get_split('training'),
                                    model=model)
-        train_loader = train_split.get_loader()
-        # train_loader = train_split.get_loader().batch(cfg.batch_size)
+        train_loader = train_split.get_loader(cfg.batch_size)
 
         for epoch in range(0, cfg.max_epoch + 1):
             print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
@@ -80,8 +79,7 @@ class SemanticSegmentation():
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
-                # print("acc = {}".format(acc))
-                # print("iou = {}".format(iou))
+
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)
                 self.ious.append(iou)

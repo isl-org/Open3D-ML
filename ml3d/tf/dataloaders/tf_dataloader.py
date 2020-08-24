@@ -55,7 +55,6 @@ class TFDataloader():
         else:
             self.cache_convert = None
 
-        self.num_threads = 3  # TODO : read from config
         self.split = dataset.split
         self.pc_list = dataset.path_list
         self.num_pc = len(self.pc_list)
@@ -69,13 +68,17 @@ class TFDataloader():
 
         return data, attr
 
-    def get_loader(self):
+    def get_loader(self, batch_size=1, num_threads=3):
         gen_func, gen_types, gen_shapes = self.get_batch_gen(self)
 
-        tf_dataloader = tf.data.Dataset.from_generator(gen_func, gen_types,
-                                                       gen_shapes)
+        loader = tf.data.Dataset.from_generator(gen_func, gen_types,
+                                                gen_shapes)
 
-        tf_dataloader = tf_dataloader.map(map_func=self.transform,
-                                          num_parallel_calls=self.num_threads)
+        loader = loader.map(map_func=self.transform,
+                            num_parallel_calls=num_threads)
 
-        return tf_dataloader
+        if ('batcher' not in self.model_cfg
+                or self.model_cfg.batcher == 'DefaultBatcher'):
+            loader = loader.batch(batch_size)
+
+        return loader

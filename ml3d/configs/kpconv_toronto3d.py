@@ -148,9 +148,9 @@ model = dict(
 )
 
 pipeline = dict(
-    batch_size=2,
-    val_batch_size=2,
-    test_batch_size=3,
+    batch_size=1,
+    val_batch_size=1,
+    test_batch_size=1,
     max_epoch=100,  # maximum epoch during training
     learning_rate=1e-2,  # initial learning rate
     #lr_decays           = {0.95 for i in range(0, 500)},
