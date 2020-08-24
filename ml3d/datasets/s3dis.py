@@ -101,7 +101,7 @@ class S3DIS:
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split == 'test':
+        if split in ['test', 'testing']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) in f

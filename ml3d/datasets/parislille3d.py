@@ -42,7 +42,7 @@ class ParisLille3DSplit():
         points[:, 2] = data['z']
 
         if(self.split != 'test'):
-            labels = np.array(data['class'])
+            labels = np.array(data['class'], dtype = np.int32)
         else:
             labels = np.zeros((points.shape[0], ), dtype = np.int32)
         
@@ -98,13 +98,15 @@ class ParisLille3D:
         return ParisLille3DSplit(self, split=split)
     
     def get_split_list(self, split):
-        if split == 'test':
+        if split in ['test', 'testing']:
             random.shuffle(self.test_files)
             return self.test_files
-        elif split == 'val':
+        elif split in ['val', 'validation']:
             random.shuffle(self.val_files)
             return self.val_files
-        else:
+        elif split in ['train', 'training']:
             random.shuffle(self.train_files)
             return self.train_files
+        else:
+            raise ValueError("Invalid split {}".format(split))
 

@@ -99,14 +99,15 @@ class Custom3D:
         return Custom3DSplit(self, split=split)
     
     def get_split_list(self, split):
-        if split == 'test':
+        if split in ['test', 'testing']:
             random.shuffle(self.test_files)
             return self.test_files
-        elif split == 'val':
+        elif split in ['val', 'validation']:
             random.shuffle(self.val_files)
             return self.val_files
-        else:
+        elif split in ['train', 'training']:
             random.shuffle(self.train_files)
             return self.train_files
-
+        else:
+            raise ValueError("Invalid split {}".format(split))
 

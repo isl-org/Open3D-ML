@@ -99,13 +99,15 @@ class Toronto3D:
         return Toronto3DSplit(self, split=split)
     
     def get_split_list(self, split):
-        if split == 'test':
+        if split in ['test', 'testing']:
             random.shuffle(self.test_files)
             return self.test_files
-        elif split == 'training':
+        elif split in ['val', 'validation']:
+            random.shuffle(self.val_files)
+            return self.val_files
+        elif split in ['train', 'training']:
             random.shuffle(self.train_files)
             return self.train_files
         else:
-            random.shuffle(self.val_files)
-            return self.val_files
+            raise ValueError("Invalid split {}".format(split))
 

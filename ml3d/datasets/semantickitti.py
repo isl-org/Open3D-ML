@@ -134,12 +134,14 @@ class SemanticKITTI:
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split == 'training':
+        if split in ['train', 'training']:
             seq_list = cfg.training_split
-        elif split == 'test':
+        elif split in ['test', 'testing']:
             seq_list = [str(cfg.test_split_number)]
-        elif split == 'validation':
+        elif split in ['val', 'validation']:
             seq_list = cfg.validation_split
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
         for seq_id in seq_list:
             pc_path = join(dataset_path, seq_id, 'velodyne')

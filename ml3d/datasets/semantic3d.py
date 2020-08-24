@@ -41,9 +41,12 @@ class Semantic3DSplit():
         points = pc[:, 0:3]
         feat = pc[:, [4, 5, 6, 3]]
 
+        points = np.array(points, dtype = np.float32)
+        feat = np.array(feat, dtype = np.float32)
 
         if(self.split != 'test'):
             labels = pd.read_csv(pc_path.replace(".txt", ".labels"), header=None, delim_whitespace=True, dtype = np.int32).values
+            labels = np.array(labels, dtype = np.int32)
         else:
             labels = np.zeros((points.shape[0], ), dtype = np.int32)
         
@@ -109,13 +112,14 @@ class Semantic3D:
         return Semantic3DSplit(self, split=split)
     
     def get_split_list(self, split):
-        if split == 'test':
+        if split in ['test', 'testing']:
             random.shuffle(self.test_files)
             return self.test_files
-        elif split == 'training':
+        elif split in ['train', 'training']:
             random.shuffle(self.train_files)
             return self.train_files
-        else:
+        elif split in ['val', 'validation']:
             random.shuffle(self.val_files)
             return self.val_files
-
+        else:
+            raise ValueError("Invalid split {}".format(split))
