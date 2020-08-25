@@ -55,13 +55,15 @@ class SemanticKITTISplit(Dataset):
     def get_data(self, idx):
         pc_path = self.path_list[idx]
         points = DataProcessing.load_pc_kitti(pc_path)
-        if self.split != 'test':
-            dir, file = split(pc_path)
-            label_path = join(dir, '../labels', file[:-4] + '.label')
-            labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
-        else:
-            labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
 
+        dir, file = split(pc_path)
+        label_path = join(dir, '../labels', file[:-4] + '.label')
+        if not exists(label_path):
+            labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
+            if self.split not in ['test', 'all']:
+                raise ValueError("label file not found for {}".format(label_path))
+        else:
+            labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
 
         data = {'point': points, 
                 'feat' : None,
@@ -180,11 +182,12 @@ class SemanticKITTI:
 
         if split in ['train', 'training']:
             seq_list = cfg.training_split
-
-        elif split == ['test', 'testing']:
+        elif split in ['test', 'testing']:
             seq_list = cfg.test_split
-        elif split == ['val', 'validation']:
+        elif split in ['val', 'validation']:
             seq_list = cfg.validation_split
+        elif split in ['all']:
+            seq_list = cfg.all_split
         else:
             raise ValueError("Invalid split {}".format(split))
 
@@ -194,6 +197,5 @@ class SemanticKITTI:
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
         file_list = np.concatenate(file_list, axis=0)
-        # file_list = DataProcessing.shuffle_list(file_list)
 
         return file_list
