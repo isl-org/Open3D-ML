@@ -15,7 +15,6 @@ from .network_blocks import *
 
 
 class KPFCNN(tf.keras.Model):
-
     def __init__(self, cfg):
         super(KPFCNN, self).__init__()
 
@@ -23,10 +22,12 @@ class KPFCNN(tf.keras.Model):
         self.cfg = cfg
 
         # From config parameter, compute higher bound of neighbors number in a neighborhood
-        hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1) ** 3))
+        hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1)**3))
 
         # Initiate neighbors limit with higher bound
-        self.neighborhood_limits = np.full(cfg.num_layers, hist_n, dtype=np.int32)
+        self.neighborhood_limits = np.full(cfg.num_layers,
+                                           hist_n,
+                                           dtype=np.int32)
 
         # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
         self.dropout_prob = tf.constant(0.2, name='dropout_prob')
@@ -34,7 +35,7 @@ class KPFCNN(tf.keras.Model):
         lbl_values = cfg.lbl_values
         ign_lbls = cfg.ignored_label_inds
 
-      # Current radius of convolution and feature dimension
+        # Current radius of convolution and feature dimension
         layer = 0
         r = cfg.first_subsampling_dl * cfg.conv_radius
         in_dim = cfg.in_features_dim
@@ -42,7 +43,7 @@ class KPFCNN(tf.keras.Model):
         self.K = cfg.num_kernel_points
         self.C = len(lbl_values) - len(ign_lbls)
 
-       # Save all block operations in a list of modules
+        # Save all block operations in a list of modules
         self.encoder_blocks = []
         self.encoder_skip_dims = []
         self.encoder_skips = []
@@ -51,10 +52,15 @@ class KPFCNN(tf.keras.Model):
 
             # Check equivariance
             if ('equivariant' in block) and (not out_dim % 3 == 0):
-                raise ValueError('Equivariant block but features dimension is not a factor of 3')
+                raise ValueError(
+                    'Equivariant block but features dimension is not a factor of 3'
+                )
 
             # Detect change to next layer for skip connection
-            if np.any([tmp in block for tmp in ['pool', 'strided', 'upsample', 'global']]):
+            if np.any([
+                    tmp in block
+                    for tmp in ['pool', 'strided', 'upsample', 'global']
+            ]):
                 self.encoder_skips.append(block_i)
                 self.encoder_skip_dims.append(in_dim)
 
@@ -63,13 +69,8 @@ class KPFCNN(tf.keras.Model):
                 break
 
             # Apply the good block function defining tf ops
-            self.encoder_blocks.append(block_decider(block,
-                                                r,
-                                                in_dim,
-                                                out_dim,
-                                                layer,
-                                                cfg))
-
+            self.encoder_blocks.append(
+                block_decider(block, r, in_dim, out_dim, layer, cfg))
 
             # Update dimension of input from output
             if 'simple' in block:
@@ -77,14 +78,13 @@ class KPFCNN(tf.keras.Model):
             else:
                 in_dim = out_dim
 
-
             # Detect change to a subsampled layer
             if 'pool' in block or 'strided' in block:
                 # Update radius and feature dimension for next layer
                 layer += 1
                 r *= 2
                 out_dim *= 2
-        
+
         # Decoder blocks
         self.decoder_blocks = []
         self.decoder_concats = []
@@ -94,22 +94,19 @@ class KPFCNN(tf.keras.Model):
             if 'upsample' in block:
                 start_i = block_i
                 break
-        
+
         # Loop over consecutive blocks
         for block_i, block in enumerate(cfg.architecture[start_i:]):
 
             # Add dimension of skip connection concat
-            if block_i > 0 and 'upsample' in cfg.architecture[start_i + block_i - 1]:
+            if block_i > 0 and 'upsample' in cfg.architecture[start_i +
+                                                              block_i - 1]:
                 in_dim += self.encoder_skip_dims[layer]
                 self.decoder_concats.append(block_i)
 
             # Apply the good block function defining tf ops
-            self.decoder_blocks.append(block_decider(block,
-                                                    r,
-                                                    in_dim,
-                                                    out_dim,
-                                                    layer,
-                                                    cfg))
+            self.decoder_blocks.append(
+                block_decider(block, r, in_dim, out_dim, layer, cfg))
 
             # Update dimension of input from output
             in_dim = out_dim
@@ -122,26 +119,11 @@ class KPFCNN(tf.keras.Model):
                 out_dim = out_dim // 2
 
         self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
+        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False,
+                                       0)
 
-        # Network Losses
-
-        # List of valid labels (those not ignored in loss)
-        self.valid_labels = np.sort([c for c in lbl_values if c not in ign_lbls])
-
-        # # Choose segmentation loss
-        # if len(cfg.class_w) > 0:
-        #     class_w = tf.convert_to_tensor(class_w, dtype=tf.float32)
-        #     self.criterion = torch.nn.CrossEntropyLoss(weight=class_w, ignore_index=-1)
-        # else:
-        #     self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-        # self.deform_fitting_mode = config.deform_fitting_mode
-        # self.deform_fitting_power = config.deform_fitting_power
-        # self.deform_lr_factor = config.deform_lr_factor
-        # self.repulse_extent = config.repulse_extent
-        # self.output_loss = 0
-        # self.reg_loss = 0
-        # self.l1 = nn.L1Loss()
+        self.valid_labels = np.sort(
+            [c for c in lbl_values if c not in ign_lbls])
 
         return
 
@@ -152,7 +134,8 @@ class KPFCNN(tf.keras.Model):
         inputs['points'] = flat_inputs[:cfg.num_layers]
         inputs['neighbors'] = flat_inputs[cfg.num_layers:2 * cfg.num_layers]
         inputs['pools'] = flat_inputs[2 * cfg.num_layers:3 * cfg.num_layers]
-        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 * cfg.num_layers]
+        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 *
+                                          cfg.num_layers]
 
         ind = 4 * cfg.num_layers
         inputs['features'] = flat_inputs[ind]
@@ -181,20 +164,18 @@ class KPFCNN(tf.keras.Model):
     def call(self, flat_inputs):
         cfg = self.cfg
         inputs = self.organise_inputs(flat_inputs)
-        
+
         x = tf.stop_gradient(tf.identity(inputs['features']))
 
         skip_conn = []
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_conn.append(x)
-            print("{}".format(block_op))
             x = block_op(x, inputs)
 
         for block_i, block_op in enumerate(self.decoder_blocks):
             if block_i in self.decoder_concats:
                 x = tf.concat([x, skip_conn.pop()], axis=1)
-            print("{}".format(block_op))
             x = block_op(x, inputs)
 
         x = self.head_mlp(x, inputs)
@@ -215,9 +196,9 @@ class KPFCNN(tf.keras.Model):
         scores, labels = Loss.filter_valid_label(logits, labels)
 
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        loss += sum(self.losses)
 
         return loss, labels, scores
-        
 
     def big_neighborhood_filter(self, neighbors, layer):
         """
@@ -226,7 +207,6 @@ class KPFCNN(tf.keras.Model):
         """
         # crop neighbors matrix
         return neighbors[:, :self.neighborhood_limits[layer]]
-
 
     def regularization_losses(self):
 
@@ -985,4 +965,3 @@ class KPFCNN(tf.keras.Model):
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
-

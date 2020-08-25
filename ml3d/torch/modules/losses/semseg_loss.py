@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 from ....datasets.utils import DataProcessing
 
+
 def filter_valid_label(scores, labels, num_classes, ignored_label_inds,
                        device):
     """filter out invalid points"""
@@ -45,10 +46,11 @@ class SemSegLoss(object):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss
         if 'class_weights' in dataset.cfg.keys():
-            class_wt = DataProcessing.get_class_weights(dataset.cfg.class_weights)
-            weights = torch.tensor(
-                class_wt, dtype=torch.float, device=device)
+            class_wt = DataProcessing.get_class_weights(
+                dataset.cfg.class_weights)
+            weights = torch.tensor(class_wt, dtype=torch.float, device=device)
 
-            self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(weight=weights)
+            self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(
+                weight=weights)
         else:
             self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss()

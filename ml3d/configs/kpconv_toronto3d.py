@@ -1,9 +1,8 @@
 # model settings
 model = dict(
     ign_lbls=[0],
-    lbl_values=[
-        0, 1, 2, 3, 4, 5, 6, 7, 8],
-    num_classes=19,  # Number of valid classes
+    lbl_values=[0, 1, 2, 3, 4, 5, 6, 7, 8],
+    num_classes=8,  # Number of valid classes
     ignored_label_inds=[0],
     # Dataset name
     dataset='SemanticKitti',
@@ -17,31 +16,19 @@ model = dict(
     batcher='ConcatBatcher',
 
     # Density of neighborhoods for deformable convs (which need bigger radiuses). For normal conv we use KP_extent
-    density_parameter = 5.0,
+    density_parameter=5.0,
 
     #########################
     # Architecture definition
     #########################
 
     # Define layers
-    architecture = ['simple',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'nearest_upsample',
-                    'unary',
-                    'nearest_upsample',
-                    'unary',
-                    'nearest_upsample',
-                    'unary',
-                    'nearest_upsample',
-                    'unary'],
+    architecture=[
+        'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb_strided',
+        'resnetb', 'resnetb_strided', 'resnetb', 'resnetb_strided', 'resnetb',
+        'nearest_upsample', 'unary', 'nearest_upsample', 'unary',
+        'nearest_upsample', 'unary', 'nearest_upsample', 'unary'
+    ],
 
     ###################
     # KPConv parameters
@@ -59,7 +46,7 @@ model = dict(
     val_batch_num=8,
 
     # Number of steps per epochs
-    epoch_steps = 500,
+    epoch_steps=500,
 
     # Number of kernel points
     num_kernel_points=15,
@@ -98,7 +85,8 @@ model = dict(
     # 'point2plane' fitting geometry by penalizing distance from deform point to input point triplet (not implemented)
     deform_fitting_mode='point2point',
     deform_fitting_power=1.0,  # Multiplier for the fitting/repulsive loss
-    deform_lr_factor=0.1,  # Multiplier for learning rate applied to the deformations
+    deform_lr_factor=
+    0.1,  # Multiplier for learning rate applied to the deformations
     repulse_extent=1.2,  # Distance of repulsion for deformed kernel points
 
     #####################
@@ -160,9 +148,9 @@ model = dict(
 )
 
 pipeline = dict(
-    batch_size=2,
-    val_batch_size=2,
-    test_batch_size=3,
+    batch_size=1,
+    val_batch_size=1,
+    test_batch_size=1,
     max_epoch=100,  # maximum epoch during training
     learning_rate=1e-2,  # initial learning rate
     #lr_decays           = {0.95 for i in range(0, 500)},
@@ -177,15 +165,16 @@ pipeline = dict(
 )
 
 dataset = dict(
-    dataset_path = '/Users/sanskara/data/Toronto_3D/',
-    cache_dir = '/Users/sanskara/data/Toronto_3D/cache/',
-    prepro_grid_size    = 0.06,
-    num_points      = 65536,
-    test_result_folder  = './test',
-
-    class_weights = [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353],
-    ignored_label_inds = [0],
-    train_files = ['L001.ply', 'L003.ply', 'L004.ply'],
-    val_files = ['L002.ply'],
-    test_files = ['L002.ply'],
-    )
+    dataset_path='/Users/sanskara/data/Toronto_3D/',
+    cache_dir='/Users/sanskara/data/Toronto_3D/cache/',
+    prepro_grid_size=0.06,
+    num_points=65536,
+    test_result_folder='./test',
+    class_weights=[
+        5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
+    ],
+    ignored_label_inds=[0],
+    train_files=['L001.ply', 'L003.ply', 'L004.ply'],
+    val_files=['L002.ply'],
+    test_files=['L002.ply'],
+)

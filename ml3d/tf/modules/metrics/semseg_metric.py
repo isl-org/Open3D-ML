@@ -30,8 +30,6 @@ class SemSegMetric(object):
         correct_prediction = tf.nn.in_top_k(labels, scores, 1)
         acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-
-
         num_classes = scores.shape[-1]
         predictions = tf.argmax(scores, axis=-1)
 
@@ -42,7 +40,7 @@ class SemSegMetric(object):
         for label in range(num_classes):
             label_mask = labels == label
             num_label = label_mask.numpy().sum()
-            if num_label == 0 :
+            if num_label == 0:
                 num_label = 1
             per_class_accuracy = (accuracy_mask & label_mask).numpy().sum()
             per_class_accuracy /= num_label
@@ -50,10 +48,8 @@ class SemSegMetric(object):
         # overall accuracy
         accuracies.append(accuracy_mask.numpy().mean())
         #accuracies = np.array(accuracies)
-      
+
         return accuracies
-
-
 
     def iou(self, scores, labels):
         r"""

@@ -122,7 +122,6 @@ class DataProcessing:
                                            sampleDl=grid_size,
                                            verbose=verbose)
 
-
     @staticmethod
     def IoU_from_confusions(confusions):
         """
@@ -153,7 +152,7 @@ class DataProcessing:
     @staticmethod
     def get_class_weights(num_per_class):
         # pre-calculate the number of points in each category
-        num_per_class = np.array(num_per_class, dtype = np.float32)
+        num_per_class = np.array(num_per_class, dtype=np.float32)
 
         weight = num_per_class / float(sum(num_per_class))
         ce_label_weight = 1 / (weight + 0.02)

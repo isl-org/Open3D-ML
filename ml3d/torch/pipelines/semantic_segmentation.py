@@ -12,7 +12,6 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from os.path import exists, join, isfile, dirname, abspath
 
-
 from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
@@ -176,25 +175,22 @@ class SemanticSegmentation():
         batcher = self.get_batcher(device)
 
         train_split = TorchDataloader(dataset=dataset.get_split('training'),
-                                    preprocess=model.preprocess,
-                                    transform=model.transform,
-                                    shuffle=True)
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      shuffle=True)
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   collate_fn=batcher.collate_fn)
 
-
-        valid_split = TorchDataloader(
-            dataset=dataset.get_split('validation'),
-            preprocess=model.preprocess,
-            transform=model.transform,
-            shuffle=True)
-        valid_loader = DataLoader(
-            train_split,
-            batch_size=cfg.val_batch_size,
-            shuffle=True,
-            collate_fn=batcher.collate_fn)
+        valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      shuffle=True)
+        valid_loader = DataLoader(train_split,
+                                  batch_size=cfg.val_batch_size,
+                                  shuffle=True,
+                                  collate_fn=batcher.collate_fn)
 
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
@@ -217,8 +213,7 @@ class SemanticSegmentation():
             self.ious = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, 
-                                        desc='training')):
+            for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
 
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.loss(
@@ -245,8 +240,8 @@ class SemanticSegmentation():
             self.valid_ious = []
             step = 0
             with torch.no_grad():
-                for idx, inputs in enumerate(tqdm(valid_loader, 
-                                            desc='validation')):
+                for idx, inputs in enumerate(
+                        tqdm(valid_loader, desc='validation')):
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.loss(
                         Loss, results, inputs, device)
