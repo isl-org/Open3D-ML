@@ -15,7 +15,8 @@ class SemanticKittiCustomBatch:
     """Custom batch definition with memory pinning for SemanticKitti"""
 
     def __init__(self, input_list):
-
+        print("batcher")
+        print(len(input_list))
         # Get rid of batch dimension
         input_list = input_list[0]['data']
 

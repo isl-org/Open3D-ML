@@ -81,11 +81,11 @@ class SemanticSegmentation():
         with torch.no_grad():
             while True:
                 inputs = model.inference_preprocess()
-                results = model(inputs)
+                results = model(inputs['data'])
                 if model.inference_end(inputs, results):
                     break
    
-        return np.argmax(model.test_probs, 1)
+        return model.inference_result
 
     def run_test(self, device):
         #self.device = device
@@ -104,18 +104,13 @@ class SemanticSegmentation():
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        batcher = self.get_batcher(device,split='test')
+        batcher = self.get_batcher(device, split='test')
 
         test_split = TorchDataloader(
             dataset=dataset.get_split('test'),
             preprocess=model.preprocess,
             transform=model.transform,
             shuffle=False)
-        test_loader = DataLoader(
-            test_split,
-            batch_size=cfg.test_batch_size,
-            shuffle=False,
-            collate_fn=batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
 
@@ -124,58 +119,13 @@ class SemanticSegmentation():
         log.info("Started testing")
         
         with torch.no_grad():
-            for idx, inputs  in enumerate(tqdm(test_loader, 
-                                desc='test')):
-                if dataset.is_tested(inputs):
+            for idx in tqdm(range(len(test_split)), desc='test'):
+                attr = datset_split.get_attr(idx)
+                if dataset.is_tested(attr):
                     continue
                 data = datset_split.get_data(idx)
                 results = self.run_inference(data, device)
-                dataset.save_test_result(results, inputs)
-
-                
-    def run_test_kpconv(self, device):
-        #self.device = device
-        model = self.model
-        dataset = self.dataset
-        cfg = self.cfg
-        model.device = device
-        model.to(device)
-        model.eval()
-
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
-        log.info("DEVICE : {}".format(device))
-        log.info(model)
-        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
-
-        batcher = self.get_batcher(device,split='test')
-
-        test_split = TorchDataloader(
-            dataset=dataset.get_split('test'),
-            preprocess=model.preprocess,
-            transform=model.transform,
-            shuffle=False)
-        test_loader = DataLoader(
-            test_split,
-            batch_size=cfg.test_batch_size,
-            shuffle=False,
-            collate_fn=batcher.collate_fn)
-
-        self.load_ckpt(model.cfg.ckpt_path, False)
-        epoch = 0
-
-        log.info("Started testing")
-        
-        with torch.no_grad():
-            for idx, inputs  in enumerate(tqdm(test_loader, 
-                                desc='test')):
-                results = model(inputs['data'])
-                dataset.save_test_result(results.cpu().numpy(), 
-                            inputs)
-
-                
+                dataset.save_test_result(results, attr)
 
     def run_train(self, device):
         model = self.model
@@ -237,24 +187,24 @@ class SemanticSegmentation():
             self.ious = []
             step = 0
 
-            # for idx, inputs in enumerate(tqdm(train_loader, 
-            #                             desc='training')):
+            for idx, inputs in enumerate(tqdm(train_loader, 
+                                        desc='training')):
 
-            #     results = model(inputs['data'])
-            #     loss, gt_labels, predict_scores = model.get_loss(
-            #         Loss, results, inputs, device)
+                results = model(inputs['data'])
+                loss, gt_labels, predict_scores = model.get_loss(
+                    Loss, results, inputs, device)
 
-            #     self.optimizer.zero_grad()
-            #     loss.backward()
-            #     self.optimizer.step()
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
 
-            #     acc = Metric.acc(predict_scores, gt_labels)
-            #     iou = Metric.iou(predict_scores, gt_labels)
-            #     self.losses.append(loss.cpu().item())
-            #     self.accs.append(acc)
-            #     self.ious.append(iou)
+                acc = Metric.acc(predict_scores, gt_labels)
+                iou = Metric.iou(predict_scores, gt_labels)
+                self.losses.append(loss.cpu().item())
+                self.accs.append(acc)
+                self.ious.append(iou)
 
-            #     step = step + 1
+                step = step + 1
 
             self.scheduler.step()
 

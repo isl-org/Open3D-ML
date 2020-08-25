@@ -28,6 +28,7 @@ class SemSegMetric(object):
             list of floats of length num_classes+1 
             (last item is overall accuracy)
         """
+        print(scores.size())
         num_classes = scores.size(-2)
         predictions = torch.max(scores, dim=-2).indices
 

@@ -9,6 +9,7 @@ from sklearn.neighbors import KDTree
 import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 
+from ..dataloaders import ConcatBatcher
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
 from ...datasets.utils import DataProcessing
@@ -479,7 +480,6 @@ class KPFCNN(nn.Module):
 
         # Number collected
         n = in_pts.shape[0]
-
         # Safe check
         if n < 2:
             print("sample n < 2!")
@@ -514,6 +514,7 @@ class KPFCNN(nn.Module):
         # Data augmentation
         in_pts, scale, R = self.augmentation_transform(in_pts)
 
+        print(in_pts.shape)
         # Color augmentation
         if np.random.rand() > self.cfg.augment_color:
             in_fts[:, 3:] *= 0
@@ -586,29 +587,35 @@ class KPFCNN(nn.Module):
 
         return [self.cfg.num_layers] + input_list
 
-    def preprocess_(self, data, attr):
-        cfg = self.cfg
-        points = data['point']
-        labels = data['label']
-        split = attr['split']
 
-        data = dict()
+    def inference_begin(self, data):
+        self.inference_data = data
+        self.batcher = ConcatBatcher(self.device)
 
-        sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-            points, labels=labels, grid_size=cfg.grid_size)
 
-        search_tree = KDTree(sub_points)
+    def inference_preprocess(self):
+        data = self.transform_test(self.inference_data, {})
+        inputs = {'data': data, 'attr': []}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
 
-        data['point'] = sub_points
-        data['label'] = sub_labels
-        data['search_tree'] = search_tree
+        return inputs
 
-        if split != "training":
-            proj_inds = np.squeeze(
-                search_tree.query(points, return_distance=False))
-            proj_inds = proj_inds.astype(np.int32)
-            data['proj_inds'] = proj_inds
-        return data
+    def inference_end(self, inputs, results): 
+        m_softmax    = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+        proj_inds = inputs['data'].reproj_inds[0] 
+        results = results[proj_inds]
+        predict_scores = results
+
+        inference_result = {
+            'predict_labels': np.argmax(predict_scores, 1),
+            'predict_scores': predict_scores
+        }
+
+        self.inference_result = inference_result
+        return True
 
     def segmentation_inputs(self, stacked_points, stacked_features, labels,
                             stack_lengths):

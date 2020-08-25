@@ -106,8 +106,8 @@ model = dict(
 )
 
 pipeline = dict(
-    batch_size=2,
-    val_batch_size=2,
+    batch_size=8,
+    val_batch_size=16,
     test_batch_size=1,
     #lr_decays           = {0.95 for i in range(0, 500)},
     save_ckpt_freq=20,
@@ -175,6 +175,7 @@ dataset = dict(
     dataset_path=
     '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
     prepro_grid_size=0.06,
+    use_cache=False,
     test_result_folder='./test_kpconv',
     training_split=[
         '00', '01', '02', '03', '04', '05', '06', '07', '09', '10'

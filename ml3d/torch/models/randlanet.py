@@ -148,47 +148,47 @@ class RandLANet(nn.Module):
         return loss, labels, scores
 
 
-    def transform_whole(self, data, attr):
-        cfg = self.cfg
-        pc = data['point']
-        label = data['label']
-        feat = data['feat']
-        tree = data['search_tree']
-        features = feat
+    # def transform_whole(self, data, attr):
+    #     cfg = self.cfg
+    #     pc = data['point']
+    #     label = data['label']
+    #     feat = data['feat']
+    #     tree = data['search_tree']
+    #     features = feat
 
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
+    #     input_points = []
+    #     input_neighbors = []
+    #     input_pools = []
+    #     input_up_samples = []
 
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+    #     for i in range(cfg.num_layers):
+    #         neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
 
-            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:pc.shape[0] //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, pc, 1)
-            input_points.append(pc)
-            input_neighbors.append(neighbour_idx.astype(np.int64))
-            input_pools.append(pool_i.astype(np.int64))
-            input_up_samples.append(up_i.astype(np.int64))
-            pc = sub_points
+    #         sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+    #         pool_i = neighbour_idx[:pc.shape[0] //
+    #                                cfg.sub_sampling_ratio[i], :]
+    #         up_i = DataProcessing.knn_search(sub_points, pc, 1)
+    #         input_points.append(pc)
+    #         input_neighbors.append(neighbour_idx.astype(np.int64))
+    #         input_pools.append(pool_i.astype(np.int64))
+    #         input_up_samples.append(up_i.astype(np.int64))
+    #         pc = sub_points
 
-        inputs = dict()
-        inputs['xyz'] = input_points
-        inputs['neigh_idx'] = input_neighbors
-        inputs['sub_idx'] = input_pools
-        inputs['interp_idx'] = input_up_samples
-        inputs['features'] = features
+    #     inputs = dict()
+    #     inputs['xyz'] = input_points
+    #     inputs['neigh_idx'] = input_neighbors
+    #     inputs['sub_idx'] = input_pools
+    #     inputs['interp_idx'] = input_up_samples
+    #     inputs['features'] = features
 
-        inputs['labels'] = label.astype(np.int64)
-        if attr['split'] == "test":
-            inputs['proj_inds'] = data['proj_inds'] 
+    #     inputs['labels'] = label.astype(np.int64)
+    #     if attr['split'] == "test":
+    #         inputs['proj_inds'] = data['proj_inds'] 
       
-        return inputs
+    #     return inputs
 
 
-    def transform_crop(self, data, attr, min_posbility_idx=None):
+    def transform(self, data, attr, min_posbility_idx=None):
         cfg = self.cfg
         inputs = dict()
 
@@ -244,11 +244,11 @@ class RandLANet(nn.Module):
 
         return inputs
 
-    def transform(self, data, attr):
-        if attr['split'] == 'test':
-            return self.transform_whole(data, attr) 
-        else: 
-            return self.transform_crop(data, attr)
+    # def transform(self, data, attr):
+    #     if attr['split'] == 'test':
+    #         return self.transform_whole(data, attr) 
+    #     else: 
+    #         return self.transform_crop(data, attr)
 
     def inference_begin(self, data):
         self.test_smooth = 0.98
@@ -262,11 +262,12 @@ class RandLANet(nn.Module):
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
-        data = self.transform_crop(self.inference_data, {}, min_posbility_idx)
-       
-        data = self.batcher.collate_fn([data])
-      
-        return data
+        data = self.transform(self.inference_data, {}, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        return inputs
 
     def inference_end(self, inputs, results):
        
@@ -275,11 +276,14 @@ class RandLANet(nn.Module):
         results = m_softmax(results)
         results = results.cpu().data.numpy()
         probs = np.reshape(results, [-1, self.cfg.num_classes])
-                       
-        inds = inputs['point_inds'][0, :]
+        inds = inputs['data']['point_inds'][0, :]
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (1 - self.test_smooth) * probs
-
         if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
             return True
         else:
             return False
