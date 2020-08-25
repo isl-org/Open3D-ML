@@ -39,7 +39,8 @@ model = dict(
     in_radius=4.0,
     val_radius=4.0,
     n_frames=1,
-    max_in_points=100000,
+    max_in_points=20000,
+    batch_limit=50000,
     max_val_points=100000,
 
     # Number of batch
@@ -107,7 +108,7 @@ model = dict(
 
 pipeline = dict(
     batch_size=8,
-    val_batch_size=16,
+    val_batch_size=8,
     test_batch_size=1,
     #lr_decays           = {0.95 for i in range(0, 500)},
     save_ckpt_freq=20,
