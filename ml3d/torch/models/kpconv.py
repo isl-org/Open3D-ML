@@ -13,6 +13,7 @@ from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
 from ...datasets.utils import DataProcessing
 
+
 class KPFCNN(nn.Module):
     """
     Class defining KPFCNN
@@ -1663,7 +1664,6 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
-
 
 from ...utils.kpconv_config import bcolors
 

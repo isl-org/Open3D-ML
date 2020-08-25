@@ -445,7 +445,6 @@ class SemanticKittiCustomBatch:
 
 class ConcatBatcher(object):
     """docstring for BaseBatcher"""
-
     def __init__(self, device):
         super(ConcatBatcher, self).__init__()
         self.device = device

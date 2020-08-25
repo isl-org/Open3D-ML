@@ -12,7 +12,6 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from os.path import exists, join, isfile, dirname, abspath
 
-
 from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
@@ -153,11 +152,11 @@ class SemanticSegmentation():
                                     preprocess=model.preprocess,
                                     transform=model.transform,
                                     use_cache=dataset.cfg.use_cache)
+
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   collate_fn=batcher.collate_fn)
-
 
         valid_split = TorchDataloader(
             dataset=dataset.get_split('validation'),
@@ -169,6 +168,7 @@ class SemanticSegmentation():
             batch_size=cfg.val_batch_size,
             shuffle=True,
             collate_fn=batcher.collate_fn)
+
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -187,8 +187,7 @@ class SemanticSegmentation():
             self.ious = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, 
-                                        desc='training')):
+            for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
 
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
@@ -215,8 +214,8 @@ class SemanticSegmentation():
             self.valid_ious = []
             step = 0
             with torch.no_grad():
-                for idx, inputs in enumerate(tqdm(valid_loader, 
-                                            desc='validation')):
+                for idx, inputs in enumerate(
+                        tqdm(valid_loader, desc='validation')):
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)

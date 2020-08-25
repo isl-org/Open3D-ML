@@ -5,4 +5,8 @@ cd ../../
 
 cd cpp_wrappers
 sh compile_wrappers.sh
-cd ../../../
+cd ../
+
+cd ml3d/tf/utils/tf_custom_ops
+sh compile_op.sh
+cd ../../../../

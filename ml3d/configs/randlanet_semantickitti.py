@@ -47,7 +47,7 @@ dataset = dict(
     test_result_folder='./test',
 
     # training_split      = ['00', '01', '02', '03', '04', '05',
-                           # '06', '07', '09', '10'],
+    # '06', '07', '09', '10'],
     training_split=['01'],
     validation_split=['08'],
     test_split=['11', '12', '13', '14', '15', '16', '17', 

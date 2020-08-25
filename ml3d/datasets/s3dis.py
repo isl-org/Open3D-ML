@@ -11,17 +11,12 @@ from tqdm import tqdm
 
 from .utils import DataProcessing
 
+
 class S3DISSplit():
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         print("Found {} pointclouds for {}".format(len(path_list), split))
-        # if split == 'test':
-        #     dataset.test_list = path_list
-        #     for test_file_name in path_list:
-        #         points = np.load(test_file_name)
-        #         dataset.possibility += [np.random.rand(points.shape[0]) * 1e-3]
-        #         dataset.min_possibility += [float(np.min(dataset.possibility[-1]))]
 
         self.path_list = path_list
         self.split = split
@@ -49,8 +44,7 @@ class S3DISSplit():
             labels = data['class']
 
         data = {'point': points, 'feat': feat, 'label': labels}
-        # print(data['feat'])
-        # exit(0)
+
         return data
 
     def get_attr(self, idx):
@@ -103,15 +97,12 @@ class S3DIS:
     def get_split(self, split):
         return S3DISSplit(self, split=split)
 
-    # def get_sampler (self, batch_size, split):
-    #     return SimpleSampler(self, batch_size, split=split)
-
     def get_split_list(self, split):
         cfg = self.cfg
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split == 'test':
+        if split in ['test', 'testing']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) in f
@@ -121,8 +112,6 @@ class S3DIS:
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) not in f
             ]
-
-        # self.prepro_randlanet(file_list, split)
 
         random.shuffle(file_list)
 
@@ -152,80 +141,6 @@ class S3DIS:
             labels = pc_feat_labels[:, 6]
 
         return points, feat, search_tree, labels
-
-    def crop_pc(self, points, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        if (points.shape[0] < self.cfg.num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = self.cfg.num_points - points.shape[0]
-            select_idx = list(select_idx) + list(
-                random.choices(select_idx, k=diff))
-            random.shuffle(select_idx)
-            return select_idx
-        center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point,
-                                       k=self.cfg.num_points)[1][0]
-
-        select_idx = DataProcessing.shuffle_idx(select_idx)
-        return select_idx
-
-    def prepro_randlanet(self, pc_list, split):
-        cfg = self.cfg
-        cache_path = cfg.cache_path
-        os.makedirs(cache_path, exist_ok=True)
-        pc_list = np.sort(pc_list)
-
-        for pc_path in tqdm(pc_list):
-            pc_name = Path(pc_path).name
-            print('Pointcloud ' + pc_name + ' start')
-
-            os.makedirs(Path(cache_path) / 'KDTree', exist_ok=True)
-            os.makedirs(Path(cache_path) / 'proj', exist_ok=True)
-            os.makedirs(Path(cache_path) / 'sub', exist_ok=True)
-
-            kdtree_path = Path(cache_path) / 'KDTree' / pc_name.replace(
-                '.ply', '.pkl')
-            proj_path = Path(cache_path) / 'proj' / pc_name.replace(
-                '.ply', '_proj.pkl')
-            sub_path = Path(cache_path) / 'sub' / pc_name.replace(
-                '.ply', '_sub.npy')
-
-            if (exists(kdtree_path) and exists(proj_path)
-                    and exists(sub_path)):
-                continue
-
-            data = PlyData.read(pc_path)['vertex']
-            points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
-            points[:, 0] = data['x']
-            points[:, 1] = data['y']
-            points[:, 2] = data['z']
-
-            feat = np.zeros(points.shape, dtype=np.float32)
-            feat[:, 0] = data['red']
-            feat[:, 1] = data['green']
-            feat[:, 2] = data['blue']
-
-            labels = np.zeros((points.shape[0], ), dtype=np.int32)
-            labels = data['class']
-
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                points,
-                features=feat,
-                labels=labels,
-                grid_size=cfg.prepro_grid_size)
-
-            search_tree = KDTree(sub_points)
-            np.save(sub_path,
-                    np.concatenate([sub_points, sub_feat, sub_labels], axis=1))
-
-            with open(kdtree_path, 'wb') as f:
-                pickle.dump(search_tree, f)
-
-            proj_idx = np.squeeze(
-                search_tree.query(points, return_distance=False))
-            proj_idx = proj_idx.astype(np.int32)
-            with open(proj_path, 'wb') as f:
-                pickle.dump([proj_idx, labels], f)
 
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
@@ -350,14 +265,12 @@ class S3DIS:
             elems = str(anno_path).split('/')
             save_path = elems[-3] + '_' + elems[-2] + out_format
             save_path = Path(dataset_path) / 'original_ply' / save_path
-            print(save_path)
 
             data_list = []
             for file in glob.glob(str(anno_path / '*.txt')):
                 class_name = Path(file).name.split('_')[0]
                 if class_name not in class_names:
                     class_name = 'clutter'
-                # print(class_name)
 
                 pc = pd.read_csv(file, header=None,
                                  delim_whitespace=True).values
@@ -365,7 +278,8 @@ class S3DIS:
                 data_list.append(np.concatenate([pc, labels], 1))
 
             pc_label = np.concatenate(data_list, 0)
-            xyz_min = np.amin(pc_label[:, 0:3], axis=0)
+            xyz_min = np.amin(pc_label[:, 0:3],
+                              axis=0)  # TODO : can be moved to preprocess
             pc_label[:, 0:3] -= xyz_min
 
             xyz = pc_label[:, :3].astype(np.float32)
@@ -374,16 +288,3 @@ class S3DIS:
 
             S3DIS.write_ply(str(save_path), (xyz, colors, labels),
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
-
-
-from ..utils import Config
-
-if __name__ == '__main__':
-    config = '../configs/randlanet_s3dis.py'
-    cfg = Config.load_from_file(config)
-    a = S3DIS(cfg.dataset)
-    b = a.get_split("training")
-    c = b.get_data(0)
-    print(c['label'])
-    # print(b.get_data(0))
-    print(b.get_attr(10))

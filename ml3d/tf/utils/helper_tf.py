@@ -5,40 +5,46 @@
 import numpy as np
 import tensorflow as tf
 
+
 class ExpandDims(tf.keras.layers.Layer):
-  def __init__(self, axis=-1):
-    super(ExpandDims, self).__init__()
-    self.axis = axis
+    def __init__(self, axis=-1):
+        super(ExpandDims, self).__init__()
+        self.axis = axis
 
-  def build(self, input_shape):
-    pass
+    def build(self, input_shape):
+        pass
 
-  def call(self, input):
-    return tf.expand_dims(input, axis=self.axis)
+    def call(self, input):
+        return tf.expand_dims(input, axis=self.axis)
+
 
 class conv2d(tf.keras.layers.Layer):
-    def __init__(self, batchNorm, out_planes, kernel_size=1, stride=1, activation=True):
+    def __init__(self,
+                 batchNorm,
+                 out_planes,
+                 kernel_size=1,
+                 stride=1,
+                 activation=True):
         super(conv2d, self).__init__()
 
-        self.conv = tf.keras.layers.Conv2D(out_planes, kernel_size, 
+        self.conv = tf.keras.layers.Conv2D(out_planes,
+                                           kernel_size,
                                            strides=(stride, stride))
 
-      
         self.batchNorm = batchNorm
         if self.batchNorm:
             self.batch_normalization = tf.keras.layers.BatchNormalization()
 
         if activation:
             self.activation_fn = tf.keras.layers.LeakyReLU(alpha=0.2)
-        else: 
+        else:
             self.activation_fn = None
 
     # def build(self, input_shape):
     #     super(conv2d, self).build(input_shape)
-    #     self.conv.build(input_shape)        
+    #     self.conv.build(input_shape)
     #     self._biases  = self.conv.bias
     #     self._weights = self.conv.kernel
-
 
     def call(self, x):
         x = self.conv(x)
@@ -50,31 +56,33 @@ class conv2d(tf.keras.layers.Layer):
         return x
 
 
-
 class conv2d_transpose(tf.keras.layers.Layer):
-    def __init__(self, batchNorm, out_planes, kernel_size=1, stride=1, activation=True):
+    def __init__(self,
+                 batchNorm,
+                 out_planes,
+                 kernel_size=1,
+                 stride=1,
+                 activation=True):
         super(conv2d_transpose, self).__init__()
-        
-        self.conv = tf.keras.layers.Conv2DTranspose(out_planes, kernel_size, 
-                                           strides=(stride, stride))
 
-      
-      
+        self.conv = tf.keras.layers.Conv2DTranspose(out_planes,
+                                                    kernel_size,
+                                                    strides=(stride, stride))
+
         self.batchNorm = batchNorm
         if self.batchNorm:
             self.batch_normalization = tf.keras.layers.BatchNormalization()
 
         if activation:
             self.activation_fn = tf.keras.layers.LeakyReLU(alpha=0.2)
-        else: 
+        else:
             self.activation_fn = None
 
     # def build(self, input_shape):
     #     super(conv2d_transpose, self).build(input_shape)
-    #     self.conv.build(input_shape)        
+    #     self.conv.build(input_shape)
     #     self.biases  = self.conv.bias
     #     self.weights = self.conv.kernel
-
 
     def call(self, x):
         x = self.conv(x)
@@ -85,11 +93,7 @@ class conv2d_transpose(tf.keras.layers.Layer):
         return x
 
 
-def dropout(inputs,
-            is_training,
-            scope,
-            keep_prob=0.5,
-            noise_shape=None):
+def dropout(inputs, is_training, scope, keep_prob=0.5, noise_shape=None):
     """ Dropout layer.
 
     Args:
@@ -102,8 +106,7 @@ def dropout(inputs,
     Returns:
       tensor variable
     """
-    with tf.variable_scope(scope) as sc:
-        outputs = tf.cond(is_training,
-                          lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
-                          lambda: inputs)
-        return outputs
+    outputs = tf.cond(is_training,
+                      lambda: tf.nn.dropout(inputs, keep_prob, noise_shape),
+                      lambda: inputs)
+    return outputs
