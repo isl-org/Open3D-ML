@@ -13,6 +13,7 @@ set -euo pipefail
 PATH_TO_OPEN3D_ML=$(pwd)
 # the build system of the main repo expects a master branch. make sure master exists
 git checkout -b master || true
+pip install -r requirements.txt
 echo $PATH_TO_OPEN3D_ML
 cd ..
 python -m pip install -U Cython
