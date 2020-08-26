@@ -98,8 +98,8 @@ class SemanticSegmentation():
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-                if step > 2:
-                    break
+                # if step > 2:
+                #    break
 
 
             # --------------------- validation
@@ -121,8 +121,8 @@ class SemanticSegmentation():
                 self.valid_accs.append(acc)
                 self.valid_ious.append(iou)
                 step = step + 1
-                if step > 2:
-                    break
+                #if step > 2:
+                #    break
 
             self.save_logs(writer, epoch)
 
