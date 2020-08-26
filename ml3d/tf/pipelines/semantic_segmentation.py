@@ -31,13 +31,8 @@ class SemanticSegmentation():
         cfg.logs_dir = join(cfg.main_log_dir, cfg.model_name + '_TF')
         make_dir(cfg.logs_dir)
 
-        gpus = tf.config.experimental.list_physical_devices('GPU')
-        if gpus:
-          try:
-            for gpu in gpus:
-              tf.config.experimental.set_memory_growth(gpu, True)
-          except RuntimeError as e:
-            print(e)
+        # tf.config.gpu.set_per_process_memory_growth(True)
+
 
         # dataset.cfg.num_points = model.cfg.num_points
 
