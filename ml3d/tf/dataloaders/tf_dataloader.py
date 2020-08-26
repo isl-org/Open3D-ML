@@ -54,7 +54,6 @@ class TFDataloader():
 
         else:
             self.cache_convert = None
-
         self.split = dataset.split
         self.pc_list = dataset.path_list
         self.num_pc = len(self.pc_list)

@@ -20,6 +20,14 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    for gpu in gpus:
+      tf.config.experimental.set_memory_growth(gpu, True)
+  except RuntimeError as e:
+    print(e)
+
 
 class SemanticSegmentation():
     def __init__(self, model, dataset, cfg):
@@ -30,6 +38,9 @@ class SemanticSegmentation():
         make_dir(cfg.main_log_dir)
         cfg.logs_dir = join(cfg.main_log_dir, cfg.model_name + '_TF')
         make_dir(cfg.logs_dir)
+
+        # tf.config.gpu.set_per_process_memory_growth(True)
+
 
         # dataset.cfg.num_points = model.cfg.num_points
 
@@ -98,8 +109,7 @@ class SemanticSegmentation():
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-                if step > 2:
-                    break
+
 
 
             # --------------------- validation
@@ -108,7 +118,7 @@ class SemanticSegmentation():
             self.valid_losses = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, desc='validation')):
+            for idx, inputs in enumerate(tqdm(valid_loader, desc='validation')):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(
@@ -121,8 +131,7 @@ class SemanticSegmentation():
                 self.valid_accs.append(acc)
                 self.valid_ious.append(iou)
                 step = step + 1
-                if step > 2:
-                    break
+   
 
             self.save_logs(writer, epoch)
 
