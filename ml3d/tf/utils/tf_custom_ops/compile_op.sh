@@ -26,7 +26,7 @@ else
 	framework="${TF_LIB}/libtensorflow_framework.so"
 
 	if ! [ -f $framework ]; then
-		echo "not exists"
+		echo "creating symlink"
 		ln "${TF_LIB}/libtensorflow_framework.so.2" $framework
 	fi
 
