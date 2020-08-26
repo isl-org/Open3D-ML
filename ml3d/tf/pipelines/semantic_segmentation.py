@@ -10,13 +10,10 @@ from os.path import exists, join, isfile, dirname, abspath
 import tensorflow as tf
 import yaml
 
-
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, LogRecord
-
-
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -59,12 +56,11 @@ class SemanticSegmentation():
         Loss = SemSegLoss(self, model, dataset)
         Metric = SemSegMetric(self, model, dataset)
 
-        train_split = TFDataloader(dataset=dataset.get_split('training'), 
-                                 model = model)
-        train_loader = train_split.get_loader().batch(cfg.batch_size)
+        train_split = TFDataloader(dataset=dataset.get_split('training'),
+                                   model=model)
+        train_loader = train_split.get_loader(cfg.batch_size)
 
-
-        for epoch in range(0, cfg.max_epoch + 1): 
+        for epoch in range(0, cfg.max_epoch + 1):
             print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             self.accs = []
             self.ious = []
@@ -74,7 +70,7 @@ class SemanticSegmentation():
             #for inputs in train_loader:
             for idx, inputs in enumerate(tqdm(train_loader)):
                 with tf.GradientTape() as tape:
-                    results = model(inputs, training=True)  
+                    results = model(inputs, training=True)
                     loss, gt_labels, predict_scores = model.loss(
                         Loss, results, inputs)
 
@@ -83,12 +79,11 @@ class SemanticSegmentation():
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-
-
 
     def save_logs(self, writer, epoch):
         accs = np.nanmean(np.array(self.accs), axis=0)
@@ -133,7 +128,6 @@ class SemanticSegmentation():
     def load_ckpt(self, ckpt_path, is_train=True):
         # TODO
         pass
-
 
     def save_ckpt(self, path_ckpt, epoch):
         # TODO

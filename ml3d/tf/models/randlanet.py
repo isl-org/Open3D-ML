@@ -15,7 +15,7 @@ from ...datasets.utils import DataProcessing
 #     def __init__(self, cfg):
 #         super(RandLANet, self).__init__()
 #         self.cfg = cfg
-        
+
 
 class RandLANet(tf.keras.Model):
     def __init__(self, cfg):
@@ -24,9 +24,10 @@ class RandLANet(tf.keras.Model):
         d_feature = cfg.d_feature
 
         self.fc0 = tf.keras.layers.Dense(d_feature, activation=None)
-        self.batch_normalization = tf.keras.layers.BatchNormalization(-1, 0.99, 1e-6)
+        self.batch_normalization = tf.keras.layers.BatchNormalization(
+            -1, 0.99, 1e-6)
         self.leaky_relu0 = tf.keras.layers.LeakyReLU()
-       
+
         # ###########################Encoder############################
         d_encoder_list = []
 
@@ -57,15 +58,14 @@ class RandLANet(tf.keras.Model):
 
         f_layer_fc2 = helper_tf.conv2d(True, 32)
         setattr(self, 'fc2', f_layer_fc2)
-        
+
         f_dropout = tf.keras.layers.Dropout(0.5)
         setattr(self, 'dropout1', f_dropout)
 
         f_layer_fc3 = helper_tf.conv2d(False,
-                                            cfg.num_classes,
-                                            activation=False)
+                                       cfg.num_classes,
+                                       activation=False)
         setattr(self, 'fc', f_layer_fc3)
-
 
     def init_att_pooling(self, d, d_out, name):
         att_activation = tf.keras.layers.Dense(d, activation=None)
@@ -76,7 +76,7 @@ class RandLANet(tf.keras.Model):
 
     def init_building_block(self, d_in, d_out, name):
         f_pc = helper_tf.conv2d(True, d_in)
-       
+
         setattr(self, name + 'bdmlp1', f_pc)
 
         self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
@@ -92,17 +92,11 @@ class RandLANet(tf.keras.Model):
 
         self.init_building_block(d_out // 2, d_out, name + 'LFA')
 
-        f_pc = helper_tf.conv2d(True,
-                                     d_out * 2,
-                                     activation=False)
+        f_pc = helper_tf.conv2d(True, d_out * 2, activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_tf.conv2d(True,
-                                         d_out * 2,
-                                         activation=False)
+        shortcut = helper_tf.conv2d(True, d_out * 2, activation=False)
         setattr(self, name + 'shortcut', shortcut)
-
-
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
         # pc:           BxNxd
@@ -110,10 +104,10 @@ class RandLANet(tf.keras.Model):
         B, N, K = neighbor_idx.shape
         d = pc.shape[2]
 
-        index_input = tf.reshape(neighbor_idx, shape=[-1, N*K])
-      
+        index_input = tf.reshape(neighbor_idx, shape=[-1, N * K])
+
         features = tf.gather(pc, index_input, axis=1, batch_dims=1)
-     
+
         features = tf.reshape(features, [-1, N, K, d])
 
         return features
@@ -130,7 +124,7 @@ class RandLANet(tf.keras.Model):
         m_dense = getattr(self, name + 'fc')
         att_activation = m_dense(f_reshaped)
         att_scores = tf.nn.softmax(att_activation, axis=1)
-       
+
         # print("att_scores = ", att_scores.shape)
         f_agg = f_reshaped * att_scores
         f_agg = tf.reduce_sum(f_agg, axis=1)
@@ -145,21 +139,25 @@ class RandLANet(tf.keras.Model):
         B, N, K = neigh_idx.shape
         neighbor_xyz = self.forward_gather_neighbour(xyz, neigh_idx)
 
-        xyz_tile = tf.tile(tf.expand_dims(xyz, axis=2), [1, 1, tf.shape(neigh_idx)[-1], 1])
+        xyz_tile = tf.tile(tf.expand_dims(xyz, axis=2),
+                           [1, 1, tf.shape(neigh_idx)[-1], 1])
         relative_xyz = xyz_tile - neighbor_xyz
-        relative_dis = tf.sqrt(tf.reduce_sum(tf.square(relative_xyz), axis=-1, keepdims=True))
-        relative_feature = tf.concat([relative_dis, relative_xyz, xyz_tile, neighbor_xyz], axis=-1)
+        relative_dis = tf.sqrt(
+            tf.reduce_sum(tf.square(relative_xyz), axis=-1, keepdims=True))
+        relative_feature = tf.concat(
+            [relative_dis, relative_xyz, xyz_tile, neighbor_xyz], axis=-1)
         return relative_feature
 
     def forward_building_block(self, xyz, feature, neigh_idx, name):
         f_xyz = self.forward_relative_pos_encoding(xyz, neigh_idx)
         m_conv2d = getattr(self, name + 'bdmlp1')
-        
+
         f_xyz = m_conv2d(f_xyz)
-      
-        f_neighbours = self.forward_gather_neighbour(tf.squeeze(feature, axis=2), neigh_idx)
+
+        f_neighbours = self.forward_gather_neighbour(
+            tf.squeeze(feature, axis=2), neigh_idx)
         f_concat = tf.concat([f_neighbours, f_xyz], axis=-1)
-       
+
         f_pc_agg = self.forward_att_pooling(f_concat, name + 'att_pooling_1')
 
         m_conv2d = getattr(self, name + 'mlp2')
@@ -189,14 +187,12 @@ class RandLANet(tf.keras.Model):
 
     def call(self, inputs, training=True):
 
-
         num_layers = self.cfg.num_layers
         xyz = inputs[:num_layers]
-        neigh_idx = inputs[num_layers: 2 * num_layers]
+        neigh_idx = inputs[num_layers:2 * num_layers]
         sub_idx = inputs[2 * num_layers:3 * num_layers]
         interp_idx = inputs[3 * num_layers:4 * num_layers]
         feature = inputs[4 * num_layers]
-        
 
         # print("inputs")
         # print(xyz)
@@ -206,7 +202,6 @@ class RandLANet(tf.keras.Model):
         # print(feature)
         # print("-------------")
 
-
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature)
 
@@ -215,7 +210,6 @@ class RandLANet(tf.keras.Model):
 
         feature = tf.nn.leaky_relu(feature)
         feature = tf.expand_dims(feature, axis=2)
-      
 
         # B N 1 d
         # Encoder
@@ -255,7 +249,7 @@ class RandLANet(tf.keras.Model):
         f_layer_fc2 = m_conv2d(f_layer_fc1)
 
         m_dropout = getattr(self, 'dropout1')
-        f_layer_drop =  m_dropout(f_layer_fc2, training=True)
+        f_layer_drop = m_dropout(f_layer_fc2, training=True)
 
         m_conv2d = getattr(self, 'fc')
         f_layer_fc3 = m_conv2d(f_layer_drop)
@@ -265,15 +259,15 @@ class RandLANet(tf.keras.Model):
         return f_out
 
     def get_loss(self, Loss):
-
         def compute_loss(results, labels):
 
             class_weights = Loss.class_weights
             one_hot_labels = tf.one_hot(labels, depth=self.config.num_classes)
             weights = tf.reduce_sum(class_weights * one_hot_labels, axis=1)
-            unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=one_hot_labels)
+            unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits, labels=one_hot_labels)
             weighted_losses = unweighted_losses * weights
-           
+
             output_loss = tf.reduce_mean(weighted_losses)
             return output_loss
 
@@ -307,14 +301,14 @@ class RandLANet(tf.keras.Model):
         d = feature.get_shape()[-1]
         batch_size = tf.shape(pool_idx)[0]
         pool_idx = tf.reshape(pool_idx, [batch_size, -1])
-    
+
         pool_features = tf.gather(feature, pool_idx, axis=1, batch_dims=1)
-      
-        pool_features = tf.reshape(pool_features, [batch_size, -1, num_neigh, d])
-       
+
+        pool_features = tf.reshape(pool_features,
+                                   [batch_size, -1, num_neigh, d])
+
         pool_features = tf.reduce_max(pool_features, axis=2, keepdims=True)
-  
-      
+
         return pool_features
 
     @staticmethod
@@ -329,7 +323,10 @@ class RandLANet(tf.keras.Model):
         up_num_points = tf.shape(interp_idx)[1]
         interp_idx = tf.reshape(interp_idx, [batch_size, up_num_points])
 
-        interpolated_features = tf.gather(feature, interp_idx, axis=1, batch_dims=1)
+        interpolated_features = tf.gather(feature,
+                                          interp_idx,
+                                          axis=1,
+                                          batch_dims=1)
         interpolated_features = tf.expand_dims(interpolated_features, axis=2)
         return interpolated_features
 
@@ -341,9 +338,10 @@ class RandLANet(tf.keras.Model):
         d = pc.get_shape()[2].value
         index_input = tf.reshape(neighbor_idx, shape=[batch_size, -1])
         features = tf.batch_gather(pc, index_input)
-        features = tf.reshape(features, [batch_size, num_points, tf.shape(neighbor_idx)[-1], d])
+        features = tf.reshape(
+            features, [batch_size, num_points,
+                       tf.shape(neighbor_idx)[-1], d])
         return features
-
 
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
@@ -387,7 +385,6 @@ class RandLANet(tf.keras.Model):
 
                 label = label[:, 0]
 
-
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
 
@@ -428,7 +425,6 @@ class RandLANet(tf.keras.Model):
         input_list = input_points + input_neighbors + input_pools + input_up_samples
         input_list += [features, label]
 
-      
         return input_list
 
     def preprocess(self, data, attr):

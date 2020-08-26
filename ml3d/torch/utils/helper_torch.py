@@ -20,7 +20,6 @@ class conv2d_transpose(nn.Module):
         self.biases = self.conv.bias
         self.weights = self.conv.weight
         self.batchNorm = batchNorm
-        
 
         self.batch_normalization = nn.BatchNorm2d(out_planes)
 
@@ -33,7 +32,7 @@ class conv2d_transpose(nn.Module):
         x = self.conv(x)
         #print(x.permute(0,2,3,1)),
         #                                    eps=1e-6, momentum=0.99
-        
+
         if self.batchNorm:
             x = self.batch_normalization(x)
         #print(x.permute(0,2,3,1))

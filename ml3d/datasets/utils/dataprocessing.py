@@ -8,6 +8,39 @@ import utils.nearest_neighbors.lib.python.nearest_neighbors as nearest_neighbors
 
 class DataProcessing:
     @staticmethod
+    def grid_subsampling(points, features=None, labels=None, sampleDl=0.1, verbose=0):
+        """
+        CPP wrapper for a grid subsampling (method = barycenter for points and features)
+        :param points: (N, 3) matrix of input points
+        :param features: optional (N, d) matrix of features (floating number)
+        :param labels: optional (N,) matrix of integer labels
+        :param sampleDl: parameter defining the size of grid voxels
+        :param verbose: 1 to display
+        :return: subsampled points, with features and/or labels depending of the input
+        """
+
+        if (features is None) and (labels is None):
+            return cpp_subsampling.subsample(points,
+                                             sampleDl=sampleDl,
+                                             verbose=verbose)
+        elif (labels is None):
+            return cpp_subsampling.subsample(points,
+                                             features=features,
+                                             sampleDl=sampleDl,
+                                             verbose=verbose)
+        elif (features is None):
+            return cpp_subsampling.subsample(points,
+                                             classes=labels,
+                                             sampleDl=sampleDl,
+                                             verbose=verbose)
+        else:
+            return cpp_subsampling.subsample(points,
+                                             features=features,
+                                             classes=labels,
+                                             sampleDl=sampleDl,
+                                             verbose=verbose)
+
+    @staticmethod
     def load_pc_semantic3d(filename):
         pc_pd = pd.read_csv(filename,
                             header=None,
@@ -122,7 +155,6 @@ class DataProcessing:
                                            sampleDl=grid_size,
                                            verbose=verbose)
 
-
     @staticmethod
     def IoU_from_confusions(confusions):
         """
@@ -153,7 +185,7 @@ class DataProcessing:
     @staticmethod
     def get_class_weights(num_per_class):
         # pre-calculate the number of points in each category
-        num_per_class = np.array(num_per_class, dtype = np.float32)
+        num_per_class = np.array(num_per_class, dtype=np.float32)
 
         weight = num_per_class / float(sum(num_per_class))
         ce_label_weight = 1 / (weight + 0.02)

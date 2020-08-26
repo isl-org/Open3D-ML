@@ -2,6 +2,7 @@ import numpy as np
 import os, argparse, pickle, sys
 from os.path import exists, join, isfile, dirname, abspath, split
 import torch
+import logging
 
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 from sklearn.neighbors import KDTree
@@ -26,6 +27,12 @@ max_key = max(remap_dict_val.keys())
 remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
 remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+)
+log = logging.getLogger(__name__)
+
 
 class SemanticKITTISplit(Dataset):
     def __init__(self, dataset, split='training'):
@@ -34,12 +41,9 @@ class SemanticKITTISplit(Dataset):
 
         if split == 'test':
             dataset.test_list = path_list
-            for test_file_name in path_list:
-                points = np.load(test_file_name)
-                dataset.possibility += [np.random.rand(points.shape[0]) * 1e-3]
-                dataset.min_possibility += [
-                    float(np.min(dataset.possibility[-1]))
-                ]
+
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+
 
         self.path_list = path_list
         self.split = split
@@ -51,15 +55,18 @@ class SemanticKITTISplit(Dataset):
     def get_data(self, idx):
         pc_path = self.path_list[idx]
         points = DataProcessing.load_pc_kitti(pc_path)
-        if self.split != 'test':
-            dir, file = split(pc_path)
-            label_path = join(dir, '../labels', file[:-4] + '.label')
-            labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
-        else:
+
+        dir, file = split(pc_path)
+        label_path = join(dir, '../labels', file[:-4] + '.label')
+        if not exists(label_path):
             labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
+            if self.split not in ['test', 'all']:
+                raise ValueError("label file not found for {}".format(label_path))
+        else:
+            labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
 
         data = {'point': points, 
-                'feat' : points,
+                'feat' : None,
                 'label': labels,
                 }
 
@@ -103,50 +110,86 @@ class SemanticKITTI:
         }
         self.num_classes = len(self.label_to_names)
 
-        self.possibility = []
-        self.min_possibility = []
-
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)
 
-    def save_test_result(self, test_probs, test_scan_name):
+
+    def is_tested(self, attr):
         cfg = self.cfg
+        name = attr['name']
+        name_seq, name_points = name.split("_")
+        test_path = join(cfg.test_result_folder, 'sequences')
+        save_path = join(test_path, name_seq, 'predictions')
+        test_file_name = name_points
+        store_path = join(save_path, name_points + '.label')
+        if exists(store_path):
+            return True 
+        else:
+            return False
+
+
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        name_seq, name_points = name.split("_")
 
         test_path = join(cfg.test_result_folder, 'sequences')
         make_dir(test_path)
-        save_path = join(test_path, test_scan_name, 'predictions')
+        save_path = join(test_path, name_seq, 'predictions')
         make_dir(save_path)
+        test_file_name = name_points
+        
+        pred = results['predict_labels']
 
-        for j in range(len(test_probs)):
-            test_file_name = self.test_list[j]
-            frame = test_file_name.split('/')[-1][:-4]
-            proj_path = join(cfg.dataset_path, test_scan_name, 'proj')
-            proj_file = join(proj_path, str(frame) + '_proj.pkl')
-            if isfile(proj_file):
-                with open(proj_file, 'rb') as f:
-                    proj_inds = pickle.load(f)
-            probs = test_probs[j][proj_inds[0], :]
+        store_path = join(save_path, name_points + '.label')
+        pred = pred + 1
+        pred = remap_lut[pred].astype(np.uint32)
+        # pred.tofile(store_path)
+
+    def save_test_result_kpconv(self, results, inputs):
+        cfg = self.cfg
+        for j in range(1):
+            # name = inputs['attr']['name']
+            name = inputs['attr']['name']
+            # print(name)
+            name_seq, name_points = name.split("_")
+
+            test_path = join(cfg.test_result_folder, 'sequences')
+            make_dir(test_path)
+            save_path = join(test_path, name_seq, 'predictions')
+            make_dir(save_path)
+
+            test_file_name = name_points
+            # proj_inds = inputs['data']['proj_inds'][j].cpu().numpy()
+            
+            proj_inds = inputs['data'].reproj_inds[0]
+            # proj_inds = inputs.proj_inds
+            probs = results[proj_inds, :]
+            # probs = results[j][proj_inds, :]
+          
             pred = np.argmax(probs, 1)
 
-            store_path = join(test_path, test_scan_name, 'predictions',
-                              str(frame) + '.label')
+            store_path = join(save_path, name_points + '.label')
             pred = pred + 1
             pred = remap_lut[pred].astype(np.uint32)
             pred.tofile(store_path)
+
 
     def get_split_list(self, split):
         cfg = self.cfg
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split == 'training':
+        if split in ['train', 'training']:
             seq_list = cfg.training_split
-        elif split == 'test':
-            seq_list = [str(cfg.test_split_number)]
-        elif split == 'validation':
+        elif split in ['test', 'testing']:
+            seq_list = cfg.test_split
+        elif split in ['val', 'validation']:
             seq_list = cfg.validation_split
-
-        # self.prepro_randlanet(seq_list, split)
+        elif split in ['all']:
+            seq_list = cfg.all_split
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
         for seq_id in seq_list:
             pc_path = join(dataset_path, seq_id, 'velodyne')
@@ -154,16 +197,5 @@ class SemanticKITTI:
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
         file_list = np.concatenate(file_list, axis=0)
-        file_list = DataProcessing.shuffle_list(file_list)
 
         return file_list
-
-    def crop_pc(self, points, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        center_point = points[pick_idx, :].reshape(1, -1)
-        select_idx = search_tree.query(center_point,
-                                       k=self.cfg.num_points)[1][0]
-        select_idx = DataProcessing.shuffle_idx(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        return select_points, select_labels, select_idx

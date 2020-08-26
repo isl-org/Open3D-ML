@@ -4,19 +4,23 @@ import torch
 import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
+from sklearn.neighbors import KDTree
 
 import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
 import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
 
-from ...utils.ply import write_ply, read_ply
 from ..modules.losses import filter_valid_label
+from ...utils.ply import write_ply, read_ply
 from ...datasets.utils import DataProcessing
+
+
 class KPFCNN(nn.Module):
     """
     Class defining KPFCNN
     """
     def __init__(self, cfg):
         super(KPFCNN, self).__init__()
+        self.name = 'KPFCNN'
         self.cfg = cfg
 
         ############
@@ -141,7 +145,6 @@ class KPFCNN(nn.Module):
             self.criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
         self.deform_fitting_mode = cfg.deform_fitting_mode
         self.deform_fitting_power = cfg.deform_fitting_power
-        self.deform_lr_factor = cfg.deform_lr_factor
         self.repulse_extent = cfg.repulse_extent
         self.output_loss = 0
         self.reg_loss = 0
@@ -172,7 +175,23 @@ class KPFCNN(nn.Module):
 
         return x
 
-    def loss(self, Loss, results, inputs, device):
+    def get_optimizer(self, cfg_pipeline):
+        # Optimizer with specific learning rate for deformable KPConv
+        deform_params = [v for k, v in self.named_parameters() if 'offset' in k]
+        other_params = [v for k, v in self.named_parameters() if 'offset' not in k]
+        deform_lr = cfg_pipeline.learning_rate * cfg_pipeline.deform_lr_factor
+        optimizer = torch.optim.SGD([{'params': other_params},
+                                          {'params': deform_params, 'lr': deform_lr}],
+                                         lr=cfg_pipeline.learning_rate,
+                                         momentum=cfg_pipeline.momentum,
+                                         weight_decay=cfg_pipeline.weight_decay)
+      
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
+        
+        return optimizer, scheduler
+
+    def get_loss(self, Loss, results, inputs, device):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
@@ -210,6 +229,366 @@ class KPFCNN(nn.Module):
         return loss, labels, scores
 
     def transform(self, data, attr):
+        if attr['split'] == 'test':
+            return self.transform_test(data, attr)
+        else:
+            return self.transform_train(data, attr)
+
+    def transform_test(self, data, attr):
+
+        p_list = []
+        f_list = []
+        l_list = []
+        fi_list = []
+        p0_list = []
+        s_list = []
+        R_list = []
+        r_inds_list = []
+        r_mask_list = []
+        val_labels_list = []
+        batch_n = 0
+
+        # Initiate merged points
+        merged_points = np.zeros((0, 3), dtype=np.float32)
+        merged_labels = np.zeros((0, ), dtype=np.int32)
+        merged_coords = np.zeros((0, 4), dtype=np.float32)
+
+        # Get center of the first frame in world coordinates
+        p_origin = np.zeros((1, 4))
+        p_origin[0, 3] = 1
+        #pose0 = self.poses[s_ind][f_ind]
+        #p0 = p_origin.dot(pose0.T)[:, :3]
+        p0 = p_origin[:, :3]
+        p0 = np.squeeze(p0)
+        o_pts = None
+        o_labels = None
+
+        num_merged = 0
+        f_inc = 0
+
+        # Read points
+        points = data['point']
+        sem_labels = data['label']
+
+        # Apply pose (without np.dot to avoid multi-threading)
+        hpoints = np.hstack((points, np.ones_like(points[:, :1])))
+        #new_points = hpoints.dot(pose.T)
+        #new_points = np.sum(np.expand_dims(hpoints, 2) * pose.T, axis=1)
+        # TODO pose
+        new_points = hpoints
+        #new_points[:, 3:] = points[:, 3:]
+
+        # In case of validation, keep the original points in memory
+        o_pts = new_points[:, :3].astype(np.float32)
+        o_labels = sem_labels.astype(np.int32)
+
+        # In case radius smaller than 50m, chose new center on a point of the wanted class or not
+        # TODO balance
+
+        wanted_ind = np.random.choice(new_points.shape[0])
+        p0 = new_points[wanted_ind, :3]
+
+        new_points = new_points[:, :3]
+        sem_labels = sem_labels[:]
+
+        new_coords = points[:, :]
+
+        # Increment merge count
+        merged_points = np.vstack((merged_points, new_points))
+        merged_labels = sem_labels  #np.hstack((merged_labels, sem_labels))
+        merged_coords = np.vstack((merged_coords, new_coords))
+
+        in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
+            merged_points,
+            features=merged_coords,
+            labels=merged_labels,
+            sampleDl=self.cfg.first_subsampling_dl)
+
+        # Number collected
+        n = in_pts.shape[0]
+
+        # Safe check
+        if n < 2:
+            print("sample n < 2!")
+            exit()
+
+        # Project predictions on the frame points
+        search_tree = KDTree(in_pts, leaf_size=50)
+        proj_inds = search_tree.query(o_pts[:, :],
+                                      return_distance=False)
+        proj_inds = np.squeeze(proj_inds).astype(np.int32)
+  
+
+        # Data augmentation
+        in_pts, scale, R = self.augmentation_transform(in_pts)
+
+        # Stack batch
+        p_list += [in_pts]
+        f_list += [in_fts]
+        l_list += [np.squeeze(in_lbls)]
+        #fi_list += [[s_ind, f_ind]]
+        p0_list += [p0]
+        s_list += [scale]
+        R_list += [R]
+        r_inds_list += [proj_inds]
+        r_mask_list += [None]
+        val_labels_list += [o_labels]
+
+        ###################
+        # Concatenate batch
+        ###################
+
+        stacked_points = np.concatenate(p_list, axis=0)
+        features = np.concatenate(f_list, axis=0)
+        labels = np.concatenate(l_list, axis=0)
+        frame_inds = np.array(fi_list, dtype=np.int32)
+        frame_centers = np.stack(p0_list, axis=0)
+        stack_lengths = np.array([pp.shape[0] for pp in p_list],
+                                 dtype=np.int32)
+        scales = np.array(s_list, dtype=np.float32)
+        rots = np.stack(R_list, axis=0)
+
+        # Input features (Use reflectance, input height or all coordinates)
+        stacked_features = np.ones_like(stacked_points[:, :1],
+                                        dtype=np.float32)
+        if self.cfg.in_features_dim == 1:
+            pass
+        elif self.cfg.in_features_dim == 2:
+            # Use original height coordinate
+            stacked_features = np.hstack((stacked_features, features[:, 2:3]))
+        elif self.cfg.in_features_dim == 3:
+            # Use height + reflectance
+            stacked_features = np.hstack((stacked_features, features[:, 2:]))
+        elif self.cfg.in_features_dim == 4:
+            # Use all coordinates
+            stacked_features = np.hstack((stacked_features, features[:3]))
+        elif self.cfg.in_features_dim == 5:
+            # Use all coordinates + reflectance
+            stacked_features = np.hstack((stacked_features, features))
+        else:
+            raise ValueError(
+                'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
+            )
+
+        #######################
+        # Create network inputs
+        #######################
+        #
+        #   Points, neighbors, pooling indices for each layers
+        #
+
+        # Get the whole input list
+        input_list = self.segmentation_inputs(stacked_points, stacked_features,
+                                              labels.astype(np.int64),
+                                              stack_lengths)
+
+        # Add scale and rotation for testing
+        input_list += [
+            scales, rots, frame_inds, frame_centers, r_inds_list, r_mask_list,
+            val_labels_list
+        ]
+
+        return [self.cfg.num_layers] + input_list
+
+    def transform_train(self, data, attr):
+
+        # Initiate merged points
+        merged_points = np.zeros((0, 3), dtype=np.float32)
+        merged_labels = np.zeros((0, ), dtype=np.int32)
+        merged_coords = np.zeros((0, 4), dtype=np.float32)
+
+        # Get center of the first frame in world coordinates
+        p_origin = np.zeros((1, 4))
+        p_origin[0, 3] = 1
+        #pose0 = self.poses[s_ind][f_ind]
+        #p0 = p_origin.dot(pose0.T)[:, :3]
+        p0 = p_origin[:, :3]
+        p0 = np.squeeze(p0)
+        o_pts = None
+        o_labels = None
+
+        num_merged = 0
+        f_inc = 0
+
+        # Read points
+        points = data['point']
+        sem_labels = data['label']
+
+        # Apply pose (without np.dot to avoid multi-threading)
+        hpoints = np.hstack((points, np.ones_like(points[:, :1])))
+        #new_points = hpoints.dot(pose.T)
+        #new_points = np.sum(np.expand_dims(hpoints, 2) * pose.T, axis=1)
+        # TODO pose
+        new_points = hpoints
+        #new_points[:, 3:] = points[:, 3:]
+
+        # In case of validation, keep the original points in memory
+        if attr['split'] in ['validation', 'test']:
+            o_pts = new_points[:, :3].astype(np.float32)
+            o_labels = sem_labels.astype(np.int32)
+
+        # In case radius smaller than 50m, chose new center on a point of the wanted class or not
+        # TODO balance
+        if self.cfg.in_radius < 50.0 and f_inc == 0:
+            wanted_ind = np.random.choice(new_points.shape[0])
+            p0 = new_points[wanted_ind, :3]
+
+        # Eliminate points further than config.in_radius
+        mask = np.sum(np.square(new_points[:, :3] - p0),
+                      axis=1) < self.cfg.in_radius**2
+        mask_inds = np.where(mask)[0].astype(np.int32)
+
+        # Shuffle points
+        rand_order = np.random.permutation(mask_inds)
+        new_points = new_points[rand_order, :3]
+        sem_labels = sem_labels[rand_order]
+
+        # TODO
+        # Place points in original frame reference to get coordinates
+        #if f_inc == 0:
+        #    new_coords = points[rand_order, :]
+        #else:
+        #    # We have to project in the first frame coordinates
+        #    new_coords = new_points - pose0[:3, 3]
+        #    # new_coords = new_coords.dot(pose0[:3, :3])
+        #    new_coords = np.sum(np.expand_dims(new_coords, 2) * pose0[:3, :3], axis=1)
+        #    new_coords = np.hstack((new_coords, points[:, 3:]))
+        new_coords = points[rand_order, :]
+
+        # Increment merge count
+        merged_points = np.vstack((merged_points, new_points))
+        merged_labels = sem_labels  #np.hstack((merged_labels, sem_labels))
+        merged_coords = np.vstack((merged_coords, new_coords))
+
+        in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
+            merged_points,
+            features=merged_coords,
+            labels=merged_labels,
+            sampleDl=self.cfg.first_subsampling_dl)
+
+        # Number collected
+        n = in_pts.shape[0]
+        # Safe check
+        if n < 2:
+            print("sample n < 2!")
+            # exit()
+
+        # Randomly drop some points (augmentation process and safety for GPU memory consumption)
+        if n > self.cfg.max_in_points:
+            input_inds = np.random.choice(n,
+                                          size=self.cfg.max_in_points,
+                                          replace=False)
+            in_pts = in_pts[input_inds, :]
+            in_fts = in_fts[input_inds, :]
+            in_lbls = in_lbls[input_inds]
+            n = input_inds.shape[0]
+
+        # Before augmenting, compute reprojection inds (only for validation and test)
+        if attr['split'] in ['validation', 'test']:
+
+            # get val_points that are in range
+            radiuses = np.sum(np.square(o_pts - p0), axis=1)
+            reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
+
+            # Project predictions on the frame points
+            search_tree = KDTree(in_pts, leaf_size=50)
+            proj_inds = search_tree.query(o_pts[reproj_mask, :],
+                                          return_distance=False)
+            proj_inds = np.squeeze(proj_inds).astype(np.int32)
+        else:
+            proj_inds = np.zeros((0, ))
+            reproj_mask = np.zeros((0, ))
+
+        # Data augmentation
+        in_pts, scale, R = self.augmentation_transform(in_pts)
+
+        # Color augmentation
+        if np.random.rand() > self.cfg.augment_color:
+            in_fts[:, 3:] *= 0
+
+        # # Stack batch
+        # p_list += [in_pts]
+        # f_list += [in_fts]
+        # l_list += [np.squeeze(in_lbls)]
+        # #fi_list += [[s_ind, f_ind]]
+        # p0_list += [p0]
+        # s_list += [scale]
+        # R_list += [R]
+        # r_inds_list += [proj_inds]
+        # r_mask_list += [reproj_mask]
+        # val_labels_list += [o_labels]
+
+        data = {
+            'p_list': in_pts,
+            'f_list': in_fts,
+            'l_list': np.squeeze(in_lbls),
+            'p0_list': p0,
+            's_list': scale,
+            'R_list': R,
+            'r_inds_list': proj_inds,
+            'r_mask_list': reproj_mask,
+            'val_labels_list': o_labels,
+            'cfg': self.cfg
+        }
+        return data
+
+        # ###################
+        # # Concatenate batch
+        # ###################
+
+        # stacked_points = np.concatenate(p_list, axis=0)
+        # features = np.concatenate(f_list, axis=0)
+        # labels = np.concatenate(l_list, axis=0)
+        # frame_inds = np.array(fi_list, dtype=np.int32)
+        # frame_centers = np.stack(p0_list, axis=0)
+        # stack_lengths = np.array([pp.shape[0] for pp in p_list],
+        #                          dtype=np.int32)
+        # scales = np.array(s_list, dtype=np.float32)
+        # rots = np.stack(R_list, axis=0)
+
+        # # Input features (Use reflectance, input height or all coordinates)
+        # stacked_features = np.ones_like(stacked_points[:, :1],
+        #                                 dtype=np.float32)
+        # if self.cfg.in_features_dim == 1:
+        #     pass
+        # elif self.cfg.in_features_dim == 2:
+        #     # Use original height coordinate
+        #     stacked_features = np.hstack((stacked_features, features[:, 2:3]))
+        # elif self.cfg.in_features_dim == 3:
+        #     # Use height + reflectance
+        #     stacked_features = np.hstack((stacked_features, features[:, 2:]))
+        # elif self.cfg.in_features_dim == 4:
+        #     # Use all coordinates
+        #     stacked_features = np.hstack((stacked_features, features[:3]))
+        # elif self.cfg.in_features_dim == 5:
+        #     # Use all coordinates + reflectance
+        #     stacked_features = np.hstack((stacked_features, features))
+        # else:
+        #     raise ValueError(
+        #         'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
+        #     )
+
+        # #######################
+        # # Create network inputs
+        # #######################
+        # #
+        # #   Points, neighbors, pooling indices for each layers
+        # #
+
+        # # Get the whole input list
+        # input_list = self.segmentation_inputs(stacked_points, stacked_features,
+        #                                       labels.astype(np.int64),
+        #                                       stack_lengths)
+
+        # # Add scale and rotation for testing
+        # input_list += [
+        #     scales, rots, frame_inds, frame_centers, r_inds_list, r_mask_list,
+        #     val_labels_list
+        # ]
+
+        # return [self.cfg.num_layers] + input_list
+
+    def _transform_train(self, data, attr):
 
         p_list = []
         f_list = []
@@ -299,7 +678,6 @@ class KPFCNN(nn.Module):
 
         # Number collected
         n = in_pts.shape[0]
-
         # Safe check
         if n < 2:
             print("sample n < 2!")
@@ -334,6 +712,7 @@ class KPFCNN(nn.Module):
         # Data augmentation
         in_pts, scale, R = self.augmentation_transform(in_pts)
 
+        print(in_pts.shape)
         # Color augmentation
         if np.random.rand() > self.cfg.augment_color:
             in_fts[:, 3:] *= 0
@@ -406,151 +785,36 @@ class KPFCNN(nn.Module):
 
         return [self.cfg.num_layers] + input_list
 
-    def preprocess_(self, data, attr):
-        cfg = self.cfg
-        points = data['point']
-        labels = data['label']
-        split = attr['split']
+    def inference_begin(self, data):
+        self.inference_data = data
+        from ..dataloaders import ConcatBatcher
+        self.batcher = ConcatBatcher(self.device)
 
-        data = dict()
 
-        sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-            points, labels=labels, grid_size=cfg.grid_size)
+    def inference_preprocess(self):
+        data = self.transform_test(self.inference_data, {})
+        inputs = {'data': data, 'attr': []}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
 
-        search_tree = KDTree(sub_points)
+        return inputs
 
-        data['point'] = sub_points
-        data['label'] = sub_labels
-        data['search_tree'] = search_tree
+    def inference_end(self, inputs, results): 
+        m_softmax    = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+        proj_inds = inputs['data'].reproj_inds[0] 
+        results = results[proj_inds]
+        predict_scores = results
 
-        if split != "training":
-            proj_inds = np.squeeze(
-                search_tree.query(points, return_distance=False))
-            proj_inds = proj_inds.astype(np.int32)
-            data['proj_inds'] = proj_inds
-        return data
+        inference_result = {
+            'predict_labels': np.argmax(predict_scores, 1),
+            'predict_scores': predict_scores
+        }
 
-    def segmentation_inputs(self, stacked_points, stacked_features, labels,
-                            stack_lengths):
+        self.inference_result = inference_result
+        return True
 
-        # Starting radius of convolutions
-        r_normal = self.cfg.first_subsampling_dl * self.cfg.conv_radius
-
-        # Starting layer
-        layer_blocks = []
-
-        # Lists of inputs
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_upsamples = []
-        input_stack_lengths = []
-        deform_layers = []
-
-        ######################
-        # Loop over the blocks
-        ######################
-
-        arch = self.cfg.architecture
-
-        for block_i, block in enumerate(arch):
-
-            # Get all blocks of the layer
-            if not ('pool' in block or 'strided' in block or 'global' in block
-                    or 'upsample' in block):
-                layer_blocks += [block]
-                continue
-
-            # Convolution neighbors indices
-            # *****************************
-
-            deform_layer = False
-            if layer_blocks:
-                # Convolutions are done in this layer, compute the neighbors with the good radius
-                if np.any(['deformable' in blck for blck in layer_blocks]):
-                    r = r_normal * self.cfg.deform_radius / self.cfg.conv_radius
-                    deform_layer = True
-                else:
-                    r = r_normal
-                conv_i = batch_neighbors(stacked_points, stacked_points,
-                                         stack_lengths, stack_lengths, r)
-
-            else:
-                # This layer only perform pooling, no neighbors required
-                conv_i = np.zeros((0, 1), dtype=np.int32)
-
-            # Pooling neighbors indices
-            # *************************
-
-            # If end of layer is a pooling operation
-            if 'pool' in block or 'strided' in block:
-
-                # New subsampling length
-                dl = 2 * r_normal / self.cfg.conv_radius
-
-                # Subsampled points
-                pool_p, pool_b = batch_grid_subsampling(stacked_points,
-                                                        stack_lengths,
-                                                        sampleDl=dl)
-
-                # Radius of pooled neighbors
-                if 'deformable' in block:
-                    r = r_normal * self.cfg.deform_radius / self.cfg.conv_radius
-                    deform_layer = True
-                else:
-                    r = r_normal
-
-                # Subsample indices
-                pool_i = batch_neighbors(pool_p, stacked_points, pool_b,
-                                         stack_lengths, r)
-
-                # Upsample indices (with the radius of the next layer to keep wanted density)
-                up_i = batch_neighbors(stacked_points, pool_p, stack_lengths,
-                                       pool_b, 2 * r)
-
-            else:
-                # No pooling in the end of this layer, no pooling indices required
-                pool_i = np.zeros((0, 1), dtype=np.int32)
-                pool_p = np.zeros((0, 3), dtype=np.float32)
-                pool_b = np.zeros((0, ), dtype=np.int32)
-                up_i = np.zeros((0, 1), dtype=np.int32)
-
-            # Reduce size of neighbors matrices by eliminating furthest point
-            conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
-            pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
-            if up_i.shape[0] > 0:
-                up_i = self.big_neighborhood_filter(up_i,
-                                                    len(input_points) + 1)
-
-            # Updating input lists
-            input_points += [stacked_points]
-            input_neighbors += [conv_i.astype(np.int64)]
-            input_pools += [pool_i.astype(np.int64)]
-            input_upsamples += [up_i.astype(np.int64)]
-            input_stack_lengths += [stack_lengths]
-            deform_layers += [deform_layer]
-
-            # New points for next layer
-            stacked_points = pool_p
-            stack_lengths = pool_b
-
-            # Update radius and reset blocks
-            r_normal *= 2
-            layer_blocks = []
-
-            # Stop when meeting a global pooling or upsampling
-            if 'global' in block or 'upsample' in block:
-                break
-
-        ###############
-        # Return inputs
-        ###############
-
-        # list of network inputs
-        li = input_points + input_neighbors + input_pools + input_upsamples + input_stack_lengths
-        li += [stacked_features, labels]
-
-        return li
 
     def big_neighborhood_filter(self, neighbors, layer):
         """
@@ -1400,7 +1664,6 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
-
 
 from ...utils.kpconv_config import bcolors
 
