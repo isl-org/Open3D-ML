@@ -20,6 +20,14 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+  try:
+    for gpu in gpus:
+      tf.config.experimental.set_memory_growth(gpu, True)
+  except RuntimeError as e:
+    print(e)
+
 
 class SemanticSegmentation():
     def __init__(self, model, dataset, cfg):
@@ -101,8 +109,7 @@ class SemanticSegmentation():
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-                # if step > 2:
-                #    break
+
 
 
             # --------------------- validation
@@ -124,8 +131,7 @@ class SemanticSegmentation():
                 self.valid_accs.append(acc)
                 self.valid_ious.append(iou)
                 step = step + 1
-                #if step > 2:
-                #    break
+   
 
             self.save_logs(writer, epoch)
 

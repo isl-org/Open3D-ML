@@ -17,6 +17,8 @@ model = dict(
     input_threads=10,
     training_batcher='ConcatBatcher',
     test_batcher='ConcatBatcher',
+    batcher='ConcatBatcher',
+    density_parameter=5.0,
 
     #########################
     # Architecture definition
