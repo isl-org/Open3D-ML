@@ -71,8 +71,9 @@ class SemanticSegmentation():
         writer = tf.summary.create_file_writer(
                     join(cfg.logs_dir, cfg.train_sum_dir))
 
-        self.optimizer = model.get_optimizer(cfg)
 
+        self.optimizer = model.get_optimizer(cfg)
+        self.load_ckpt()
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
             # --------------------- training
@@ -97,8 +98,8 @@ class SemanticSegmentation():
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
-                # if step > 2:
-                #     break
+                if step > 2:
+                    break
 
 
             # --------------------- validation
@@ -120,14 +121,13 @@ class SemanticSegmentation():
                 self.valid_accs.append(acc)
                 self.valid_ious.append(iou)
                 step = step + 1
-                # if step > 2:
-                #     break
+                if step > 2:
+                    break
 
             self.save_logs(writer, epoch)
 
-            # if epoch % cfg.save_ckpt_freq == 0:
-            #     path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-            #     self.save_ckpt(path_ckpt, epoch)
+            if epoch % cfg.save_ckpt_freq == 0:
+                self.save_ckpt(epoch)
 
     def save_logs(self, writer, epoch):
         accs = np.nanmean(np.array(self.accs), axis=0)
@@ -173,13 +173,28 @@ class SemanticSegmentation():
 
         # print(acc_dicts[-1])
 
-    def load_ckpt(self, ckpt_path, is_train=True):
-        # TODO
-        pass
+    def load_ckpt(self):
+        train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
+        make_dir(train_ckpt_dir)
+        self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), 
+                            optimizer=self.optimizer,
+                            net=self.model)
+        self.manager = tf.train.CheckpointManager(self.ckpt, 
+                train_ckpt_dir, max_to_keep=3)
 
-    def save_ckpt(self, path_ckpt, epoch):
-        make_dir(path_ckpt)
-        model.save('path/to/location')
 
-        # TODO
-        pass
+        self.ckpt.restore(self.manager.latest_checkpoint)
+        if self.manager.latest_checkpoint:
+            print("Restored from {}".format(self.manager.latest_checkpoint))
+        else:
+            print("Initializing from scratch.")
+
+        #if exists(self.model.cfg.ckpt_path):
+        #    self.model.load_weights(self.model.cfg.ckpt_path)
+        #    log.info("Loading checkpoint {}".format(self.model.cfg.ckpt_path))
+
+
+    def save_ckpt(self, epoch):
+        save_path = self.manager.save()
+        log.info("Saved checkpoint at: {}".format( save_path))
+     

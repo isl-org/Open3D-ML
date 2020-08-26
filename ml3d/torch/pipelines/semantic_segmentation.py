@@ -229,8 +229,7 @@ class SemanticSegmentation():
             self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
-                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-                self.save_ckpt(path_ckpt, epoch)
+                self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
         batcher_name = getattr(self.model.cfg, split+'_batcher')
@@ -302,7 +301,8 @@ class SemanticSegmentation():
 
         return first_epoch
 
-    def save_ckpt(self, path_ckpt, epoch):
+    def save_ckpt(self, epoch):
+        path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(path_ckpt)
         torch.save(
             dict(epoch=epoch,
