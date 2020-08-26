@@ -19,8 +19,8 @@ model = dict(
     ckpt_path='./ml3d/torch/checkpoint/randlanet_semantickitti.pth')
 
 pipeline = dict(
-    batch_size=4,
-    val_batch_size=4,
+    batch_size=1,
+    val_batch_size=1,
     test_batch_size=1,
     max_epoch=100,  # maximum epoch during training
     learning_rate=1e-2,  # initial learning rate
@@ -37,12 +37,10 @@ pipeline = dict(
 
 dataset = dict(
     original_pc_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
-    original_label_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_labels/dataset/sequences',
+    './datasets/SemanticKITTI/dataset/sequences',
     dataset_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
-    cache_dir='/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache1',
+    './datasets/SemanticKITTI/dataset/sequences',
+    cache_dir='./logs/cache',
     use_cache=False,
     test_result_folder='./test',
 

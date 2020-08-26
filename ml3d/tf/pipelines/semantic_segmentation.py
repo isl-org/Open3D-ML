@@ -108,7 +108,7 @@ class SemanticSegmentation():
             self.valid_losses = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, desc='validation')):
+            for idx, inputs in enumerate(tqdm(valid_loader, desc='validation')):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(
