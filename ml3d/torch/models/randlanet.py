@@ -11,6 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
 from ..utils import helper_torch
+from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
 from ...utils import Config
@@ -119,62 +120,13 @@ class RandLANet(nn.Module):
             select_feat = feat[select_idx]
         return select_points, select_feat, select_labels, select_idx
 
-    def transform(self, data, attr):
-        cfg = self.cfg
-        pc = data['point']
-        label = data['label']
-        feat = data['feat']
-        tree = data['search_tree']
-        pick_idx = np.random.choice(len(pc), 1)
+    def get_optimizer(self, cfg_pipeline):
+        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
+        return optimizer, scheduler
 
-        pc, feat, label, selected_idx = \
-            self.crop_pc(pc, feat, label, tree, pick_idx)
-        '''
-        if split != "training":
-            proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
-            proj_inds = proj_inds.astype(np.int32)
-            data['proj_inds'] = proj_inds
-        '''
-
-        if (feat is not None):
-            features = np.concatenate([pc, feat], axis=1)
-        else:
-            features = pc
-
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
-
-        ori_pc = pc
-
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
-
-            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:pc.shape[0] //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, pc, 1)
-            input_points.append(pc)
-            input_neighbors.append(neighbour_idx.astype(np.int64))
-            input_pools.append(pool_i.astype(np.int64))
-            input_up_samples.append(up_i.astype(np.int64))
-            pc = sub_points
-
-        inputs = dict()
-        inputs['xyz'] = input_points
-        inputs['neigh_idx'] = input_neighbors
-        inputs['sub_idx'] = input_pools
-        inputs['interp_idx'] = input_up_samples
-        inputs['features'] = features
-
-        inputs['labels'] = label.astype(np.int64)
-        # inputs['input_inds']    = batch_pc_idx
-        # inputs['cloud_inds']    = batch_cloud_idx
-
-        return inputs
-
-    def loss(self, Loss, results, inputs, device):
+    def get_loss(self, Loss, results, inputs, device):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
@@ -195,30 +147,165 @@ class RandLANet(nn.Module):
 
         return loss, labels, scores
 
+
+    # def transform_whole(self, data, attr):
+    #     cfg = self.cfg
+    #     pc = data['point']
+    #     label = data['label']
+    #     feat = data['feat']
+    #     tree = data['search_tree']
+    #     features = feat
+
+    #     input_points = []
+    #     input_neighbors = []
+    #     input_pools = []
+    #     input_up_samples = []
+
+    #     for i in range(cfg.num_layers):
+    #         neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+    #         sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+    #         pool_i = neighbour_idx[:pc.shape[0] //
+    #                                cfg.sub_sampling_ratio[i], :]
+    #         up_i = DataProcessing.knn_search(sub_points, pc, 1)
+    #         input_points.append(pc)
+    #         input_neighbors.append(neighbour_idx.astype(np.int64))
+    #         input_pools.append(pool_i.astype(np.int64))
+    #         input_up_samples.append(up_i.astype(np.int64))
+    #         pc = sub_points
+
+    #     inputs = dict()
+    #     inputs['xyz'] = input_points
+    #     inputs['neigh_idx'] = input_neighbors
+    #     inputs['sub_idx'] = input_pools
+    #     inputs['interp_idx'] = input_up_samples
+    #     inputs['features'] = features
+
+    #     inputs['labels'] = label.astype(np.int64)
+    #     if attr['split'] == "test":
+    #         inputs['proj_inds'] = data['proj_inds'] 
+      
+    #     return inputs
+
+
+    def transform(self, data, attr, min_posbility_idx=None):
+        cfg = self.cfg
+        inputs = dict()
+
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']
+        if min_posbility_idx is None: # training
+            pick_idx = np.random.choice(len(pc), 1)
+        else:
+            pick_idx = min_posbility_idx
+
+
+        selected_pc, feat, label, selected_idx = \
+            self.crop_pc(pc, feat, label, tree, pick_idx)
+        
+        if min_posbility_idx is not None:
+            dists = np.sum(np.square((selected_pc - pc[pick_idx]).astype(np.float32)), axis=1)
+            delta = np.square(1 - dists / np.max(dists))
+            self.possibility[selected_idx] += delta
+            inputs['point_inds'] = selected_idx
+
+        pc = selected_pc
+        features = feat
+        input_points = []
+        input_neighbors = []
+        input_pools = []
+        input_up_samples = []
+
+
+        for i in range(cfg.num_layers):
+            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] //
+                                   cfg.sub_sampling_ratio[i], :]
+            up_i = DataProcessing.knn_search(sub_points, pc, 1)
+            input_points.append(pc)
+            input_neighbors.append(neighbour_idx.astype(np.int64))
+            input_pools.append(pool_i.astype(np.int64))
+            input_up_samples.append(up_i.astype(np.int64))
+            pc = sub_points
+
+        inputs['xyz'] = input_points
+        inputs['neigh_idx'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = features
+
+        inputs['labels'] = label.astype(np.int64)
+        # inputs['input_inds']    = batch_pc_idx
+        # inputs['cloud_inds']    = batch_cloud_idx
+
+        return inputs
+
+    # def transform(self, data, attr):
+    #     if attr['split'] == 'test':
+    #         return self.transform_whole(data, attr) 
+    #     else: 
+    #         return self.transform_crop(data, attr)
+
+    def inference_begin(self, data):
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes], dtype=np.float16)
+        self.batcher = DefaultBatcher()
+
+
+    def inference_preprocess(self):
+        min_posbility_idx = np.argmin(self.possibility)
+        data = self.transform(self.inference_data, {}, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        return inputs
+
+    def inference_end(self, inputs, results):
+       
+        results = torch.reshape(results, (-1, self.cfg.num_classes))
+        m_softmax    = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds'][0, :]
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
+
     def preprocess(self, data, attr):
         cfg = self.cfg
 
-        if 'feat' not in data.keys():
-            data['feat'] = None
-
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
-        feat = np.array(data['feat'], dtype=np.float32)
         labels = np.array(data['label'], dtype=np.int32)
+
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = points
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+            feat = np.concatenate([points, feat], axis=1)
 
         split = attr['split']
 
-        if (feat is None):
-            sub_feat = None
-
         data = dict()
-
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                points, labels=labels, grid_size=cfg.grid_size)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                points, features=feat, labels=labels, grid_size=cfg.grid_size)
+    
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
@@ -227,107 +314,13 @@ class RandLANet(nn.Module):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split == "test":
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
             data['proj_inds'] = proj_inds
 
         return data
-
-    def previous_preprocess(self, batch_data, device):
-        cfg = self.cfg
-        batch_pc = batch_data[0]
-        batch_label = batch_data[1]
-        batch_pc_idx = batch_data[2]
-        batch_cloud_idx = batch_data[3]
-
-        features = batch_data[0]
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
-
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(batch_pc, batch_pc,
-                                                      cfg.k_n)
-            sub_points = batch_pc[:, :batch_pc.size(1) //
-                                  cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:, :batch_pc.size(1) //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, batch_pc, 1)
-            input_points.append(batch_pc)
-            input_neighbors.append(neighbour_idx)
-            input_pools.append(pool_i)
-            input_up_samples.append(up_i)
-            batch_pc = sub_points
-
-        inputs = dict()
-        #print(features)
-        inputs['xyz'] = [arr.to(device) for arr in input_points]
-        inputs['neigh_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_neighbors
-        ]
-        inputs['sub_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_pools
-        ]
-        inputs['interp_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_up_samples
-        ]
-        inputs['features'] = features.to(device)
-        inputs['input_inds'] = batch_pc_idx
-        inputs['cloud_inds'] = batch_cloud_idx
-
-        return inputs
-
-    def preprocess_inference(self, pc, device):
-        cfg = self.cfg
-        idx = DataProcessing.shuffle_idx(np.arange(len(pc)))
-        pc = pc[idx]
-        batch_pc = torch.from_numpy(pc).unsqueeze(0)
-        features = batch_pc
-
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
-
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(batch_pc, batch_pc,
-                                                      cfg.k_n)
-
-            sub_points = batch_pc[:, :batch_pc.size(1) //
-                                  cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:, :batch_pc.size(1) //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, batch_pc, 1)
-            input_points.append(batch_pc)
-            input_neighbors.append(neighbour_idx)
-            input_pools.append(pool_i)
-            input_up_samples.append(up_i)
-            batch_pc = sub_points
-
-        inputs = dict()
-        #print(features)
-        inputs['xyz'] = [arr.to(device) for arr in input_points]
-        inputs['neigh_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_neighbors
-        ]
-        inputs['sub_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_pools
-        ]
-        inputs['interp_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_up_samples
-        ]
-        inputs['features'] = features.to(device)
-
-        return inputs
 
     def init_att_pooling(self, d, d_out, name):
         att_activation = nn.Linear(d, d)
