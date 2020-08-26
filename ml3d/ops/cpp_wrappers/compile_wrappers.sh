@@ -9,3 +9,7 @@ cd ..
 cd cpp_neighbors
 python3 setup.py build_ext --inplace
 cd ..
+
+cd nearest_neighbors
+python setup.py install --home="."
+cd ../../
