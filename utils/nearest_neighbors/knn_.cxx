@@ -8,7 +8,9 @@ using namespace nanoflann;
 #include <ctime>
 #include <cstdlib>
 #include <iostream>
+#ifndef __APPLE__  // clang doesn't support OpenMP
 #include <omp.h>
+#endif  // __APPLE__
 
 #include <vector>
 #include <random>

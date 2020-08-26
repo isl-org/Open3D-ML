@@ -18,6 +18,7 @@ import torch
 from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
 from collections import namedtuple
+import vis
 
 from ...utils import dataset_helper
 
@@ -76,3 +77,6 @@ class Torch_Dataloader(Dataset):
 
     def __len__(self):
         return len(self.dataset)
+
+    def visualize(self, indices):
+        vis.visualize(self, indices)

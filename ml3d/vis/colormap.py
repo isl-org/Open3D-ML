@@ -1,0 +1,67 @@
+class Colormap:
+    class Point:
+        def __init__(self, value, color):
+            assert(value >= 0.0)
+            assert(value <= 1.0)
+
+            self.value = value
+            self.color = color
+
+    # The value of each Point must be greater than the previous
+    # (e.g. [0.0, 0.1, 0.4, 1.0], not [0.0, 0.4, 0.1, 1.0]
+    def __init__(self, points):
+        self.points = points
+
+    def calc_u_array(self, values, range_min, range_max):
+        range_width = (range_max - range_min)
+        return [min(1.0, max(0.0, (v - range_min) / range_width))
+                for v in values]
+
+    # TODO: this will be done by the colormap shader
+    def calc_color_array(self, values, range_min, range_max):
+        u_array = self.calc_u_array(values, range_min, range_max)
+
+        tex = [[1.0, 0.0, 1.0]] * 128
+        n = float(len(tex) - 1)
+        idx = 0
+        for tex_idx in range(0, len(tex)):
+            x = float(tex_idx) / n
+            while idx < len(self.points) and x > self.points[idx].value:
+                idx += 1
+                
+            if idx == 0:
+                tex[tex_idx] = self.points[0].color
+            elif idx == len(self.points):
+                tex[tex_idx] = self.points[-1].color
+            else:
+                p0 = self.points[idx-1]
+                p1 = self.points[idx]
+                dist = p1.value - p0.value
+                # Calc weights between 0 and 1
+                w0 = 1.0 - (x - p0.value) / dist
+                w1 = (x - p0.value) / dist
+                c = [w0 * p0.color[0] + w1 * p1.color[0],
+                     w0 * p0.color[1] + w1 * p1.color[1],
+                     w0 * p0.color[2] + w1 * p1.color[2]]
+                tex[tex_idx] = c
+
+        return [tex[int(u * n)] for u in u_array]
+
+    # These are factory methods rather than class objects because
+    # the user may modify the colormaps that are used.
+    @staticmethod
+    def make_greyscale():
+        return Colormap([Colormap.Point(0.0, [0.0, 0.0, 0.0]),
+                         Colormap.Point(1.0, [1.0, 1.0, 1.0])])
+
+    @staticmethod
+    def make_rainbow():
+        return Colormap([Colormap.Point(0.000, [0.0, 0.0, 1.0]),
+                         Colormap.Point(0.125, [0.0, 0.5, 1.0]),
+                         Colormap.Point(0.250, [0.0, 1.0, 1.0]),
+                         Colormap.Point(0.375, [0.0, 1.0, 0.5]),
+                         Colormap.Point(0.500, [0.0, 1.0, 0.0]),
+                         Colormap.Point(0.625, [0.5, 1.0, 0.0]),
+                         Colormap.Point(0.750, [1.0, 1.0, 0.0]),
+                         Colormap.Point(0.875, [1.0, 0.5, 0.0]),
+                         Colormap.Point(1.000, [1.0, 0.0, 0.0])])
