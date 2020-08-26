@@ -17,7 +17,7 @@ class TFDataloader():
                  *args,
                  dataset=None,
                  model=None,
-                 no_progress: bool = False,
+                 use_cache=True,
                  **kwargs):
         self.dataset = dataset
         self.model = model
@@ -26,7 +26,7 @@ class TFDataloader():
         self.get_batch_gen = model.get_batch_gen
         self.model_cfg = model.cfg
 
-        if self.preprocess is not None:
+        if self.preprocess is not None and use_cache:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
 
             assert cache_dir is not None, 'cache directory is not given'
@@ -59,12 +59,15 @@ class TFDataloader():
         self.pc_list = dataset.path_list
         self.num_pc = len(self.pc_list)
 
-    def read_data(self, key):
-        attr = self.dataset.get_attr(key)
-        if self.cache_convert is None:
-            data = self.dataset.get_data(key)
-        else:
+    def read_data(self, index):
+        attr = self.dataset.get_attr(index)
+        if self.cache_convert:
             data = self.cache_convert(attr['name'])
+        elif self.preprocess:
+            data = self.preprocess(self.dataset.get_data(index), attr)
+        else:
+            data = self.dataset.get_data(index)
+
 
         return data, attr
 

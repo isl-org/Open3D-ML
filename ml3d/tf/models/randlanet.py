@@ -131,7 +131,7 @@ class RandLANet(tf.keras.Model):
         f_agg = tf.reshape(f_agg, [-1, num_points, 1, d])
 
         m_conv2d = getattr(self, name + 'mlp')
-        f_agg = m_conv2d(f_agg)
+        f_agg = m_conv2d(f_agg, training=self.training)
 
         return f_agg
 
@@ -152,7 +152,7 @@ class RandLANet(tf.keras.Model):
         f_xyz = self.forward_relative_pos_encoding(xyz, neigh_idx)
         m_conv2d = getattr(self, name + 'bdmlp1')
 
-        f_xyz = m_conv2d(f_xyz)
+        f_xyz = m_conv2d(f_xyz, training=self.training)
 
         f_neighbours = self.forward_gather_neighbour(
             tf.squeeze(feature, axis=2), neigh_idx)
@@ -161,7 +161,7 @@ class RandLANet(tf.keras.Model):
         f_pc_agg = self.forward_att_pooling(f_concat, name + 'att_pooling_1')
 
         m_conv2d = getattr(self, name + 'mlp2')
-        f_xyz = m_conv2d(f_xyz)
+        f_xyz = m_conv2d(f_xyz, training=self.training)
 
         f_neighbours = self.forward_gather_neighbour(
             tf.squeeze(f_pc_agg, axis=2), neigh_idx)
@@ -172,21 +172,21 @@ class RandLANet(tf.keras.Model):
 
     def forward_dilated_res_block(self, feature, xyz, neigh_idx, d_out, name):
         m_conv2d = getattr(self, name + 'mlp1')
-        f_pc = m_conv2d(feature)
+        f_pc = m_conv2d(feature, training=self.training)
 
         f_pc = self.forward_building_block(xyz, f_pc, neigh_idx, name + 'LFA')
 
         m_conv2d = getattr(self, name + 'mlp2')
-        f_pc = m_conv2d(f_pc)
+        f_pc = m_conv2d(f_pc, training=self.training)
 
         m_conv2d = getattr(self, name + 'shortcut')
-        shortcut = m_conv2d(feature)
+        shortcut = m_conv2d(feature, training=self.training)
 
         result = tf.nn.leaky_relu(f_pc + shortcut)
         return result
 
     def call(self, inputs, training=True):
-
+        self.training = training
         num_layers = self.cfg.num_layers
         xyz = inputs[:num_layers]
         neigh_idx = inputs[num_layers:2 * num_layers]
@@ -194,19 +194,11 @@ class RandLANet(tf.keras.Model):
         interp_idx = inputs[3 * num_layers:4 * num_layers]
         feature = inputs[4 * num_layers]
 
-        # print("inputs")
-        # print(xyz)
-        # print(neigh_idx)
-        # print(sub_idx)
-        # print(interp_idx)
-        # print(feature)
-        # print("-------------")
-
         m_dense = getattr(self, 'fc0')
-        feature = m_dense(feature)
+        feature = m_dense(feature, training=self.training)
 
         m_bn = getattr(self, 'batch_normalization')
-        feature = m_bn(feature)
+        feature = m_bn(feature, training=self.training)
 
         feature = tf.nn.leaky_relu(feature)
         feature = tf.expand_dims(feature, axis=2)
@@ -225,7 +217,7 @@ class RandLANet(tf.keras.Model):
             f_encoder_list.append(f_sampled_i)
 
         m_conv2d = getattr(self, 'decoder_0')
-        feature = m_conv2d(f_encoder_list[-1])
+        feature = m_conv2d(f_encoder_list[-1], training=self.training)
 
         # Decoder
         f_decoder_list = []
@@ -237,43 +229,36 @@ class RandLANet(tf.keras.Model):
             m_transposeconv2d = getattr(self, name)
             concat_feature = tf.concat([f_encoder_list[-j - 2], f_interp_i],
                                        axis=3)
-            f_decoder_i = m_transposeconv2d(concat_feature)
+            f_decoder_i = m_transposeconv2d(concat_feature, training=self.training)
 
             feature = f_decoder_i
             f_decoder_list.append(f_decoder_i)
 
         m_conv2d = getattr(self, 'fc1')
-        f_layer_fc1 = m_conv2d(f_decoder_list[-1])
+        f_layer_fc1 = m_conv2d(f_decoder_list[-1], training=self.training)
 
         m_conv2d = getattr(self, 'fc2')
-        f_layer_fc2 = m_conv2d(f_layer_fc1)
+        f_layer_fc2 = m_conv2d(f_layer_fc1, training=self.training)
 
         m_dropout = getattr(self, 'dropout1')
-        f_layer_drop = m_dropout(f_layer_fc2, training=True)
+        f_layer_drop = m_dropout(f_layer_fc2, training=self.training)
 
         m_conv2d = getattr(self, 'fc')
-        f_layer_fc3 = m_conv2d(f_layer_drop)
+        f_layer_fc3 = m_conv2d(f_layer_drop, training=self.training)
 
         f_out = tf.squeeze(f_layer_fc3, [2])
 
         return f_out
 
-    def get_loss(self, Loss):
-        def compute_loss(results, labels):
+    def get_optimizer(self, cfg_pipeline):
+        lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+            cfg_pipeline.adam_lr, decay_steps=100000, decay_rate=cfg_pipeline.scheduler_gamma)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
-            class_weights = Loss.class_weights
-            one_hot_labels = tf.one_hot(labels, depth=self.config.num_classes)
-            weights = tf.reduce_sum(class_weights * one_hot_labels, axis=1)
-            unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(
-                logits=logits, labels=one_hot_labels)
-            weighted_losses = unweighted_losses * weights
+        return optimizer
 
-            output_loss = tf.reduce_mean(weighted_losses)
-            return output_loss
 
-        return compute_loss
-
-    def loss(self, Loss, results, inputs):
+    def get_loss(self, Loss, results, inputs):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
@@ -429,16 +414,16 @@ class RandLANet(tf.keras.Model):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-        if 'feat' not in data.keys():
-            data['feat'] = None
 
         points = data['point'][:, 0:3]
-        feat = data['feat'][:, 0:3]
         labels = data['label']
         split = attr['split']
 
-        if (feat is None):
-            sub_feat = None
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = points
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+            feat = np.concatenate([points, feat], axis=1)
 
         data = dict()
 

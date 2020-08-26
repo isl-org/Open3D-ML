@@ -62,7 +62,7 @@ class SemanticSegmentation():
         self.dataset = dataset
 
         make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.name)
+        cfg.logs_dir = join(cfg.main_log_dir, model.name + '_torch')
         make_dir(cfg.logs_dir)
 
         # dataset.cfg.num_points = model.cfg.num_points
@@ -136,9 +136,7 @@ class SemanticSegmentation():
 
         log.info("DEVICE : {}".format(device))
         log.info(model)
-
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))

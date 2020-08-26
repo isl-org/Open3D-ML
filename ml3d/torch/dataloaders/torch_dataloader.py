@@ -29,7 +29,6 @@ class TorchDataloader(Dataset):
                  preprocess=None,
                  transform=None,
                  use_cache=True,
-                 no_progress: bool = False,
                  **kwargs):
         self.dataset = dataset
         self.preprocess = preprocess

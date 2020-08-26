@@ -183,7 +183,7 @@ class KPFCNN(tf.keras.Model):
 
         return x
 
-    def loss(self, Loss, logits, inputs):
+    def get_loss(self, Loss, logits, inputs):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
