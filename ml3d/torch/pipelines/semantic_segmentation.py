@@ -232,7 +232,7 @@ class SemanticSegmentation():
                 self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
-        batcher_name = getattr(self.model.cfg, split+'_batcher')
+        batcher_name = getattr(self.model.cfg, 'batcher')
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':
