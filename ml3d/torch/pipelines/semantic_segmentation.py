@@ -233,6 +233,7 @@ class SemanticSegmentation():
 
     def get_batcher(self, device, split='training'):
         batcher_name = getattr(self.model.cfg, 'batcher')
+
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':

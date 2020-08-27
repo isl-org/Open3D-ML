@@ -36,11 +36,10 @@ pipeline = dict(
 )
 
 dataset = dict(
-    original_pc_path=
-    './datasets/SemanticKITTI/dataset/sequences',
-    dataset_path=
-    './datasets/SemanticKITTI/dataset/sequences',
+    original_pc_path='./datasets/SemanticKITTI/dataset/sequences',
+    dataset_path='./datasets/SemanticKITTI/dataset/sequences',
     cache_dir='./logs/cache',
+
     use_cache=False,
     test_result_folder='./test',
 
@@ -49,6 +48,7 @@ dataset = dict(
     #training_split=['01'],
     validation_split=['08'],
     #validation_split=['01'],
+
     test_split=['11', '12', '13', '14', '15', '16', '17', 
                 '18', '19', '20', '21'],
     all_split=['00', '01', '02', '03', '04', '05', '06', '07', 
