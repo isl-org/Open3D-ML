@@ -1,5 +1,6 @@
 # model settings
 model = dict(
+    name='RandLANet',
     k_n=16,  # KNN,
     num_layers=5,  # Number of layers
     num_points=65536,  # Number of input points
@@ -30,11 +31,11 @@ pipeline = dict(
 
     # logs
     main_log_dir='./logs',
-    model_name='RandLANet',
     train_sum_dir='train_log',
 )
 
 dataset = dict(
+    name='Semantic3D',
     dataset_path='./datasets/Semantic3D/',
     cache_dir='.logs/cache/',
     use_cache=True,

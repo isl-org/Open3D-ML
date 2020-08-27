@@ -1,5 +1,6 @@
 # model settings
 model = dict(
+    name='KPConv',
     ign_lbls=[0],
     lbl_values=[
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
@@ -119,7 +120,6 @@ pipeline = dict(
 
     # logs
     main_log_dir='./logs',
-    model_name='KPConv',
     train_sum_dir='train_log',
 
 

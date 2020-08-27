@@ -1,5 +1,6 @@
 # model settings
 model = dict(
+    name='RandLANet',
     k_n=16,  # KNN,
     num_layers=4,  # Number of layers
     num_points=4096 * 11,  # Number of input points
@@ -31,11 +32,11 @@ pipeline = dict(
 
     # logs
     main_log_dir='./logs',
-    model_name='RandLANet',
     train_sum_dir='train_log',
 )
 
 dataset = dict(
+    name='SemanticKITTI',
     original_pc_path='./datasets/SemanticKITTI/dataset/sequences',
     dataset_path='./datasets/SemanticKITTI/dataset/sequences',
     cache_dir='./logs/cache',

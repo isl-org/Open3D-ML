@@ -62,7 +62,7 @@ class SemanticSegmentation():
         self.dataset = dataset
 
         make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.name + '_torch')
+        cfg.logs_dir = join(cfg.main_log_dir, model.cfg.name + '_torch')
         make_dir(cfg.logs_dir)
 
         # dataset.cfg.num_points = model.cfg.num_points

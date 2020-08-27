@@ -1,5 +1,6 @@
 # model settings
 model = dict(
+    name='KPConv',
     ign_lbls=[0],
     lbl_values=[0, 1, 2, 3, 4, 5, 6, 7, 8],
     num_classes=8,  # Number of valid classes
@@ -160,7 +161,6 @@ pipeline = dict(
 
     # logs
     main_log_dir='./logs',
-    model_name='KPConv',
     train_sum_dir='train_log',
 )
 
