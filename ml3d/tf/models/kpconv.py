@@ -183,7 +183,15 @@ class KPFCNN(tf.keras.Model):
 
         return x
 
-    def loss(self, Loss, logits, inputs):
+    def get_optimizer(self, cfg_pipeline):
+
+        optimizer = tf.keras.optimizers.SGD(learning_rate=cfg_pipeline.learning_rate, 
+                                    momentum=cfg_pipeline.momentum)
+
+        return optimizer
+
+
+    def get_loss(self, Loss, logits, inputs):
         """
         Runs the loss on outputs of the model
         :param outputs: logits
@@ -759,17 +767,18 @@ class KPFCNN(tf.keras.Model):
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-        if 'feat' not in data.keys():
-            data['feat'] = None
 
         points = data['point'][:, 0:3]
-        feat = data['feat'][:, 0:3]
         labels = data['label']
         split = attr['split']
 
-        if (feat is None):
-            sub_feat = None
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = points
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+            feat = np.concatenate([points, feat], axis=1)
 
+            
         data = dict()
 
         if (feat is None):
@@ -828,7 +837,7 @@ class KPFCNN(tf.keras.Model):
         def spatially_regular_gen():
 
             random_pick_n = None
-            epoch_n = cfg.epoch_steps * cfg.batch_num
+            epoch_n = 500 * cfg.batch_num
             split = dataset.split
 
             batch_limit = 5000  # TODO : read from calibrate_batch, typically 100 * batch_size required

@@ -21,6 +21,7 @@ eggs/
 #
 logs/
 test/
+test_kpconv/
 kernels/
 **/.fuse*
-
+datasets/

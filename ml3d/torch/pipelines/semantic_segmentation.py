@@ -62,95 +62,69 @@ class SemanticSegmentation():
         self.dataset = dataset
 
         make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.name)
+        cfg.logs_dir = join(cfg.main_log_dir, model.name + '_torch')
         make_dir(cfg.logs_dir)
 
         # dataset.cfg.num_points = model.cfg.num_points
 
-    def run_inference(self, points, device):
+    def run_inference(self, data, device):
         cfg = self.cfg
         model = self.model
 
         model.to(device)
+        model.device = device
         model.eval()
 
-        with torch.no_grad():
-            inputs = model.preprocess_inference(points, device)
-            scores = model(inputs)
-            pred = torch.max(scores.squeeze(0), dim=-1).indices
-            # pred    = pred.cpu().data.numpy()
+        model.inference_begin(data)
 
-        return pred
+        with torch.no_grad():
+            while True:
+                inputs = model.inference_preprocess()
+                results = model(inputs['data'])
+                if model.inference_end(inputs, results):
+                    break
+   
+        return model.inference_result
 
     def run_test(self, device):
         #self.device = device
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
+        model.device = device
         model.to(device)
         model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
+        log.info("DEVICE : {}".format(device))
+        log.info(model)
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        test_sampler = dataset.get_sampler(cfg.test_batch_size, 'test')
-        test_loader = DataLoader(test_sampler, batch_size=cfg.test_batch_size)
-        test_probs = [
-            np.zeros(shape=[len(l), self.model.cfg.num_classes],
-                     dtype=np.float16) for l in dataset.possibility
-        ]
+        batcher = self.get_batcher(device, split='test')
+
+        test_split = TorchDataloader(
+            dataset=dataset.get_split('test'),
+            preprocess=model.preprocess,
+            transform=model.transform,
+            shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
-        log.info("Model Loaded from : {}".format(model.cfg.ckpt_path))
 
-        test_smooth = 0.98
-        epoch = 0
+        datset_split = self.dataset.get_split('test')
 
         log.info("Started testing")
-
+        
         with torch.no_grad():
-            while True:
-                for batch_data in tqdm(test_loader, desc='test', leave=False):
-                    # loader: point_clout, label
-                    inputs = model.preprocess(batch_data, device)
-                    result_torch = model(inputs)
-                    result_torch = torch.reshape(result_torch,
-                                                 (-1, model.cfg.num_classes))
-
-                    m_softmax = nn.Softmax(dim=-1)
-                    result_torch = m_softmax(result_torch)
-                    stacked_probs = result_torch.cpu().data.numpy()
-
-                    stacked_probs = np.reshape(stacked_probs, [
-                        cfg.test_batch_size, model.cfg.num_points,
-                        model.cfg.num_classes
-                    ])
-
-                    point_inds = inputs['input_inds']
-                    cloud_inds = inputs['cloud_inds']
-
-                    for j in range(np.shape(stacked_probs)[0]):
-                        probs = stacked_probs[j, :, :]
-                        inds = point_inds[j, :]
-                        c_i = cloud_inds[j][0]
-                        test_probs[c_i][inds] = test_smooth * test_probs[c_i][
-                            inds] + (1 - test_smooth) * probs
-
-                new_min = np.min(dataset.min_possibility)
-                log.info(f"Epoch {epoch:3d}, end. "
-                         f"Min possibility = {new_min:.1f}")
-
-                if np.min(dataset.min_possibility) > 0.5:  # 0.5
-                    log.info(f"\nReproject Vote #"
-                             f"{int(np.floor(new_min)):d}")
-                    dataset.save_test_result(
-                        test_probs, str(dataset.cfg.test_split_number))
-                    log.info(f"{str(dataset.cfg.test_split_number)}"
-                             f" finished")
-                    return
-                epoch += 1
+            for idx in tqdm(range(len(test_split)), desc='test'):
+                attr = datset_split.get_attr(idx)
+                if dataset.is_tested(attr):
+                    continue
+                data = datset_split.get_data(idx)
+                results = self.run_inference(data, device)
+                dataset.save_test_result(results, attr)
 
     def run_train(self, device):
         model = self.model
@@ -162,9 +136,7 @@ class SemanticSegmentation():
 
         log.info("DEVICE : {}".format(device))
         log.info(model)
-
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
@@ -175,28 +147,28 @@ class SemanticSegmentation():
         batcher = self.get_batcher(device)
 
         train_split = TorchDataloader(dataset=dataset.get_split('training'),
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      shuffle=True)
+                                    preprocess=model.preprocess,
+                                    transform=model.transform,
+                                    use_cache=dataset.cfg.use_cache)
+
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   collate_fn=batcher.collate_fn)
 
-        valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      shuffle=True)
-        valid_loader = DataLoader(train_split,
-                                  batch_size=cfg.val_batch_size,
-                                  shuffle=True,
-                                  collate_fn=batcher.collate_fn)
+        valid_split = TorchDataloader(
+            dataset=dataset.get_split('validation'),
+            preprocess=model.preprocess,
+            transform=model.transform,
+            use_cache=dataset.cfg.use_cache)
+        valid_loader = DataLoader(
+            train_split,
+            batch_size=cfg.val_batch_size,
+            shuffle=True,
+            collate_fn=batcher.collate_fn)
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=cfg.adam_lr)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer, cfg.scheduler_gamma)
 
-        self.optimizer, self.scheduler = optimizer, scheduler
+        self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
 
@@ -216,12 +188,12 @@ class SemanticSegmentation():
             for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
 
                 results = model(inputs['data'])
-                loss, gt_labels, predict_scores = model.loss(
+                loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
 
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
@@ -231,7 +203,7 @@ class SemanticSegmentation():
 
                 step = step + 1
 
-            scheduler.step()
+            self.scheduler.step()
 
             # --------------------- validation
             model.eval()
@@ -243,7 +215,7 @@ class SemanticSegmentation():
                 for idx, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
                     results = model(inputs['data'])
-                    loss, gt_labels, predict_scores = model.loss(
+                    loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
                     acc = Metric.acc(predict_scores, gt_labels)
                     iou = Metric.iou(predict_scores, gt_labels)
@@ -257,11 +229,11 @@ class SemanticSegmentation():
             self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
-                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-                self.save_ckpt(path_ckpt, epoch)
+                self.save_ckpt(epoch)
 
-    def get_batcher(self, device):
+    def get_batcher(self, device, split='training'):
         batcher_name = getattr(self.model.cfg, 'batcher')
+
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':
@@ -318,15 +290,20 @@ class SemanticSegmentation():
             first_epoch = ckpt['epoch'] + 1
             self.model.load_state_dict(ckpt['model_state_dict'])
             if is_train:
-                self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-                self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+                if 'optimizer_state_dict' in ckpt:
+                    log.info(f'Loading checkpoint optimizer_state_dict')
+                    self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+                if 'scheduler_state_dict' in ckpt:
+                    log.info(f'Loading checkpoint scheduler_state_dict')
+                    self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
         else:
             first_epoch = 0
             log.info('No checkpoint')
 
         return first_epoch
 
-    def save_ckpt(self, path_ckpt, epoch):
+    def save_ckpt(self, epoch):
+        path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(path_ckpt)
         torch.save(
             dict(epoch=epoch,

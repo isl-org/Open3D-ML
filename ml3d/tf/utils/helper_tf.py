@@ -46,10 +46,10 @@ class conv2d(tf.keras.layers.Layer):
     #     self._biases  = self.conv.bias
     #     self._weights = self.conv.kernel
 
-    def call(self, x):
+    def call(self, x, training=False):
         x = self.conv(x)
         if self.batchNorm:
-            x = self.batch_normalization(x)
+            x = self.batch_normalization(x, training=training)
         if self.activation_fn:
             x = self.activation_fn(x)
 
@@ -84,10 +84,10 @@ class conv2d_transpose(tf.keras.layers.Layer):
     #     self.biases  = self.conv.bias
     #     self.weights = self.conv.kernel
 
-    def call(self, x):
+    def call(self, x, training=False):
         x = self.conv(x)
         if self.batchNorm:
-            x = self.batch_normalization(x)
+            x = self.batch_normalization(x, training=training)
         if self.activation_fn:
             x = self.activation_fn(x)
         return x

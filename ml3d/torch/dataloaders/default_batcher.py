@@ -87,6 +87,7 @@ class DefaultBatcher(object):
     def __init__(self):
         super(DefaultBatcher, self).__init__()
 
+
     def collate_fn(self, batch):
         batching_result = default_collate(batch)
 

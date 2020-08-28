@@ -35,8 +35,9 @@ pipeline = dict(
 )
 
 dataset = dict(
-    dataset_path='/home/sanskar_agrawal/data/Semantic3D/',
-    cache_dir='/home/sanskar_agrawal/data/Semantic3D/cache/',
+    dataset_path='./datasets/Semantic3D/',
+    cache_dir='.logs/cache/',
+    use_cache=True,
     prepro_grid_size=0.06,
     num_points=65536,
     test_result_folder='./test',
