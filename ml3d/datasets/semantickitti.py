@@ -11,21 +11,21 @@ import yaml
 from .utils import DataProcessing
 from ..utils import make_dir
 
-BASE_DIR = dirname(abspath(__file__))
+# BASE_DIR = dirname(abspath(__file__))
 
-data_config = join(BASE_DIR, 'utils', 'semantic-kitti.yaml')
-DATA = yaml.safe_load(open(data_config, 'r'))
-remap_dict = DATA["learning_map_inv"]
+# data_config = join(BASE_DIR, 'utils', 'semantic-kitti.yaml')
+# DATA = yaml.safe_load(open(data_config, 'r'))
+# remap_dict = DATA["learning_map_inv"]
 
-# make lookup table for mapping
-max_key = max(remap_dict.keys())
-remap_lut = np.zeros((max_key + 100), dtype=np.int32)
-remap_lut[list(remap_dict.keys())] = list(remap_dict.values())
+# # make lookup table for mapping
+# max_key = max(remap_dict.keys())
+# remap_lut = np.zeros((max_key + 100), dtype=np.int32)
+# remap_lut[list(remap_dict.keys())] = list(remap_dict.values())
 
-remap_dict_val = DATA["learning_map"]
-max_key = max(remap_dict_val.keys())
-remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
-remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
+# remap_dict_val = DATA["learning_map"]
+# max_key = max(remap_dict_val.keys())
+# remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
+# remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
 
 logging.basicConfig(
     level=logging.INFO,
