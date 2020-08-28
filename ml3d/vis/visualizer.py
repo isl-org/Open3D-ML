@@ -1,4 +1,5 @@
 import math  # debugging; remove
+import numpy as np
 import open3d as o3d
 from open3d.visualization import gui
 from open3d.visualization import rendering
@@ -430,7 +431,7 @@ class Visualizer:
         node = self._dataset.add_item(parent, cell)
         self._name2treenode[name] = cell
 
-        for attr_name in cloud.keys():
+        for attr_name,_ in cloud.point.items():
             if attr_name == "points":
                 continue
             if attr_name not in self._known_attrs:
@@ -441,7 +442,7 @@ class Visualizer:
         if len(self._data) == 1:
             self._slider_current.text = name
 
-        self._update_legacy_point_cloud(name, cloud)
+        self._update_point_cloud(name, cloud)
 
     def setup_camera(self):
         bounds = self._3d.scene.bounding_box
@@ -465,41 +466,40 @@ class Visualizer:
             attr_min = 1e30
             attr_max = -1e30
             for _,tcloud in self._data.items():
-                if attr_name in tcloud:
-                    attr = tcloud[attr_name]
-                    attr_min = min(attr_min , min(attr))
-                    attr_max = max(attr_max , max(attr))
+                if attr_name in tcloud.point:
+                    attr = tcloud.point[attr_name].as_tensor().numpy()
+                    attr_min = min(attr_min, min(attr))
+                    attr_max = max(attr_max, max(attr))
+                    maxattr = max(attr)
             self._attr2minmax[attr_name] = (attr_min, attr_max)
         return self._attr2minmax[attr_name]
 
-    def _update_legacy(self):
+    def _update_geometry(self):
         for n,tcloud in self._data.items():
-            self._update_legacy_point_cloud(n, tcloud)
+            self._update_point_cloud(n, tcloud)
         
-    def _update_legacy_point_cloud(self, name, tcloud):
+    def _update_point_cloud(self, name, tcloud):
         if self._dont_update_geometry:
             return
 
         self._3d.scene.remove_geometry(name)
-        pts = tcloud["points"]
-        cloud = o3d.geometry.PointCloud(o3d.utility.Vector3dVector(pts))
         attr_name = self._datasource_combobox.selected_text
-        attr = tcloud.get(attr_name)
-        if attr is not None:
+        if attr_name in tcloud.point:
+            attr = tcloud.point[attr_name].as_tensor().numpy()
             make_colors = self._shader2updater[self._shader.selected_index]
             if make_colors is not None:
                 this = self
                 colors = make_colors(this, attr)
-                assert(len(colors) == len(attr))
-                assert(len(colors) == len(pts))
+                # assert(len(colors) == len(attr))
+                # assert(len(colors) == len(pts))
             else:
                 print("[warning] dataset '" + str(name) + "' has no attribute named '" + self._shader.selected_text + "'")
-                colors = [[1.0, 0.0, 1.0]] * len(pts)
-        cloud.colors = o3d.utility.Vector3dVector(colors)
+                colors = [[1.0, 0.0, 1.0]] * len(attr)
+        tcloud.point["colors"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(np.array(colors, dtype='float32')), inplace=True)
         material = rendering.Material()
         material.shader = "defaultUnlit"
         material.base_color = [1.0, 1.0, 1.0, 1.0]
-        self._3d.scene.add_geometry(name, cloud, material)
+        self._3d.scene.add_geometry(name, tcloud, material)
         node = self._name2treenode[name]
         if node is not None:
             self._3d.scene.show_geometry(name, node.checkbox.checked)
@@ -588,7 +588,7 @@ class Visualizer:
             cmap = self._colormaps[self._shader.selected_text]
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
 
-        self._update_legacy()
+        self._update_geometry()
 
     def _on_shader_changed(self, name, idx):
         # Last items are all colormaps, so just clamp to n_children - 1
@@ -599,16 +599,24 @@ class Visualizer:
             cmap = self._colormaps[name]
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
 
-        self._update_legacy()
+        self._update_geometry()
 
     def _on_shader_color_changed(self, color):
-        self._update_legacy()
+        self._update_geometry()
             
     def _on_labels_changed(self):
-        self._update_legacy()
+        self._update_geometry()
 
     def _on_colormap_changed(self):
-        self._update_legacy()
+        self._update_geometry()
+
+    @staticmethod
+    def _make_tcloud_array(np_array, copy=False):
+        if copy:
+            t = o3d.core.Tensor(np_array)
+        else:
+            t = o3d.core.Tensor.from_numpy(np_array)
+        return o3d.core.TensorList.from_tensor(t, inplace=True)
 
     @staticmethod
     def visualize(dataset, idx_or_list):
@@ -637,19 +645,27 @@ class Visualizer:
 
             # Create tpointcloud
             pts = data["point"]
-            tcloud = {}
+            tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
+                                              o3d.core.Device("CPU:0"))
             if pts.shape[1] == 4:
-                tcloud["intensity"] = pts[:,3]
-                tcloud["points"] = pts[:,[0,1,2]]
+                # We can't use inplace Tensor creation (e.g. from_numpy())
+                # because the resulting arrays won't be contiguous. However,
+                # TensorList can be inplace.
+                xyz = pts[:,[0,1,2]]
+                tcloud.point["intensity"] = Visualizer._make_tcloud_array(pts[:,3], copy=True)
+                tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
             else:
-                tcloud["points"] = pts
+                tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
             # Only add scalar attributes for now
             for k,v in data.items():
                 if len(v.shape) == 1 or (len(v.shape) == 2 and v.shape[1] == 1):
-                    tcloud[k] = v
+                    isint = v.dtype.name.startswith('int')
+                    tcloud.point[k] = Visualizer._make_tcloud_array(v, copy=isint)
 
             # ---- Debugging ----
-            # tcloud["distance"] = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]) for pt in tcloud["points"]]
+            # dist = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]) for pt in tcloud.point["points"].as_tensor().numpy()]
+            # dist = np.array(dist, dtype='float32')
+            # tcloud.point["distance"] = Visualizer._make_tcloud_array(dist, copy=False)
             # ----
 
             mlvis.add(info["name"], tcloud)
@@ -674,7 +690,7 @@ class Visualizer:
 
         # Ok, now we can create our geometry
         mlvis._dont_update_geometry = False
-        mlvis._update_legacy()
+        mlvis._update_geometry()
 
         mlvis.setup_camera()
 
