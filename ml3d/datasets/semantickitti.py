@@ -11,22 +11,6 @@ import yaml
 from .utils import DataProcessing
 from ..utils import make_dir
 
-# BASE_DIR = dirname(abspath(__file__))
-
-# data_config = join(BASE_DIR, 'utils', 'semantic-kitti.yaml')
-# DATA = yaml.safe_load(open(data_config, 'r'))
-# remap_dict = DATA["learning_map_inv"]
-
-# # make lookup table for mapping
-# max_key = max(remap_dict.keys())
-# remap_lut = np.zeros((max_key + 100), dtype=np.int32)
-# remap_lut[list(remap_dict.keys())] = list(remap_dict.values())
-
-# remap_dict_val = DATA["learning_map"]
-# max_key = max(remap_dict_val.keys())
-# remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
-# remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
@@ -38,6 +22,7 @@ class SemanticKITTISplit(Dataset):
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
+        self.remap_lut_val = dataset.remap_lut_val
 
         if split == 'test':
             dataset.test_list = path_list
@@ -63,7 +48,7 @@ class SemanticKITTISplit(Dataset):
             if self.split not in ['test', 'all']:
                 raise ValueError("label file not found for {}".format(label_path))
         else:
-            labels = DataProcessing.load_label_kitti(label_path, remap_lut_val)
+            labels = DataProcessing.load_label_kitti(label_path, self.remap_lut_val)
 
         data = {'point': points, 
                 'feat' : None,
@@ -109,6 +94,22 @@ class SemanticKITTI:
             19: 'traffic-sign'
         }
         self.num_classes = len(self.label_to_names)
+        data_config = join(cfg.dataset_path, 'semantic-kitti.yaml')
+        DATA = yaml.safe_load(open(data_config, 'r'))
+        remap_dict = DATA["learning_map_inv"]
+
+        # make lookup table for mapping
+        max_key = max(remap_dict.keys())
+        remap_lut = np.zeros((max_key + 100), dtype=np.int32)
+        remap_lut[list(remap_dict.keys())] = list(remap_dict.values())
+
+        remap_dict_val = DATA["learning_map"]
+        max_key = max(remap_dict_val.keys())
+        remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
+        remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
+
+        self.remap_lut_val = remap_lut_val
+
 
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)
