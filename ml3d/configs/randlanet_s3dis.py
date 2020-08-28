@@ -37,9 +37,9 @@ pipeline = dict(
 
 dataset = dict(
     dataset_path=
-    '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/',
+    '../dataset/Stanford3dDataset_v1.2_Aligned_Version/',
     cache_dir=
-    '/Users/sanskara/Downloads/Stanford3dDataset_v1.2_Aligned_Version/cache/',
+    './logs/cache',
     prepro_grid_size=0.04,
     num_points=4096 * 10,
     test_result_folder='./test',

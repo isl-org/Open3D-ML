@@ -35,8 +35,8 @@ pipeline = dict(
 )
 
 dataset = dict(
-    dataset_path='/Users/sanskara/data/Paris_Lille_3D/',
-    cache_dir='/Users/sanskara/data/Paris_Lille_3D/cache/',
+    dataset_path='../dataset/Paris_Lille_3D/',
+    cache_dir='./logs/cache',
     prepro_grid_size=0.06,
     num_points=65536,
     test_result_folder='./test',
@@ -45,7 +45,7 @@ dataset = dict(
         269353
     ],
     ignored_label_inds=[0],
-    train_dir='/Users/sanskara/data/Paris_Lille_3D/' + 'training_10_classes/',
+    train_dir='../dataset/Paris_Lille_3D/' + 'training_10_classes/',
     val_files=['Lille2.ply'],
-    test_dir='/Users/sanskara/data/Paris_Lille_3D/' + 'test_10_classes/',
+    test_dir='../dataset/Paris_Lille_3D/' + 'test_10_classes/',
 )

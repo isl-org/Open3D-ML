@@ -16,8 +16,6 @@ model = dict(
 
     # Number of CPU threads for the input pipeline
     input_threads=10,
-    training_batcher='ConcatBatcher',
-    test_batcher='ConcatBatcher',
     batcher='ConcatBatcher',
     density_parameter=5.0,
 
@@ -171,12 +169,8 @@ pipeline = dict(
 )
 
 dataset = dict(
-    original_pc_path=
-    './datasets/SemanticKITTI/dataset/sequences',
-    original_label_path=
-    './datasets/SemanticKITTI/dataset/sequences',
     dataset_path=
-    './datasets/SemanticKITTI/dataset/sequences',
+    '../dataset/SemanticKITTI/dataset/sequences',
     prepro_grid_size=0.06,
     use_cache=False,
     test_result_folder='./test_kpconv',

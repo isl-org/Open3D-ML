@@ -36,7 +36,7 @@ class SemanticSegmentation():
         self.cfg = cfg
 
         make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.cfg.model_name + '_TF')
+        cfg.logs_dir = join(cfg.main_log_dir, model.cfg.name + '_TF')
         make_dir(cfg.logs_dir)
 
         # tf.config.gpu.set_per_process_memory_growth(True)
@@ -52,7 +52,7 @@ class SemanticSegmentation():
         # TODO
         pass
 
-    def run_train(self):
+    def run_train(self, **args):
         model = self.model
         dataset = self.dataset
 

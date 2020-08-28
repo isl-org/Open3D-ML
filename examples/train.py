@@ -60,10 +60,11 @@ def main():
         from ml3d.torch.pipelines import SemanticSegmentation 
         from ml3d.torch.models import RandLANet, KPFCNN
         import torch
-        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     elif args.framework in ['tf', 'tensorflow']:
         from ml3d.tf.pipelines import SemanticSegmentation 
         from ml3d.tf.models import RandLANet, KPFCNN
+        device = None
     else:
         print("Unsupported pipeline {}".format(args.framework.name))
         exit()
@@ -83,9 +84,11 @@ def main():
         print("Unsupported datasets {}".format(args.dataset.name))
 
     # TODO choose device
+    # TODO Log
+    # TODO merge
     
     pipeline = SemanticSegmentation(model, dataset, cfg.pipeline)
-    pipeline.run_train(device)
+    pipeline.run_train(device=device)
 
     # log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
     # logger = get_root_logger(log_file=log_file, log_level=cfg.log_level)

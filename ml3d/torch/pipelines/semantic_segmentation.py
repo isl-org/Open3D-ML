@@ -126,8 +126,9 @@ class SemanticSegmentation():
                 results = self.run_inference(data, device)
                 dataset.save_test_result(results, attr)
 
-    def run_train(self, device):
+    def run_train(self, **args):
         model = self.model
+        device = args["device"]
         model.device = device
         dataset = self.dataset
 

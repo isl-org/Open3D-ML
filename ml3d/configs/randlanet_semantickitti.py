@@ -15,8 +15,7 @@ model = dict(
     d_feature=8,
     d_out=[16, 64, 128, 256],
     grid_size=0.06,
-    training_batcher='DefaultBatcher',
-    test_batcher='DefaultBatcher',
+    batcher='DefaultBatcher',
     ckpt_path='./ml3d/torch/checkpoint/randlanet_semantickitti.pth')
 
 pipeline = dict(
@@ -37,8 +36,7 @@ pipeline = dict(
 
 dataset = dict(
     name='SemanticKITTI',
-    original_pc_path='./datasets/SemanticKITTI/dataset/sequences',
-    dataset_path='./datasets/SemanticKITTI/dataset/sequences',
+    dataset_path='../dataset/SemanticKITTI/dataset/sequences',
     cache_dir='./logs/cache',
 
     use_cache=False,
