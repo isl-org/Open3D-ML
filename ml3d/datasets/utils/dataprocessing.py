@@ -2,8 +2,8 @@ import numpy as np
 import os, argparse, pickle, sys
 from os.path import exists, join, isfile, dirname, abspath, split
 
-import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
-import utils.nearest_neighbors.lib.python.nearest_neighbors as nearest_neighbors
+from ...ops.cpp_wrappers.cpp_subsampling import grid_subsampling as cpp_subsampling
+from ...ops.cpp_wrappers.nearest_neighbors.lib.python import nearest_neighbors as nearest_neighbors
 
 
 class DataProcessing:

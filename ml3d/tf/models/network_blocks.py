@@ -9,16 +9,16 @@ from .utils.kernels.kernel_points import load_kernels as create_kernel_points
 BASE_DIR = Path(abspath(__file__))
 
 tf_neighbors_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+    str(BASE_DIR.parent.parent.parent / 'ops' / 'tf_custom_ops' /
         'tf_neighbors.so'))
 tf_batch_neighbors_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+    str(BASE_DIR.parent.parent.parent / 'ops' / 'tf_custom_ops' /
         'tf_batch_neighbors.so'))
 tf_subsampling_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+    str(BASE_DIR.parent.parent.parent / 'ops' / 'tf_custom_ops' /
         'tf_subsampling.so'))
 tf_batch_subsampling_module = tf.load_op_library(
-    str(BASE_DIR.parent.parent / 'utils' / 'tf_custom_ops' /
+    str(BASE_DIR.parent.parent.parent / 'ops' / 'tf_custom_ops' /
         'tf_batch_subsampling.so'))
 
 

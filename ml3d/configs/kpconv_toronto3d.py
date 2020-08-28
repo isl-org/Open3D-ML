@@ -167,6 +167,7 @@ pipeline = dict(
 dataset = dict(
     dataset_path='/Users/sanskara/data/Toronto_3D/',
     cache_dir='/Users/sanskara/data/Toronto_3D/cache/',
+    use_cache=True,
     prepro_grid_size=0.06,
     num_points=65536,
     test_result_folder='./test',
