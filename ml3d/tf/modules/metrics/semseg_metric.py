@@ -37,16 +37,21 @@ class SemSegMetric(object):
         labels = tf.cast(labels, tf.int64)
         accuracy_mask = predictions == labels
 
+        total_corret = 0
+        total_label = 0
+
         for label in range(num_classes):
             label_mask = labels == label
+            num_correct = (accuracy_mask & label_mask).numpy().sum()
             num_label = label_mask.numpy().sum()
             if num_label == 0:
                 num_label = 1
-            per_class_accuracy = (accuracy_mask & label_mask).numpy().sum()
-            per_class_accuracy /= num_label
+            per_class_accuracy = num_correct / num_label
+            total_corret += num_correct
+            total_label += num_label
             accuracies.append(per_class_accuracy)
         # overall accuracy
-        accuracies.append(accuracy_mask.numpy().mean())
+        accuracies.append(total_corret / total_label)
         #accuracies = np.array(accuracies)
 
         return accuracies
@@ -67,16 +72,23 @@ class SemSegMetric(object):
             list of floats of length num_classes+1 (last item is mIoU)
         """
         num_classes = scores.shape[-1]
-        predictions = tf.argmax(scores, axis=-1)
-        labels = tf.cast(labels, tf.int64)
+        predictions = tf.argmax(scores, axis=-1).numpy()
+        labels = tf.cast(labels, tf.int64).numpy()
 
         ious = []
+        total_i = 0
+        total_u = 0
 
         for label in range(num_classes):
             pred_mask = predictions == label
             labels_mask = labels == label
-            iou = (pred_mask & labels_mask).numpy().sum()
-            iou = iou / (pred_mask | labels_mask).numpy().sum()
+            num_i = (pred_mask & labels_mask).sum()
+            num_u = (pred_mask | labels_mask).sum()
+            if num_u == 0:
+                num_u = 1
+            iou = num_i / num_u
+            total_i += num_i
+            total_u += num_u
             ious.append(iou)
-        ious.append(np.nanmean(ious))
+        ious.append(total_i / total_u)
         return ious

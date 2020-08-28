@@ -1,4 +1,4 @@
-from ml3d.datasets import Toronto3D
+from ml3d.datasets import Toronto3D, SemanticKITTI
 from ml3d.tf.models import KPFCNN
 from ml3d.tf.pipelines import SemanticSegmentation 
 from ml3d.utils import Config
@@ -6,7 +6,7 @@ from ml3d.utils import Config
 from os.path import abspath, dirname
 
 
-config = dirname(abspath(__file__)) + '/../ml3d/configs/kpconv_toronto3d.py'
+config = dirname(abspath(__file__)) + '/../ml3d/configs/kpconv_semantickitti.py'
 cfg = Config.load_from_file(config)
 
 dataset = SemanticKITTI(cfg.dataset)

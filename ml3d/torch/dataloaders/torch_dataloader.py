@@ -29,7 +29,6 @@ class TorchDataloader(Dataset):
                  preprocess=None,
                  transform=None,
                  use_cache=True,
-                 no_progress: bool = False,
                  **kwargs):
         self.dataset = dataset
         self.preprocess = preprocess
@@ -49,8 +48,7 @@ class TorchDataloader(Dataset):
             ]
             if len(uncached) > 0:
                 for idx in tqdm(range(len(dataset)),
-                                desc=desc,
-                                disable=no_progress):
+                                desc=desc):
                     attr = dataset.get_attr(idx)
                     data = dataset.get_data(idx)
                     name = attr['name']

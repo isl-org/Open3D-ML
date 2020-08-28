@@ -17,6 +17,8 @@ model = dict(
     input_threads=10,
     training_batcher='ConcatBatcher',
     test_batcher='ConcatBatcher',
+    batcher='ConcatBatcher',
+    density_parameter=5.0,
 
     #########################
     # Architecture definition
@@ -170,11 +172,11 @@ pipeline = dict(
 
 dataset = dict(
     original_pc_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
+    './datasets/SemanticKITTI/dataset/sequences',
     original_label_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_labels/dataset/sequences',
+    './datasets/SemanticKITTI/dataset/sequences',
     dataset_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
+    './datasets/SemanticKITTI/dataset/sequences',
     prepro_grid_size=0.06,
     use_cache=False,
     test_result_folder='./test_kpconv',

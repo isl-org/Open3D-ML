@@ -62,7 +62,7 @@ class SemanticSegmentation():
         self.dataset = dataset
 
         make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.name)
+        cfg.logs_dir = join(cfg.main_log_dir, model.name + '_torch')
         make_dir(cfg.logs_dir)
 
         # dataset.cfg.num_points = model.cfg.num_points
@@ -136,9 +136,7 @@ class SemanticSegmentation():
 
         log.info("DEVICE : {}".format(device))
         log.info(model)
-
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
@@ -231,11 +229,11 @@ class SemanticSegmentation():
             self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
-                path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
-                self.save_ckpt(path_ckpt, epoch)
+                self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
-        batcher_name = getattr(self.model.cfg, split+'_batcher')
+        batcher_name = getattr(self.model.cfg, 'batcher')
+
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':
@@ -304,7 +302,8 @@ class SemanticSegmentation():
 
         return first_epoch
 
-    def save_ckpt(self, path_ckpt, epoch):
+    def save_ckpt(self, epoch):
+        path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(path_ckpt)
         torch.save(
             dict(epoch=epoch,
