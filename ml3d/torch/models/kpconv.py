@@ -6,8 +6,8 @@ from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
 
-import cpp_wrappers.cpp_neighbors.radius_neighbors as cpp_neighbors
-import cpp_wrappers.cpp_subsampling.grid_subsampling as cpp_subsampling
+from ...ops.cpp_wrappers.cpp_neighbors import radius_neighbors as cpp_neighbors
+from ...ops.cpp_wrappers.cpp_subsampling import grid_subsampling as cpp_subsampling
 
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
