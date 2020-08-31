@@ -11,7 +11,7 @@ import tensorflow as tf
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
-from ...utils import make_dir, LogRecord
+from ...utils import make_dir, LogRecord, PIPELINE
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -29,6 +29,7 @@ if gpus:
     print(e)
 
 
+@PIPELINE.register_module("torch")
 class SemanticSegmentation():
     def __init__(self, model, dataset, cfg):
         self.model = model
@@ -36,7 +37,8 @@ class SemanticSegmentation():
         self.cfg = cfg
 
         make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.cfg.name + '_TF')
+        cfg.logs_dir = join(cfg.main_log_dir, 
+                    model.__class__.__name__ + '_TF')
         make_dir(cfg.logs_dir)
 
         # tf.config.gpu.set_per_process_memory_growth(True)
@@ -52,7 +54,7 @@ class SemanticSegmentation():
         # TODO
         pass
 
-    def run_train(self, **args):
+    def run_train(self, **kwargs):
         model = self.model
         dataset = self.dataset
 

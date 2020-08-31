@@ -5,55 +5,26 @@ import numpy as np
 import random
 
 from pathlib import Path
-from os.path import abspath
 from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
+from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
-from ...utils import Config
+from ...utils import Config, MODEL
 
 
-class RandLANet(nn.Module):
-    def __init__(self,
-                 cfg=None,
-                 num_layers=4,
-                 d_feature=8,
-                 d_in=3,
-                 d_out=[16, 64, 128, 256],
-                 batcher='DefaultBatcher',
-                 num_classes=8,
-                 num_points=65536,
-                 sub_sampling_ratio=[4, 4, 4, 4, 2],
-                 grid_size=0.06,
-                 k_n=16,
-                 ckpt_name='randlanet_toronto3d.pth',
-                 ignored_label_inds=[0]):
+@MODEL.register_module('torch')
+class RandLANet(BaseModel):
+    def __init__(self, cfg=None, **kwargs):
+        self.default_cfg_name = "randlanet.yml"
 
-        super(RandLANet, self).__init__()
-        self.name = 'RandLANet'
-        if cfg is None:
-            cfg = dict(
-                num_layers=num_layers,
-                d_feature=d_feature,
-                d_in=d_in,
-                d_out=d_out,
-                batcher=batcher,
-                num_classes=num_classes,
-                k_n=k_n,
-                num_points=num_points,
-                sub_sampling_ratio=sub_sampling_ratio,
-                grid_size=grid_size,
-                ckpt_path=Path(abspath(__file__)).parent.parent /
-                'checkpoint' / ckpt_name,
-                ignored_label_inds=ignored_label_inds,
-            )
-            cfg = Config(cfg)
+        super().__init__(cfg=cfg,**kwargs)
 
-        self.cfg = cfg
+        cfg = self.cfg
         d_feature = cfg.d_feature
 
         self.fc0 = nn.Linear(cfg.d_in, d_feature)

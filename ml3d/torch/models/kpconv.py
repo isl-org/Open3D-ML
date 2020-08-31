@@ -11,9 +11,11 @@ from ...ops.cpp_wrappers.cpp_subsampling import grid_subsampling as cpp_subsampl
 
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
+from ...utils import MODEL
 from ...datasets.utils import DataProcessing
 
 
+@MODEL.register_module('torch', name='KPConv')
 class KPFCNN(nn.Module):
     """
     Class defining KPFCNN
@@ -1665,7 +1667,6 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
-from ...utils.kpconv_config import bcolors
 
 # ------------------------------------------------------------------------------------------
 #

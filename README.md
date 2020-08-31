@@ -43,48 +43,60 @@ TODO List:
           
 ```
 
-Some important functions of pipeline, model, and dataset classes,
+
+## Build the project
+
+## Prepare Datasets
+
+## Visualizer
+### Investigate a dataset
+### Visualize a pointcloud with labels
+
+## Inference with pretrained weights
+### Test on a dataset
+### Test on a pointcloud file
+### APIs for inference
+
+## Training
+```
+python examples/train.py torch -c ml3d/configs/randlanet_semantickitti.yml
+```
+```shell
+python examples/train.py ${TF/torch} ${CONFIG_FILE} [optional arguments]
+```
+Optional arguments can be
+- `--log_dir ${LOG_DIR}`: By default, the `${LOG_DIR}` is `./logs`. This directory is where all the logs, results, and checkpoints are stored.
+- `--ckpt_path`:
+- `--device`
+- 
+
+Examples:
+Train torch model of RandLA-Net on SemanticKITTI
+```shell
+python examples/train.py torch ml3d/configs/randlanet_semantickitti.yaml
+```
+
+## Components of Open3D-ML3D
+### pipeline
 ```
 pipeline
 	__init__(model, dataset, cfg)
 	run_train
 	run_test
 	run_inference
-	compute metrics(iou, acc)
-
-model
-	__init__(cfg)
-	forward
-	preprocess         
-
-dataset
+```
+### dataloader
+```
+dataloader
 	__init__(cfg)
 	save_test_result
 	get_sampler(split="training/test/validation")
 	get_data(file_path)
-
-config
-	__init__()
-	load_from_file
-
-	train...
-	test...
-	network...
-	general...
 ```
-
-## Usage example
-
-First build the project
-```bash
-bash compile_op.sh
-pip install -e .
+### model
 ```
-
-
-Run demo code
-```bash
-python examples/train_semantic_seg.py
-python examples/test_semantic_seg.py
-python examples/inference_semantic_seg.py
+model
+	__init__(cfg)
+	forward
+	preprocess         
 ```

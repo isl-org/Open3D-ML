@@ -57,7 +57,7 @@ class Config(object):
 
         self.cfg_dict = cfg_dict
 
-    def dump(self, **kwargs):
+    def dump(self, *args, **kwargs):
         """Dump to a string."""
         def convert_to_dict(cfg_node, key_list):
             if not isinstance(cfg_node, ConfigDict):
@@ -70,8 +70,22 @@ class Config(object):
 
         self_as_dict = convert_to_dict(self._cfg_dict, [])
         print(self_as_dict)
-        return yaml.safe_dump(self_as_dict, **kwargs)
+        return yaml.dump(self_as_dict, *args, **kwargs)
         #return self_as_dict
+
+
+    def merge_from_dict(self, new_dict):
+        """Merge a new into cfg_dict.
+
+        Args:
+            new_dict (dict): a dict of configs.
+        """
+        b = self.copy()
+        for k, v in new_dict.items():
+            b[k] = v
+        return Config(b)
+
+
 
     @staticmethod
     def load_from_file(filename):
@@ -99,10 +113,9 @@ class Config(object):
                 # close temp file
                 temp_config_file.close()
 
-        if filename.endswith('.yaml'):
+        if filename.endswith('.yaml') or filename.endswith('.yml') :
             with open(filename) as f:
                 cfg_dict = yaml.safe_load(f)
-                cfg_dict = yaml.full_load(cfg_dict)
 
         return Config(cfg_dict)
 
