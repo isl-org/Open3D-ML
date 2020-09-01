@@ -9,6 +9,7 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
+from ..utils import make_dir, DATASET
 
 logging.basicConfig(
     level=logging.INFO,
@@ -105,3 +106,5 @@ class Toronto3D:
             return self.train_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+DATASET._register_module(Toronto3D)

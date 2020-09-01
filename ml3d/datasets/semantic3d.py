@@ -10,6 +10,7 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
+from ..utils import make_dir, DATASET
 from .utils import DataProcessing as DP
 
 logging.basicConfig(
@@ -130,3 +131,5 @@ class Semantic3D:
             return self.val_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+DATASET._register_module(Semantic3D)

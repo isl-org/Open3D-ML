@@ -9,6 +9,7 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
+from ..utils import make_dir, DATASET
 from .utils import DataProcessing
 
 
@@ -288,3 +289,5 @@ class S3DIS:
 
             S3DIS.write_ply(str(save_path), (xyz, colors, labels),
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
+
+DATASET._register_module(S3DIS)

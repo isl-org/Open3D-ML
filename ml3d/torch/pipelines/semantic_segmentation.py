@@ -26,7 +26,6 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-@PIPELINE.register_module("torch")
 class SemanticSegmentation(BasePipeline):
     def __init__(self, 
                 model=None, 
@@ -326,3 +325,5 @@ class SemanticSegmentation(BasePipeline):
         valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
 
         return valid_scores, valid_labels
+
+PIPELINE._register_module(SemanticSegmentation, "torch")
