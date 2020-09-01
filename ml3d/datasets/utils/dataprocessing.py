@@ -9,7 +9,11 @@ from ...ops.cpp_wrappers.nearest_neighbors.lib.python import nearest_neighbors a
 
 class DataProcessing:
     @staticmethod
-    def grid_subsampling(points, features=None, labels=None, grid_size=0.1, verbose=0):
+    def grid_subsampling(points,
+                         features=None,
+                         labels=None,
+                         grid_size=0.1,
+                         verbose=0):
         """
         CPP wrapper for a grid subsampling (method = barycenter for points and features)
         :param points: (N, 3) matrix of input points
@@ -21,9 +25,7 @@ class DataProcessing:
         """
 
         if (features is None) and (labels is None):
-            return subsample(points,
-                             sampleDl=grid_size,
-                             verbose=verbose)
+            return subsample(points, sampleDl=grid_size, verbose=verbose)
         elif (labels is None):
             return subsample(points,
                              features=features,
@@ -31,15 +33,15 @@ class DataProcessing:
                              verbose=verbose)
         elif (features is None):
             return subsample(points,
-                                             classes=labels,
-                                             sampleDl=grid_size,
-                                             verbose=verbose)
+                             classes=labels,
+                             sampleDl=grid_size,
+                             verbose=verbose)
         else:
             return subsample(points,
-                                             features=features,
-                                             classes=labels,
-                                             sampleDl=grid_size,
-                                             verbose=verbose)
+                             features=features,
+                             classes=labels,
+                             sampleDl=grid_size,
+                             verbose=verbose)
 
     @staticmethod
     def load_pc_semantic3d(filename):
