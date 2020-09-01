@@ -1,6 +1,3 @@
-import torch
-import yaml
-
 from ml3d.datasets import SemanticKITTI
 from ml3d.torch.pipelines import SemanticSegmentation 
 from ml3d.torch.models import RandLANet
