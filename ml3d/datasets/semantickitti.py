@@ -4,7 +4,6 @@ from os.path import exists, join, isfile, dirname, abspath, split
 import torch
 import logging
 
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 from sklearn.neighbors import KDTree
 import yaml
 
@@ -19,8 +18,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-        
-@DATASET.register_module()
 class SemanticKITTI(BaseDataset):
     """
     SemanticKITTI dataset, used in visualizer, training, or test
@@ -177,7 +174,7 @@ class SemanticKITTI(BaseDataset):
 
 
 
-class SemanticKITTISplit(Dataset):
+class SemanticKITTISplit():
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -224,3 +221,5 @@ class SemanticKITTISplit(Dataset):
 
         attr = {'name': name, 'path': pc_path, 'split': self.split}
         return attr
+
+DATASET._register_module(SemanticKITTI)

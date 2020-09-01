@@ -9,13 +9,13 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
+from ..utils import make_dir, DATASET
 from .utils import DataProcessing
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
 
 
 
-@DATASET.register_module()
 class S3DIS(BaseDataset):
     """
     S3DIS dataset, used in visualizer, training, or test
@@ -269,6 +269,7 @@ class S3DIS(BaseDataset):
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
 
 
+
 class S3DISSplit():
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
@@ -311,3 +312,4 @@ class S3DISSplit():
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
+DATASET._register_module(S3DIS)

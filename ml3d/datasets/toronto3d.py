@@ -9,6 +9,7 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
+from ..utils import make_dir, DATASET
 
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
@@ -21,7 +22,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-@DATASET.register_module()
 class Toronto3D(BaseDataset):
     """
     Toronto3D dataset, used in visualizer, training, or test
@@ -129,3 +129,4 @@ class Toronto3DSplit():
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
+DATASET._register_module(Toronto3D)

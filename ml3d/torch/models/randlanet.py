@@ -17,7 +17,6 @@ from ...datasets.utils import DataProcessing
 from ...utils import MODEL
 
 
-@MODEL.register_module('torch')
 class RandLANet(BaseModel):
     def __init__(self, cfg=None, **kwargs):
         self.default_cfg_name = "randlanet.yml"
@@ -528,3 +527,5 @@ class RandLANet(BaseModel):
         interpolated_features = torch.gather(feature, 2, interp_idx)
         interpolated_features = interpolated_features.unsqueeze(3)
         return interpolated_features
+
+MODEL._register_module(RandLANet, 'torch')

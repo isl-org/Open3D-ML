@@ -10,6 +10,7 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
+from ..utils import make_dir, DATASET
 from .utils import DataProcessing as DP
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
@@ -21,7 +22,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-@DATASET.register_module()
 class Semantic3D(BaseDataset):
     """
     SemanticKITTI dataset, used in visualizer, training, or test
@@ -151,3 +151,5 @@ class Semantic3DSplit():
 
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
+
+DATASET._register_module(Semantic3D)

@@ -118,3 +118,5 @@ class ParisLille3DSplit():
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
+DATASET._register_module(ParisLille3D)
+
