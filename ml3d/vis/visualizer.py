@@ -22,10 +22,9 @@ class Visualizer:
         def is_empty(self):
             return len(self._label2color) == 0
 
-        def get_color(self, label):
-            if label in self._label2color:
-                return self._label2color[label]
-            return None
+        def get_colors(self):
+            return [self._label2color[label]
+                    for label in sorted(self._label2color.keys())]
 
         def set_on_changed(self, callback):  # takes no args, no return value
             self._on_changed = callback
@@ -35,10 +34,14 @@ class Visualizer:
             root = self.widget.get_root_item()
             for key in sorted(labellut.labels.keys()):
                 lbl = labellut.labels[key]
-                self._label2color[key] = lbl.color
+                color = lbl.color
+                if len(color) == 3:
+                    color += [1.0]
+                self._label2color[key] = color
                 color = gui.Color(lbl.color[0], lbl.color[1], lbl.color[2])
                 cell = gui.LUTTreeCell(str(key) + ": " + lbl.name, True,
                                        color, None, None)
+                cell.checkbox.set_on_checked(self._make_on_checked(key, self._on_label_checked))
                 cell.color_edit.set_on_value_changed(self._make_on_color_changed(key, self._on_label_color_changed))
                 self.widget.add_item(root, cell)
 
@@ -48,11 +51,27 @@ class Visualizer:
             return on_changed
             
         def _on_label_color_changed(self, label, gui_color):
-            self._label2color[label] = [gui_color.red, gui_color.green,
-                                        gui_color.blue]
+            self._label2color[label] = [gui_color.red,
+                                        gui_color.green,
+                                        gui_color.blue,
+                                        self._label2color[label][3]]
             if self._on_changed is not None:
                 self._on_changed()
 
+        def _make_on_checked(self, label, member_func):
+            def on_checked(checked):
+                member_func(label, checked)
+            return on_checked
+            
+        def _on_label_checked(self, label, checked):
+            if checked:
+                alpha = 1.0
+            else:
+                alpha = 0.0
+            color = self._label2color[label]
+            self._label2color[label] = [color[0], color[1], color[2], alpha]
+            if self._on_changed is not None:
+                self._on_changed()
 
     class ColormapEdit:
         def __init__(self, window, em):
@@ -225,6 +244,11 @@ class Visualizer:
 
             gui.Application.instance.post_to_main_thread(self._window, update)
 
+    SOLID_NAME = "Solid Color"
+    LABELS_NAME = "Labels"
+    RAINBOW_NAME = "Colormap (Rainbow)"
+    GREYSCALE_NAME = "Colormap (Greyscale)"
+
     def __init__(self):
         self._data = {}
         self._data_names = []  # sets the order data will be displayed / animated
@@ -232,7 +256,7 @@ class Visualizer:
         self._name2treenode = {}
         self._name2treeid = {}
         self._colormaps = {}
-        self._shader2updater = {}
+        self._gradient = rendering.Gradient()
         self._attr2minmax = {}  # should only be accessed by _get_attr_minmax()
         self._scalar_min = 0.0
         self._scalar_max = 1.0
@@ -342,18 +366,12 @@ class Visualizer:
 
         # ... shader
         self._shader = gui.Combobox()
-        self._shader.add_item("Solid Color")
-        self._shader.add_item("Labels")
-        rainbow_name = "Colormap (Rainbow)"
-        greyscale_name = "Colormap (Greyscale)"
-        self._shader.add_item(rainbow_name)
-        self._shader.add_item(greyscale_name)
-        self._colormaps[rainbow_name] = Colormap.make_rainbow()
-        self._colormaps[greyscale_name] = Colormap.make_greyscale()
-        self._shader2updater[0] = self._make_color_data_uniform
-        self._shader2updater[1] = self._make_color_data_labels
-        self._shader2updater[2] = self._make_colormap_callback(self._colormaps[rainbow_name])
-        self._shader2updater[3] = self._make_colormap_callback(self._colormaps[greyscale_name])
+        self._shader.add_item(self.SOLID_NAME)
+        self._shader.add_item(self.LABELS_NAME)
+        self._shader.add_item(self.RAINBOW_NAME)
+        self._shader.add_item(self.GREYSCALE_NAME)
+        self._colormaps[self.RAINBOW_NAME] = Colormap.make_rainbow()
+        self._colormaps[self.GREYSCALE_NAME] = Colormap.make_greyscale()
         self._shader.selected_index = 0
         self._shader.set_on_selection_changed(self._on_shader_changed)
         grid.add_child(gui.Label("Shader"))
@@ -442,8 +460,6 @@ class Visualizer:
         if len(self._data) == 1:
             self._slider_current.text = name
 
-        self._update_point_cloud(name, cloud)
-
     def setup_camera(self):
         bounds = self._3d.scene.bounding_box
         self._3d.setup_camera(60, bounds, bounds.get_center())
@@ -452,6 +468,7 @@ class Visualizer:
         self._dont_update_geometry = True
         self._on_datasource_changed(self._datasource_combobox.selected_text,
                                     self._datasource_combobox.selected_index)
+        self._update_geometry_colors()
         self._dont_update_geometry = old_dont_update
 
     def show_geometries_under(self, name, show):
@@ -475,10 +492,11 @@ class Visualizer:
         return self._attr2minmax[attr_name]
 
     def _update_geometry(self):
+        material = self._get_material()
         for n,tcloud in self._data.items():
-            self._update_point_cloud(n, tcloud)
+            self._update_point_cloud(n, tcloud, material)
         
-    def _update_point_cloud(self, name, tcloud):
+    def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
             return
 
@@ -486,46 +504,58 @@ class Visualizer:
         attr_name = self._datasource_combobox.selected_text
         if attr_name in tcloud.point:
             attr = tcloud.point[attr_name].as_tensor().numpy()
-            make_colors = self._shader2updater[self._shader.selected_index]
-            if make_colors is not None:
-                this = self
-                colors = make_colors(this, attr)
-                # assert(len(colors) == len(attr))
-                # assert(len(colors) == len(pts))
-            else:
-                print("[warning] dataset '" + str(name) + "' has no attribute named '" + self._shader.selected_text + "'")
-                colors = [[1.0, 0.0, 1.0]] * len(attr)
-        tcloud.point["colors"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(np.array(colors, dtype='float32')), inplace=True)
-        material = rendering.Material()
-        material.shader = "defaultUnlit"
-        material.base_color = [1.0, 1.0, 1.0, 1.0]
+            uv = np.column_stack((attr, [0.0] * len(attr)))
+        else:
+            uv = [[0.0, 0.0]] * len(tcloud.point["points"].as_tensor().numpy())
+        tcloud.point["uv"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(np.array(uv, dtype='float32')), inplace=True)
+
         self._3d.scene.add_geometry(name, tcloud, material)
         node = self._name2treenode[name]
         if node is not None:
             self._3d.scene.show_geometry(name, node.checkbox.checked)
 
-    @staticmethod
-    def _make_color_data_uniform(this, attr):
-        color = this._color.color_value
-        return [[color.red, color.green, color.blue]] * len(attr)
+    def _get_material(self):
+        self._update_gradient()
+        material = rendering.Material()
+        if self._shader.selected_text == self.SOLID_NAME:
+            material.shader = "defaultUnlit"
+            c = self._color.color_value
+            material.base_color = [c.red, c.green, c.blue, 1.0]
+        else:
+            material.shader = "unlitGradient"
+            material.gradient = self._gradient
+            material.scalar_min = self._scalar_min
+            material.scalar_max = self._scalar_max
 
-    @staticmethod
-    def _make_color_data_labels(this, attr):
-        colors = [[1.0, 0.0, 1.0]] * len(attr)
-        for i in range(0, len(attr)):
-            c = this._label_edit.get_color(attr[i])
-            if c is not None:
-                colors[i] = c
-        return colors
+        return material
 
-    @staticmethod
-    def _make_color_data_colormap(this, cmap, attr):
-        return cmap.calc_color_array(attr, this._scalar_min, this._scalar_max)
+    def _update_gradient(self):
+        if self._shader.selected_text == self.LABELS_NAME:
+            colors = self._label_edit.get_colors()
+            n = float(len(colors) - 1)
+            if n >= 1:
+                self._gradient.points = [rendering.Gradient.Point(
+                                         float(i) / n,
+                                         [colors[i][0], colors[i][1],
+                                          colors[i][2], colors[i][3]])
+                                     for i in range(0, len(colors))]
+            else:
+                self._gradient.points = [rendering.Gradient.Point(0.0, [1.0, 0.0, 1.0, 1.0])]
+            self._gradient.mode = rendering.Gradient.LUT
+        else:
+            cmap = self._colormaps.get(self._shader.selected_text)
+            if cmap is not None:
+                self._gradient.points = [rendering.Gradient.Point(p.value,
+                                                          [p.color[0],
+                                                           p.color[1],
+                                                           p.color[2],
+                                                           1.0])
+                                         for p in cmap.points]
+                self._gradient.mode = rendering.Gradient.GRADIENT
 
-    def _make_colormap_callback(self, cmap):
-        def callback(this, attr):
-            return Visualizer._make_color_data_colormap(this, cmap, attr)
-        return callback
+    def _update_geometry_colors(self):
+        material = self._get_material()
+        self._3d.scene.update_material(material)
 
     def _on_layout(self, theme):
         frame = self.window.content_rect
@@ -599,16 +629,17 @@ class Visualizer:
             cmap = self._colormaps[name]
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
 
-        self._update_geometry()
+        self._update_geometry_colors()
 
     def _on_shader_color_changed(self, color):
-        self._update_geometry()
+        self._update_geometry_colors()
             
     def _on_labels_changed(self):
-        self._update_geometry()
+        self._update_geometry_colors()
 
     def _on_colormap_changed(self):
-        self._update_geometry()
+        self._colormaps[self._shader.selected_text] = self._colormap_edit.colormap
+        self._update_geometry_colors()
 
     @staticmethod
     def _make_tcloud_array(np_array, copy=False):
@@ -665,7 +696,7 @@ class Visualizer:
             # ---- Debugging ----
             # dist = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]) for pt in tcloud.point["points"].as_tensor().numpy()]
             # dist = np.array(dist, dtype='float32')
-            # tcloud.point["distance"] = Visualizer._make_tcloud_array(dist, copy=False)
+            # tcloud.point["distance"] = Visualizer._make_tcloud_array(dist, copy=True)
             # ----
 
             mlvis.add(info["name"], tcloud)
