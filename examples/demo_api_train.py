@@ -4,10 +4,11 @@ import yaml
 from ml3d.datasets import SemanticKITTI
 from ml3d.torch.pipelines import SemanticSegmentation 
 from ml3d.torch.models import RandLANet
-from ml3d.utils import Config
+from ml3d.utils import Config, get_module
 
-def demo1():
+def demo_dataset():
     # read data from datasets
+
     dataset = SemanticKITTI(dataset_path="../dataset/SemanticKITTI",
                             use_cahe=True)
     print(dataset.label_to_names)
@@ -27,8 +28,9 @@ def demo1():
         print(data['point'].shape)
 
 
-def demo2():
+def demo_train():
     # Initialize the training by passing parameters
+
     dataset = SemanticKITTI(dataset_path="../dataset/SemanticKITTI",
                             use_cahe=True)
 
@@ -40,13 +42,12 @@ def demo2():
                                     max_epoch=100,
                                     batch_size=4,
                                     device="gpu")
+
     pipeline.run_train()
 
 
-def demo3():
-    # Initialize the training by config file
-    from ml3d.utils import get_module
-    import ml3d.torch
+def demo_inference():
+    # Inference and test example
 
     Pipeline = get_module("pipeline", "SemanticSegmentation", "torch")
     Model = get_module("model", "RandLANet", "torch")
@@ -54,7 +55,8 @@ def demo3():
 
     # Initialize using default configuration in 
     # "ml3d/configs/default_cfgs/randlanet.yml"
-    RandLANet = Model()
+    RandLANet = Model(
+        ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth")
 
     # Initialize by specifying config file path
     SemanticKITTI = Dataset(cfg="ml3d/configs/default_cfgs/semantickitti.yml",
@@ -65,11 +67,21 @@ def demo3():
                         dataset=SemanticKITTI,
                         device="gpu")
 
-    # run test
+    # inference
+    # get data
+    train_split = SemanticKITTI.get_split("train")
+    data = train_split.get_data(0)
+    # restore weights
+    pipeline.load_ckpt(RandLANet.cfg.ckpt_path, False)
+    # run inference
+    results = pipeline.run_inference(data)
+    print(results)
+
+    # test
     pipeline.run_test()
 
 
 if __name__ == '__main__':
-    demo1()
-    demo2()
-    demo3()
+    demo_dataset()
+    demo_inference()
+    demo_train()
