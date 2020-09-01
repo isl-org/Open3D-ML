@@ -21,7 +21,6 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-@DATASET.register_module()
 class ParisLille3D(BaseDataset):
     """
     ParisLille3D dataset, used in visualizer, training, or test

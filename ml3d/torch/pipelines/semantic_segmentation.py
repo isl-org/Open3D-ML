@@ -69,13 +69,13 @@ class SemanticSegmentation(BasePipeline):
         device = self.device
         cfg = self.cfg
         model.device = device
+        print(device)
         model.to(device)
         model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
         log.info("DEVICE : {}".format(device))
-        log.info(model)
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
@@ -86,6 +86,7 @@ class SemanticSegmentation(BasePipeline):
             dataset=dataset.get_split('test'),
             preprocess=model.preprocess,
             transform=model.transform,
+            use_cache=dataset.cfg.use_cache,
             shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
@@ -100,7 +101,7 @@ class SemanticSegmentation(BasePipeline):
                 if dataset.is_tested(attr):
                     continue
                 data = datset_split.get_data(idx)
-                results = self.run_inference(data, device)
+                results = self.run_inference(data)
                 dataset.save_test_result(results, attr)
 
     def run_train(self):

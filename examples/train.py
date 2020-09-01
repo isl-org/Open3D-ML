@@ -73,7 +73,7 @@ def main():
 
         Pipeline = get_module("pipeline", args.pipeline, framework)
         Model = get_module("model", args.model, framework)
-        Dataset = get_module("dataset", args.dataset,)
+        Dataset = get_module("dataset", args.dataset)
 
         dataset = Dataset(cfg=args.cfg_dataset, 
                         dataset_path=args.dataset_path, 

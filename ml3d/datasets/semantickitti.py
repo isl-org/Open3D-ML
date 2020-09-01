@@ -79,6 +79,7 @@ class SemanticKITTI(BaseDataset):
         remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
 
         self.remap_lut_val = remap_lut_val
+        self.remap_lut = remap_lut
 
 
     def get_split(self, split):
@@ -114,8 +115,8 @@ class SemanticKITTI(BaseDataset):
 
         store_path = join(save_path, name_points + '.label')
         pred = pred + 1
-        pred = remap_lut[pred].astype(np.uint32)
-        # pred.tofile(store_path)
+        pred = self.remap_lut[pred].astype(np.uint32)
+        pred.tofile(store_path)
 
     def save_test_result_kpconv(self, results, inputs):
         cfg = self.cfg
