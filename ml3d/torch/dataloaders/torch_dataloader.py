@@ -22,16 +22,18 @@ import vis
 
 from ...utils import dataset_helper
 
-class Torch_Dataloader(Dataset):
+
+class TorchDataloader(Dataset):
     def __init__(self,
                  *args,
                  dataset=None,
                  preprocess=None,
                  transform=None,
-                 no_progress: bool = False,
+                 use_cache=True,
                  **kwargs):
         self.dataset = dataset
-        if preprocess is not None:
+        self.preprocess = preprocess
+        if preprocess is not None and use_cache:
             desc = 'preprocess'
             cache_dir = getattr(dataset.cfg, 'cache_dir')
             assert cache_dir is not None, 'cache directory is not given'
@@ -42,13 +44,12 @@ class Torch_Dataloader(Dataset):
                 cache_key=dataset_helper._get_hash(repr(preprocess)))
 
             uncached = [
-                idx for idx in range(len(dataset))
-                if dataset.get_attr(idx)['name'] not in
-                self.cache_convert.cached_ids
+                idx for idx in range(len(dataset)) if dataset.get_attr(idx)
+                ['name'] not in self.cache_convert.cached_ids
             ]
             if len(uncached) > 0:
-                for idx in tqdm(
-                        range(len(dataset)), desc=desc, disable=no_progress):
+                for idx in tqdm(range(len(dataset)),
+                                desc=desc):
                     attr = dataset.get_attr(idx)
                     data = dataset.get_data(idx)
                     name = attr['name']
@@ -64,9 +65,12 @@ class Torch_Dataloader(Dataset):
         """Returns the item at index idx. """
         dataset = self.dataset
         attr = dataset.get_attr(index)
-        data = (dataset.get_data(index)
-                if self.cache_convert is None else self.cache_convert(
-                    attr['name']))
+        if self.cache_convert:
+            data = self.cache_convert(attr['name'])
+        elif self.preprocess:
+            data = self.preprocess(dataset.get_data(index), attr)
+        else:
+            data = dataset.get_data(index)
 
         if self.transform is not None:
             data = self.transform(data, attr)

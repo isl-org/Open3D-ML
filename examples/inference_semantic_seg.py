@@ -1,30 +1,50 @@
 import torch
-import numpy as np
+import yaml
+
 # there should be pipeline. pipeline is bigger that randlanet
-from ml3d.datasets.semantickitti import SemanticKITTI
+from ml3d.datasets import SemanticKITTI
 from ml3d.torch.pipelines import SemanticSegmentation 
-from ml3d.torch.models import RandLANet
+from ml3d.torch.models import RandLANet, KPFCNN
 from ml3d.utils import Config
 
+# from tf2torch import load_tf_weights
 
-import open3d as o3d
+# yaml_config = 'ml3d/configs/randlanet_semantickitti.yaml'
+# py_config = 'ml3d/configs/randlanet_semantickitti.py'
+py_config = 'ml3d/configs/kpconv_semantickitti.py'
+# py_config 	= 'ml3d/configs/kpconv_semantickitti.py'
 
-config_file = 'ml3d/configs/randlanet_semantickitti.py'
-cfg         = Config.load_from_file(config_file)
-dataset 	= SemanticKITTI(cfg.dataset)
+cfg         = Config.load_from_file(py_config)
 
-model   	= RandLANet(cfg.model)
+dataset    	= SemanticKITTI(cfg.dataset)
+#dataset     = S3DIS(cfg.dataset)
+datset_split = dataset.get_split('training')
+data 		= datset_split.get_data(0)
 
-pipeline 	= SemanticSegmentation(model, dataset, cfg.pipeline)
+# model       = RandLANet(cfg.model)
+model       = KPFCNN(cfg.model)
 
-device  	= torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-#device  = torch.device('cpu')
+pipeline    = SemanticSegmentation(model, dataset, cfg.pipeline)
+pipeline.load_ckpt(model.cfg.ckpt_path, False)
 
-pc_file 	= 'data/demo/fragment.ply'
-pcd 		= o3d.io.read_point_cloud(pc_file)
-points 		= np.asarray(pcd.points).astype(np.float32)
-print(points.shape)
-# input:  points: nv x 3   numpy
-# output: result: n        tensor    
-result 		= pipeline.run_inference(points, device)
-print(result.size())
+device      = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+#device     = torch.device('cpu')
+
+results = pipeline.run_inference(data, device)
+
+import numpy as np
+np.set_printoptions(threshold=np.inf)
+# print(pred)
+print(datset_split.get_attr(0)) 
+gt = np.squeeze(model.inference_data['label'])
+
+pred = results['predict_labels']
+
+mask = gt == pred+1
+print(gt.shape)
+print(pred.shape)
+print(np.sum(mask))
+print(mask.shape)
+
+print(np.sum(mask)/mask.shape[0])
+# pipeline.run_train(device)

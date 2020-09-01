@@ -1,8 +1,8 @@
 #!/bin/bash
-cd utils/nearest_neighbors
-python setup.py install --home="."
-cd ../../
-
-cd cpp_wrappers
+cd ml3d/ops/cpp_wrappers
 sh compile_wrappers.sh
-cd ../../../
+cd ..
+
+cd tf_custom_ops
+sh compile_op.sh
+cd ../../../../

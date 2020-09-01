@@ -14,13 +14,14 @@ model = dict(
     d_feature=8,
     d_out=[16, 64, 128, 256],
     grid_size=0.06,
-    batcher='DefaultBatcher',
+    training_batcher='DefaultBatcher',
+    test_batcher='DefaultBatcher',
     ckpt_path='./ml3d/torch/checkpoint/randlanet_semantickitti.pth')
 
 pipeline = dict(
-    batch_size=2,
-    val_batch_size=2,
-    test_batch_size=3,
+    batch_size=1,
+    val_batch_size=1,
+    test_batch_size=1,
     max_epoch=100,  # maximum epoch during training
     learning_rate=1e-2,  # initial learning rate
     #lr_decays           = {0.95 for i in range(0, 500)},
@@ -35,19 +36,24 @@ pipeline = dict(
 )
 
 dataset = dict(
-    original_pc_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
-    original_label_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_labels/dataset/sequences',
-    dataset_path=
-    '/home/yiling/d2T/intel2020/datasets/semanticKITTI/data_odometry_velodyne/dataset/sequences',
-    cache_dir='/home/yiling/d2T/intel2020/datasets/semanticKITTI/cache1',
+    original_pc_path='./datasets/SemanticKITTI/dataset/sequences',
+    dataset_path='./datasets/SemanticKITTI/dataset/sequences',
+    cache_dir='./logs/cache',
+
+    use_cache=False,
     test_result_folder='./test',
 
-    #training_split      = ['00', '01', '02', '03', '04', '05',
-    #                        '06', '07', '09', '10'],
-    training_split=['01'],
+    training_split      = ['00', '01', '02', '03', '04', '05',
+     '06', '07', '09', '10'],
+    #training_split=['01'],
     validation_split=['08'],
+    #validation_split=['01'],
+
+    test_split=['11', '12', '13', '14', '15', '16', '17', 
+                '18', '19', '20', '21'],
+    all_split=['00', '01', '02', '03', '04', '05', '06', '07', 
+                '09', '08', '10', '11', '12', '13', '14', '15', 
+                '16', '17', '18', '19', '20', '21'],
     test_split_number=11,
     class_weights=[
         55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 78858,

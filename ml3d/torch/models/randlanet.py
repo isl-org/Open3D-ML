@@ -1,7 +1,6 @@
 #coding: future_fstrings
 import torch
 import torch.nn as nn
-import helper_torch_util
 import numpy as np
 import random
 
@@ -11,7 +10,8 @@ from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
-
+from ..utils import helper_torch
+from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
 from ...utils import Config
@@ -72,7 +72,7 @@ class RandLANet(nn.Module):
                 d_encoder_list.append(d_feature)
             d_encoder_list.append(d_feature)
 
-        feature = helper_torch_util.conv2d(True, d_feature, d_feature)
+        feature = helper_torch.conv2d(True, d_feature, d_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
@@ -81,20 +81,20 @@ class RandLANet(nn.Module):
             d_in = d_encoder_list[-j - 2] + d_feature
             d_out = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_torch_util.conv2d_transpose(True, d_in, d_out)
+            f_decoder_i = helper_torch.conv2d_transpose(True, d_in, d_out)
             setattr(self, name, f_decoder_i)
             d_feature = d_encoder_list[-j - 2]
 
-        f_layer_fc1 = helper_torch_util.conv2d(True, d_feature, 64)
+        f_layer_fc1 = helper_torch.conv2d(True, d_feature, 64)
         setattr(self, 'fc1', f_layer_fc1)
 
-        f_layer_fc2 = helper_torch_util.conv2d(True, 64, 32)
+        f_layer_fc2 = helper_torch.conv2d(True, 64, 32)
         setattr(self, 'fc2', f_layer_fc2)
 
-        f_layer_fc3 = helper_torch_util.conv2d(False,
-                                               32,
-                                               cfg.num_classes,
-                                               activation=False)
+        f_layer_fc3 = helper_torch.conv2d(False,
+                                          32,
+                                          cfg.num_classes,
+                                          activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
@@ -120,34 +120,104 @@ class RandLANet(nn.Module):
             select_feat = feat[select_idx]
         return select_points, select_feat, select_labels, select_idx
 
-    def transform(self, data, attr):
+    def get_optimizer(self, cfg_pipeline):
+        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
+        return optimizer, scheduler
+
+    def get_loss(self, Loss, results, inputs, device):
+        """
+        Runs the loss on outputs of the model
+        :param outputs: logits
+        :param labels: labels
+        :return: loss
+        """
         cfg = self.cfg
+        labels = inputs['data']['labels']
+
+        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
+                                            cfg.ignored_label_inds, device)
+
+        # logp = torch.distributions.utils.probs_to_logits(scores,
+        #                                                  is_binary=False)
+        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+
+        # predict_labels = torch.max(scores, dim=-2).indices
+
+        return loss, labels, scores
+
+
+    # def transform_whole(self, data, attr):
+    #     cfg = self.cfg
+    #     pc = data['point']
+    #     label = data['label']
+    #     feat = data['feat']
+    #     tree = data['search_tree']
+    #     features = feat
+
+    #     input_points = []
+    #     input_neighbors = []
+    #     input_pools = []
+    #     input_up_samples = []
+
+    #     for i in range(cfg.num_layers):
+    #         neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+    #         sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+    #         pool_i = neighbour_idx[:pc.shape[0] //
+    #                                cfg.sub_sampling_ratio[i], :]
+    #         up_i = DataProcessing.knn_search(sub_points, pc, 1)
+    #         input_points.append(pc)
+    #         input_neighbors.append(neighbour_idx.astype(np.int64))
+    #         input_pools.append(pool_i.astype(np.int64))
+    #         input_up_samples.append(up_i.astype(np.int64))
+    #         pc = sub_points
+
+    #     inputs = dict()
+    #     inputs['xyz'] = input_points
+    #     inputs['neigh_idx'] = input_neighbors
+    #     inputs['sub_idx'] = input_pools
+    #     inputs['interp_idx'] = input_up_samples
+    #     inputs['features'] = features
+
+    #     inputs['labels'] = label.astype(np.int64)
+    #     if attr['split'] == "test":
+    #         inputs['proj_inds'] = data['proj_inds'] 
+      
+    #     return inputs
+
+
+    def transform(self, data, attr, min_posbility_idx=None):
+        cfg = self.cfg
+        inputs = dict()
+
         pc = data['point']
         label = data['label']
         feat = data['feat']
         tree = data['search_tree']
-        pick_idx = np.random.choice(len(pc), 1)
-
-        pc, feat, label, selected_idx = \
-            self.crop_pc(pc, feat, label, tree, pick_idx)
-        '''
-        if split != "training":
-            proj_inds = np.squeeze(search_tree.query(points, return_distance=False))
-            proj_inds = proj_inds.astype(np.int32)
-            data['proj_inds'] = proj_inds
-        '''
-
-        if (feat is not None):
-            features = np.concatenate([pc, feat], axis=1)
+        if min_posbility_idx is None: # training
+            pick_idx = np.random.choice(len(pc), 1)
         else:
-            features = pc
+            pick_idx = min_posbility_idx
 
+
+        selected_pc, feat, label, selected_idx = \
+            self.crop_pc(pc, feat, label, tree, pick_idx)
+        
+        if min_posbility_idx is not None:
+            dists = np.sum(np.square((selected_pc - pc[pick_idx]).astype(np.float32)), axis=1)
+            delta = np.square(1 - dists / np.max(dists))
+            self.possibility[selected_idx] += delta
+            inputs['point_inds'] = selected_idx
+
+        pc = selected_pc
+        features = feat
         input_points = []
         input_neighbors = []
         input_pools = []
         input_up_samples = []
 
-        ori_pc = pc
 
         for i in range(cfg.num_layers):
             neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
@@ -162,7 +232,6 @@ class RandLANet(nn.Module):
             input_up_samples.append(up_i.astype(np.int64))
             pc = sub_points
 
-        inputs = dict()
         inputs['xyz'] = input_points
         inputs['neigh_idx'] = input_neighbors
         inputs['sub_idx'] = input_pools
@@ -175,51 +244,68 @@ class RandLANet(nn.Module):
 
         return inputs
 
-    def loss(self, Loss, results, inputs, device):
-        """
-        Runs the loss on outputs of the model
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
-        """
-        cfg = self.cfg
-        labels = inputs['data']['labels']
+    # def transform(self, data, attr):
+    #     if attr['split'] == 'test':
+    #         return self.transform_whole(data, attr) 
+    #     else: 
+    #         return self.transform_crop(data, attr)
 
-        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
-                                            cfg.ignored_label_inds, device)
+    def inference_begin(self, data):
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes], dtype=np.float16)
+        self.batcher = DefaultBatcher()
 
-        logp = torch.distributions.utils.probs_to_logits(scores,
-                                                         is_binary=False)
-        loss = Loss.weighted_CrossEntropyLoss(logp, labels)
 
-        # predict_labels = torch.max(scores, dim=-2).indices
+    def inference_preprocess(self):
+        min_posbility_idx = np.argmin(self.possibility)
+        data = self.transform(self.inference_data, {}, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
 
-        return loss, labels, scores
+        return inputs
+
+    def inference_end(self, inputs, results):
+       
+        results = torch.reshape(results, (-1, self.cfg.num_classes))
+        m_softmax    = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds'][0, :]
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def preprocess(self, data, attr):
         cfg = self.cfg
-        
-        if 'feat' not in data.keys():
-            data['feat'] = None
-            
+
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
-        feat = np.array(data['feat'], dtype=np.float32)
         labels = np.array(data['label'], dtype=np.int32)
+
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = points
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+            feat = np.concatenate([points, feat], axis=1)
 
         split = attr['split']
 
-        if (feat is None):
-            sub_feat = None
-
         data = dict()
-
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                points, labels=labels, grid_size=cfg.grid_size)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                points, features=feat, labels=labels, grid_size=cfg.grid_size)
+    
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
@@ -228,7 +314,7 @@ class RandLANet(nn.Module):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split == "test":
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -236,134 +322,34 @@ class RandLANet(nn.Module):
 
         return data
 
-    def previous_preprocess(self, batch_data, device):
-        cfg = self.cfg
-        batch_pc = batch_data[0]
-        batch_label = batch_data[1]
-        batch_pc_idx = batch_data[2]
-        batch_cloud_idx = batch_data[3]
-
-        features = batch_data[0]
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
-
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(batch_pc, batch_pc,
-                                                      cfg.k_n)
-            sub_points = batch_pc[:, :batch_pc.size(1) //
-                                  cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:, :batch_pc.size(1) //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, batch_pc, 1)
-            input_points.append(batch_pc)
-            input_neighbors.append(neighbour_idx)
-            input_pools.append(pool_i)
-            input_up_samples.append(up_i)
-            batch_pc = sub_points
-
-        inputs = dict()
-        #print(features)
-        inputs['xyz'] = [arr.to(device) for arr in input_points]
-        inputs['neigh_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_neighbors
-        ]
-        inputs['sub_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_pools
-        ]
-        inputs['interp_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_up_samples
-        ]
-        inputs['features'] = features.to(device)
-        inputs['input_inds'] = batch_pc_idx
-        inputs['cloud_inds'] = batch_cloud_idx
-
-        return inputs
-
-    def preprocess_inference(self, pc, device):
-        cfg = self.cfg
-        idx = DataProcessing.shuffle_idx(np.arange(len(pc)))
-        pc = pc[idx]
-        batch_pc = torch.from_numpy(pc).unsqueeze(0)
-        features = batch_pc
-
-        input_points = []
-        input_neighbors = []
-        input_pools = []
-        input_up_samples = []
-
-        for i in range(cfg.num_layers):
-            neighbour_idx = DataProcessing.knn_search(batch_pc, batch_pc,
-                                                      cfg.k_n)
-
-            sub_points = batch_pc[:, :batch_pc.size(1) //
-                                  cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:, :batch_pc.size(1) //
-                                   cfg.sub_sampling_ratio[i], :]
-            up_i = DataProcessing.knn_search(sub_points, batch_pc, 1)
-            input_points.append(batch_pc)
-            input_neighbors.append(neighbour_idx)
-            input_pools.append(pool_i)
-            input_up_samples.append(up_i)
-            batch_pc = sub_points
-
-        inputs = dict()
-        #print(features)
-        inputs['xyz'] = [arr.to(device) for arr in input_points]
-        inputs['neigh_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_neighbors
-        ]
-        inputs['sub_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_pools
-        ]
-        inputs['interp_idx'] = [
-            torch.from_numpy(arr).to(torch.int64).to(device)
-            for arr in input_up_samples
-        ]
-        inputs['features'] = features.to(device)
-
-        return inputs
-
     def init_att_pooling(self, d, d_out, name):
         att_activation = nn.Linear(d, d)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_torch_util.conv2d(True, d, d_out)
+        f_agg = helper_torch.conv2d(True, d, d_out)
         setattr(self, name + 'mlp', f_agg)
 
     def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_torch_util.conv2d(True, 10, d_in)
+        f_pc = helper_torch.conv2d(True, 10, d_in)
         setattr(self, name + 'mlp1', f_pc)
 
         self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
 
-        f_xyz = helper_torch_util.conv2d(True, d_in, d_out // 2)
+        f_xyz = helper_torch.conv2d(True, d_in, d_out // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
         self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
 
     def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_torch_util.conv2d(True, d_in, d_out // 2)
+        f_pc = helper_torch.conv2d(True, d_in, d_out // 2)
         setattr(self, name + 'mlp1', f_pc)
 
         self.init_building_block(d_out // 2, d_out, name + 'LFA')
 
-        f_pc = helper_torch_util.conv2d(True,
-                                        d_out,
-                                        d_out * 2,
-                                        activation=False)
+        f_pc = helper_torch.conv2d(True, d_out, d_out * 2, activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_torch_util.conv2d(True,
-                                            d_in,
-                                            d_out * 2,
-                                            activation=False)
+        shortcut = helper_torch.conv2d(True, d_in, d_out * 2, activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
