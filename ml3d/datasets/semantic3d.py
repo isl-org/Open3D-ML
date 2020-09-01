@@ -11,6 +11,8 @@ from tqdm import tqdm
 import logging
 
 from .utils import DataProcessing as DP
+from .base_dataset import BaseDataset
+from ..utils import make_dir, DATASET
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,60 +21,30 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class Semantic3DSplit():
-    def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+@DATASET.register_module()
+class Semantic3D(BaseDataset):
+    """
+    SemanticKITTI dataset, used in visualizer, training, or test
+    """
+    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+        """
+        Initialize
+        Args:
+            cfg (cfg object or str): cfg object or path to cfg file
+            dataset_path (str): path to the dataset
+            args (dict): dict of args 
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        self.default_cfg_name = "semantic3d.yml"
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+        super().__init__(cfg=cfg, 
+                        dataset_path=dataset_path, 
+                        **kwargs)
 
-    def __len__(self):
-        return len(self.path_list)
+        cfg = self.cfg
 
-    def get_data(self, idx):
-        pc_path = self.path_list[idx]
-        log.debug("get_data called {}".format(pc_path))
-
-        pc = pd.read_csv(pc_path,
-                         header=None,
-                         delim_whitespace=True,
-                         dtype=np.float32).values
-
-        points = pc[:, 0:3]
-        feat = pc[:, [4, 5, 6, 3]]
-
-        points = np.array(points, dtype=np.float32)
-        feat = np.array(feat, dtype=np.float32)
-
-        if (self.split != 'test'):
-            labels = pd.read_csv(pc_path.replace(".txt", ".labels"),
-                                 header=None,
-                                 delim_whitespace=True,
-                                 dtype=np.int32).values
-            labels = np.array(labels, dtype=np.int32)
-        else:
-            labels = np.zeros((points.shape[0], ), dtype=np.int32)
-
-        data = {'point': points, 'feat': feat, 'label': labels}
-
-        return data
-
-    def get_attr(self, idx):
-        pc_path = Path(self.path_list[idx])
-        name = pc_path.name.replace('.txt', '')
-
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
-        return attr
-
-
-class Semantic3D:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'Semantic3D'
-        self.dataset_path = cfg.dataset_path
         self.label_to_names = {
             0: 'unlabeled',
             1: 'man-made terrain',
@@ -130,3 +102,52 @@ class Semantic3D:
             return self.val_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+
+class Semantic3DSplit():
+    def __init__(self, dataset, split='training'):
+        self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+
+        self.path_list = path_list
+        self.split = split
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.path_list)
+
+    def get_data(self, idx):
+        pc_path = self.path_list[idx]
+        log.debug("get_data called {}".format(pc_path))
+
+        pc = pd.read_csv(pc_path,
+                         header=None,
+                         delim_whitespace=True,
+                         dtype=np.float32).values
+
+        points = pc[:, 0:3]
+        feat = pc[:, [4, 5, 6, 3]]
+
+        points = np.array(points, dtype=np.float32)
+        feat = np.array(feat, dtype=np.float32)
+
+        if (self.split != 'test'):
+            labels = pd.read_csv(pc_path.replace(".txt", ".labels"),
+                                 header=None,
+                                 delim_whitespace=True,
+                                 dtype=np.int32).values
+            labels = np.array(labels, dtype=np.int32)
+        else:
+            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+
+        data = {'point': points, 'feat': feat, 'label': labels}
+
+        return data
+
+    def get_attr(self, idx):
+        pc_path = Path(self.path_list[idx])
+        name = pc_path.name.replace('.txt', '')
+
+        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        return attr

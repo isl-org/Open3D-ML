@@ -10,11 +10,72 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
+from .base_dataset import BaseDataset
+from ..utils import make_dir, DATASET
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
 )
 log = logging.getLogger(__name__)
+
+
+@DATASET.register_module()
+class ParisLille3D(BaseDataset):
+    """
+    ParisLille3D dataset, used in visualizer, training, or test
+    """
+    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+        """
+        Initialize
+        Args:
+            cfg (cfg object or str): cfg object or path to cfg file
+            dataset_path (str): path to the dataset
+            args (dict): dict of args 
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        self.default_cfg_name = "parislille3d.yml"
+        
+        super().__init__(cfg=cfg, 
+                        dataset_path=dataset_path, 
+                        **kwargs)
+
+        cfg = self.cfg
+
+        self.num_classes = len(self.label_to_names)
+        self.label_values = np.sort(
+            [k for k, v in self.label_to_names.items()])
+        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
+        self.ignored_labels = np.array([0])
+
+        self.train_files = glob.glob(cfg.train_dir + "*.ply")
+        self.val_files = [
+            f for f in self.train_files if Path(f).name in cfg.val_files
+        ]
+        self.train_files = [
+            f for f in self.train_files if f not in self.val_files
+        ]
+
+        self.test_files = glob.glob(cfg.test_dir + '*.ply')
+
+    def get_split(self, split):
+        return ParisLille3DSplit(self, split=split)
+
+    def get_split_list(self, split):
+        if split in ['test', 'testing']:
+            random.shuffle(self.test_files)
+            return self.test_files
+        elif split in ['val', 'validation']:
+            random.shuffle(self.val_files)
+            return self.val_files
+        elif split in ['train', 'training']:
+            random.shuffle(self.train_files)
+            return self.train_files
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
 
 class ParisLille3DSplit():
@@ -57,53 +118,3 @@ class ParisLille3DSplit():
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
-
-class ParisLille3D:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'ParisLille3D'
-        self.dataset_path = cfg.dataset_path
-        self.label_to_names = {
-            0: 'unclassified',
-            1: 'ground',
-            2: 'building',
-            3: 'pole-road_sign-traffic_light',
-            4: 'bollard-small_pole',
-            5: 'trash_can',
-            6: 'barrier',
-            7: 'pedestrian',
-            8: 'car',
-            9: 'natural-vegetation'
-        }
-
-        self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
-        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.array([0])
-
-        self.train_files = glob.glob(cfg.train_dir + "*.ply")
-        self.val_files = [
-            f for f in self.train_files if Path(f).name in cfg.val_files
-        ]
-        self.train_files = [
-            f for f in self.train_files if f not in self.val_files
-        ]
-
-        self.test_files = glob.glob(cfg.test_dir + '*.ply')
-
-    def get_split(self, split):
-        return ParisLille3DSplit(self, split=split)
-
-    def get_split_list(self, split):
-        if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
-            return self.test_files
-        elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
-            return self.val_files
-        elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
-            return self.train_files
-        else:
-            raise ValueError("Invalid split {}".format(split))

@@ -14,7 +14,7 @@ from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
-from ...utils import Config, MODEL
+from ...utils import MODEL
 
 
 @MODEL.register_module('torch')

@@ -1,4 +1,5 @@
 
+
 # Open3D-ML
 An extension of Open3D to address 3D Machine Learning tasks
 This repo is a proposal for the directory structure.
@@ -7,19 +8,6 @@ The repo can be used together with the precompiled open3d pip package but will a
 The file ```examples/train_semantic_seg.py``` contains a working example showing how the repo can be used directly and after it has been integrated in the open3d namespace.
 
 TODO List:
-- [x] tensorboard
-- [x] strucutred config file
-- [x] disentangle config
-- [x] support yaml
-- [x] validation loader
-- [x] re-training
-- [x] on-the-fly cached preprocessing
-- [x] reorganize the dataloading and caching
-- [x] dataset class in torch 
-- [ ] support KPConv
-- [ ] support S3DIS
-- [ ] Tensorflow pipeline
-- [ ] semantickitti example data for inference
 - [ ] fine-tune training
 - [ ] rename ml3d.torch.datasets -> ml3d.torch.dataloaders same for tf
 - [ ] replace custom compiled ops with functionality in o3d if possible
@@ -52,29 +40,59 @@ TODO List:
 ### Investigate a dataset
 ### Visualize a pointcloud with labels
 
+
+## Training
+### Command line
+Train a network by specifying the names of dataset, model, and pipeline (SemanticSegmentation by default). Either a path to the dataset or a config file of the dataset is needed in this case,
+
+```shell
+# Initialize a dataset using its path
+python examples/train.py ${tf/torch} -p ${PIPELINE_NAME} -m ${MODEL_NAME} \
+-d ${DATASET_NAME} --dataset_path ${DATASET_PATH} [optional arguments]
+
+# Initialize a dataset using its config file
+python examples/train.py ${tf/torch} -p ${PIPELINE_NAME} -m ${MODEL_NAME} \
+-d ${DATASET_NAME} --cfg_dataset ${DATASET_CONFIG_FILE}  [optional arguments]
+```
+
+Alternatively, you can run the script using a config file, which contains configs for dataset, model, and pipeline.
+```shell
+python examples/train.py ${tf/torch} -c ${CONFIG_FILE} [optional arguments]
+```
+
+Examples,
+```shell
+# Train RandLANet on SemanticKITTI for segmantic segmentation (by default)
+python examples/train.py torch -m RandLANet \
+-d SemanticKITTI --dataset_path ../dataset/SemanticKITTI 
+
+# or
+python examples/train.py torch -m RandLANet \
+-d SemanticKITTI --cfg_dataset ./ml3d/configs/default_cfgs/semantickitti.yml
+
+# Use a config file to train this model with tensorflow
+python examples/train.py tf -c ml3d/configs/randlanet_semantickitti.yml
+```
+Arguments can be
+- `-p, --pipeline`: pipeline name, SemanticSegmentation by default
+- `-m, --model`: model name (RnadLANet, KPConv)
+- `-d, --dataset`: dataset name (SemanticKITTI, Toronto3D, S3DIS, ParisLille3D, Semantic3D)
+- `-c, --c`: config file path (example config files are in in `ml3d/configs/`)
+- `--cfg_model`: path to the model's config file
+- `--cfg_pipeline`: path to the pipeline's config file
+- `--cfg_dataset`: path to the dataset's config file
+- `--cfg_model`: path to the model's config file
+- `--dataset_path`: path to the dataset
+- `--device`: `cpu` or `gpu`
+
+You can also arbitrary arguments in the command line, and the arguments will save in a dictionary and merge with dataset/model/pipeline's existing cfg.
+For example, `--foo abc` will add `{"foo": "abc"}`to the cfg dict.
+
 ## Inference with pretrained weights
 ### Test on a dataset
 ### Test on a pointcloud file
 ### APIs for inference
 
-## Training
-```
-python examples/train.py torch -c ml3d/configs/randlanet_semantickitti.yml
-```
-```shell
-python examples/train.py ${TF/torch} ${CONFIG_FILE} [optional arguments]
-```
-Optional arguments can be
-- `--log_dir ${LOG_DIR}`: By default, the `${LOG_DIR}` is `./logs`. This directory is where all the logs, results, and checkpoints are stored.
-- `--ckpt_path`:
-- `--device`
-- 
-
-Examples:
-Train torch model of RandLA-Net on SemanticKITTI
-```shell
-python examples/train.py torch ml3d/configs/randlanet_semantickitti.yaml
-```
 
 ## Components of Open3D-ML3D
 ### pipeline

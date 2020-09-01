@@ -10,17 +10,17 @@ from sklearn.neighbors import KDTree
 from ..utils import helper_tf
 from ...datasets.utils import DataProcessing
 
-# class RandLANet(tf.keras.Model):
-#     """docstring for RandLANet"""
-#     def __init__(self, cfg):
-#         super(RandLANet, self).__init__()
-#         self.cfg = cfg
+from .base_model import BaseModel
+from ...utils import MODEL
 
+@MODEL.register_module('tf')
+class RandLANet(BaseModel):
+    def __init__(self, cfg=None, **kwargs):
+        self.default_cfg_name = "randlanet.yml"
 
-class RandLANet(tf.keras.Model):
-    def __init__(self, cfg):
-        super(RandLANet, self).__init__()
-        self.cfg = cfg
+        super().__init__(cfg=cfg,**kwargs)
+
+        cfg = self.cfg
         d_feature = cfg.d_feature
 
         self.fc0 = tf.keras.layers.Dense(d_feature, activation=None)

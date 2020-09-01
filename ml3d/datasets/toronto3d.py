@@ -10,11 +10,78 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
+from .base_dataset import BaseDataset
+from ..utils import make_dir, DATASET
+
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
 )
 log = logging.getLogger(__name__)
+
+
+@DATASET.register_module()
+class Toronto3D(BaseDataset):
+    """
+    Toronto3D dataset, used in visualizer, training, or test
+    """
+    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+        """
+        Initialize
+        Args:
+            cfg (cfg object or str): cfg object or path to cfg file
+            dataset_path (str): path to the dataset
+            args (dict): dict of args 
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        self.default_cfg_name = "toronto3d.yml"
+
+        super().__init__(cfg=cfg, 
+                        dataset_path=dataset_path, 
+                        **kwargs)
+
+        cfg = self.cfg
+
+        self.label_to_names = {
+            0: 'Unclassified',
+            1: 'Ground',
+            2: 'Road_markings',
+            3: 'Natural',
+            4: 'Building',
+            5: 'Utility_line',
+            6: 'Pole',
+            7: 'Car',
+            8: 'Fence'
+        }
+
+        self.num_classes = len(self.label_to_names)
+        self.label_values = np.sort(
+            [k for k, v in self.label_to_names.items()])
+        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
+        self.ignored_labels = np.array([0])
+
+        self.train_files = [self.dataset_path + f for f in cfg.train_files]
+        self.val_files = [self.dataset_path + f for f in cfg.val_files]
+        self.test_files = [self.dataset_path + f for f in cfg.test_files]
+
+    def get_split(self, split):
+        return Toronto3DSplit(self, split=split)
+
+    def get_split_list(self, split):
+        if split in ['test', 'testing']:
+            random.shuffle(self.test_files)
+            return self.test_files
+        elif split in ['val', 'validation']:
+            random.shuffle(self.val_files)
+            return self.val_files
+        elif split in ['train', 'training']:
+            random.shuffle(self.train_files)
+            return self.train_files
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
 
 class Toronto3DSplit():
@@ -62,46 +129,3 @@ class Toronto3DSplit():
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
-
-class Toronto3D:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'Toronto3D'
-        self.dataset_path = cfg.dataset_path
-        self.label_to_names = {
-            0: 'Unclassified',
-            1: 'Ground',
-            2: 'Road_markings',
-            3: 'Natural',
-            4: 'Building',
-            5: 'Utility_line',
-            6: 'Pole',
-            7: 'Car',
-            8: 'Fence'
-        }
-
-        self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
-        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.array([0])
-
-        self.train_files = [self.dataset_path + f for f in cfg.train_files]
-        self.val_files = [self.dataset_path + f for f in cfg.val_files]
-        self.test_files = [self.dataset_path + f for f in cfg.test_files]
-
-    def get_split(self, split):
-        return Toronto3DSplit(self, split=split)
-
-    def get_split_list(self, split):
-        if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
-            return self.test_files
-        elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
-            return self.val_files
-        elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
-            return self.train_files
-        else:
-            raise ValueError("Invalid split {}".format(split))

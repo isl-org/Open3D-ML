@@ -14,3 +14,5 @@ def test_integration_torch():
         num_layers=5,
     )
     print(model)
+
+test_integration_torch()

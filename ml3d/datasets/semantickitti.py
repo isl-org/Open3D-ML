@@ -8,9 +8,9 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 from sklearn.neighbors import KDTree
 import yaml
 
+from .base_dataset import BaseDataset
 from .utils import DataProcessing
 from ..utils import make_dir, DATASET
-from .base_dataset import BaseDataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,11 +37,10 @@ class SemanticKITTI(BaseDataset):
             class: The corresponding class.
         """
         self.default_cfg_name = "semantickitti.yml"
-        
+
         super().__init__(cfg=cfg, 
                         dataset_path=dataset_path, 
                         **kwargs)
-        self.name = 'SemanticKITTI'
 
         cfg = self.cfg
 

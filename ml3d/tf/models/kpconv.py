@@ -10,16 +10,20 @@ from pathlib import Path
 from sklearn.neighbors import KDTree
 import pudb
 
+from .base_model import BaseModel
+from ...utils import MODEL
 from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
 
 
-class KPFCNN(tf.keras.Model):
-    def __init__(self, cfg):
-        super(KPFCNN, self).__init__()
+@MODEL.register_module('tf', name='KPConv')
+class KPFCNN(BaseModel):
+    def __init__(self, cfg=None, **kwargs):
+        self.default_cfg_name = "kpconv.yml"
 
-        # Model parameters
-        self.cfg = cfg
+        super().__init__(cfg=cfg,**kwargs)
+
+        cfg = self.cfg
 
         # From config parameter, compute higher bound of neighbors number in a neighborhood
         hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1)**3))

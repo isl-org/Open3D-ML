@@ -29,7 +29,7 @@ if gpus:
     print(e)
 
 
-@PIPELINE.register_module("torch")
+@PIPELINE.register_module("tf")
 class SemanticSegmentation():
     def __init__(self, model, dataset, cfg):
         self.model = model
