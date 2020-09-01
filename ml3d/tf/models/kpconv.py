@@ -782,11 +782,11 @@ class KPFCNN(tf.keras.Model):
         data = dict()
 
         if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.first_subsampling_dl)
 
         else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points,
                 features=feat,
                 labels=labels,

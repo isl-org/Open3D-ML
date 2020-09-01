@@ -5,9 +5,9 @@ import torch.nn as nn
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
+from open3d.pybind.ml.contrib import subsample_batch
 
 from ...ops.cpp_wrappers.cpp_neighbors import radius_neighbors as cpp_neighbors
-from ...ops.cpp_wrappers.cpp_subsampling import grid_subsampling as cpp_subsampling
 
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
@@ -302,7 +302,7 @@ class KPFCNN(nn.Module):
             merged_points,
             features=merged_coords,
             labels=merged_labels,
-            sampleDl=self.cfg.first_subsampling_dl)
+            grid_size=self.cfg.first_subsampling_dl)
 
         # Number collected
         n = in_pts.shape[0]
@@ -464,7 +464,7 @@ class KPFCNN(nn.Module):
             merged_points,
             features=merged_coords,
             labels=merged_labels,
-            sampleDl=self.cfg.first_subsampling_dl)
+            grid_size=self.cfg.first_subsampling_dl)
 
         # Number collected
         n = in_pts.shape[0]
@@ -2237,7 +2237,7 @@ def batch_grid_subsampling(points,
     #######################
 
     if (features is None) and (labels is None):
-        s_points, s_len = cpp_subsampling.subsample_batch(points,
+        s_points, s_len = subsample_batch(points,
                                                           batches_len,
                                                           sampleDl=sampleDl,
                                                           max_p=max_p,
@@ -2252,7 +2252,7 @@ def batch_grid_subsampling(points,
         return s_points, s_len
 
     elif (labels is None):
-        s_points, s_len, s_features = cpp_subsampling.subsample_batch(
+        s_points, s_len, s_features = subsample_batch(
             points,
             batches_len,
             features=features,
@@ -2270,7 +2270,7 @@ def batch_grid_subsampling(points,
         return s_points, s_len, s_features
 
     elif (features is None):
-        s_points, s_len, s_labels = cpp_subsampling.subsample_batch(
+        s_points, s_len, s_labels = subsample_batch(
             points,
             batches_len,
             classes=labels,
@@ -2288,7 +2288,7 @@ def batch_grid_subsampling(points,
         return s_points, s_len, s_labels
 
     else:
-        s_points, s_len, s_features, s_labels = cpp_subsampling.subsample_batch(
+        s_points, s_len, s_features, s_labels = subsample_batch(
             points,
             batches_len,
             features=features,
