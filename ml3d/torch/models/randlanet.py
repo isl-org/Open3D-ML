@@ -121,7 +121,8 @@ class RandLANet(nn.Module):
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     lr=cfg_pipeline.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
@@ -146,7 +147,6 @@ class RandLANet(nn.Module):
         # predict_labels = torch.max(scores, dim=-2).indices
 
         return loss, labels, scores
-
 
     # def transform_whole(self, data, attr):
     #     cfg = self.cfg
@@ -183,10 +183,9 @@ class RandLANet(nn.Module):
 
     #     inputs['labels'] = label.astype(np.int64)
     #     if attr['split'] == "test":
-    #         inputs['proj_inds'] = data['proj_inds'] 
-      
-    #     return inputs
+    #         inputs['proj_inds'] = data['proj_inds']
 
+    #     return inputs
 
     def transform(self, data, attr, min_posbility_idx=None):
         cfg = self.cfg
@@ -196,7 +195,7 @@ class RandLANet(nn.Module):
         label = data['label']
         feat = data['feat']
         tree = data['search_tree']
-        if min_posbility_idx is None: # training
+        if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
         else:
             pick_idx = min_posbility_idx
@@ -204,9 +203,11 @@ class RandLANet(nn.Module):
 
         selected_pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
-        
+
         if min_posbility_idx is not None:
-            dists = np.sum(np.square((selected_pc - pc[pick_idx]).astype(np.float32)), axis=1)
+            dists = np.sum(np.square(
+                (selected_pc - pc[pick_idx]).astype(np.float32)),
+                           axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
@@ -217,7 +218,6 @@ class RandLANet(nn.Module):
         input_neighbors = []
         input_pools = []
         input_up_samples = []
-
 
         for i in range(cfg.num_layers):
             neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
@@ -246,8 +246,8 @@ class RandLANet(nn.Module):
 
     # def transform(self, data, attr):
     #     if attr['split'] == 'test':
-    #         return self.transform_whole(data, attr) 
-    #     else: 
+    #         return self.transform_whole(data, attr)
+    #     else:
     #         return self.transform_crop(data, attr)
 
     def inference_begin(self, data):
@@ -256,9 +256,9 @@ class RandLANet(nn.Module):
         self.inference_data = self.preprocess(data, attr)
         num_points = self.inference_data['search_tree'].data.shape[0]
         self.possibility = np.random.rand(num_points) * 1e-3
-        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes], dtype=np.float16)
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
         self.batcher = DefaultBatcher()
-
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
@@ -270,14 +270,15 @@ class RandLANet(nn.Module):
         return inputs
 
     def inference_end(self, inputs, results):
-       
+
         results = torch.reshape(results, (-1, self.cfg.num_classes))
-        m_softmax    = torch.nn.Softmax(dim=-1)
+        m_softmax = torch.nn.Softmax(dim=-1)
         results = m_softmax(results)
         results = results.cpu().data.numpy()
         probs = np.reshape(results, [-1, self.cfg.num_classes])
         inds = inputs['data']['point_inds'][0, :]
-        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (1 - self.test_smooth) * probs
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
         if np.min(self.possibility) > 0.5:
             inference_result = {
                 'predict_labels': np.argmax(self.test_probs, 1),
@@ -303,7 +304,7 @@ class RandLANet(nn.Module):
         split = attr['split']
 
         data = dict()
-    
+
         sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
             points, features=feat, labels=labels, grid_size=cfg.grid_size)
 

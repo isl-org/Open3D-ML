@@ -177,18 +177,26 @@ class KPFCNN(nn.Module):
 
     def get_optimizer(self, cfg_pipeline):
         # Optimizer with specific learning rate for deformable KPConv
-        deform_params = [v for k, v in self.named_parameters() if 'offset' in k]
-        other_params = [v for k, v in self.named_parameters() if 'offset' not in k]
+        deform_params = [
+            v for k, v in self.named_parameters() if 'offset' in k
+        ]
+        other_params = [
+            v for k, v in self.named_parameters() if 'offset' not in k
+        ]
         deform_lr = cfg_pipeline.learning_rate * cfg_pipeline.deform_lr_factor
-        optimizer = torch.optim.SGD([{'params': other_params},
-                                          {'params': deform_params, 'lr': deform_lr}],
-                                         lr=cfg_pipeline.learning_rate,
-                                         momentum=cfg_pipeline.momentum,
-                                         weight_decay=cfg_pipeline.weight_decay)
-      
+        optimizer = torch.optim.SGD([{
+            'params': other_params
+        }, {
+            'params': deform_params,
+            'lr': deform_lr
+        }],
+                                    lr=cfg_pipeline.learning_rate,
+                                    momentum=cfg_pipeline.momentum,
+                                    weight_decay=cfg_pipeline.weight_decay)
+
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
-        
+
         return optimizer, scheduler
 
     def get_loss(self, Loss, results, inputs, device):
@@ -314,10 +322,8 @@ class KPFCNN(nn.Module):
 
         # Project predictions on the frame points
         search_tree = KDTree(in_pts, leaf_size=50)
-        proj_inds = search_tree.query(o_pts[:, :],
-                                      return_distance=False)
+        proj_inds = search_tree.query(o_pts[:, :], return_distance=False)
         proj_inds = np.squeeze(proj_inds).astype(np.int32)
-  
 
         # Data augmentation
         in_pts, scale, R = self.augmentation_transform(in_pts)
@@ -790,7 +796,6 @@ class KPFCNN(nn.Module):
         from ..dataloaders import ConcatBatcher
         self.batcher = ConcatBatcher(self.device)
 
-
     def inference_preprocess(self):
         data = self.transform_test(self.inference_data, {})
         inputs = {'data': data, 'attr': []}
@@ -799,11 +804,11 @@ class KPFCNN(nn.Module):
 
         return inputs
 
-    def inference_end(self, inputs, results): 
-        m_softmax    = torch.nn.Softmax(dim=-1)
+    def inference_end(self, inputs, results):
+        m_softmax = torch.nn.Softmax(dim=-1)
         results = m_softmax(results)
         results = results.cpu().data.numpy()
-        proj_inds = inputs['data'].reproj_inds[0] 
+        proj_inds = inputs['data'].reproj_inds[0]
         results = results[proj_inds]
         predict_scores = results
 
@@ -814,7 +819,6 @@ class KPFCNN(nn.Module):
 
         self.inference_result = inference_result
         return True
-
 
     def big_neighborhood_filter(self, neighbors, layer):
         """
@@ -2238,10 +2242,10 @@ def batch_grid_subsampling(points,
 
     if (features is None) and (labels is None):
         s_points, s_len = subsample_batch(points,
-                                                          batches_len,
-                                                          sampleDl=sampleDl,
-                                                          max_p=max_p,
-                                                          verbose=verbose)
+                                          batches_len,
+                                          sampleDl=sampleDl,
+                                          max_p=max_p,
+                                          verbose=verbose)
         if random_grid_orient:
             i0 = 0
             for bi, length in enumerate(s_len):
@@ -2252,13 +2256,12 @@ def batch_grid_subsampling(points,
         return s_points, s_len
 
     elif (labels is None):
-        s_points, s_len, s_features = subsample_batch(
-            points,
-            batches_len,
-            features=features,
-            sampleDl=sampleDl,
-            max_p=max_p,
-            verbose=verbose)
+        s_points, s_len, s_features = subsample_batch(points,
+                                                      batches_len,
+                                                      features=features,
+                                                      sampleDl=sampleDl,
+                                                      max_p=max_p,
+                                                      verbose=verbose)
         if random_grid_orient:
             i0 = 0
             for bi, length in enumerate(s_len):
@@ -2270,13 +2273,12 @@ def batch_grid_subsampling(points,
         return s_points, s_len, s_features
 
     elif (features is None):
-        s_points, s_len, s_labels = subsample_batch(
-            points,
-            batches_len,
-            classes=labels,
-            sampleDl=sampleDl,
-            max_p=max_p,
-            verbose=verbose)
+        s_points, s_len, s_labels = subsample_batch(points,
+                                                    batches_len,
+                                                    classes=labels,
+                                                    sampleDl=sampleDl,
+                                                    max_p=max_p,
+                                                    verbose=verbose)
         if random_grid_orient:
             i0 = 0
             for bi, length in enumerate(s_len):
