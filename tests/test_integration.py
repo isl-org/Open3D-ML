@@ -4,7 +4,8 @@ import os
 if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
     base = os.environ['PATH_TO_OPEN3D_ML']
 else:
-    base = '../Open3D-ML'
+    base = '.'
+    # base = '../Open3D-ML'
 
 def test_integration_torch():
     import torch

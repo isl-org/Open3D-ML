@@ -10,7 +10,7 @@ YAPF_VER="0.30.0"
 set -euo pipefail
 
 # 1. Prepare the Open3D-ML repo and install dependencies
-PATH_TO_OPEN3D_ML=$(pwd)
+export PATH_TO_OPEN3D_ML=$(pwd)
 # the build system of the main repo expects a master branch. make sure master exists
 git checkout -b master || true
 pip install -r requirements.txt
