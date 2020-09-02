@@ -12,7 +12,7 @@ import pudb
 
 from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
-
+from open3d.ml.tf.ops import *
 
 class KPFCNN(tf.keras.Model):
     def __init__(self, cfg):
