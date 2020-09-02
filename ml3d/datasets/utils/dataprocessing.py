@@ -1,10 +1,10 @@
 import numpy as np
 import os, argparse, pickle, sys
+import open3d.core as o3c
+
 from os.path import exists, join, isfile, dirname, abspath, split
 from open3d.pybind.ml.contrib import subsample
-
-# from ...ops.cpp_wrappers.cpp_subsampling import grid_subsampling as cpp_subsampling
-from ...ops.cpp_wrappers.nearest_neighbors.lib.python import nearest_neighbors as nearest_neighbors
+from open3d.pybind.ml.contrib import knn_search
 
 
 class DataProcessing:
@@ -88,10 +88,10 @@ class DataProcessing:
         :return: neighbor_idx: neighboring points indexes, B*N2*k
         """
 
-        neighbor_idx = nearest_neighbors.knn(support_pts,
-                                             query_pts,
-                                             k,
-                                             omp=True)
+        neighbor_idx = knn_search(o3c.Tensor.from_numpy(query_pts),
+                                  o3c.Tensor.from_numpy(support_pts),
+                                  k).numpy()
+
         return neighbor_idx.astype(np.int32)
 
     @staticmethod

@@ -2,12 +2,13 @@ import time
 import math
 import torch
 import torch.nn as nn
+import open3d.core as o3c
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
 from open3d.pybind.ml.contrib import subsample_batch
 
-from ...ops.cpp_wrappers.cpp_neighbors import radius_neighbors as cpp_neighbors
+from open3d.pybind.ml.contrib import radius_search
 
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
@@ -2174,11 +2175,11 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
     :return: neighbors indices
     """
 
-    return cpp_neighbors.batch_query(queries,
-                                     supports,
-                                     q_batches,
-                                     s_batches,
-                                     radius=radius)
+    return radius_search(
+        o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
+        o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
+        o3c.Tensor.from_numpy(np.array(s_batches, dtype=np.int32)),
+        radius).numpy()
 
 
 def batch_grid_subsampling(points,
