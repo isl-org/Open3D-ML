@@ -82,9 +82,33 @@ class Config(object):
         """
         b = self.copy()
         for k, v in new_dict.items():
+            if v is None:
+                continue
             b[k] = v
         return Config(b)
 
+
+    @staticmethod
+    def merge_default_cfgs(
+            default_cfg_path, 
+            cfg, 
+            **kwargs):
+        result_cfg = Config.load_from_file(default_cfg_path)
+  
+        if cfg is not None:
+            if isinstance(cfg, str):
+                result_cfg = Config.load_from_file(cfg)
+            elif isinstance(cfg, Config):
+                result_cfg = cfg
+            elif isinstance(cfg, dict):
+                result_cfg = result_cfg.merge_from_dict(cfg)
+            else:
+                raise TypeError("cfg must be a string, dict, or Config " +
+                                "but got {}".format(type(cfg)))
+
+        result_cfg.merge_from_dict(kwargs)
+
+        return result_cfg
 
 
     @staticmethod
