@@ -12,7 +12,7 @@ def test_integration_torch():
     import open3d.ml.torch as ml3d
     print(dir(ml3d))
     
-    config = base + '/ml3d/configs/randlanet_toronto3d.py'
+    config = base + '/ml3d/configs/randlanet_toronto3d.yml'
     cfg = ml3d.utils.Config.load_from_file(config)
 
     model = ml3d.models.RandLANet(cfg.model)
@@ -24,11 +24,9 @@ def test_integration_tf():
     import open3d.ml.tf as ml3d
     print(dir(ml3d))
 
-    config = base + '/ml3d/configs/randlanet_toronto3d.py'
+    config = base + '/ml3d/configs/randlanet_toronto3d.yml'
     cfg = ml3d.utils.Config.load_from_file(config)
 
     model = ml3d.models.RandLANet(cfg.model)
 
     print(model)
-
-test_integration_torch()
