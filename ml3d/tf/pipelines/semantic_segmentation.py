@@ -45,6 +45,13 @@ class SemanticSegmentation(BasePipeline):
                         device=device,
                         **kwargs)
 
+<<<<<<< HEAD
+=======
+        make_dir(cfg.main_log_dir)
+        cfg.logs_dir = join(cfg.main_log_dir, 
+                    model.__class__.__name__ + '_TF')
+        make_dir(cfg.logs_dir)
+>>>>>>> master
 
         # tf.config.gpu.set_per_process_memory_growth(True)
 
@@ -214,5 +221,9 @@ class SemanticSegmentation(BasePipeline):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format( save_path))
      
+<<<<<<< HEAD
 
 PIPELINE._register_module(SemanticSegmentation, 'tf')
+=======
+PIPELINE._register_module(SemanticSegmentation, "tf")
+>>>>>>> master

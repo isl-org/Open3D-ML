@@ -6,9 +6,9 @@ import random
 
 import tensorflow as tf
 import numpy as np
-from ml3d.utils import dataset_helper
+from ...utils import dataset_helper
 
-from ml3d.datasets.utils import DataProcessing
+from ...datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
 
 
