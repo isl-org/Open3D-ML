@@ -643,7 +643,7 @@ class Visualizer:
 
     @staticmethod
     def _make_tcloud_array(np_array, copy=False):
-        if copy:
+        if copy or not np_array.data.c_contiguous:
             t = o3d.core.Tensor(np_array)
         else:
             t = o3d.core.Tensor.from_numpy(np_array)
