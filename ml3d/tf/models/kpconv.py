@@ -14,7 +14,7 @@ from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
-
+from open3d.ml.tf.ops import *
 
 class KPFCNN(BaseModel):
     def __init__(self, cfg=None, **kwargs):
@@ -785,11 +785,11 @@ class KPFCNN(BaseModel):
         data = dict()
 
         if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.first_subsampling_dl)
 
         else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points,
                 features=feat,
                 labels=labels,

@@ -427,11 +427,11 @@ class RandLANet(BaseModel):
         data = dict()
 
         if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.grid_size)
 
         else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
