@@ -105,9 +105,9 @@ class Config(object):
             else:
                 raise TypeError("cfg must be a string, dict, or Config " +
                                 "but got {}".format(type(cfg)))
-
-        result_cfg.merge_from_dict(kwargs)
-
+        
+        result_cfg = result_cfg.merge_from_dict(kwargs)
+       
         return result_cfg
 
 

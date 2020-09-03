@@ -37,6 +37,7 @@ class ParisLille3D(BaseDataset):
             class: The corresponding class.
         """
         self.default_cfg_name = "parislille3d.yml"
+
         
         super().__init__(cfg=cfg, 
                         dataset_path=dataset_path, 
@@ -44,13 +45,27 @@ class ParisLille3D(BaseDataset):
 
         cfg = self.cfg
 
+        self.label_to_names = {
+            0: 'unclassified',
+            1: 'ground',
+            2: 'building',
+            3: 'pole-road_sign-traffic_light',
+            4: 'bollard-small_pole',
+            5: 'trash_can',
+            6: 'barrier',
+            7: 'pedestrian',
+            8: 'car',
+            9: 'natural-vegetation'
+        }
+
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort(
             [k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
-        self.train_files = glob.glob(cfg.train_dir + "*.ply")
+        train_path = cfg.dataset_path + "/training_10_classes/"
+        self.train_files = glob.glob(train_path + "/*.ply")
         self.val_files = [
             f for f in self.train_files if Path(f).name in cfg.val_files
         ]
@@ -58,7 +73,8 @@ class ParisLille3D(BaseDataset):
             f for f in self.train_files if f not in self.val_files
         ]
 
-        self.test_files = glob.glob(cfg.test_dir + '*.ply')
+        test_path = cfg.dataset_path + "/test_10_classes/"
+        self.test_files = glob.glob(test_path + '*.ply')
 
     def get_split(self, split):
         return ParisLille3DSplit(self, split=split)
@@ -93,7 +109,6 @@ class ParisLille3DSplit():
     def get_data(self, idx):
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
-
         data = PlyData.read(pc_path)['vertex']
 
         points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)

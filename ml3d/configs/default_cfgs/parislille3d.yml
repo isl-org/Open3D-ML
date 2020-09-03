@@ -15,8 +15,6 @@ ignored_label_inds:
 - 0
 num_points: 65536
 prepro_grid_size: 0.06
-test_dir: ../dataset/Paris_Lille_3D/test_10_classes/
 test_result_folder: ./test
-train_dir: ../dataset/Paris_Lille_3D/training_10_classes/
 val_files:
 - Lille2.ply
