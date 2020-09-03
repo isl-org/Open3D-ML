@@ -10,16 +10,19 @@ from pathlib import Path
 from sklearn.neighbors import KDTree
 import pudb
 
+from .base_model import BaseModel
+from ...utils import MODEL
 from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
+from open3d.ml.tf.ops import *
 
+class KPFCNN(BaseModel):
+    def __init__(self, cfg=None, **kwargs):
+        self.default_cfg_name = "kpconv.yml"
 
-class KPFCNN(tf.keras.Model):
-    def __init__(self, cfg):
-        super(KPFCNN, self).__init__()
+        super().__init__(cfg=cfg,**kwargs)
 
-        # Model parameters
-        self.cfg = cfg
+        cfg = self.cfg
 
         # From config parameter, compute higher bound of neighbors number in a neighborhood
         hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1)**3))
@@ -782,11 +785,11 @@ class KPFCNN(tf.keras.Model):
         data = dict()
 
         if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.first_subsampling_dl)
 
         else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points,
                 features=feat,
                 labels=labels,
@@ -974,3 +977,5 @@ class KPFCNN(tf.keras.Model):
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
+
+MODEL._register_module(KPFCNN, 'tf', 'KPConv')

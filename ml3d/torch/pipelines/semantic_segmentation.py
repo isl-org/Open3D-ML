@@ -12,10 +12,11 @@ from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, Batc
 
 from os.path import exists, join, isfile, dirname, abspath
 
+from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
-from ...utils import make_dir, LogRecord, Config
+from ...utils import make_dir, LogRecord, Config, PIPELINE
 from ...datasets.utils import DataProcessing
 
 logging.setLogRecordFactory(LogRecord)
@@ -25,51 +26,26 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+class SemanticSegmentation(BasePipeline):
+    def __init__(self, 
+                model=None, 
+                dataset=None, 
+                cfg=None,  
+                device=None,
+                **kwargs):
+        self.default_cfg_name = "semantic_segmentation.yml"
 
-class SemanticSegmentation():
-    def __init__(self,
-                 model,
-                 dataset,
-                 cfg=None,
-                 batch_size=1,
-                 val_batch_size=1,
-                 test_batch_size=1,
-                 max_epoch=100,
-                 learning_rate=1e-2,
-                 save_ckpt_freq=20,
-                 adam_lr=1e-2,
-                 scheduler_gamma=0.95,
-                 main_log_dir='./logs/',
-                 train_sum_dir='train_log'):
+        super().__init__(model=model, 
+                        dataset=dataset, 
+                        cfg=cfg,  
+                        device=device,
+                        **kwargs)
 
-        if cfg is None:
-            cfg = dict(
-                batch_size=batch_size,
-                val_batch_size=val_batch_size,
-                test_batch_size=test_batch_size,
-                max_epoch=max_epoch,
-                learning_rate=learning_rate,
-                save_ckpt_freq=save_ckpt_freq,
-                adam_lr=adam_lr,
-                scheduler_gamma=scheduler_gamma,
-                main_log_dir=main_log_dir,
-                train_sum_dir=train_sum_dir,
-            )
-            cfg = Config(cfg)
-
-        self.cfg = cfg
-        self.model = model
-        self.dataset = dataset
-
-        make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, model.name + '_torch')
-        make_dir(cfg.logs_dir)
-
-        # dataset.cfg.num_points = model.cfg.num_points
-
-    def run_inference(self, data, device):
+        
+    def run_inference(self, data):
         cfg = self.cfg
         model = self.model
+        device = self.device
 
         model.to(device)
         model.device = device
@@ -86,19 +62,20 @@ class SemanticSegmentation():
    
         return model.inference_result
 
-    def run_test(self, device):
+    def run_test(self):
         #self.device = device
         model = self.model
         dataset = self.dataset
+        device = self.device
         cfg = self.cfg
         model.device = device
+        print(device)
         model.to(device)
         model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
         log.info("DEVICE : {}".format(device))
-        log.info(model)
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
@@ -109,6 +86,7 @@ class SemanticSegmentation():
             dataset=dataset.get_split('test'),
             preprocess=model.preprocess,
             transform=model.transform,
+            use_cache=dataset.cfg.use_cache,
             shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
@@ -123,11 +101,12 @@ class SemanticSegmentation():
                 if dataset.is_tested(attr):
                     continue
                 data = datset_split.get_data(idx)
-                results = self.run_inference(data, device)
+                results = self.run_inference(data)
                 dataset.save_test_result(results, attr)
 
-    def run_train(self, device):
+    def run_train(self):
         model = self.model
+        device = self.device
         model.device = device
         dataset = self.dataset
 
@@ -135,8 +114,8 @@ class SemanticSegmentation():
         model.to(device)
 
         log.info("DEVICE : {}".format(device))
-        log.info(model)
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
@@ -232,6 +211,7 @@ class SemanticSegmentation():
                 self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
+
         batcher_name = getattr(self.model.cfg, 'batcher')
 
         if batcher_name == 'DefaultBatcher':
@@ -346,3 +326,5 @@ class SemanticSegmentation():
         valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
 
         return valid_scores, valid_labels
+
+PIPELINE._register_module(SemanticSegmentation, "torch")

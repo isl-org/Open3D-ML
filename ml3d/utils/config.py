@@ -57,7 +57,7 @@ class Config(object):
 
         self.cfg_dict = cfg_dict
 
-    def dump(self, **kwargs):
+    def dump(self, *args, **kwargs):
         """Dump to a string."""
         def convert_to_dict(cfg_node, key_list):
             if not isinstance(cfg_node, ConfigDict):
@@ -70,8 +70,46 @@ class Config(object):
 
         self_as_dict = convert_to_dict(self._cfg_dict, [])
         print(self_as_dict)
-        return yaml.safe_dump(self_as_dict, **kwargs)
+        return yaml.dump(self_as_dict, *args, **kwargs)
         #return self_as_dict
+
+
+    def merge_from_dict(self, new_dict):
+        """Merge a new into cfg_dict.
+
+        Args:
+            new_dict (dict): a dict of configs.
+        """
+        b = self.copy()
+        for k, v in new_dict.items():
+            if v is None:
+                continue
+            b[k] = v
+        return Config(b)
+
+
+    @staticmethod
+    def merge_default_cfgs(
+            default_cfg_path, 
+            cfg, 
+            **kwargs):
+        result_cfg = Config.load_from_file(default_cfg_path)
+  
+        if cfg is not None:
+            if isinstance(cfg, str):
+                result_cfg = Config.load_from_file(cfg)
+            elif isinstance(cfg, Config):
+                result_cfg = cfg
+            elif isinstance(cfg, dict):
+                result_cfg = result_cfg.merge_from_dict(cfg)
+            else:
+                raise TypeError("cfg must be a string, dict, or Config " +
+                                "but got {}".format(type(cfg)))
+        
+        result_cfg = result_cfg.merge_from_dict(kwargs)
+       
+        return result_cfg
+
 
     @staticmethod
     def load_from_file(filename):
@@ -99,10 +137,9 @@ class Config(object):
                 # close temp file
                 temp_config_file.close()
 
-        if filename.endswith('.yaml'):
+        if filename.endswith('.yaml') or filename.endswith('.yml') :
             with open(filename) as f:
                 cfg_dict = yaml.safe_load(f)
-                cfg_dict = yaml.full_load(cfg_dict)
 
         return Config(cfg_dict)
 

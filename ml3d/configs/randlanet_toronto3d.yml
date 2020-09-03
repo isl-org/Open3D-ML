@@ -1,0 +1,69 @@
+dataset:
+  cache_dir: ./logs/cache
+  class_weights:
+  - 5181602
+  - 5012952
+  - 6830086
+  - 1311528
+  - 10476365
+  - 946982
+  - 334860
+  - 269353
+  dataset_path: datasets/Toronto_3D/
+  ignored_label_inds:
+  - 0
+  num_points: 65536
+  prepro_grid_size: 0.06
+  test_files:
+  - L002.ply
+  test_result_folder: ./test
+  train_files:
+  - L001.ply
+  - L003.ply
+  - L004.ply
+  use_cache: true
+  val_files:
+  - L002.ply
+model:
+  batcher: DefaultBatcher
+  ckpt_path: ./ml3d/torch/checkpoint/randlanet_toronto3d.pth
+  d_feature: 8
+  d_in: 6
+  d_out:
+  - 16
+  - 64
+  - 128
+  - 256
+  - 512
+  grid_size: 0.06
+  ignored_label_inds:
+  - 0
+  k_n: 16
+  name: RandLANet
+  num_classes: 8
+  num_layers: 5
+  num_points: 65536
+  num_sub_points:
+  - 16384
+  - 4096
+  - 1024
+  - 256
+  - 128
+  sub_grid_size: 0.06
+  sub_sampling_ratio:
+  - 4
+  - 4
+  - 4
+  - 4
+  - 2
+pipeline:
+  adam_lr: 0.01
+  batch_size: 1
+  learning_rate: 0.01
+  main_log_dir: ./logs
+  max_epoch: 100
+  save_ckpt_freq: 20
+  scheduler_gamma: 0.95
+  test_batch_size: 1
+  train_sum_dir: train_log
+  val_batch_size: 1

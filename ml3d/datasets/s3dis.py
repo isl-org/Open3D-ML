@@ -9,57 +9,36 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
+from ..utils import make_dir, DATASET
 from .utils import DataProcessing
+from .base_dataset import BaseDataset
+from ..utils import make_dir, DATASET
 
 
-class S3DISSplit():
-    def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        print("Found {} pointclouds for {}".format(len(path_list), split))
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+class S3DIS(BaseDataset):
+    """
+    S3DIS dataset, used in visualizer, training, or test
+    """
+    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+        """
+        Initialize
+        Args:
+            cfg (cfg object or str): cfg object or path to cfg file
+            dataset_path (str): path to the dataset
+            args (dict): dict of args 
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        self.default_cfg_name = "s3dis.yml"
 
-    def __len__(self):
-        return len(self.path_list)
+        super().__init__(cfg=cfg, 
+                        dataset_path=dataset_path, 
+                        **kwargs)
 
-    def get_data(self, idx):
-        pc_path = self.path_list[idx]
-        data = PlyData.read(pc_path)['vertex']
+        cfg = self.cfg
 
-        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
-        points[:, 0] = data['x']
-        points[:, 1] = data['y']
-        points[:, 2] = data['z']
-
-        feat = np.zeros(points.shape, dtype=np.float32)
-        feat[:, 0] = data['red']
-        feat[:, 1] = data['green']
-        feat[:, 2] = data['blue']
-
-        labels = np.zeros((points.shape[0], ), dtype=np.int32)
-        if (self.split != 'test'):
-            labels = data['class']
-
-        data = {'point': points, 'feat': feat, 'label': labels}
-
-        return data
-
-    def get_attr(self, idx):
-        pc_path = Path(self.path_list[idx])
-        name = pc_path.name.replace('.ply', '')
-
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
-        return attr
-
-
-class S3DIS:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'S3DIS'
-        self.dataset_path = cfg.dataset_path
         self.label_to_names = {
             0: 'ceiling',
             1: 'floor',
@@ -288,3 +267,49 @@ class S3DIS:
 
             S3DIS.write_ply(str(save_path), (xyz, colors, labels),
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
+
+
+
+class S3DISSplit():
+    def __init__(self, dataset, split='training'):
+        self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
+        print("Found {} pointclouds for {}".format(len(path_list), split))
+
+        self.path_list = path_list
+        self.split = split
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.path_list)
+
+    def get_data(self, idx):
+        pc_path = self.path_list[idx]
+        data = PlyData.read(pc_path)['vertex']
+
+        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
+        points[:, 0] = data['x']
+        points[:, 1] = data['y']
+        points[:, 2] = data['z']
+
+        feat = np.zeros(points.shape, dtype=np.float32)
+        feat[:, 0] = data['red']
+        feat[:, 1] = data['green']
+        feat[:, 2] = data['blue']
+
+        labels = np.zeros((points.shape[0], ), dtype=np.int32)
+        if (self.split != 'test'):
+            labels = data['class']
+
+        data = {'point': points, 'feat': feat, 'label': labels}
+
+        return data
+
+    def get_attr(self, idx):
+        pc_path = Path(self.path_list[idx])
+        name = pc_path.name.replace('.ply', '')
+
+        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        return attr
+
+DATASET._register_module(S3DIS)

@@ -4,12 +4,12 @@ from os.path import exists, join, isfile, dirname, abspath, split
 import torch
 import logging
 
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 from sklearn.neighbors import KDTree
 import yaml
 
+from .base_dataset import BaseDataset
 from .utils import DataProcessing
-from ..utils import make_dir
+from ..utils import make_dir, DATASET
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,59 +18,29 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class SemanticKITTISplit(Dataset):
-    def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        self.remap_lut_val = dataset.remap_lut_val
+class SemanticKITTI(BaseDataset):
+    """
+    SemanticKITTI dataset, used in visualizer, training, or test
+    """
+    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+        """
+        Initialize
+        Args:
+            cfg (cfg object or str): cfg object or path to cfg file
+            dataset_path (str): path to the dataset
+            args (dict): dict of args 
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        self.default_cfg_name = "semantickitti.yml"
 
-        if split == 'test':
-            dataset.test_list = path_list
+        super().__init__(cfg=cfg, 
+                        dataset_path=dataset_path, 
+                        **kwargs)
 
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+        cfg = self.cfg
 
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
-
-    def __len__(self):
-        return len(self.path_list)
-
-    def get_data(self, idx):
-        pc_path = self.path_list[idx]
-        points = DataProcessing.load_pc_kitti(pc_path)
-
-        dir, file = split(pc_path)
-        label_path = join(dir, '../labels', file[:-4] + '.label')
-        if not exists(label_path):
-            labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
-            if self.split not in ['test', 'all']:
-                raise ValueError("label file not found for {}".format(label_path))
-        else:
-            labels = DataProcessing.load_label_kitti(label_path, self.remap_lut_val)
-
-        data = {'point': points, 
-                'feat' : None,
-                'label': labels,
-                }
-
-        return data
-
-    def get_attr(self, idx):
-        pc_path = self.path_list[idx]
-        dir, file = split(pc_path)
-        _, seq = split(split(dir)[0])
-        name = '{}_{}'.format(seq, file[:-4])
-
-        attr = {'name': name, 'path': pc_path, 'split': self.split}
-        return attr
-
-
-class SemanticKITTI:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'SemanticKITTI'
         self.label_to_names = {
             0: 'unlabeled',
             1: 'car',
@@ -94,7 +64,7 @@ class SemanticKITTI:
             19: 'traffic-sign'
         }
         self.num_classes = len(self.label_to_names)
-        data_config = join(cfg.dataset_path, 'semantic-kitti.yaml')
+        data_config = join(cfg.dataset_path, 'dataset', 'semantic-kitti.yaml')
         DATA = yaml.safe_load(open(data_config, 'r'))
         remap_dict = DATA["learning_map_inv"]
 
@@ -109,6 +79,7 @@ class SemanticKITTI:
         remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
 
         self.remap_lut_val = remap_lut_val
+        self.remap_lut = remap_lut
 
 
     def get_split(self, split):
@@ -144,8 +115,8 @@ class SemanticKITTI:
 
         store_path = join(save_path, name_points + '.label')
         pred = pred + 1
-        pred = remap_lut[pred].astype(np.uint32)
-        # pred.tofile(store_path)
+        pred = self.remap_lut[pred].astype(np.uint32)
+        pred.tofile(store_path)
 
     def save_test_result_kpconv(self, results, inputs):
         cfg = self.cfg
@@ -193,10 +164,63 @@ class SemanticKITTI:
             raise ValueError("Invalid split {}".format(split))
 
         for seq_id in seq_list:
-            pc_path = join(dataset_path, seq_id, 'velodyne')
+            pc_path = join(dataset_path, 'dataset', 
+                                'sequences', seq_id, 'velodyne')
             file_list.append(
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
         file_list = np.concatenate(file_list, axis=0)
 
         return file_list
+
+
+
+class SemanticKITTISplit():
+    def __init__(self, dataset, split='training'):
+        self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
+        self.remap_lut_val = dataset.remap_lut_val
+
+        if split == 'test':
+            dataset.test_list = path_list
+
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+
+
+        self.path_list = path_list
+        self.split = split
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.path_list)
+
+    def get_data(self, idx):
+        pc_path = self.path_list[idx]
+        points = DataProcessing.load_pc_kitti(pc_path)
+
+        dir, file = split(pc_path)
+        label_path = join(dir, '../labels', file[:-4] + '.label')
+        if not exists(label_path):
+            labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
+            if self.split not in ['test', 'all']:
+                raise ValueError("label file not found for {}".format(label_path))
+        else:
+            labels = DataProcessing.load_label_kitti(label_path, self.remap_lut_val)
+
+        data = {'point': points, 
+                'feat' : None,
+                'label': labels,
+                }
+
+        return data
+
+    def get_attr(self, idx):
+        pc_path = self.path_list[idx]
+        dir, file = split(pc_path)
+        _, seq = split(split(dir)[0])
+        name = '{}_{}'.format(seq, file[:-4])
+
+        attr = {'name': name, 'path': pc_path, 'split': self.split}
+        return attr
+
+DATASET._register_module(SemanticKITTI)

@@ -10,17 +10,16 @@ from sklearn.neighbors import KDTree
 from ..utils import helper_tf
 from ...datasets.utils import DataProcessing
 
-# class RandLANet(tf.keras.Model):
-#     """docstring for RandLANet"""
-#     def __init__(self, cfg):
-#         super(RandLANet, self).__init__()
-#         self.cfg = cfg
+from .base_model import BaseModel
+from ...utils import MODEL
 
+class RandLANet(BaseModel):
+    def __init__(self, cfg=None, **kwargs):
+        self.default_cfg_name = "randlanet.yml"
 
-class RandLANet(tf.keras.Model):
-    def __init__(self, cfg):
-        super(RandLANet, self).__init__()
-        self.cfg = cfg
+        super().__init__(cfg=cfg,**kwargs)
+
+        cfg = self.cfg
         d_feature = cfg.d_feature
 
         self.fc0 = tf.keras.layers.Dense(d_feature, activation=None)
@@ -428,11 +427,11 @@ class RandLANet(tf.keras.Model):
         data = dict()
 
         if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.grid_size)
 
         else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
@@ -449,3 +448,5 @@ class RandLANet(tf.keras.Model):
             data['proj_inds'] = proj_inds
 
         return data
+
+MODEL._register_module(RandLANet, 'tf')
