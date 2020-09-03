@@ -29,7 +29,6 @@ if gpus:
     print(e)
 
 
-@PIPELINE.register_module("tf")
 class SemanticSegmentation():
     def __init__(self, model, dataset, cfg):
         self.model = model
@@ -209,3 +208,4 @@ class SemanticSegmentation():
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format( save_path))
      
+PIPELINE._register_module(SemanticSegmentation, "tf")
