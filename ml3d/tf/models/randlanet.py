@@ -13,7 +13,6 @@ from ...datasets.utils import DataProcessing
 from .base_model import BaseModel
 from ...utils import MODEL
 
-@MODEL.register_module('tf')
 class RandLANet(BaseModel):
     def __init__(self, cfg=None, **kwargs):
         self.default_cfg_name = "randlanet.yml"
@@ -449,3 +448,5 @@ class RandLANet(BaseModel):
             data['proj_inds'] = proj_inds
 
         return data
+
+MODEL._register_module(RandLANet, 'tf')

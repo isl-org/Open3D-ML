@@ -9,7 +9,6 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
-from ..utils import make_dir, DATASET
 
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
@@ -63,9 +62,9 @@ class Toronto3D(BaseDataset):
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
-        self.train_files = [self.dataset_path + f for f in cfg.train_files]
-        self.val_files = [self.dataset_path + f for f in cfg.val_files]
-        self.test_files = [self.dataset_path + f for f in cfg.test_files]
+        self.train_files = [join(self.cfg.dataset_path, f) for f in cfg.train_files]
+        self.val_files = [join(self.cfg.dataset_path, f) for f in cfg.val_files]
+        self.test_files = [join(self.cfg.dataset_path, f) for f in cfg.test_files]
 
     def get_split(self, split):
         return Toronto3DSplit(self, split=split)

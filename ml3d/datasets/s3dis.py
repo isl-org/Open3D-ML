@@ -62,10 +62,11 @@ class S3DIS(BaseDataset):
 
         self.test_split = 'Area_' + str(cfg.test_area_idx)
 
-        self.pc_path = Path(self.dataset_path) / 'original_ply'
+        self.pc_path = Path(self.cfg.dataset_path) / 'original_ply'
+        print(self.pc_path)
         if not exists(self.pc_path):
             print("creating dataset")
-            self.create_ply_files(self.dataset_path, self.label_to_names)
+            self.create_ply_files(self.cfg.dataset_path, self.label_to_names)
 
         # TODO : if num of ply files < 272, then create.
 

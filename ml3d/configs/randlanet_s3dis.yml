@@ -15,7 +15,7 @@ dataset:
   - 1284130
   - 229758
   - 2272837
-  dataset_path: ../dataset/Stanford3dDataset_v1.2_Aligned_Version/
+  dataset_path: ../dataset/S3DIS/
   ignored_label_inds: []
   num_points: 40960
   prepro_grid_size: 0.04

@@ -62,7 +62,7 @@ class Semantic3D(BaseDataset):
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
-        self.all_files = glob.glob(str(Path(self.dataset_path) / '*.txt'))
+        self.all_files = glob.glob(str(Path(self.cfg.dataset_path) / '*.txt'))
         random.shuffle(self.all_files)
 
         self.train_files = [

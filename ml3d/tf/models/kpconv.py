@@ -16,7 +16,6 @@ from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
 
 
-@MODEL.register_module('tf', name='KPConv')
 class KPFCNN(BaseModel):
     def __init__(self, cfg=None, **kwargs):
         self.default_cfg_name = "kpconv.yml"
@@ -978,3 +977,6 @@ class KPFCNN(BaseModel):
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
+
+
+MODEL._register_module(KPConv, 'tf')
