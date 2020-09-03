@@ -689,6 +689,8 @@ class Visualizer:
                 tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
             # Only add scalar attributes for now
             for k,v in data.items():
+                if v is None:
+                    continue
                 if len(v.shape) == 1 or (len(v.shape) == 2 and v.shape[1] == 1):
                     isint = v.dtype.name.startswith('int')
                     tcloud.point[k] = Visualizer._make_tcloud_array(v, copy=isint)
