@@ -784,7 +784,8 @@ class KPFCNN(BaseModel):
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
 
-        predict_scores = results
+        proj_inds = self.inference_data['proj_inds']
+        predict_scores = results[proj_inds] # TODO: check [proj_inds][0] may be correct.
         inference_result = {
             'predict_labels' : np.argmax(predict_scores, 1),
             'predict_scores' : predict_scores
