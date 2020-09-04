@@ -771,42 +771,27 @@ class KPFCNN(BaseModel):
     def inference_begin(self, data):
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
-        # num_points = self.inference_data['search_tree'].data.shape[0]
-        # self.possibility = np.random.rand(num_points) * 1e-3
-        # self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
-        #                            dtype=np.float16)       
 
     def inference_preprocess(self):
-        # min_posbility_idx = np.argmin(self.possibility)
-        # data = self.transform(self.inference_data, min_posbility_idx)
-        data = self.transform(self.inference_data)
-        inputs = {'data': data, 'attr': []}
-        # inputs = self.batcher.collate_fn([inputs])
-        self.inference_input = inputs
+        flat_inputs = self.transform_inference(self.inference_data)
 
-        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data['interp_idx'] # TODO: convert to tensor.
-        flat_inputs += [data['features'] + data['labels']]
+        self.inference_input = flat_inputs
 
         return flat_inputs
 
     def inference_end(self, results):
-        inputs = self.inference_input
         results = tf.reshape(results, (-1, self.cfg.num_classes))
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
-        probs = np.reshape(results, [-1, self.cfg.num_classes])
-        inds = inputs['data']['point_inds'][0, :]
-        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
-            1 - self.test_smooth) * probs
-        if np.min(self.possibility) > 0.5:
-            inference_result = {
-                'predict_labels': np.argmax(self.test_probs, 1),
-                'predict_scores': self.test_probs
-            }
-            self.inference_result = inference_result
-            return True
-        else:
-            return False
+
+        predict_scores = results
+        inference_result = {
+            'predict_labels' : np.argmax(predict_scores, 1),
+            'predict_scores' : predict_scores
+        }
+
+        self.inference_result = inference_result
+        return True
 
     def transform_inference(self, data):
         cfg = self.cfg
@@ -820,6 +805,7 @@ class KPFCNN(BaseModel):
         points = np.array(data['search_tree'].data)
 
         for i in range(points.shape[0]):
+            cloud_ind = 0
             point_ind = i
             center_point = points[point_ind, :].reshape(1, -1)
             pick_point = center_point
@@ -834,8 +820,27 @@ class KPFCNN(BaseModel):
 
             if n > 0:
                 p_list += [input_points]
-                c_list += [np.hstack((input_colors, input_points))]
+                c_list += [np.hstack((input_colors, input_points + pick_point))]
+                pl_list += [input_labels]
+                pi_list += [input_inds]
+                ci_list += [cloud_ind]
 
+        stacked_points = np.concatenate(p_list, axis=0), #TODO : convert to tensor.
+        stacked_colors = np.concatenate(c_list, axis=0),
+        point_labels = np.concatenate(pl_list, axis=0),
+        stacks_lengths = np.array([tp.shape[0] for tp in p_list]),
+        point_inds = np.concatenate(pi_list, axis=0),
+        cloud_inds = np.array(ci_list, dtype=np.int32)
+
+        input_list = self.transform(
+            stacked_points,
+            stacked_colors,
+            point_labels,
+            stacks_lengths,
+            point_inds,
+            cloud_inds
+        )
+        return input_list
 
     def preprocess(self, data, attr):
         cfg = self.cfg

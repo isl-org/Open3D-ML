@@ -76,15 +76,8 @@ class SemanticSegmentation():
 
         test_split = dataset.get_split('test')
         for idx in tqdm(range(len(test_split)), desc='test'):
+            attr = test_split.get_attr(idx)
             data = test_split.get_data(idx)
-            results = self.run_inference(data)
-
-
-        for idx in tqdm(range(len(test_split)), desc='test'):
-            attr = datset_split.get_attr(idx)
-            if dataset.is_tested(attr):
-                continue
-            data = datset_split.get_data(idx)
             results = self.run_inference(data)
             dataset.save_test_result(results, attr)
 
