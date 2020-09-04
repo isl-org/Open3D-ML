@@ -8,6 +8,7 @@ from os.path import exists, join, isfile, dirname, abspath
 
 import tensorflow as tf
 
+from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
@@ -29,21 +30,20 @@ if gpus:
     print(e)
 
 
-class SemanticSegmentation():
-    def __init__(self, model, dataset, cfg):
-        self.model = model
-        self.dataset = dataset
-        self.cfg = cfg
+class SemanticSegmentation(BasePipeline):
+    def __init__(self, 
+                model=None, 
+                dataset=None, 
+                cfg=None,  
+                device=None,
+                **kwargs):
+        self.default_cfg_name = "semantic_segmentation.yml"
 
-        make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, 
-                    model.__class__.__name__ + '_TF')
-        make_dir(cfg.logs_dir)
-
-        # tf.config.gpu.set_per_process_memory_growth(True)
-
-
-        # dataset.cfg.num_points = model.cfg.num_points
+        super().__init__(model=model, 
+                        dataset=dataset, 
+                        cfg=cfg,  
+                        device=device,
+                        **kwargs)
 
     def run_inference(self, data):
         cfg = self.cfg

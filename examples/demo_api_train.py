@@ -67,9 +67,11 @@ def demo_train():
 
 def demo_inference():
     # Inference and test example
+    from ml3d.tf.pipelines import SemanticSegmentation 
+    from ml3d.tf.models import RandLANet
 
-    Pipeline = get_module("pipeline", "SemanticSegmentation", "torch")
-    Model = get_module("model", "RandLANet", "torch")
+    Pipeline = get_module("pipeline", "SemanticSegmentation", "tf")
+    Model = get_module("model", "RandLANet", "tf")
     Dataset = get_module("dataset", "SemanticKITTI")
 
     # Initialize using default configuration in 
@@ -83,15 +85,14 @@ def demo_inference():
 
 
     pipeline = Pipeline(model=RandLANet, 
-                        dataset=SemanticKITTI,
-                        device="gpu")
+                        dataset=SemanticKITTI)
 
     # inference
     # get data
     train_split = SemanticKITTI.get_split("train")
     data = train_split.get_data(0)
     # restore weights
-    pipeline.load_ckpt(RandLANet.cfg.ckpt_path, False)
+    # pipeline.load_ckpt(RandLANet.cfg.ckpt_path, False)
     # run inference
     results = pipeline.run_inference(data)
     print(results)
@@ -101,7 +102,7 @@ def demo_inference():
 
 
 if __name__ == '__main__':
-    demo_dataset()
+    # demo_dataset()
     # demo_dataset_read()
-    # demo_inference()
+    demo_inference()
     # demo_train()
