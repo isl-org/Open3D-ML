@@ -768,6 +768,75 @@ class KPFCNN(BaseModel):
 
         return input_list
 
+    def inference_begin(self, data):
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        # num_points = self.inference_data['search_tree'].data.shape[0]
+        # self.possibility = np.random.rand(num_points) * 1e-3
+        # self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+        #                            dtype=np.float16)       
+
+    def inference_preprocess(self):
+        # min_posbility_idx = np.argmin(self.possibility)
+        # data = self.transform(self.inference_data, min_posbility_idx)
+        data = self.transform(self.inference_data)
+        inputs = {'data': data, 'attr': []}
+        # inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data['interp_idx'] # TODO: convert to tensor.
+        flat_inputs += [data['features'] + data['labels']]
+
+        return flat_inputs
+
+    def inference_end(self, results):
+        inputs = self.inference_input
+        results = tf.reshape(results, (-1, self.cfg.num_classes))
+        results = tf.nn.softmax(results, axis=-1)
+        results = results.cpu().numpy()
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds'][0, :]
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
+
+    def transform_inference(self, data):
+        cfg = self.cfg
+
+        p_list = []
+        c_list = []
+        pl_list = []
+        pi_list = []
+        ci_list = []
+        
+        points = np.array(data['search_tree'].data)
+
+        for i in range(points.shape[0]):
+            point_ind = i
+            center_point = points[point_ind, :].reshape(1, -1)
+            pick_point = center_point
+            input_inds = data['search_tree'].query_radius(
+                pick_point, r = cfg.in_radius)[0]
+            
+            n = input_inds.shape[0]
+            
+            input_points = (points[input_inds] - pick_point).astype(np.float32)
+            input_colors = data['feat'][input_inds]
+            input_labels = np.zeros(input_points.shape[0])
+
+            if n > 0:
+                p_list += [input_points]
+                c_list += [np.hstack((input_colors, input_points))]
+
+
     def preprocess(self, data, attr):
         cfg = self.cfg
 
@@ -779,21 +848,14 @@ class KPFCNN(BaseModel):
             feat = points
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
-
             
         data = dict()
 
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_subsampling(
-                points, labels=labels, grid_size=cfg.first_subsampling_dl)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-                points,
-                features=feat,
-                labels=labels,
-                grid_size=cfg.first_subsampling_dl)
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+            points,
+            features=feat,
+            labels=labels,
+            grid_size=cfg.first_subsampling_dl)
 
         search_tree = KDTree(sub_points)
 
@@ -802,7 +864,7 @@ class KPFCNN(BaseModel):
         data['label'] = np.array(sub_labels)
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -843,7 +905,8 @@ class KPFCNN(BaseModel):
             epoch_n = 500 * cfg.batch_num
             split = dataset.split
 
-            batch_limit = 5000  # TODO : read from calibrate_batch, typically 100 * batch_size required
+            # batch_limit = 5000  # TODO : read from calibrate_batch, typically 100 * batch_size required
+            batch_limit = cfg.batch_limit
 
             # Initiate potentials for regular generation
             if not hasattr(self, 'potentials'):
@@ -974,7 +1037,7 @@ class KPFCNN(BaseModel):
         gen_func = spatially_regular_gen
         gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32,
                      tf.int32)
-        gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
+        gen_shapes = ([None, 3], [None, 3], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 
