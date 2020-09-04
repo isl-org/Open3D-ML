@@ -30,37 +30,62 @@ if gpus:
     print(e)
 
 class SemanticSegmentation(BasePipeline):
-    def __init__(self, 
-                model=None, 
-                dataset=None, 
-                cfg=None,  
-                device=None,
-                **kwargs):
+    def __init__(self,
+                model,
+                dataset=None,
+                name='SemanticSegmentation', 
+                batch_size=4,
+                val_batch_size=4,
+                test_batch_size=3,
+                max_epoch=100,  # maximum epoch during training
+                learning_rate=1e-2,  # initial learning rate
+                lr_decays=0.95,
+                save_ckpt_freq=20,
+                adam_lr=1e-2,
+                scheduler_gamma=0.95,
+                main_log_dir='./logs/',
+                device='gpu',
+                split='train',
+                train_sum_dir='train_log'):
     
-        self.default_cfg_name = "semantic_segmentation.yml"
 
         super().__init__(model=model, 
                         dataset=dataset, 
-                        cfg=cfg,  
+                        name=name,
+                        batch_size=batch_size,
+                        val_batch_size=val_batch_size,
+                        test_batch_size=test_batch_size,
+                        max_epoch=max_epoch,
+                        learning_rate=learning_rate,
+                        lr_decays=lr_decays,
+                        save_ckpt_freq=save_ckpt_freq,
+                        adam_lr=adam_lr,  
+                        scheduler_gamma=scheduler_gamma,
+                        main_log_dir=main_log_dir,
                         device=device,
-                        **kwargs)
-
-<<<<<<< HEAD
-=======
-        make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, 
-                    model.__class__.__name__ + '_TF')
-        make_dir(cfg.logs_dir)
->>>>>>> master
+                        split=split,
+                        train_sum_dir=train_sum_dir)
 
         # tf.config.gpu.set_per_process_memory_growth(True)
 
 
         # dataset.cfg.num_points = model.cfg.num_points
 
-    def run_inference(self, points, device):
-        # TODO
-        pass
+    def run_inference(self, data):
+        cfg = self.cfg
+        model = self.model
+        device = self.device
+
+        model.inference_begin(data)
+
+        with torch.no_grad():
+            while True:
+                inputs = model.inference_preprocess()
+                results = model(inputs['data'])
+                if model.inference_end(inputs, results):
+                    break
+   
+        return model.inference_result
 
     def run_test(self, device):
         # TODO
@@ -221,9 +246,5 @@ class SemanticSegmentation(BasePipeline):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format( save_path))
      
-<<<<<<< HEAD
 
-PIPELINE._register_module(SemanticSegmentation, 'tf')
-=======
 PIPELINE._register_module(SemanticSegmentation, "tf")
->>>>>>> master

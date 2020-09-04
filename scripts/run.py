@@ -19,7 +19,7 @@ def parse_args():
     parser.add_argument('--dataset_path', help='path to the dataset')
     parser.add_argument('--device', help='device to run the pipeline', default='gpu')
     parser.add_argument('--split', help='train or test', default='train')
-    parser.add_argument('--work_dir', help='the dir to save logs and models')
+    parser.add_argument('--main_log_dir', help='the dir to save logs and models', default='./logs/')
 
     args, unknown = parser.parse_known_args()
 
@@ -56,16 +56,12 @@ def main():
         Model = get_module("model", cfg.model.name, framework)
         Dataset = get_module("dataset", cfg.dataset.name)
 
-        dataset = Dataset(cfg=cfg.dataset, 
-                        dataset_path=args.dataset_path, 
-                        **extra_dict)
-        model = Model(cfg=cfg.model, 
-                        **extra_dict)
-        pipeline = Pipeline(model=model, 
-                            dataset=dataset, 
-                            cfg=cfg.pipeline,
-                            device=args.device,
-                            **extra_dict)
+        cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
+                        Config.merge_cfg_file(cfg, args, extra_dict)
+
+        dataset = Dataset(**cfg_dict_dataset)
+        model = Model(**cfg_dict_model)
+        pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
     else: 
         if (args.pipeline and args.model and args.dataset) is None:
             raise ValueError("please specify pipeline, model, and dataset " +
@@ -75,16 +71,14 @@ def main():
         Model = get_module("model", args.model, framework)
         Dataset = get_module("dataset", args.dataset)
 
-        dataset = Dataset(cfg=args.cfg_dataset, 
-                        dataset_path=args.dataset_path, 
-                        **extra_dict)
-        model = Model(cfg=args.cfg_model, 
-                    **extra_dict)
-        pipeline = Pipeline(model=model, 
-                            dataset=dataset, 
-                            cfg=args.cfg_dataset, 
-                            device=args.device,
-                            **extra_dict)
+
+        cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
+                        Config.merge_module_cfg_file(args, extra_dict)
+
+        dataset = Dataset(**cfg_dict_dataset)
+        model = Model(**cfg_dict_model)
+        pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
+        
 
     if args.split is 'train':
         pipeline.run_train()

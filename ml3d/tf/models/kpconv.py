@@ -977,9 +977,4 @@ class KPFCNN(BaseModel):
 
         return gen_func, gen_types, gen_shapes
 
-<<<<<<< HEAD
-
-MODEL._register_module(KPConv, 'tf')
-=======
-MODEL._register_module(KPFCNN, 'tf', 'KPConv')
->>>>>>> master
+MODEL._register_module(KPFCNN, 'tf')

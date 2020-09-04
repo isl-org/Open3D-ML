@@ -58,7 +58,6 @@ dataset:
   - '19'
   - '20'
   - '21'
-  test_split_number: 11
   training_split:
   - '00'
   - '01'
@@ -68,11 +67,11 @@ dataset:
   - '05'
   - '06'
   - '07'
-  - 09
+  - '09'
   - '10'
   use_cache: false
   validation_split:
-  - 08
+  - '08'
 model:
   name: RandLANet
   batcher: DefaultBatcher

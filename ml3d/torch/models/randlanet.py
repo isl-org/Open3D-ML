@@ -18,12 +18,46 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
-    def __init__(self, cfg=None, **kwargs):
-        self.default_cfg_name = "randlanet.yml"
+    def __init__(self, 
+                name='RandLANet',
+                k_n=16,  # KNN,
+                num_layers=4,  # Number of layers
+                num_points=4096 * 11,  # Number of input points
+                num_classes=19,  # Number of valid classes
+                ignored_label_inds=[0],
+                sub_grid_size=0.06,  # preprocess_parameter
+                sub_sampling_ratio=[4, 4, 4, 4],
+                num_sub_points=[
+                    4096 * 11 // 4, 4096 * 11 // 16, 
+                    4096 * 11 // 64, 4096 * 11 // 256
+                ],
+                d_in=3,
+                d_feature=8,
+                d_out=[16, 64, 128, 256],
+                grid_size=0.06,
+                batcher='DefaultBatcher',
+                ckpt_path='./dataset/ckpt/randlanet_semantickitti.pth',
+                **kwargs):
 
-        super().__init__(cfg=cfg,**kwargs)
+        super().__init__(name=name,
+                        k_n=k_n,
+                        num_layers=num_layers,
+                        num_points=num_points,
+                        num_classes=num_classes,
+                        ignored_label_inds=ignored_label_inds,
+                        sub_grid_size=sub_grid_size,
+                        sub_sampling_ratio=sub_sampling_ratio,
+                        num_sub_points=num_sub_points,
+                        d_in=d_in,
+                        d_feature=d_feature,
+                        d_out=d_out,
+                        grid_size=grid_size,
+                        batcher=batcher,
+                        ckpt_path=ckpt_path,
+                        **kwargs)
 
         cfg = self.cfg
+        
         d_feature = cfg.d_feature
 
         self.fc0 = nn.Linear(cfg.d_in, d_feature)

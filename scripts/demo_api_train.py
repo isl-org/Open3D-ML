@@ -7,7 +7,7 @@ from ml3d.utils import Config, get_module
 def demo_read_data():
     # read data from datasets
     dataset = SemanticKITTI(dataset_path="../dataset/SemanticKITTI",
-                            use_cahe=False)
+                            use_cache=False)
     print(dataset.label_to_names)
 
     # print names of all pointcould
@@ -29,7 +29,7 @@ def demo_train():
     # Initialize the training by passing parameters
 
     dataset = SemanticKITTI(dataset_path="../dataset/SemanticKITTI",
-                            use_cahe=True)
+                            use_cache=True)
 
     model = RandLANet(
                 ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth",
@@ -56,8 +56,9 @@ def demo_inference():
         ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth")
 
     # Initialize by specifying config file path
-    SemanticKITTI = Dataset(cfg="ml3d/configs/default_cfgs/semantickitti.yml",
-                            use_cahe=False)
+    cfg = Config.load_from_file("ml3d/configs/default_cfgs/semantickitti.yml")
+    cfg.use_cache=False
+    SemanticKITTI = Dataset(**cfg)
 
 
     pipeline = Pipeline(model=RandLANet, 

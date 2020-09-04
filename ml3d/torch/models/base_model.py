@@ -10,7 +10,7 @@ class BaseModel(torch.nn.Module):
     """
     Base dataset class
     """
-    def __init__(self, cfg=None, args=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize
         Args:
@@ -23,13 +23,7 @@ class BaseModel(torch.nn.Module):
         """
         super().__init__()
  
-        cfg_path = dirname(abspath(__file__)) + \
-                    "/../../configs/default_cfgs/" + self.default_cfg_name
-        
-        self.cfg = Config.merge_default_cfgs(
-                    cfg_path, 
-                    cfg, 
-                    **kwargs)
+        self.cfg = Config(kwargs)
 
 
 

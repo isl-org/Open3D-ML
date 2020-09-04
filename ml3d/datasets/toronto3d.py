@@ -30,7 +30,21 @@ class Toronto3D(BaseDataset):
     """
     Toronto3D dataset, used in visualizer, training, or test
     """
-    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+    def __init__(self, 
+                name='Toronto3D',
+                cache_dir='./logs/cache', 
+                use_cache=False,  
+                num_points=65536,
+                prepro_grid_size=0.06,
+                class_weights=[
+                    5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
+                ],
+                ignored_label_inds=[0],
+                dataset_path='../dataset/Toronto_3D/',
+                train_files=['L001.ply', 'L003.ply', 'L004.ply'],
+                val_files=['L002.ply'],
+                test_files=['L002.ply'],
+                ):
         """
         Initialize
         Args:
@@ -41,11 +55,18 @@ class Toronto3D(BaseDataset):
         Returns:
             class: The corresponding class.
         """
-        self.default_cfg_name = "toronto3d.yml"
-
-        super().__init__(cfg=cfg, 
+        super().__init__(
+                        name=name,
+                        cache_dir=cache_dir, 
+                        use_cache=use_cache, 
+                        class_weights=class_weights,
+                        num_points=num_points,
+                        prepro_grid_size=prepro_grid_size,
                         dataset_path=dataset_path, 
-                        **kwargs)
+                        ignored_label_inds=ignored_label_inds,
+                        train_files=train_files,
+                        test_files=test_files,
+                        val_files=val_files)
 
         cfg = self.cfg
 

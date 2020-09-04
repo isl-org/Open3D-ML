@@ -7,7 +7,7 @@ class BaseDataset(object):
     """
     Base dataset class
     """
-    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize
         Args:
@@ -18,20 +18,13 @@ class BaseDataset(object):
         Returns:
             class: The corresponding class.
         """
-        if dataset_path is None and cfg is None:
+        if kwargs['dataset_path'] is None:
             raise KeyError(
             "should specify dataset_path or cfg to initialize a Dataset")
 
-        cfg_path = dirname(abspath(__file__)) + \
-                    "/../configs/default_cfgs/" + self.default_cfg_name
-
-        self.cfg = Config.merge_default_cfgs(
-                    cfg_path, 
-                    cfg, 
-                    dataset_path=dataset_path,
-                    **kwargs)
+        self.cfg = Config(kwargs)
+        self.name = self.cfg.name
   
-
 
     def get_split(self, split):
         raise NotImplementedError()

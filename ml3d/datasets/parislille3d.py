@@ -25,7 +25,19 @@ class ParisLille3D(BaseDataset):
     """
     ParisLille3D dataset, used in visualizer, training, or test
     """
-    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+    def __init__(self, 
+                name='ParisLille3D',
+                cache_dir='./logs/cache', 
+                use_cache=False,  
+                num_points=65536,
+                class_weights=[
+                    5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353,
+                    269353
+                ],
+                dataset_path='../dataset/Paris_Lille3D/',
+                test_result_folder='./test',
+                val_files=['Lille2.ply']
+                ):
         """
         Initialize
         Args:
@@ -36,12 +48,15 @@ class ParisLille3D(BaseDataset):
         Returns:
             class: The corresponding class.
         """
-        self.default_cfg_name = "parislille3d.yml"
-
-        
-        super().__init__(cfg=cfg, 
+        super().__init__(
+                        name=name,
+                        cache_dir=cache_dir, 
+                        use_cache=use_cache, 
+                        class_weights=class_weights,
+                        num_points=num_points,
                         dataset_path=dataset_path, 
-                        **kwargs)
+                        test_result_folder=test_result_folder,
+                        val_files=val_files)
 
         cfg = self.cfg
 

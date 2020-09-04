@@ -14,12 +14,47 @@ from .base_model import BaseModel
 from ...utils import MODEL
 
 class RandLANet(BaseModel):
-    def __init__(self, cfg=None, **kwargs):
-        self.default_cfg_name = "randlanet.yml"
+    def __init__(self, 
+                name='RandLANet',
+                k_n=16,  # KNN,
+                num_layers=4,  # Number of layers
+                num_points=4096 * 11,  # Number of input points
+                num_classes=19,  # Number of valid classes
+                ignored_label_inds=[0],
+                sub_grid_size=0.06,  # preprocess_parameter
+                sub_sampling_ratio=[4, 4, 4, 4],
+                num_sub_points=[
+                    4096 * 11 // 4, 4096 * 11 // 16, 
+                    4096 * 11 // 64, 4096 * 11 // 256
+                ],
+                d_in=3,
+                d_feature=8,
+                d_out=[16, 64, 128, 256],
+                grid_size=0.06,
+                batcher='DefaultBatcher',
+                ckpt_path='./dataset/ckpt/randlanet_semantickitti.pth',
+                **kwargs):
 
-        super().__init__(cfg=cfg,**kwargs)
+        super().__init__(
+            name=name,
+            k_n=k_n,
+            num_layers=num_layers,
+            num_points=num_points,
+            num_classes=num_classes,
+            ignored_label_inds=ignored_label_inds,
+            sub_grid_size=sub_grid_size,
+            sub_sampling_ratio=sub_sampling_ratio,
+            num_sub_points=num_sub_points,
+            d_in=d_in,
+            d_feature=d_feature,
+            d_out=d_out,
+            grid_size=grid_size,
+            batcher=batcher,
+            ckpt_path=ckpt_path,
+            **kwargs)
 
         cfg = self.cfg
+
         d_feature = cfg.d_feature
 
         self.fc0 = tf.keras.layers.Dense(d_feature, activation=None)
@@ -65,6 +100,56 @@ class RandLANet(BaseModel):
                                        cfg.num_classes,
                                        activation=False)
         setattr(self, 'fc', f_layer_fc3)
+
+    def inference_begin(self):
+
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
+        self.batcher = DefaultBatcher()
+
+    def inference_begin(self, data):
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
+        self.batcher = DefaultBatcher()
+
+    def inference_preprocess(self):
+        min_posbility_idx = np.argmin(self.possibility)
+        data = self.transform(self.inference_data, {}, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        return inputs
+
+    def inference_end(self, inputs, results):
+
+        results = torch.reshape(results, (-1, self.cfg.num_classes))
+        m_softmax = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds'][0, :]
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def init_att_pooling(self, d, d_out, name):
         att_activation = tf.keras.layers.Dense(d, activation=None)
@@ -366,8 +451,7 @@ class RandLANet(BaseModel):
                                                   data['label'],
                                                   data['search_tree'],
                                                   pick_idx)
-
-                label = label[:, 0]
+            
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
