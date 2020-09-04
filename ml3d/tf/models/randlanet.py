@@ -374,17 +374,65 @@ class RandLANet(BaseModel):
 
         gen_func = gen
         gen_types = (tf.float32, tf.float32, tf.int32)
-        gen_shapes = ([None, 3], [None, 3], [None])
+        gen_shapes = ([None, 3], [None, cfg.d_in], [None])
 
         return gen_func, gen_types, gen_shapes
 
+    def transform_inference(self, data, min_posbility_idx):
+        cfg = self.cfg
+        inputs = dict()
+
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']
+
+        pick_idx = min_posbility_idx
+
+        selected_pc, feat, label, selected_idx = self.crop_pc(pc, feat, label, tree, pick_idx)
+        dists = np.sum(np.square(
+            (selected_pc - pc[pick_idx]).astype(np.float32)),
+            axis=1)
+        delta = np.square(q - dists/np.max(dists))
+        self.possibility[selected_idx] += delta
+        inputs['point_inds'] = selected_idx
+
+        pc = selected_pc
+        features = feat
+
+        input_points = []
+        input_neighbors = []
+        input_pools = []
+        input_up_samples = []
+
+        for i in range(cfg.num_layers):
+            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] //
+                                   cfg.sub_sampling_ratio[i], :]
+            up_i = DataProcessing.knn_search(sub_points, pc, 1)
+            input_points.append(pc)
+            input_neighbors.append(neighbour_idx.astype(np.int64))
+            input_pools.append(pool_i.astype(np.int64))
+            input_up_samples.append(up_i.astype(np.int64))
+            pc = sub_points
+        
+        inputs['xyz'] = input_points
+        inputs['neigh_idx'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = features
+
+        inputs['labels'] = label.astype(np.int64)
+
+        return inputs
+        # input_list = input_points + input_neighbors + input_pools + input_up_samples
+        # input_list += [feat, label]
+
+
     def transform(self, pc, feat, label):
         cfg = self.cfg
-
-        if (feat is not None):
-            features = tf.concat([pc, feat], axis=1)
-        else:
-            features = pc
 
         input_points = []
         input_neighbors = []
@@ -407,32 +455,75 @@ class RandLANet(BaseModel):
             pc = sub_points
 
         input_list = input_points + input_neighbors + input_pools + input_up_samples
-        input_list += [features, label]
+        input_list += [feat, label]
 
         return input_list
+
+    def inference_begin(self, data):
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
+ 
+    def inference_preprocess(self):
+        min_posbility_idx = np.argmin(self.possibility)
+        data = self.transform_inference(self.inference_data, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        # inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data['interp_idx'] # TODO: convert to tensor.
+        flat_inputs += [data['features'] + data['labels']]
+
+        return flat_inputs
+
+    def inference_end(self, results):
+        inputs = self.inference_input
+        results = tf.reshape(results, (-1, self.cfg.num_classes))
+        results = tf.nn.softmax(results, axis=-1)
+        results = results.cpu().numpy()
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds'][0, :]
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
+
 
     def preprocess(self, data, attr):
         cfg = self.cfg
 
         points = data['point'][:, 0:3]
-        labels = data['label']
-        split = attr['split']
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32)
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
             feat = np.concatenate([points, feat], axis=1)
 
+        assert self.cfg.d_in == feat.shape[1], "Wrong feature dimension, please update d_in(3 + feature_dimension) in config"
+
+        split = attr['split']
+
         data = dict()
 
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_subsampling(
-                points, labels=labels, grid_size=cfg.grid_size)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-                points, features=feat, labels=labels, grid_size=cfg.grid_size)
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+            points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
@@ -441,7 +532,7 @@ class RandLANet(BaseModel):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)

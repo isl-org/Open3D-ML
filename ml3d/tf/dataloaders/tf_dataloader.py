@@ -66,7 +66,6 @@ class TFDataloader():
         else:
             data = self.dataset.get_data(index)
 
-
         return data, attr
 
     def get_loader(self, batch_size=1, num_threads=3):

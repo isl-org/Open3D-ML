@@ -45,13 +45,48 @@ class SemanticSegmentation():
 
         # dataset.cfg.num_points = model.cfg.num_points
 
-    def run_inference(self, points, device):
-        # TODO
-        pass
+    def run_inference(self, data):
+        cfg = self.cfg
+        model = self.model
+        # model.eval()
 
-    def run_test(self, device):
-        # TODO
-        pass
+        model.inference_begin(data)
+
+        while True:
+            inputs = model.inference_preprocess()
+            results = model(inputs, training=False)
+            if model.inference_end(results):
+                break
+   
+        return model.inference_result
+
+    def run_test(self):
+        model = self.model
+        dataset = self.dataset
+        cfg = self.cfg
+
+        self.load_ckpt()
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
+        log.info("Started testing")
+
+        test_split = dataset.get_split('test')
+        for idx in tqdm(range(len(test_split)), desc='test'):
+            data = test_split.get_data(idx)
+            results = self.run_inference(data)
+
+
+        for idx in tqdm(range(len(test_split)), desc='test'):
+            attr = datset_split.get_attr(idx)
+            if dataset.is_tested(attr):
+                continue
+            data = datset_split.get_data(idx)
+            results = self.run_inference(data)
+            dataset.save_test_result(results, attr)
 
     def run_train(self, **kwargs):
         model = self.model

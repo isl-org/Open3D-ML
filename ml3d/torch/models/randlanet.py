@@ -263,7 +263,11 @@ class RandLANet(BaseModel):
         cfg = self.cfg
 
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
-        labels = np.array(data['label'], dtype=np.int32)
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32)
 
         if 'feat' not in data.keys() or data['feat'] is None:
             feat = points
@@ -285,7 +289,7 @@ class RandLANet(BaseModel):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split == "test":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)

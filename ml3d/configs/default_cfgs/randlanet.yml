@@ -2,7 +2,7 @@ name: RandLANet
 batcher: DefaultBatcher
 ckpt_path: ./ml3d/torch/checkpoint/randlanet_semantickitti.pth
 d_feature: 8
-d_in: 3
+d_in: 3 # 3 + feature dimension.
 d_out:
 - 16
 - 64
