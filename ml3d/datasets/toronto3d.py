@@ -9,14 +9,10 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
-from ..utils import make_dir, DATASET
 
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
 
-
-from .base_dataset import BaseDataset
-from ..utils import make_dir, DATASET
 
 
 logging.basicConfig(
@@ -31,6 +27,7 @@ class Toronto3D(BaseDataset):
     Toronto3D dataset, used in visualizer, training, or test
     """
     def __init__(self, 
+                dataset_path,
                 name='Toronto3D',
                 cache_dir='./logs/cache', 
                 use_cache=False,  
@@ -40,7 +37,6 @@ class Toronto3D(BaseDataset):
                     5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
                 ],
                 ignored_label_inds=[0],
-                dataset_path='../dataset/Toronto_3D/',
                 train_files=['L001.ply', 'L003.ply', 'L004.ply'],
                 val_files=['L002.ply'],
                 test_files=['L002.ply'],
@@ -48,21 +44,18 @@ class Toronto3D(BaseDataset):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-        super().__init__(
+        super().__init__(dataset_path=dataset_path, 
                         name=name,
                         cache_dir=cache_dir, 
                         use_cache=use_cache, 
                         class_weights=class_weights,
                         num_points=num_points,
                         prepro_grid_size=prepro_grid_size,
-                        dataset_path=dataset_path, 
                         ignored_label_inds=ignored_label_inds,
                         train_files=train_files,
                         test_files=test_files,
@@ -98,16 +91,17 @@ class Toronto3D(BaseDataset):
 
     def get_split_list(self, split):
         if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
-            return self.test_files
-        elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
-            return self.val_files
+            files = self.test_files
         elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
-            return self.train_files
+            files = self.train_files
+        elif split in ['val', 'validation']:
+            files = self.val_files
+        elif split in ['all']:
+            files = self.val_files + self.train_files + self.test_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+        return files
 
 
 class Toronto3DSplit():

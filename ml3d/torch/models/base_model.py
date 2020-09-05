@@ -1,9 +1,9 @@
 import numpy as np
 import yaml
 import torch
-
 from os.path import join, exists, dirname, abspath
 
+# use relative import for being compatible with Open3d main repo 
 from ...utils import Config
 
 class BaseModel(torch.nn.Module):

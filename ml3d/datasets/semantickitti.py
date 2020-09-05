@@ -24,6 +24,7 @@ class SemanticKITTI(BaseDataset):
     """
     
     def __init__(self, 
+                dataset_path,
                 name='SemanticKITTI',
                 cache_dir='./logs/cache', 
                 use_cache=False,  
@@ -32,7 +33,6 @@ class SemanticKITTI(BaseDataset):
                     240942562, 17294618, 170599734, 6369672, 230413074, 101130274,
                     476491114, 9833174, 129609852, 4506626, 1168181
                 ],
-                dataset_path='../dataset/SemanticKITTI/',
                 test_result_folder='./test',
                 test_split=['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'],
                 training_split=['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'],
@@ -44,19 +44,16 @@ class SemanticKITTI(BaseDataset):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-        super().__init__(
+        super().__init__(dataset_path=dataset_path, 
                         name=name,
                         cache_dir=cache_dir, 
                         use_cache=use_cache, 
                         class_weights=class_weights,
-                        dataset_path=dataset_path, 
                         test_result_folder=test_result_folder,
                         test_split=test_split, 
                         training_split=training_split, 
@@ -145,9 +142,7 @@ class SemanticKITTI(BaseDataset):
     def save_test_result_kpconv(self, results, inputs):
         cfg = self.cfg
         for j in range(1):
-            # name = inputs['attr']['name']
             name = inputs['attr']['name']
-            # print(name)
             name_seq, name_points = name.split("_")
 
             test_path = join(cfg.test_result_folder, 'sequences')
@@ -156,12 +151,9 @@ class SemanticKITTI(BaseDataset):
             make_dir(save_path)
 
             test_file_name = name_points
-            # proj_inds = inputs['data']['proj_inds'][j].cpu().numpy()
             
             proj_inds = inputs['data'].reproj_inds[0]
-            # proj_inds = inputs.proj_inds
             probs = results[proj_inds, :]
-            # probs = results[j][proj_inds, :]
           
             pred = np.argmax(probs, 1)
 

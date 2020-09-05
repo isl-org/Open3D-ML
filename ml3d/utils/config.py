@@ -79,10 +79,12 @@ class Config(object):
         Merge the dict parsed by MultipleKVAction into this cfg.
         """
         # merge args to cfg
-        cfg.pipeline.device = args.device
-        cfg.pipeline.split = args.split
-        cfg.pipeline.main_log_dir = args.main_log_dir
-        cfg.dataset.dataset_path = args.dataset_path
+        if args.device is not None: cfg.pipeline.device = args.device
+        if args.split is not None: cfg.pipeline.split = args.split
+        if args.main_log_dir is not None:
+            cfg.pipeline.main_log_dir = args.main_log_dir
+        if args.dataset_path is not None:
+            cfg.dataset.dataset_path = args.dataset_path
         # if args.cfg_model is not None:
 
         extra_cfg_dict = {
@@ -106,7 +108,7 @@ class Config(object):
                                                 extra_cfg_dict['pipeline'])
         cfg_dict_model = Config._merge_a_into_b(cfg.model, 
                                                 extra_cfg_dict['model'])
-
+  
         return cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model
 
 
@@ -128,11 +130,12 @@ class Config(object):
         }
         cfg = Config(cfg_dict)
 
-        cfg.pipeline.device = args.device
-        cfg.pipeline.split = args.split
-        cfg.pipeline.main_log_dir = args.main_log_dir
-        cfg.dataset.dataset_path = args.dataset_path
-        # if args.cfg_model is not None:
+        if args.device is not None: cfg.pipeline.device = args.device
+        if args.split is not None: cfg.pipeline.split = args.split
+        if args.main_log_dir is not None:
+            cfg.pipeline.main_log_dir = args.main_log_dir
+        if args.dataset_path is not None:
+            cfg.dataset.dataset_path = args.dataset_path
 
         extra_cfg_dict = {
             'model': {},

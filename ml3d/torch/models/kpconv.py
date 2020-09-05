@@ -10,6 +10,7 @@ from open3d.pybind.ml.contrib import subsample_batch
 
 from open3d.pybind.ml.contrib import radius_search
 
+# use relative import for being compatible with Open3d main repo 
 from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
@@ -29,7 +30,7 @@ class KPFCNN(BaseModel):
                 ],
                 num_classes=19,  # Number of valid classes
                 ignored_label_inds=[0],
-                ckpt_path='../dataset/ckpt/kpconv_semantickitti.pth',
+                ckpt_path=None,
                 dataset_task='',
                 input_threads=10,
                 batcher='ConcatBatcher',
@@ -66,7 +67,7 @@ class KPFCNN(BaseModel):
                 max_epoch=800,
                 learning_rate=1e-2,
                 momentum=0.98,
-                lr_decays=0.9847666521101581,
+                lr_decays=0.98477,
                 grad_clip_norm=100.0,
                 epoch_steps=500,
                 validation_size=200,
@@ -567,16 +568,6 @@ class KPFCNN(BaseModel):
         new_points = new_points[rand_order, :3]
         sem_labels = sem_labels[rand_order]
 
-        # TODO
-        # Place points in original frame reference to get coordinates
-        #if f_inc == 0:
-        #    new_coords = points[rand_order, :]
-        #else:
-        #    # We have to project in the first frame coordinates
-        #    new_coords = new_points - pose0[:3, 3]
-        #    # new_coords = new_coords.dot(pose0[:3, :3])
-        #    new_coords = np.sum(np.expand_dims(new_coords, 2) * pose0[:3, :3], axis=1)
-        #    new_coords = np.hstack((new_coords, points[:, 3:]))
         intensity = np.expand_dims(data['intensity'], 1)
         new_coords = np.hstack((points, intensity))
         new_coords = new_coords[rand_order, :]
@@ -632,18 +623,6 @@ class KPFCNN(BaseModel):
         if np.random.rand() > self.cfg.augment_color:
             in_fts[:, 3:] *= 0
 
-        # # Stack batch
-        # p_list += [in_pts]
-        # f_list += [in_fts]
-        # l_list += [np.squeeze(in_lbls)]
-        # #fi_list += [[s_ind, f_ind]]
-        # p0_list += [p0]
-        # s_list += [scale]
-        # R_list += [R]
-        # r_inds_list += [proj_inds]
-        # r_mask_list += [reproj_mask]
-        # val_labels_list += [o_labels]
-
         data = {
             'p_list': in_pts,
             'f_list': in_fts,
@@ -657,62 +636,6 @@ class KPFCNN(BaseModel):
             'cfg': self.cfg
         }
         return data
-
-        # ###################
-        # # Concatenate batch
-        # ###################
-
-        # stacked_points = np.concatenate(p_list, axis=0)
-        # features = np.concatenate(f_list, axis=0)
-        # labels = np.concatenate(l_list, axis=0)
-        # frame_inds = np.array(fi_list, dtype=np.int32)
-        # frame_centers = np.stack(p0_list, axis=0)
-        # stack_lengths = np.array([pp.shape[0] for pp in p_list],
-        #                          dtype=np.int32)
-        # scales = np.array(s_list, dtype=np.float32)
-        # rots = np.stack(R_list, axis=0)
-
-        # # Input features (Use reflectance, input height or all coordinates)
-        # stacked_features = np.ones_like(stacked_points[:, :1],
-        #                                 dtype=np.float32)
-        # if self.cfg.in_features_dim == 1:
-        #     pass
-        # elif self.cfg.in_features_dim == 2:
-        #     # Use original height coordinate
-        #     stacked_features = np.hstack((stacked_features, features[:, 2:3]))
-        # elif self.cfg.in_features_dim == 3:
-        #     # Use height + reflectance
-        #     stacked_features = np.hstack((stacked_features, features[:, 2:]))
-        # elif self.cfg.in_features_dim == 4:
-        #     # Use all coordinates
-        #     stacked_features = np.hstack((stacked_features, features[:3]))
-        # elif self.cfg.in_features_dim == 5:
-        #     # Use all coordinates + reflectance
-        #     stacked_features = np.hstack((stacked_features, features))
-        # else:
-        #     raise ValueError(
-        #         'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
-        #     )
-
-        # #######################
-        # # Create network inputs
-        # #######################
-        # #
-        # #   Points, neighbors, pooling indices for each layers
-        # #
-
-        # # Get the whole input list
-        # input_list = self.segmentation_inputs(stacked_points, stacked_features,
-        #                                       labels.astype(np.int64),
-        #                                       stack_lengths)
-
-        # # Add scale and rotation for testing
-        # input_list += [
-        #     scales, rots, frame_inds, frame_centers, r_inds_list, r_mask_list,
-        #     val_labels_list
-        # ]
-
-        # return [self.cfg.num_layers] + input_list
 
     def _transform_train(self, data, attr):
 
@@ -736,8 +659,6 @@ class KPFCNN(BaseModel):
         # Get center of the first frame in world coordinates
         p_origin = np.zeros((1, 4))
         p_origin[0, 3] = 1
-        #pose0 = self.poses[s_ind][f_ind]
-        #p0 = p_origin.dot(pose0.T)[:, :3]
         p0 = p_origin[:, :3]
         p0 = np.squeeze(p0)
         o_pts = None
@@ -752,9 +673,6 @@ class KPFCNN(BaseModel):
 
         # Apply pose (without np.dot to avoid multi-threading)
         hpoints = np.hstack((points, np.ones_like(points[:, :1])))
-        #new_points = hpoints.dot(pose.T)
-        #new_points = np.sum(np.expand_dims(hpoints, 2) * pose.T, axis=1)
-        # TODO pose
         new_points = hpoints
         #new_points[:, 3:] = points[:, 3:]
 
@@ -779,16 +697,6 @@ class KPFCNN(BaseModel):
         new_points = new_points[rand_order, :3]
         sem_labels = sem_labels[rand_order]
 
-        # TODO
-        # Place points in original frame reference to get coordinates
-        #if f_inc == 0:
-        #    new_coords = points[rand_order, :]
-        #else:
-        #    # We have to project in the first frame coordinates
-        #    new_coords = new_points - pose0[:3, 3]
-        #    # new_coords = new_coords.dot(pose0[:3, :3])
-        #    new_coords = np.sum(np.expand_dims(new_coords, 2) * pose0[:3, :3], axis=1)
-        #    new_coords = np.hstack((new_coords, points[:, 3:]))
         new_coords = points[rand_order, :]
 
         # Increment merge count
@@ -855,9 +763,6 @@ class KPFCNN(BaseModel):
         r_mask_list += [reproj_mask]
         val_labels_list += [o_labels]
 
-        ###################
-        # Concatenate batch
-        ###################
 
         stacked_points = np.concatenate(p_list, axis=0)
         features = np.concatenate(f_list, axis=0)
@@ -891,14 +796,6 @@ class KPFCNN(BaseModel):
                 'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
             )
 
-        #######################
-        # Create network inputs
-        #######################
-        #
-        #   Points, neighbors, pooling indices for each layers
-        #
-
-        # Get the whole input list
         input_list = self.segmentation_inputs(stacked_points, stacked_features,
                                               labels.astype(np.int64),
                                               stack_lengths)

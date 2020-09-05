@@ -10,17 +10,135 @@ from pathlib import Path
 from sklearn.neighbors import KDTree
 import pudb
 
+# use relative import for being compatible with Open3d main repo 
+from open3d.ml.tf.ops import *
+from .network_blocks import *
 from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.utils.dataprocessing import DataProcessing
-from .network_blocks import *
-from open3d.ml.tf.ops import *
 
 class KPFCNN(BaseModel):
-    def __init__(self, cfg=None, **kwargs):
-        self.default_cfg_name = "kpconv.yml"
-        super().__init__(cfg=cfg,**kwargs)
+    def __init__(self, 
+                name='KPFCNN',
+                ign_lbls=[0],
+                lbl_values=[
+                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+                ],
+                num_classes=19,  # Number of valid classes
+                ignored_label_inds=[0],
+                ckpt_path=None,
+                dataset_task='',
+                input_threads=10,
+                batcher='ConcatBatcher',
+                architecture=[
+                    'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb',
+                    'resnetb_strided', 'resnetb', 'resnetb', 'resnetb_strided', 'resnetb',
+                    'resnetb', 'resnetb_strided', 'resnetb', 'nearest_upsample', 'unary',
+                    'nearest_upsample', 'unary', 'nearest_upsample', 'unary',
+                    'nearest_upsample', 'unary'
+                ],
+                in_radius=4.0,
+                val_radius=4.0,
+                n_frames=1,
+                max_in_points=100000,
+                max_val_points=100000,
+                batch_num=8,
+                val_batch_num=8,
+                num_kernel_points=15,
+                first_subsampling_dl=0.06,
+                conv_radius=2.5,
+                deform_radius=6.0,
+                KP_extent=1.2,
+                KP_influence='linear',
+                aggregation_mode='sum',
+                first_features_dim=128,
+                in_features_dim=2,
+                modulated=False,
+                use_batch_norm=True,
+                batch_norm_momentum=0.02,
+                deform_fitting_mode='point2point',
+                deform_fitting_power=1.0, 
+                deform_lr_factor=0.1,  
+                repulse_extent=1.2, 
+                max_epoch=800,
+                learning_rate=1e-2,
+                momentum=0.98,
+                lr_decays=0.98477,
+                grad_clip_norm=100.0,
+                epoch_steps=500,
+                validation_size=200,
+                checkpoint_gap=50,
+                augment_scale_anisotropic=True,
+                augment_symmetries=[True, False, False],
+                augment_rotation='vertical',
+                augment_scale_min=0.8,
+                augment_scale_max=1.2,
+                augment_noise=0.001,
+                augment_color=0.8,
+                saving=True,
+                saving_path=None,
+                in_points_dim=3,
+                fixed_kernel_points='center',
+                class_w=[],
+                num_layers=5,
+                **kwargs):
 
+        super().__init__(name=name,
+                        ign_lbls=ign_lbls,
+                        lbl_values=lbl_values,
+                        num_classes=num_classes,  
+                        ignored_label_inds=ignored_label_inds,
+                        ckpt_path=ckpt_path,
+                        dataset_task=dataset_task,
+                        input_threads=input_threads,
+                        batcher=batcher,
+                        architecture=architecture,
+                        in_radius=in_radius,
+                        val_radius=val_radius,
+                        n_frames=n_frames,
+                        max_in_points=max_in_points,
+                        max_val_points=max_val_points,
+                        batch_num=batch_num,
+                        val_batch_num=val_batch_num,
+                        num_kernel_points=num_kernel_points,
+                        first_subsampling_dl=first_subsampling_dl,
+                        conv_radius=conv_radius,
+                        deform_radius=deform_radius,
+                        KP_extent=KP_extent,
+                        KP_influence=KP_influence,
+                        aggregation_mode=aggregation_mode,
+                        first_features_dim=first_features_dim,
+                        in_features_dim=in_features_dim,
+                        modulated=modulated,
+                        use_batch_norm=use_batch_norm,
+                        batch_norm_momentum=batch_norm_momentum,
+                        deform_fitting_mode=deform_fitting_mode,
+                        deform_fitting_power=deform_fitting_power, 
+                        deform_lr_factor=deform_lr_factor,  
+                        repulse_extent=repulse_extent, 
+                        max_epoch=max_epoch,
+                        learning_rate=learning_rate,
+                        momentum=momentum,
+                        lr_decays=lr_decays,
+                        grad_clip_norm=grad_clip_norm,
+                        epoch_steps=epoch_steps,
+                        validation_size=validation_size,
+                        checkpoint_gap=checkpoint_gap,
+                        augment_scale_anisotropic=augment_scale_anisotropic,
+                        augment_symmetries=augment_symmetries,
+                        augment_rotation=augment_rotation,
+                        augment_scale_min=augment_scale_min,
+                        augment_scale_max=augment_scale_max,
+                        augment_noise=augment_noise,
+                        augment_color=augment_color,
+                        saving=saving,
+                        saving_path=saving_path,
+                        in_points_dim=in_points_dim,
+                        fixed_kernel_points=fixed_kernel_points,
+                        class_w=class_w,
+                        num_layers=num_layers,
+                        **kwargs)
+        
         cfg = self.cfg
 
         # From config parameter, compute higher bound of neighbors number in a neighborhood

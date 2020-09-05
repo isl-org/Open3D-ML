@@ -1,15 +1,14 @@
 import numpy as np
 import yaml
 import torch
-
-from ...utils import make_dir
 from os.path import join, exists, dirname, abspath
 
-from ...utils import Config
+# use relative import for being compatible with Open3d main repo 
+from ...utils import Config, make_dir
 
 class BasePipeline(object):
     """
-    Base dataset class
+    Base pipeline class
     """
     def __init__(self,
                 model,
@@ -19,15 +18,13 @@ class BasePipeline(object):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
-            dataset_path (str): path to the dataset
-            args (dict): dict of args 
+            model: network
+            dataset: dataset, or None for inference model
+            devce: 'gpu' or 'cpu' 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-
-
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name

@@ -1,21 +1,9 @@
 dataset:
   name: S3DIS
+  dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights:
-  - 3370714
-  - 2856755
-  - 4919229
-  - 318158
-  - 375640
-  - 478001
-  - 974733
-  - 650464
-  - 791496
-  - 88727
-  - 1284130
-  - 229758
-  - 2272837
-  dataset_path: ../dataset/S3DIS/
+  class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
+478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
   ignored_label_inds: []
   num_points: 40960
   prepro_grid_size: 0.04
@@ -24,10 +12,10 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ./ml3d/torch/checkpoint/randlanet_s3dis.pth
-  d_feature: 8
-  d_in: 6
-  d_out:
+  ckpt_path: # path/to/your/checkpoint
+  dim_feature: 8
+  dim_input: 6
+  dim_output:
   - 16
   - 64
   - 128

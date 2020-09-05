@@ -11,16 +11,19 @@ class BaseDataset(object):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
         if kwargs['dataset_path'] is None:
             raise KeyError(
-            "should specify dataset_path or cfg to initialize a Dataset")
+            "Please specify dataset_path to initialize a Dataset")
+
+        if kwargs['name'] is None:
+            raise KeyError(
+            "Please give a name to the dataset")
+
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name

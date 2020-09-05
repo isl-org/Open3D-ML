@@ -38,7 +38,7 @@ batch_limit: 50000
 batch_norm_momentum: 0.02
 batch_num: 8
 batcher: ConcatBatcher
-ckpt_path: /home/yiling/d2T/intel2020/datasets/kpconv_450.tar
+ckpt_path: # path/to/your/checkpoint
 class_w: []
 conv_radius: 2.5
 dataset: SemanticKitti
@@ -58,27 +58,7 @@ in_features_dim: 2
 in_points_dim: 3
 in_radius: 4.0
 input_threads: 10
-lbl_values:
-- 0
-- 1
-- 2
-- 3
-- 4
-- 5
-- 6
-- 7
-- 8
-- 9
-- 10
-- 11
-- 12
-- 13
-- 14
-- 15
-- 16
-- 17
-- 18
-- 19
+lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 max_in_points: 20000
 max_val_points: 100000
 modulated: false

@@ -33,7 +33,7 @@ def demo_train():
 
     model = RandLANet(
                 ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth",
-                d_in=3)
+                dim_input=3)
 
     pipeline = SemanticSegmentation(model=model, dataset=dataset,
                                     max_epoch=100,

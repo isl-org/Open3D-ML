@@ -7,11 +7,11 @@ import time
 import random
 from sklearn.neighbors import KDTree
 
-from ..utils import helper_tf
-from ...datasets.utils import DataProcessing
 
+# use relative import for being compatible with Open3d main repo 
 from .base_model import BaseModel
-from ...utils import MODEL
+from ...utils import MODEL, helper_tf
+from ...datasets.utils import DataProcessing
 
 class RandLANet(BaseModel):
     def __init__(self, 
@@ -27,12 +27,12 @@ class RandLANet(BaseModel):
                     4096 * 11 // 4, 4096 * 11 // 16, 
                     4096 * 11 // 64, 4096 * 11 // 256
                 ],
-                d_in=3,
-                d_feature=8,
-                d_out=[16, 64, 128, 256],
+                dim_input=3,
+                dim_feature=8,
+                dim_output=[16, 64, 128, 256],
                 grid_size=0.06,
                 batcher='DefaultBatcher',
-                ckpt_path='./dataset/ckpt/randlanet_semantickitti.pth',
+                ckpt_path=None,
                 **kwargs):
 
         super().__init__(
@@ -45,9 +45,9 @@ class RandLANet(BaseModel):
             sub_grid_size=sub_grid_size,
             sub_sampling_ratio=sub_sampling_ratio,
             num_sub_points=num_sub_points,
-            d_in=d_in,
-            d_feature=d_feature,
-            d_out=d_out,
+            dim_input=dim_input,
+            dim_feature=dim_feature,
+            dim_output=dim_output,
             grid_size=grid_size,
             batcher=batcher,
             ckpt_path=ckpt_path,
@@ -55,9 +55,9 @@ class RandLANet(BaseModel):
 
         cfg = self.cfg
 
-        d_feature = cfg.d_feature
+        dim_feature = cfg.dim_feature
 
-        self.fc0 = tf.keras.layers.Dense(d_feature, activation=None)
+        self.fc0 = tf.keras.layers.Dense(dim_feature, activation=None)
         self.batch_normalization = tf.keras.layers.BatchNormalization(
             -1, 0.99, 1e-6)
         self.leaky_relu0 = tf.keras.layers.LeakyReLU()
@@ -68,24 +68,24 @@ class RandLANet(BaseModel):
         # Encoder
         for i in range(cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
-            self.init_dilated_res_block(d_feature, cfg.d_out[i], name)
-            d_feature = cfg.d_out[i] * 2
+            self.init_dilated_res_block(dim_feature, cfg.dim_output[i], name)
+            dim_feature = cfg.dim_output[i] * 2
             if i == 0:
-                d_encoder_list.append(d_feature)
-            d_encoder_list.append(d_feature)
+                d_encoder_list.append(dim_feature)
+            d_encoder_list.append(dim_feature)
 
-        feature = helper_tf.conv2d(True, d_feature)
+        feature = helper_tf.conv2d(True, dim_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
         for j in range(cfg.num_layers):
             name = 'Decoder_layer_' + str(j)
-            d_in = d_encoder_list[-j - 2] + d_feature
-            d_out = d_encoder_list[-j - 2]
+            dim_input = d_encoder_list[-j - 2] + dim_feature
+            dim_output = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_tf.conv2d_transpose(True, d_out)
+            f_decoder_i = helper_tf.conv2d_transpose(True, dim_output)
             setattr(self, name, f_decoder_i)
-            d_feature = d_encoder_list[-j - 2]
+            dim_feature = d_encoder_list[-j - 2]
 
         f_layer_fc1 = helper_tf.conv2d(True, 64)
         setattr(self, 'fc1', f_layer_fc1)
@@ -151,35 +151,35 @@ class RandLANet(BaseModel):
         else:
             return False
 
-    def init_att_pooling(self, d, d_out, name):
+    def init_att_pooling(self, d, dim_output, name):
         att_activation = tf.keras.layers.Dense(d, activation=None)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_tf.conv2d(True, d_out)
+        f_agg = helper_tf.conv2d(True, dim_output)
         setattr(self, name + 'mlp', f_agg)
 
-    def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_tf.conv2d(True, d_in)
+    def init_building_block(self, dim_input, dim_output, name):
+        f_pc = helper_tf.conv2d(True, dim_input)
 
         setattr(self, name + 'bdmlp1', f_pc)
 
-        self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
+        self.init_att_pooling(dim_input * 2, dim_output // 2, name + 'att_pooling_1')
 
-        f_xyz = helper_tf.conv2d(True, d_out // 2)
+        f_xyz = helper_tf.conv2d(True, dim_output // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
-        self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
+        self.init_att_pooling(dim_input * 2, dim_output, name + 'att_pooling_2')
 
-    def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_tf.conv2d(True, d_out // 2)
+    def init_dilated_res_block(self, dim_input, dim_output, name):
+        f_pc = helper_tf.conv2d(True, dim_output // 2)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_building_block(d_out // 2, d_out, name + 'LFA')
+        self.init_building_block(dim_output // 2, dim_output, name + 'LFA')
 
-        f_pc = helper_tf.conv2d(True, d_out * 2, activation=False)
+        f_pc = helper_tf.conv2d(True, dim_output * 2, activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_tf.conv2d(True, d_out * 2, activation=False)
+        shortcut = helper_tf.conv2d(True, dim_output * 2, activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
@@ -254,7 +254,7 @@ class RandLANet(BaseModel):
 
         return f_pc_agg
 
-    def forward_dilated_res_block(self, feature, xyz, neigh_idx, d_out, name):
+    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output, name):
         m_conv2d = getattr(self, name + 'mlp1')
         f_pc = m_conv2d(feature, training=self.training)
 
@@ -293,7 +293,7 @@ class RandLANet(BaseModel):
         for i in range(self.cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
             f_encoder_i = self.forward_dilated_res_block(
-                feature, xyz[i], neigh_idx[i], self.cfg.d_out[i], name)
+                feature, xyz[i], neigh_idx[i], self.cfg.dim_output[i], name)
             f_sampled_i = self.random_sample(f_encoder_i, sub_idx[i])
             feature = f_sampled_i
             if i == 0:
@@ -392,12 +392,12 @@ class RandLANet(BaseModel):
         up_num_points = tf.shape(interp_idx)[1]
         interp_idx = tf.reshape(interp_idx, [batch_size, up_num_points])
 
-        interpolated_features = tf.gather(feature,
+        interpolatedim_features = tf.gather(feature,
                                           interp_idx,
                                           axis=1,
                                           batch_dims=1)
-        interpolated_features = tf.expand_dims(interpolated_features, axis=2)
-        return interpolated_features
+        interpolatedim_features = tf.expand_dims(interpolatedim_features, axis=2)
+        return interpolatedim_features
 
     @staticmethod
     def gather_neighbour(pc, neighbor_idx):

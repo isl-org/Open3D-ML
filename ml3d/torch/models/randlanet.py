@@ -9,6 +9,7 @@ from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
+# use relative import for being compatible with Open3d main repo 
 from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
@@ -31,12 +32,12 @@ class RandLANet(BaseModel):
                     4096 * 11 // 4, 4096 * 11 // 16, 
                     4096 * 11 // 64, 4096 * 11 // 256
                 ],
-                d_in=3,
-                d_feature=8,
-                d_out=[16, 64, 128, 256],
+                dim_input=3,
+                dim_feature=8,
+                dim_output=[16, 64, 128, 256],
                 grid_size=0.06,
                 batcher='DefaultBatcher',
-                ckpt_path='./dataset/ckpt/randlanet_semantickitti.pth',
+                ckpt_path=None,
                 **kwargs):
 
         super().__init__(name=name,
@@ -48,20 +49,18 @@ class RandLANet(BaseModel):
                         sub_grid_size=sub_grid_size,
                         sub_sampling_ratio=sub_sampling_ratio,
                         num_sub_points=num_sub_points,
-                        d_in=d_in,
-                        d_feature=d_feature,
-                        d_out=d_out,
+                        dim_input=dim_input,
+                        dim_feature=dim_feature,
+                        dim_output=dim_output,
                         grid_size=grid_size,
                         batcher=batcher,
                         ckpt_path=ckpt_path,
                         **kwargs)
-
         cfg = self.cfg
-        
-        d_feature = cfg.d_feature
 
-        self.fc0 = nn.Linear(cfg.d_in, d_feature)
-        self.batch_normalization = nn.BatchNorm2d(d_feature,
+        dim_feature = cfg.dim_feature
+        self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
+        self.batch_normalization = nn.BatchNorm2d(dim_feature,
                                                   eps=1e-6,
                                                   momentum=0.99)
 
@@ -70,26 +69,26 @@ class RandLANet(BaseModel):
         # Encoder
         for i in range(cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
-            self.init_dilated_res_block(d_feature, cfg.d_out[i], name)
-            d_feature = cfg.d_out[i] * 2
+            self.init_dilated_res_block(dim_feature, cfg.dim_output[i], name)
+            dim_feature = cfg.dim_output[i] * 2
             if i == 0:
-                d_encoder_list.append(d_feature)
-            d_encoder_list.append(d_feature)
+                d_encoder_list.append(dim_feature)
+            d_encoder_list.append(dim_feature)
 
-        feature = helper_torch.conv2d(True, d_feature, d_feature)
+        feature = helper_torch.conv2d(True, dim_feature, dim_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
         for j in range(cfg.num_layers):
             name = 'Decoder_layer_' + str(j)
-            d_in = d_encoder_list[-j - 2] + d_feature
-            d_out = d_encoder_list[-j - 2]
+            dim_input = d_encoder_list[-j - 2] + dim_feature
+            dim_output = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_torch.conv2d_transpose(True, d_in, d_out)
+            f_decoder_i = helper_torch.conv2d_transpose(True, dim_input, dim_output)
             setattr(self, name, f_decoder_i)
-            d_feature = d_encoder_list[-j - 2]
+            dim_feature = d_encoder_list[-j - 2]
 
-        f_layer_fc1 = helper_torch.conv2d(True, d_feature, 64)
+        f_layer_fc1 = helper_torch.conv2d(True, dim_feature, 64)
         setattr(self, 'fc1', f_layer_fc1)
 
         f_layer_fc2 = helper_torch.conv2d(True, 64, 32)
@@ -243,16 +242,7 @@ class RandLANet(BaseModel):
         inputs['features'] = features
 
         inputs['labels'] = label.astype(np.int64)
-        # inputs['input_inds']    = batch_pc_idx
-        # inputs['cloud_inds']    = batch_cloud_idx
-
         return inputs
-
-    # def transform(self, data, attr):
-    #     if attr['split'] == 'test':
-    #         return self.transform_whole(data, attr)
-    #     else:
-    #         return self.transform_crop(data, attr)
 
     def inference_begin(self, data):
         self.test_smooth = 0.98
@@ -327,34 +317,34 @@ class RandLANet(BaseModel):
 
         return data
 
-    def init_att_pooling(self, d, d_out, name):
+    def init_att_pooling(self, d, dim_output, name):
         att_activation = nn.Linear(d, d)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_torch.conv2d(True, d, d_out)
+        f_agg = helper_torch.conv2d(True, d, dim_output)
         setattr(self, name + 'mlp', f_agg)
 
-    def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_torch.conv2d(True, 10, d_in)
+    def init_building_block(self, dim_input, dim_output, name):
+        f_pc = helper_torch.conv2d(True, 10, dim_input)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
+        self.init_att_pooling(dim_input * 2, dim_output // 2, name + 'att_pooling_1')
 
-        f_xyz = helper_torch.conv2d(True, d_in, d_out // 2)
+        f_xyz = helper_torch.conv2d(True, dim_input, dim_output // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
-        self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
+        self.init_att_pooling(dim_input * 2, dim_output, name + 'att_pooling_2')
 
-    def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_torch.conv2d(True, d_in, d_out // 2)
+    def init_dilated_res_block(self, dim_input, dim_output, name):
+        f_pc = helper_torch.conv2d(True, dim_input, dim_output // 2)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_building_block(d_out // 2, d_out, name + 'LFA')
+        self.init_building_block(dim_output // 2, dim_output, name + 'LFA')
 
-        f_pc = helper_torch.conv2d(True, d_out, d_out * 2, activation=False)
+        f_pc = helper_torch.conv2d(True, dim_output, dim_output * 2, activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_torch.conv2d(True, d_in, d_out * 2, activation=False)
+        shortcut = helper_torch.conv2d(True, dim_input, dim_output * 2, activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
@@ -434,7 +424,7 @@ class RandLANet(BaseModel):
 
         return f_pc_agg
 
-    def forward_dilated_res_block(self, feature, xyz, neigh_idx, d_out, name):
+    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output, name):
         m_conv2d = getattr(self, name + 'mlp1')
         f_pc = m_conv2d(feature)
 
@@ -475,7 +465,7 @@ class RandLANet(BaseModel):
         for i in range(self.cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
             f_encoder_i = self.forward_dilated_res_block(
-                feature, xyz[i], neigh_idx[i], self.cfg.d_out[i], name)
+                feature, xyz[i], neigh_idx[i], self.cfg.dim_output[i], name)
             f_sampled_i = self.random_sample(f_encoder_i, sub_idx[i])
             feature = f_sampled_i
             if i == 0:
@@ -559,8 +549,8 @@ class RandLANet(BaseModel):
         interp_idx = torch.reshape(interp_idx, (batch_size, up_num_points))
         interp_idx = interp_idx.unsqueeze(1).expand(batch_size, d, -1)
 
-        interpolated_features = torch.gather(feature, 2, interp_idx)
-        interpolated_features = interpolated_features.unsqueeze(3)
-        return interpolated_features
+        interpolatedim_features = torch.gather(feature, 2, interp_idx)
+        interpolatedim_features = interpolatedim_features.unsqueeze(3)
+        return interpolatedim_features
 
 MODEL._register_module(RandLANet, 'torch')

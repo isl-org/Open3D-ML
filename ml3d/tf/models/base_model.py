@@ -1,9 +1,9 @@
 import numpy as np
 import yaml
 import tensorflow as tf
-
 from os.path import join, exists, dirname, abspath
 
+# use relative import for being compatible with Open3d main repo 
 from ...utils import Config
 
 class BaseModel(tf.keras.Model):

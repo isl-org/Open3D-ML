@@ -17,9 +17,9 @@ def parse_args():
     parser.add_argument('--cfg_pipeline', help='path to the pipeline\'s config file')
     parser.add_argument('--cfg_dataset', help='path to the dataset\'s config file')
     parser.add_argument('--dataset_path', help='path to the dataset')
-    parser.add_argument('--device', help='device to run the pipeline', default='gpu')
+    parser.add_argument('--device', help='device to run the pipeline')
     parser.add_argument('--split', help='train or test', default='train')
-    parser.add_argument('--main_log_dir', help='the dir to save logs and models', default='./logs/')
+    parser.add_argument('--main_log_dir', help='the dir to save logs and models')
 
     args, unknown = parser.parse_known_args()
 
@@ -52,6 +52,8 @@ def main():
 
     if args.cfg_file is not None:
         cfg = Config.load_from_file(args.cfg_file)
+      
+   
         Pipeline = get_module("pipeline", cfg.pipeline.name, framework)
         Model = get_module("model", cfg.model.name, framework)
         Dataset = get_module("dataset", cfg.dataset.name)
@@ -59,7 +61,8 @@ def main():
         cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
                         Config.merge_cfg_file(cfg, args, extra_dict)
 
-        dataset = Dataset(**cfg_dict_dataset)
+        dataset = Dataset(cfg_dict_dataset.pop('dataset_path', None), 
+                            **cfg_dict_dataset)
         model = Model(**cfg_dict_model)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
     else: 

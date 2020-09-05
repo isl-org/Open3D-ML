@@ -9,7 +9,6 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
-from ..utils import make_dir, DATASET
 from .utils import DataProcessing
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
@@ -22,6 +21,7 @@ class S3DIS(BaseDataset):
     """
     
     def __init__(self, 
+                dataset_path,
                 name='S3DIS',
                 cache_dir='./logs/cache', 
                 use_cache=False,  
@@ -33,25 +33,22 @@ class S3DIS(BaseDataset):
                 num_points=40960,
                 test_area_idx=3,
                 ignored_label_inds=[],
-                dataset_path='../dataset/S3DIS/',
+                
                 test_result_folder='./test'
                 ):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-        super().__init__(
+        super().__init__(dataset_path=dataset_path, 
                         name=name,
                         cache_dir=cache_dir, 
                         use_cache=use_cache, 
                         class_weights=class_weights,
-                        dataset_path=dataset_path, 
                         test_result_folder=test_result_folder,
                         prepro_grid_size=prepro_grid_size, 
                         num_points=num_points, 
@@ -93,8 +90,6 @@ class S3DIS(BaseDataset):
 
         self.all_files = glob.glob(
             str(Path(self.cfg.dataset_path) / 'original_ply' / '*.ply'))
-        print(self.all_files)
-        # print(len(self.all_files))
 
     def get_split(self, split):
         return S3DISSplit(self, split=split)
@@ -104,23 +99,24 @@ class S3DIS(BaseDataset):
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split in ['test', 'testing']:
+        if split in ['test', 'testing', 'val', 'validation']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) in f
             ]
-        else:
+        elif split in ['train', 'training']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) not in f
             ]
-
-        random.shuffle(file_list)
+        elif split in ['all']:
+            file_list = self.all_files
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
         return file_list
 
     def get_data(self, file_path, is_test=False):
-        # print("get data = " + file_path)
         file_path = Path(file_path)
         kdtree_path = Path(
             file_path

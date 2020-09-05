@@ -63,16 +63,15 @@ python scripts/run.py ${tf/torch} -c ${CONFIG_FILE} [optional arguments]
 
 Examples,
 ```shell
-# Train RandLANet on SemanticKITTI for segmantic segmentation (by default)
+# Train RandLANet on SemanticKITTI for segmantic segmentation 
 python scripts/run.py torch -m RandLANet \
--d SemanticKITTI --dataset_path ../dataset/SemanticKITTI 
+-d SemanticKITTI --cfg_dataset ml3d/configs/default_cfgs/semantickitti.yml \
+--dataset_path ../dataset/SemanticKITTI 
 
-# or
-python scripts/run.py torch -m RandLANet \
--d SemanticKITTI --cfg_dataset ./ml3d/configs/default_cfgs/semantickitti.yml
 
 # Use a config file to train this model with tensorflow
-python scripts/run.py tf -c ml3d/configs/randlanet_semantickitti.yml
+python scripts/run.py tf -c ml3d/configs/kpconv_semantickitti.yml \
+--pipeline.batch_size 2
 ```
 Arguments can be
 - `-p, --pipeline`: pipeline name, SemanticSegmentation by default

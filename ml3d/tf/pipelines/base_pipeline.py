@@ -17,16 +17,13 @@ class BasePipeline(object):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
-            dataset_path (str): path to the dataset
-            args (dict): dict of args 
+            model: network
+            dataset: dataset, or None for inference model
+            devce: 'gpu' or 'cpu' 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-
-
-
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
 
@@ -37,10 +34,6 @@ class BasePipeline(object):
         self.cfg.logs_dir = join(self.cfg.main_log_dir, 
                         model.__class__.__name__ + '_torch')
         make_dir(self.cfg.logs_dir)
-
-        
-        # self.device = torch.device('cuda' if torch.cuda.is_available() 
-        #                             and device == 'gpu' else 'cpu')
 
     def get_loss(self):
         raise NotImplementedError()

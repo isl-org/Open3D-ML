@@ -1,15 +1,7 @@
 name: Semantic3D
+dataset_path: # path/to/your/dataset
 cache_dir: .logs/cache/
-class_weights:
-- 5181602
-- 5012952
-- 6830086
-- 1311528
-- 10476365
-- 946982
-- 334860
-- 269353
-dataset_path: ./datasets/Semantic3D/
+class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353, 269353]
 ignored_label_inds:
 - 0
 num_points: 65536
