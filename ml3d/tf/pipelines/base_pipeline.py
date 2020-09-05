@@ -22,11 +22,12 @@ class BasePipeline(object):
         Returns:
             class: The corresponding class.
         """
-        self.cfg = Config(kwargs)
-        self.name = self.cfg.name
         if kwargs['name'] is None:
             raise KeyError(
             "Please give a name to the pipeline")
+            
+        self.cfg = Config(kwargs)
+        self.name = self.cfg.name
 
         self.model = model
         self.dataset = dataset
