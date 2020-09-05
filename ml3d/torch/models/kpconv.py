@@ -525,8 +525,6 @@ class KPFCNN(BaseModel):
         # Get center of the first frame in world coordinates
         p_origin = np.zeros((1, 4))
         p_origin[0, 3] = 1
-        #pose0 = self.poses[s_ind][f_ind]
-        #p0 = p_origin.dot(pose0.T)[:, :3]
         p0 = p_origin[:, :3]
         p0 = np.squeeze(p0)
         o_pts = None
@@ -541,11 +539,8 @@ class KPFCNN(BaseModel):
 
         # Apply pose (without np.dot to avoid multi-threading)
         hpoints = np.hstack((points, np.ones_like(points[:, :1])))
-        #new_points = hpoints.dot(pose.T)
-        #new_points = np.sum(np.expand_dims(hpoints, 2) * pose.T, axis=1)
-        # TODO pose
+
         new_points = hpoints
-        #new_points[:, 3:] = points[:, 3:]
 
         # In case of validation, keep the original points in memory
         if attr['split'] in ['validation', 'test']:
