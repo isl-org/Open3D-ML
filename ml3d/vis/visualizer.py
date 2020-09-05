@@ -1,5 +1,6 @@
 import math  # debugging; remove
 import numpy as np
+import threading
 import open3d as o3d
 from open3d.visualization import gui
 from open3d.visualization import rendering
@@ -244,26 +245,136 @@ class Visualizer:
 
             gui.Application.instance.post_to_main_thread(self._window, update)
 
+    class ProgressDialog:
+        def __init__(self, title, window, n_items):
+            self._window = window
+            self._n_items = n_items
+
+            em = window.theme.font_size
+            self.dialog = gui.Dialog(title)
+            self._layout = gui.Vert(0, gui.Margins(em, em, em, em))
+            self.dialog.add_child(self._layout)
+            self._layout.add_child(gui.Label(title + "                    "))
+            self._layout.add_fixed(0.5 * em)
+            self._progress = gui.ProgressBar()
+            self._progress.value = 0.0
+            self._layout.add_child(self._progress)
+
+        def post_update(self):
+            gui.Application.instance.post_to_main_thread(self._window,
+                                                         self.update)
+
+        def update(self):
+            value = min(1.0, self._progress.value + 1.0 / self._n_items)
+            self._progress.value = value
+
     SOLID_NAME = "Solid Color"
     LABELS_NAME = "Labels"
     RAINBOW_NAME = "Colormap (Rainbow)"
     GREYSCALE_NAME = "Colormap (Greyscale)"
 
-    def __init__(self):
-        self._data = {}
-        self._data_names = []  # sets the order data will be displayed / animated
-        self._known_attrs = set()
+    class ObjectModel:
+        def __init__(self, dataset, indices):
+            self._dataset = dataset
+            self._name2datasetidx = {}
+            self._attr2minmax = {}  # only access in _get_attr_minmax()
+
+            self.data = {}  # name -> tpointcloud
+            self.data_names = []  # the order data will be displayed / animated
+            self.known_attrs = set(["labels"])
+
+            for i in indices:
+                info = dataset.get_attr(i)
+                name = info["name"]
+                while name in self.data:  # ensure each name is unique
+                    name = name + "_"
+
+                tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
+                                                  o3d.core.Device("CPU:0"))
+                self.data[name] = tcloud
+                self.data_names.append(name)
+                self._name2datasetidx[name] = i
+
+        def is_loaded(self, name):
+            return not self.data[name].is_empty()
+
+        def load(self, name):
+            assert(name in self._name2datasetidx)
+
+            if self.is_loaded(name):
+                return
+
+            idx = self._name2datasetidx[name]
+            data = self._dataset.get_data(idx)
+
+            # Create tpointcloud
+            pts = data["point"]
+            tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
+                                              o3d.core.Device("CPU:0"))
+            if pts.shape[1] == 4:
+                # We can't use inplace Tensor creation (e.g. from_numpy())
+                # because the resulting arrays won't be contiguous. However,
+                # TensorList can be inplace.
+                xyz = pts[:,[0,1,2]]
+                tcloud.point["intensity"] = Visualizer._make_tcloud_array(pts[:,3], copy=True)
+                tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
+            else:
+                tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
+            # Only add scalar attributes for now
+            for k,v in data.items():
+                if v is None:
+                    continue
+                if len(v.shape) == 1 or (len(v.shape) == 2 and v.shape[1] == 1):
+                    isint = v.dtype.name.startswith('int')
+                    attr_name = k
+                    if attr_name == "label":
+                        attr_name = "labels"
+                    tcloud.point[attr_name] = Visualizer._make_tcloud_array(v, copy=isint)
+
+            # ---- Debugging ----
+            # dist = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]) for pt in tcloud.point["points"].as_tensor().numpy()]
+            # dist = np.array(dist, dtype='float32')
+            # tcloud.point["distance"] = Visualizer._make_tcloud_array(dist, copy=True)
+            # ----
+
+            self.data[name] = tcloud
+
+        def unload(self, name):
+            tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
+                                              o3d.core.Device("CPU:0"))
+            self.data[name] = tcloud
+
+        def get_attr_minmax(self, attr_name):
+            if attr_name not in self._attr2minmax:
+                attr_min = 1e30
+                attr_max = -1e30
+                for _,tcloud in self.data.items():
+                    if attr_name in tcloud.point:
+                        attr = tcloud.point[attr_name].as_tensor().numpy()
+                        attr_min = min(attr_min, min(attr))
+                        attr_max = max(attr_max, max(attr))
+                        maxattr = max(attr)
+                if attr_min <= attr_max:
+                    self._attr2minmax[attr_name] = (attr_min, attr_max)
+                else:
+                    return (0.0, 0.0)
+            return self._attr2minmax[attr_name]
+
+    def __init__(self, dataset, indices):
+        self._objects = Visualizer.ObjectModel(dataset, indices)
+
         self._name2treenode = {}
         self._name2treeid = {}
         self._colormaps = {}
         self._gradient = rendering.Gradient()
-        self._attr2minmax = {}  # should only be accessed by _get_attr_minmax()
         self._scalar_min = 0.0
         self._scalar_max = 1.0
         self._last_animation_time = time.time()
         self._animation_delay_secs = 0.100
-        self._dont_update_geometry = True
+        self._dont_update_geometry = False
         self.window = gui.Window("ml3d.vis.Visualizer", 1024, 768)
+        if hasattr(dataset.dataset, "name"):
+            self.window.title = dataset.dataset.name
         self.window.set_on_layout(self._on_layout)
 
         em = self.window.theme.font_size
@@ -330,7 +441,7 @@ class Visualizer:
         v.add_child(grid)
 
         self._slider = gui.Slider(gui.Slider.INT)
-        self._slider.set_limits(0, len(self._data))
+        self._slider.set_limits(0, len(self._objects.data_names))
         self._slider.set_on_value_changed(self._on_animation_slider_changed)
         grid.add_child(gui.Label("Index"))
         grid.add_child(self._slider)
@@ -412,22 +523,34 @@ class Visualizer:
         properties.add_child(self._shader_panels)
         self._panel.add_child(properties)
 
+        # Populate tree, etc.
+        for name in self._objects.data_names:
+            self._add_tree_name(name)
+        for attr_name in self._objects.known_attrs:
+            self._datasource_combobox.add_item(attr_name)
+
     def set_labels(self, labellut):
         self._label_edit.set_labels(labellut)
 
-    def clear():
-        self._data = {}
-        self._data_names = []
-        self._name2treenode = {}
-        self._name2treeid = {}
-        self._dataset.clear()
-        self._attr2minmax = {}
-        self._label_edit.clear()
+    def setup_camera(self):
+        bounds = self._3d.scene.bounding_box
+        self._3d.setup_camera(60, bounds, bounds.get_center())
 
-    def add(self, name, cloud):
-        self._data[name] = cloud
-        self._data_names.append(name)
+        old_dont_update = self._dont_update_geometry
+        self._dont_update_geometry = True
+        self._on_datasource_changed(self._datasource_combobox.selected_text,
+                                    self._datasource_combobox.selected_index)
+        self._update_geometry_colors()
+        self._dont_update_geometry = old_dont_update
 
+    def show_geometries_under(self, name, show):
+        prefix = name
+        for (n,node) in self._name2treenode.items():
+            if n.startswith(prefix):
+                self._3d.scene.show_geometry(n, show)
+                node.checkbox.checked = show
+
+    def _add_tree_name(self, name):
         names = name.split("/")
         parent = self._dataset.get_root_item()
         for i in range(0, len(names) - 1):
@@ -449,53 +572,65 @@ class Visualizer:
         node = self._dataset.add_item(parent, cell)
         self._name2treenode[name] = cell
 
-        for attr_name,_ in cloud.point.items():
-            if attr_name == "points":
-                continue
-            if attr_name not in self._known_attrs:
-                self._datasource_combobox.add_item(attr_name)
-                self._known_attrs.add(attr_name)
-
-        self._slider.set_limits(0, len(self._data) - 1)
-        if len(self._data) == 1:
+        self._slider.set_limits(0, len(self._objects.data_names) - 1)
+        if len(self._objects.data_names) == 1:
             self._slider_current.text = name
 
-    def setup_camera(self):
-        bounds = self._3d.scene.bounding_box
-        self._3d.setup_camera(60, bounds, bounds.get_center())
+    def _load_geometries(self, names, ui_done_callback):
+        # Progress has: len(names) items + ui_done_callback
+        progress_dlg = Visualizer.ProgressDialog("Loading...", self.window,
+                                                 len(names) + 1)
 
-        old_dont_update = self._dont_update_geometry
-        self._dont_update_geometry = True
-        self._on_datasource_changed(self._datasource_combobox.selected_text,
-                                    self._datasource_combobox.selected_index)
-        self._update_geometry_colors()
-        self._dont_update_geometry = old_dont_update
+        def load_thread():
+            for name in names:
+                self._objects.load(name)
+                progress_dlg.post_update()
 
-    def show_geometries_under(self, name, show):
-        prefix = name
-        for (n,node) in self._name2treenode.items():
-            if n.startswith(prefix):
-                self._3d.scene.show_geometry(n, show)
-                node.checkbox.checked = show
+            gui.Application.instance.post_to_main_thread(self.window,
+                                                         ui_done_callback)
+            gui.Application.instance.post_to_main_thread(self.window,
+                                                        self.window.close_dialog)
 
-    def _get_attr_minmax(self, attr_name):
-        if attr_name not in self._attr2minmax:
-            attr_min = 1e30
-            attr_max = -1e30
-            for _,tcloud in self._data.items():
-                if attr_name in tcloud.point:
-                    attr = tcloud.point[attr_name].as_tensor().numpy()
-                    attr_min = min(attr_min, min(attr))
-                    attr_max = max(attr_max, max(attr))
-                    maxattr = max(attr)
-            self._attr2minmax[attr_name] = (attr_min, attr_max)
-        return self._attr2minmax[attr_name]
+        self.window.show_dialog(progress_dlg.dialog)
+        threading.Thread(target=load_thread).start()
 
     def _update_geometry(self):
         material = self._get_material()
-        for n,tcloud in self._data.items():
+        for n,tcloud in self._objects.data.items():
             self._update_point_cloud(n, tcloud, material)
-        
+
+    """def _update_geometry_with_progress(self):
+        if self._dont_update_geometry:
+            return
+
+        progress_dlg = Visualizer.ProgressDialog("Updating geometry...",
+                                                 self.window,
+                                                 len(self._objects.data))
+
+        material = self._get_material()
+        def make_next(idx):
+            def update():
+                print("[debug] update", idx)
+                n = self._objects.data_names[idx]
+                tcloud = self._objects.data[n]
+                self._update_point_cloud(n, tcloud, material)
+                progress_dlg.update()
+            return update
+
+        def show_dialog():
+            self.window.show_dialog(progress_dlg.dialog)
+
+        def update_thread():
+            gui.Application.instance.post_to_main_thread(self.window,
+                                                         show_dialog)
+            for i in range(0, len(self._objects.data_names)):
+                gui.Application.instance.post_to_main_thread(self.window,
+                                                             make_next(i))
+                gui.Application.instance.post_to_main_thread(self.window,
+                                                             self.window.close_dialog)
+
+        threading.Thread(target=update_thread).start()"""
+
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
             return
@@ -576,9 +711,9 @@ class Visualizer:
 
     def _on_animation_slider_changed(self, new_value):
         idx = int(new_value)
-        for i in range(0, len(self._data_names)):
-            self._3d.scene.show_geometry(self._data_names[i], (i == idx))
-        self._slider_current.text = self._data_names[idx]
+        for i in range(0, len(self._objects.data_names)):
+            self._3d.scene.show_geometry(self._objects.data_names[i], (i == idx))
+        self._slider_current.text = self._objects.data_names[idx]
         r = self._slider_current.frame
         self._slider_current.frame = gui.Rect(r.x, r.y,
                                               self._slider.frame.get_right(),
@@ -596,7 +731,7 @@ class Visualizer:
     def _on_animate(self):
         now = time.time()
         if now >= self._last_animation_time + self._animation_delay_secs:
-            idx = (self._slider.int_value + 1) % (len(self._data_names) - 1)
+            idx = (self._slider.int_value + 1) % (len(self._objects.data_names) - 1)
             self._slider.int_value = idx
             self._on_animation_slider_changed(idx)
             self._last_animation_time = now
@@ -612,7 +747,7 @@ class Visualizer:
         self._3d.set_background_color(new_color)
 
     def _on_datasource_changed(self, attr_name, idx):
-        self._scalar_min, self._scalar_max = self._get_attr_minmax(attr_name)
+        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name)
 
         if self._shader.selected_text in self._colormaps:
             cmap = self._colormaps[self._shader.selected_text]
@@ -651,10 +786,13 @@ class Visualizer:
 
     @staticmethod
     def visualize(dataset, idx_or_list):
+        indices = idx_or_list
+        if not isinstance(idx_or_list, list):
+            indices = [idx_or_list]
+
         gui.Application.instance.initialize()
 
-        mlvis = Visualizer()
-        mlvis.window.title = dataset.dataset.name
+        mlvis = Visualizer(dataset, indices)
 
         # Setup the labels
         lut = LabelLUT()
@@ -662,70 +800,29 @@ class Visualizer:
             lut.add_label(dataset.dataset.label_to_names[val], val)
         mlvis.set_labels(lut)
 
-        # We don't want to be recreating the geometry all the time, so defer
-        # it until we are ready.
-        mlvis._dont_update_geometry = True
-
-        # Add the requested data
-        indices = idx_or_list
-        if not isinstance(idx_or_list, list):
-            indices = [idx_or_list]
-        for i in indices:
-            info = dataset.get_attr(i)
-            data = dataset.get_data(i)
-
-            # Create tpointcloud
-            pts = data["point"]
-            tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
-                                              o3d.core.Device("CPU:0"))
-            if pts.shape[1] == 4:
-                # We can't use inplace Tensor creation (e.g. from_numpy())
-                # because the resulting arrays won't be contiguous. However,
-                # TensorList can be inplace.
-                xyz = pts[:,[0,1,2]]
-                tcloud.point["intensity"] = Visualizer._make_tcloud_array(pts[:,3], copy=True)
-                tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
-            else:
-                tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
-            # Only add scalar attributes for now
-            for k,v in data.items():
-                if v is None:
-                    continue
-                if len(v.shape) == 1 or (len(v.shape) == 2 and v.shape[1] == 1):
-                    isint = v.dtype.name.startswith('int')
-                    tcloud.point[k] = Visualizer._make_tcloud_array(v, copy=isint)
-
-            # ---- Debugging ----
-            # dist = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]) for pt in tcloud.point["points"].as_tensor().numpy()]
-            # dist = np.array(dist, dtype='float32')
-            # tcloud.point["distance"] = Visualizer._make_tcloud_array(dist, copy=True)
-            # ----
-
-            mlvis.add(info["name"], tcloud)
-
-        # Display labels by default, if available
-        for attr_name in ["label", "labels"]:
-            if attr_name in mlvis._known_attrs:
-                mlvis._datasource_combobox.selected_text = attr_name
-                if not mlvis._label_edit.is_empty():
-                    mlvis._shader.selected_text = "Labels"
-                    mlvis._on_shader_changed(mlvis._shader.selected_text,
-                                             mlvis._shader.selected_index)
-                break
-
         # Turn all the objects off except the first one
         for name,node in mlvis._name2treenode.items():
             node.checkbox.checked = False
             mlvis._3d.scene.show_geometry(name, False)
-        for name in [mlvis._data_names[0]]:
+        for name in [mlvis._objects.data_names[0]]:
             mlvis._name2treenode[name].checkbox.checked = True
             mlvis._3d.scene.show_geometry(name, True)
 
-        # Ok, now we can create our geometry
-        mlvis._dont_update_geometry = False
-        mlvis._update_geometry()
+        def on_done_ui():
+            # Display labels by default, if available
+            for attr_name in ["label", "labels"]:
+                if attr_name in mlvis._objects.known_attrs:
+                    mlvis._datasource_combobox.selected_text = attr_name
+                    if not mlvis._label_edit.is_empty():
+                        mlvis._shader.selected_text = "Labels"
+                        mlvis._on_shader_changed(mlvis._shader.selected_text,
+                                                 mlvis._shader.selected_index)
+                    break
 
-        mlvis.setup_camera()
+            mlvis._update_geometry()
+#            mlvis._update_geometry_with_progress()
+            mlvis.setup_camera()
 
+        mlvis._load_geometries(mlvis._objects.data_names, on_done_ui)
         gui.Application.instance.add_window(mlvis.window)
         gui.Application.instance.run()
