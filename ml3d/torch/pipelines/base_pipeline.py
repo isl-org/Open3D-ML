@@ -27,6 +27,10 @@ class BasePipeline(object):
         """
 
         self.cfg = Config(kwargs)
+
+        if kwargs['name'] is None:
+            raise KeyError(
+            "Please give a name to the pipeline")
         self.name = self.cfg.name
 
         self.model = model

@@ -76,7 +76,6 @@ class Semantic3D(BaseDataset):
         self.ignored_labels = np.array([0])
 
         self.all_files = glob.glob(str(Path(self.cfg.dataset_path) / '*.txt'))
-        self.all_files
 
         self.train_files = [
             f for f in self.all_files if exists(

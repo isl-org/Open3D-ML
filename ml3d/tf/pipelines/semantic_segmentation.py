@@ -72,20 +72,8 @@ class SemanticSegmentation(BasePipeline):
         # dataset.cfg.num_points = model.cfg.num_points
 
     def run_inference(self, data):
-        cfg = self.cfg
-        model = self.model
-        device = self.device
-
-        model.inference_begin(data)
-
-        with torch.no_grad():
-            while True:
-                inputs = model.inference_preprocess()
-                results = model(inputs['data'])
-                if model.inference_end(inputs, results):
-                    break
-   
-        return model.inference_result
+        # TODO
+        pass
 
     def run_test(self, device):
         # TODO

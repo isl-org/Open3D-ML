@@ -1,14 +1,12 @@
 import numpy as np
 import yaml
-
-from ...utils import make_dir
 from os.path import join, exists, dirname, abspath
 
-from ...utils import Config
+from ...utils import Config, make_dir
 
 class BasePipeline(object):
     """
-    Base dataset class
+    Base pipeline class
     """
     def __init__(self,
                 model,
@@ -26,6 +24,9 @@ class BasePipeline(object):
         """
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
+        if kwargs['name'] is None:
+            raise KeyError(
+            "Please give a name to the pipeline")
 
         self.model = model
         self.dataset = dataset

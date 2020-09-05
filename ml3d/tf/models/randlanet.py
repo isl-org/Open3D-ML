@@ -101,55 +101,6 @@ class RandLANet(BaseModel):
                                        activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
-    def inference_begin(self):
-
-        self.test_smooth = 0.98
-        attr = {'split': 'test'}
-        self.inference_data = self.preprocess(data, attr)
-        num_points = self.inference_data['search_tree'].data.shape[0]
-        self.possibility = np.random.rand(num_points) * 1e-3
-        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
-                                   dtype=np.float16)
-        self.batcher = DefaultBatcher()
-
-    def inference_begin(self, data):
-        self.test_smooth = 0.98
-        attr = {'split': 'test'}
-        self.inference_data = self.preprocess(data, attr)
-        num_points = self.inference_data['search_tree'].data.shape[0]
-        self.possibility = np.random.rand(num_points) * 1e-3
-        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
-                                   dtype=np.float16)
-        self.batcher = DefaultBatcher()
-
-    def inference_preprocess(self):
-        min_posbility_idx = np.argmin(self.possibility)
-        data = self.transform(self.inference_data, {}, min_posbility_idx)
-        inputs = {'data': data, 'attr': []}
-        inputs = self.batcher.collate_fn([inputs])
-        self.inference_input = inputs
-
-        return inputs
-
-    def inference_end(self, inputs, results):
-
-        results = torch.reshape(results, (-1, self.cfg.num_classes))
-        m_softmax = torch.nn.Softmax(dim=-1)
-        results = m_softmax(results)
-        results = results.cpu().data.numpy()
-        probs = np.reshape(results, [-1, self.cfg.num_classes])
-        inds = inputs['data']['point_inds'][0, :]
-        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
-            1 - self.test_smooth) * probs
-        if np.min(self.possibility) > 0.5:
-            inference_result = {
-                'predict_labels': np.argmax(self.test_probs, 1),
-                'predict_scores': self.test_probs
-            }
-            self.inference_result = inference_result
-            return True
-        else:
-            return False
 
     def init_att_pooling(self, d, dim_output, name):
         att_activation = tf.keras.layers.Dense(d, activation=None)

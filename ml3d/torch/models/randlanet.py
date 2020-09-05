@@ -143,52 +143,11 @@ class RandLANet(BaseModel):
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
 
-        # logp = torch.distributions.utils.probs_to_logits(scores,
-        #                                                  is_binary=False)
+                                               is_binary=False)
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
-
-        # predict_labels = torch.max(scores, dim=-2).indices
 
         return loss, labels, scores
 
-    # def transform_whole(self, data, attr):
-    #     cfg = self.cfg
-    #     pc = data['point']
-    #     label = data['label']
-    #     feat = data['feat']
-    #     tree = data['search_tree']
-    #     features = feat
-
-    #     input_points = []
-    #     input_neighbors = []
-    #     input_pools = []
-    #     input_up_samples = []
-
-    #     for i in range(cfg.num_layers):
-    #         neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
-
-    #         sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-    #         pool_i = neighbour_idx[:pc.shape[0] //
-    #                                cfg.sub_sampling_ratio[i], :]
-    #         up_i = DataProcessing.knn_search(sub_points, pc, 1)
-    #         input_points.append(pc)
-    #         input_neighbors.append(neighbour_idx.astype(np.int64))
-    #         input_pools.append(pool_i.astype(np.int64))
-    #         input_up_samples.append(up_i.astype(np.int64))
-    #         pc = sub_points
-
-    #     inputs = dict()
-    #     inputs['xyz'] = input_points
-    #     inputs['neigh_idx'] = input_neighbors
-    #     inputs['sub_idx'] = input_pools
-    #     inputs['interp_idx'] = input_up_samples
-    #     inputs['features'] = features
-
-    #     inputs['labels'] = label.astype(np.int64)
-    #     if attr['split'] == "test":
-    #         inputs['proj_inds'] = data['proj_inds']
-
-    #     return inputs
 
     def transform(self, data, attr, min_posbility_idx=None):
         cfg = self.cfg
