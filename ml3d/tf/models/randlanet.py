@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 import time
 import random
+import pudb
 from sklearn.neighbors import KDTree
 
 from ..utils import helper_tf
@@ -390,10 +391,10 @@ class RandLANet(BaseModel):
         pick_idx = min_posbility_idx
 
         selected_pc, feat, label, selected_idx = self.crop_pc(pc, feat, label, tree, pick_idx)
-        dists = np.sum(np.square(
-            (selected_pc - pc[pick_idx]).astype(np.float32)),
-            axis=1)
-        delta = np.square(q - dists/np.max(dists))
+        dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+
+        delta = np.square(1 - dists/np.max(dists))
+
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx
 
@@ -440,13 +441,13 @@ class RandLANet(BaseModel):
         input_up_samples = []
 
         for i in range(cfg.num_layers):
-            neighbour_idx = tf.py_function(DataProcessing.knn_search,
+            neighbour_idx = tf.numpy_function(DataProcessing.knn_search,
                                            [pc, pc, cfg.k_n], tf.int32)
 
             sub_points = pc[:tf.shape(pc)[0] // cfg.sub_sampling_ratio[i], :]
             pool_i = neighbour_idx[:tf.shape(pc)[0] //
                                    cfg.sub_sampling_ratio[i], :]
-            up_i = tf.py_function(DataProcessing.knn_search,
+            up_i = tf.numpy_function(DataProcessing.knn_search,
                                   [sub_points, pc, 1], tf.int32)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx)
@@ -475,8 +476,11 @@ class RandLANet(BaseModel):
         # inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
 
-        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data['interp_idx'] # TODO: convert to tensor.
-        flat_inputs += [data['features'] + data['labels']]
+        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data['interp_idx']
+        flat_inputs += [data['features'], data['labels']]
+
+        for i in range(len(flat_inputs)):
+            flat_inputs[i] = np.expand_dims(flat_inputs[i], 0)
 
         return flat_inputs
 
@@ -485,8 +489,9 @@ class RandLANet(BaseModel):
         results = tf.reshape(results, (-1, self.cfg.num_classes))
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
+
         probs = np.reshape(results, [-1, self.cfg.num_classes])
-        inds = inputs['data']['point_inds'][0, :]
+        inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
         if np.min(self.possibility) > 0.5:

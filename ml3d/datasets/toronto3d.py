@@ -57,6 +57,7 @@ class Toronto3D(BaseDataset):
             8: 'Fence'
         }
 
+        self.dataset_path = cfg.dataset_path
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort(
             [k for k, v in self.label_to_names.items()])

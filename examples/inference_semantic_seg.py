@@ -1,50 +1,45 @@
 import torch
 import yaml
 
-# there should be pipeline. pipeline is bigger that randlanet
-from ml3d.datasets import SemanticKITTI
-from ml3d.torch.pipelines import SemanticSegmentation 
-from ml3d.torch.models import RandLANet, KPFCNN
+from ml3d.datasets import Toronto3D
+from ml3d.tf.pipelines import SemanticSegmentation 
+from ml3d.tf.models import RandLANet, KPFCNN
 from ml3d.utils import Config
+from ml3d.tf.dataloaders import TFDataloader
 
-# from tf2torch import load_tf_weights
-
-# yaml_config = 'ml3d/configs/randlanet_semantickitti.yaml'
-# py_config = 'ml3d/configs/randlanet_semantickitti.py'
-py_config = 'ml3d/configs/kpconv_semantickitti.py'
-# py_config 	= 'ml3d/configs/kpconv_semantickitti.py'
+py_config = 'ml3d/configs/randlanet_toronto3d.yml'
+# py_config = 'ml3d/configs/kpconv_toronto3d.py'
 
 cfg         = Config.load_from_file(py_config)
 
-dataset    	= SemanticKITTI(cfg.dataset)
-#dataset     = S3DIS(cfg.dataset)
-datset_split = dataset.get_split('training')
-data 		= datset_split.get_data(0)
+dataset    	= Toronto3D(cfg.dataset)
+dataset_split = dataset.get_split('training')
+data 		= dataset_split.get_data(0)
 
-# model       = RandLANet(cfg.model)
-model       = KPFCNN(cfg.model)
+data['point'] = data['point'][:131000]
+data['label'] = data['label'][:131000]
+data['feat'] = data['feat'][:131000]
+
+model       = RandLANet(cfg.model)
+# # model       = KPFCNN(cfg.model)
 
 pipeline    = SemanticSegmentation(model, dataset, cfg.pipeline)
-pipeline.load_ckpt(model.cfg.ckpt_path, False)
+# pipeline.load_ckpt(model.cfg.ckpt_path, False)
 
-device      = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-#device     = torch.device('cpu')
+# device      = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-results = pipeline.run_inference(data, device)
+results = pipeline.run_inference(data)
 
-import numpy as np
-np.set_printoptions(threshold=np.inf)
-# print(pred)
-print(datset_split.get_attr(0)) 
-gt = np.squeeze(model.inference_data['label'])
 
-pred = results['predict_labels']
+# import numpy as np
+# np.set_printoptions(threshold=np.inf)
 
-mask = gt == pred+1
-print(gt.shape)
-print(pred.shape)
-print(np.sum(mask))
-print(mask.shape)
+# pred = results['predict_labels']
 
-print(np.sum(mask)/mask.shape[0])
-# pipeline.run_train(device)
+# mask = gt == pred+1
+# print(gt.shape)
+# print(pred.shape)
+# print(np.sum(mask))
+# print(mask.shape)
+
+# print(np.sum(mask)/mask.shape[0])
