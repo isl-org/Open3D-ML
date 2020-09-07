@@ -54,7 +54,7 @@ def max_pool(x, inds):
     """
 
     # Add a last row with minimum features for shadow pools
-    x = tf.concat([x, tf.math.reduce_min(x, axis=0, keepdims=True)], axis=0)
+    x = tf.concat([x, tf.math.reduce_min(x, axis=0, keepdims=True)], axis=0) # TODO : different in pytorch.
 
     # Get all features for each pooling location [n2, max_num, d]
     pool_features = tf.gather(x, inds, axis=0)
@@ -427,9 +427,10 @@ class BatchNormBlock(tf.keras.layers.Layer):
         else:
             self.bias = get_bias(shape=in_dim)
 
-    def call(self, x):
+    def call(self, x, training=False):
         if (self.use_bn):
-            return self.batch_norm(x)
+            # TODO : same as torch
+            return self.batch_norm(x, training)
         else:
             return x + self.bias
 
@@ -458,9 +459,9 @@ class UnaryBlock(tf.keras.layers.Layer):
         if not no_relu:
             self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
 
-    def call(self, x, batch=None):
-        x = self.mlp(x)  # TODO : check correct dimension is getting modified
-        x = self.batch_norm(x)
+    def call(self, x, batch=None, training=False):
+        x = self.mlp(x)
+        x = self.batch_norm(x, training)
         if not self.no_relu:
             x = self.leaky_relu(x)
         return x
@@ -497,7 +498,7 @@ class SimpleBlock(tf.keras.layers.Layer):
                                          self.bn_momentum)
         self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
 
-    def call(self, x, batch):
+    def call(self, x, batch, training=False):
 
         # TODO : check x, batch
         if 'strided' in self.block_name:
@@ -511,7 +512,7 @@ class SimpleBlock(tf.keras.layers.Layer):
             neighb_inds = batch['neighbors'][self.layer_ind]
 
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
-        return self.leaky_relu(self.batch_norm(x))
+        return self.leaky_relu(self.batch_norm(x, training))
 
 
 class IdentityBlock(tf.keras.layers.Layer):
@@ -585,7 +586,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         return
 
-    def call(self, features, batch):
+    def call(self, features, batch, training=False):
 
         if 'strided' in self.block_name:
             q_pts = batch['points'][self.layer_ind + 1]
@@ -601,7 +602,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         # Convolution
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
-        x = self.leaky_relu(self.batch_norm_conv(x))
+        x = self.leaky_relu(self.batch_norm_conv(x, training))
 
         # Second upscaling mlp
         x = self.unary2(x)

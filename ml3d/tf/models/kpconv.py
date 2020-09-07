@@ -164,7 +164,7 @@ class KPFCNN(BaseModel):
 
         return inputs
 
-    def call(self, flat_inputs):
+    def call(self, flat_inputs, training=False):
         cfg = self.cfg
         inputs = self.organise_inputs(flat_inputs)
 
@@ -174,12 +174,12 @@ class KPFCNN(BaseModel):
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_conn.append(x)
-            x = block_op(x, inputs)
+            x = block_op(x, inputs, training=training)
 
         for block_i, block_op in enumerate(self.decoder_blocks):
             if block_i in self.decoder_concats:
                 x = tf.concat([x, skip_conn.pop()], axis=1)
-            x = block_op(x, inputs)
+            x = block_op(x, inputs, training=training)
 
         x = self.head_mlp(x, inputs)
         x = self.head_softmax(x, inputs)
@@ -218,142 +218,6 @@ class KPFCNN(BaseModel):
         """
         # crop neighbors matrix
         return neighbors[:, :self.neighborhood_limits[layer]]
-
-    def regularization_losses(self):
-
-        #####################
-        # Regularization loss
-        #####################
-
-        # Get L2 norm of all weights
-        regularization_losses = [
-            tf.nn.l2_loss(v) for v in tf.global_variables()
-            if 'weights' in v.name
-        ]
-        self.regularization_loss = self.cfg.weights_decay * tf.add_n(
-            regularization_losses)
-
-        ##############################
-        # Gaussian regularization loss
-        ##############################
-
-        gaussian_losses = []
-        for v in tf.global_variables():
-            if 'kernel_extents' in v.name:
-
-                # Layer index
-                layer = int(v.name.split('/')[1].split('_')[-1])
-
-                # Radius of convolution for this layer
-                conv_radius = cfg.first_subsampling_dl * self.cfg.density_parameter * (
-                    2**(layer - 1))
-
-                # Target extent
-                target_extent = conv_radius / 1.5
-                gaussian_losses += [tf.nn.l2_loss(v - target_extent)]
-
-        if len(gaussian_losses) > 0:
-            self.gaussian_loss = self.cfg.gaussian_decay * tf.add_n(
-                gaussian_losses)
-        else:
-            self.gaussian_loss = tf.constant(0, dtype=tf.float32)
-
-        #############################
-        # Offsets regularization loss
-        #############################
-
-        offset_losses = []
-
-        if self.cfg.offsets_loss == 'permissive':
-
-            for op in tf.get_default_graph().get_operations():
-                if op.name.endswith('deformed_KP'):
-
-                    # Get deformed positions
-                    deformed_positions = op.outputs[0]
-
-                    # Layer index
-                    layer = int(op.name.split('/')[1].split('_')[-1])
-
-                    # Radius of deformed convolution for this layer
-                    conv_radius = cfg.first_subsampling_dl * self.cfg.density_parameter * (
-                        2**layer)
-
-                    # Normalized KP locations
-                    KP_locs = deformed_positions / conv_radius
-
-                    # Loss will be zeros inside radius and linear outside radius
-                    # Mean => loss independent from the number of input points
-                    radius_outside = tf.maximum(0.0,
-                                                tf.norm(KP_locs, axis=2) - 1.0)
-                    offset_losses += [tf.reduce_mean(radius_outside)]
-
-        elif self.cfg.offsets_loss == 'fitting':
-
-            for op in tf.get_default_graph().get_operations():
-
-                if op.name.endswith('deformed_d2'):
-
-                    # Get deformed distances
-                    deformed_d2 = op.outputs[0]
-
-                    # Layer index
-                    layer = int(op.name.split('/')[1].split('_')[-1])
-
-                    # Radius of deformed convolution for this layer
-                    KP_extent = cfg.first_subsampling_dl * cfg.KP_extent * (
-                        2**layer)
-
-                    # Get the distance to closest input point
-                    KP_min_d2 = tf.reduce_min(deformed_d2, axis=1)
-
-                    # Normalize KP locations to be independant from layers
-                    KP_min_d2 = KP_min_d2 / (KP_extent**2)
-
-                    # Loss will be the square distance to closest input point.
-                    # Mean => loss independent from the number of input points
-                    offset_losses += [tf.reduce_mean(KP_min_d2)]
-
-                if op.name.endswith('deformed_KP'):
-
-                    # Get deformed positions
-                    deformed_KP = op.outputs[0]
-
-                    # Layer index
-                    layer = int(op.name.split('/')[1].split('_')[-1])
-
-                    # Radius of deformed convolution for this layer
-                    KP_extent = cfg.first_subsampling_dl * cfg.KP_extent * (
-                        2**layer)
-
-                    # Normalized KP locations
-                    KP_locs = deformed_KP / KP_extent
-
-                    # Point should not be close to each other
-                    for i in range(cfg.num_kernel_points):
-                        other_KP = tf.stop_gradient(
-                            tf.concat(
-                                [KP_locs[:, :i, :], KP_locs[:, i + 1:, :]],
-                                axis=1))
-                        distances = tf.sqrt(
-                            tf.reduce_sum(tf.square(other_KP -
-                                                    KP_locs[:, i:i + 1, :]),
-                                          axis=2))
-                        repulsive_losses = tf.reduce_sum(tf.square(
-                            tf.maximum(0.0, 1.5 - distances)),
-                                                         axis=1)
-                        offset_losses += [tf.reduce_mean(repulsive_losses)]
-
-        elif self.cfg.offsets_loss != 'none':
-            raise ValueError('Unknown offset loss')
-
-        if len(offset_losses) > 0:
-            self.offsets_loss = self.cfg.offsets_decay * tf.add_n(
-                offset_losses)
-        else:
-            self.offsets_loss = tf.constant(0, dtype=tf.float32)
-
-        return self.offsets_loss + self.gaussian_loss + self.regularization_loss
 
     def parameters_log(self):
 
@@ -561,9 +425,6 @@ class KPFCNN(BaseModel):
             stacks_lengths, tf.float32)
         stacked_weights = tf.gather(batch_weights, batch_inds)
 
-        # KPConv specific parameters
-        density_parameter = 5.0
-
         # Starting radius of convolutions
         r_normal = cfg.first_subsampling_dl * cfg.KP_extent * 2.5
 
@@ -601,7 +462,7 @@ class KPFCNN(BaseModel):
                 # Convolutions are done in this layer, compute the neighbors with the good radius
                 if np.any(['deformable' in blck
                            for blck in layer_blocks[:-1]]):
-                    r = r_normal * density_parameter / (cfg.KP_extent * 2.5)
+                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
                 conv_i = tf_batch_neighbors(stacked_points, stacked_points,
@@ -626,7 +487,7 @@ class KPFCNN(BaseModel):
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
-                    r = r_normal * density_parameter / (cfg.KP_extent * 2.5)
+                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
 
@@ -851,7 +712,7 @@ class KPFCNN(BaseModel):
         split = attr['split']
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
             
@@ -956,13 +817,10 @@ class KPFCNN(BaseModel):
 
                 # Center point of input region
                 center_point = points[point_ind, :].reshape(1, -1)
+
                 # Add noise to the center point
-                # if split != 'ERF':
-                #     noise = np.random.normal(scale=cfg.in_radius/10, size=center_point.shape)
-                #     pick_point = center_point + noise.astype(center_point.dtype)
-                # else:
-                #     pick_point = center_point
-                pick_point = center_point
+                noise = np.random.normal(scale=cfg.in_radius/10, size=center_point.shape)
+                pick_point = center_point + noise.astype(center_point.dtype)
 
                 # Indices of points in input region
                 # input_inds = self.input_trees[data_split][cloud_ind].query_radius(pick_point,
@@ -991,14 +849,15 @@ class KPFCNN(BaseModel):
                 # Collect points and colors
                 input_points = (points[input_inds] - pick_point).astype(
                     np.float32)
-                # input_colors = self.input_colors[data_split][cloud_ind][input_inds]
                 input_colors = data['feat'][input_inds]
 
-                if split in ['test']:
+                if split in ['test', 'testing']:
                     input_labels = np.zeros(input_points.shape[0])
                 else:
-                    # input_labels = self.input_labels[data_split][cloud_ind][input_inds]
-                    input_labels = data['label'][input_inds][:, 0]
+                    if len(data['label'][input_inds].shape) == 2:
+                        input_labels = data['label'][input_inds][:, 0]
+                    else:
+                        input_labels = data['label'][input_inds]
                     # input_labels = np.array([self.label_to_idx[l] for l in input_labels])
 
                 # In case batch is full, yield it and reset it
@@ -1043,7 +902,7 @@ class KPFCNN(BaseModel):
         gen_func = spatially_regular_gen
         gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32,
                      tf.int32)
-        gen_shapes = ([None, 3], [None, 3], [None], [None], [None], [None])
+        gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 

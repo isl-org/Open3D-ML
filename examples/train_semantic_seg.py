@@ -1,31 +1,28 @@
-import torch
-import yaml
-
-# there should be pipeline. pipeline is bigger that randlanet
-from ml3d.datasets import SemanticKITTI
-from ml3d.torch.pipelines import SemanticSegmentation 
-from ml3d.torch.models import RandLANet, KPFCNN
+from ml3d.datasets import Toronto3D
+from ml3d.tf.pipelines import SemanticSegmentation 
+from ml3d.tf.models import RandLANet, KPFCNN
 from ml3d.utils import Config
+from ml3d.tf.dataloaders import TFDataloader
 
-# from tf2torch import load_tf_weights
-
-# yaml_config = 'ml3d/configs/randlanet_semantickitti.yaml'
-# py_config = 'ml3d/configs/randlanet_semantickitti.py'
-py_config = 'ml3d/configs/kpconv_semantickitti.py'
-# py_config 	= 'ml3d/configs/kpconv_semantickitti.py'
+py_config = 'ml3d/configs/kpconv_toronto3d.yml'
 
 cfg         = Config.load_from_file(py_config)
 
-dataset    	= SemanticKITTI(cfg.dataset)
-#dataset     = S3DIS(cfg.dataset)
-
-# model       = RandLANet(cfg.model)
+dataset    	= Toronto3D(cfg.dataset)
 model       = KPFCNN(cfg.model)
 
 pipeline    = SemanticSegmentation(model, dataset, cfg.pipeline)
 
-device      = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-#device     = torch.device('cpu')
+pipeline.run_train()
+# import numpy as np
+# np.set_printoptions(threshold=np.inf)
 
-# pipeline.run_test(device)
-pipeline.run_train(device)
+# pred = results['predict_labels']
+
+# mask = gt == pred+1
+# print(gt.shape)
+# print(pred.shape)
+# print(np.sum(mask))
+# print(mask.shape)
+
+# print(np.sum(mask)/mask.shape[0])
