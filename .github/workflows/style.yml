@@ -26,4 +26,4 @@ jobs:
           python -m pip install -U yapf==0.30.0 nbformat
       - name: Run style check
         run: |
-          ./ci/check_style.py
+          python ci/check_style.py
