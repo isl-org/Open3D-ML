@@ -460,10 +460,7 @@ class KPFCNN(BaseModel):
         # Parameter
         num_batches = batch_inds[-1] + 1
 
-        ##########
         # Rotation
-        ##########
-
         if cfg.augment_rotation == 'vertical':
 
             # Choose a random angle for each element
@@ -493,10 +490,7 @@ class KPFCNN(BaseModel):
             raise ValueError('Unknown rotation augmentation : ' +
                              cfg.augment_rotation)
 
-        #######
         # Scale
-        #######
-
         # Choose random scales for each example
         min_s = cfg.augment_scale_min
         max_s = cfg.augment_scale_max
@@ -521,10 +515,7 @@ class KPFCNN(BaseModel):
         # Apply scales
         stacked_points = stacked_points * stacked_scales
 
-        #######
         # Noise
-        #######
-
         noise = tf.random.normal(tf.shape(stacked_points),
                                  stddev=cfg.augment_noise)
         stacked_points = stacked_points + noise
@@ -559,10 +550,7 @@ class KPFCNN(BaseModel):
         input_upsamples = []
         input_batches_len = []
 
-        ######################
         # Loop over the blocks
-        ######################
-
         for block_i, block in enumerate(cfg.architecture):
 
             # Stop when meeting a global pooling or upsampling
@@ -577,8 +565,6 @@ class KPFCNN(BaseModel):
                     continue
 
             # Convolution neighbors indices
-            # *****************************
-
             if layer_blocks:
                 # Convolutions are done in this layer, compute the neighbors with the good radius
                 if np.any(['deformable' in blck
@@ -593,8 +579,6 @@ class KPFCNN(BaseModel):
                 conv_i = tf.zeros((0, 1), dtype=tf.int32)
 
             # Pooling neighbors indices
-            # *************************
-
             # If end of layer is a pooling operation
             if 'pool' in block or 'strided' in block:
 
@@ -648,10 +632,7 @@ class KPFCNN(BaseModel):
             r_normal *= 2
             layer_blocks = []
 
-        ###############
         # Return inputs
-        ###############
-
         # Batch unstacking (with last layer indices for optionnal classif loss)
         stacked_batch_inds_0 = self.stack_batch_inds(input_batches_len[0])
 
@@ -830,7 +811,7 @@ class KPFCNN(BaseModel):
                 pi_list += [input_inds]
                 ci_list += [cloud_ind]
 
-        stacked_points = np.concatenate(p_list, axis=0), #TODO : convert to tensor.
+        stacked_points = np.concatenate(p_list, axis=0),
         stacked_colors = np.concatenate(c_list, axis=0),
         point_labels = np.concatenate(pl_list, axis=0),
         stacks_lengths = np.array([tp.shape[0] for tp in p_list], dtype=np.int32),
@@ -915,7 +896,6 @@ class KPFCNN(BaseModel):
             epoch_n = 500 * cfg.batch_num
             split = dataset.split
 
-            # batch_limit = 5000  # TODO : read from calibrate_batch, typically 100 * batch_size required
             batch_limit = cfg.batch_limit
 
             # Initiate potentials for regular generation
@@ -927,11 +907,6 @@ class KPFCNN(BaseModel):
             self.potentials[split] = []
             self.min_potentials[split] = []
             data_split = split
-
-            #TODO :
-            # for i, tree in enumerate(self.input_trees[data_split]):
-            #     self.potentials[split] += [np.random.rand(tree.data.shape[0]) * 1e-3]
-            #     self.min_potentials[split] += [float(np.min(self.potentials[split][-1]))]
 
             # Initiate concatanation lists
             p_list = []
@@ -945,17 +920,13 @@ class KPFCNN(BaseModel):
             # Generator loop
             for i in range(epoch_n):
                 # Choose a random cloud
-                # cloud_ind = int(np.argmin(self.min_potentials[split]))
                 cloud_ind = random.randint(0, dataset.num_pc - 1)
 
                 data, attr = dataset.read_data(cloud_ind)
 
-                # Choose point ind as minimum of potentials
-                # point_ind = np.argmin(self.potentials[split][cloud_ind])
                 point_ind = np.random.choice(len(data['point']), 1)
 
                 # Get points from tree structure
-                # points = np.array(self.input_trees[data_split][cloud_ind].data, copy=False)
                 points = np.array(data['search_tree'].data, copy=False)
 
                 # Center point of input region
@@ -971,14 +942,6 @@ class KPFCNN(BaseModel):
 
                 # Number collected
                 n = input_inds.shape[0]
-
-                # Update potentials (Tuckey weights)
-                # if split != 'ERF':
-                #     dists = np.sum(np.square((points[input_inds] - pick_point).astype(np.float32)), axis=1)
-                #     tukeys = np.square(1 - dists / np.square(in_radius))
-                #     tukeys[dists > np.square(in_radius)] = 0
-                #     self.potentials[split][cloud_ind][input_inds] += tukeys
-                #     self.min_potentials[split][cloud_ind] = float(np.min(self.potentials[split][cloud_ind]))
 
                 # Safe check for very dense areas
                 if n > batch_limit:
@@ -999,7 +962,6 @@ class KPFCNN(BaseModel):
                         input_labels = data['label'][input_inds][:, 0]
                     else:
                         input_labels = data['label'][input_inds]
-                    # input_labels = np.array([self.label_to_idx[l] for l in input_labels])
 
                 # In case batch is full, yield it and reset it
                 if batch_n + n > batch_limit and batch_n > 0:
