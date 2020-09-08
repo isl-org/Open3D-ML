@@ -25,23 +25,35 @@ class ParisLille3D(BaseDataset):
     """
     ParisLille3D dataset, used in visualizer, training, or test
     """
-    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+    def __init__(self, 
+                dataset_path,
+                name='ParisLille3D',
+                cache_dir='./logs/cache', 
+                use_cache=False,  
+                num_points=65536,
+                class_weights=[
+                    5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353,
+                    269353
+                ],
+                test_result_folder='./test',
+                val_files=['Lille2.ply']
+                ):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-        self.default_cfg_name = "parislille3d.yml"
-
-        
-        super().__init__(cfg=cfg, 
-                        dataset_path=dataset_path, 
-                        **kwargs)
+        super().__init__(dataset_path=dataset_path, 
+                        name=name,
+                        cache_dir=cache_dir, 
+                        use_cache=use_cache, 
+                        class_weights=class_weights,
+                        num_points=num_points,
+                        test_result_folder=test_result_folder,
+                        val_files=val_files)
 
         cfg = self.cfg
 
@@ -81,16 +93,17 @@ class ParisLille3D(BaseDataset):
 
     def get_split_list(self, split):
         if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
-            return self.test_files
-        elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
-            return self.val_files
+            files = self.test_files
         elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
-            return self.train_files
+            files = self.train_files
+        elif split in ['val', 'validation']:
+            files = self.val_files
+        elif split in ['all']:
+            files = self.val_files + self.train_files + self.test_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+        return files
 
 
 class ParisLille3DSplit():

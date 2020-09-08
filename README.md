@@ -48,31 +48,30 @@ Train a network by specifying the names of dataset, model, and pipeline (Semanti
 
 ```shell
 # Initialize a dataset using its path
-python examples/train.py ${tf/torch} -p ${PIPELINE_NAME} -m ${MODEL_NAME} \
+python scripts/run.py ${tf/torch} -p ${PIPELINE_NAME} -m ${MODEL_NAME} \
 -d ${DATASET_NAME} --dataset_path ${DATASET_PATH} [optional arguments]
 
 # Initialize a dataset using its config file
-python examples/train.py ${tf/torch} -p ${PIPELINE_NAME} -m ${MODEL_NAME} \
+python scripts/run.py ${tf/torch} -p ${PIPELINE_NAME} -m ${MODEL_NAME} \
 -d ${DATASET_NAME} --cfg_dataset ${DATASET_CONFIG_FILE}  [optional arguments]
 ```
 
 Alternatively, you can run the script using one single config file, which contains configs for dataset, model, and pipeline.
 ```shell
-python examples/train.py ${tf/torch} -c ${CONFIG_FILE} [optional arguments]
+python scripts/run.py ${tf/torch} -c ${CONFIG_FILE} [optional arguments]
 ```
 
 Examples,
 ```shell
-# Train RandLANet on SemanticKITTI for segmantic segmentation (by default)
-python examples/train.py torch -m RandLANet \
--d SemanticKITTI --dataset_path ../dataset/SemanticKITTI 
+# Train RandLANet on SemanticKITTI for segmantic segmentation 
+python scripts/run.py torch -m RandLANet \
+-d SemanticKITTI --cfg_dataset ml3d/configs/default_cfgs/semantickitti.yml \
+--dataset_path ../dataset/SemanticKITTI 
 
-# or
-python examples/train.py torch -m RandLANet \
--d SemanticKITTI --cfg_dataset ./ml3d/configs/default_cfgs/semantickitti.yml
 
 # Use a config file to train this model with tensorflow
-python examples/train.py tf -c ml3d/configs/randlanet_semantickitti.yml
+python scripts/run.py tf -c ml3d/configs/kpconv_semantickitti.yml \
+--pipeline.batch_size 2
 ```
 Arguments can be
 - `-p, --pipeline`: pipeline name, SemanticSegmentation by default

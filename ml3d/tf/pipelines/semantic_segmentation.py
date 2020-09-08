@@ -29,21 +29,42 @@ if gpus:
   except RuntimeError as e:
     print(e)
 
-
 class SemanticSegmentation(BasePipeline):
-    def __init__(self, 
-                model=None, 
-                dataset=None, 
-                cfg=None,  
-                device=None,
-                **kwargs):
-        self.default_cfg_name = "semantic_segmentation.yml"
+    def __init__(self,
+                model,
+                dataset=None,
+                name='SemanticSegmentation', 
+                batch_size=4,
+                val_batch_size=4,
+                test_batch_size=3,
+                max_epoch=100,  # maximum epoch during training
+                learning_rate=1e-2,  # initial learning rate
+                lr_decays=0.95,
+                save_ckpt_freq=20,
+                adam_lr=1e-2,
+                scheduler_gamma=0.95,
+                main_log_dir='./logs/',
+                device='gpu',
+                split='train',
+                train_sum_dir='train_log'):
+    
 
         super().__init__(model=model, 
                         dataset=dataset, 
-                        cfg=cfg,  
+                        name=name,
+                        batch_size=batch_size,
+                        val_batch_size=val_batch_size,
+                        test_batch_size=test_batch_size,
+                        max_epoch=max_epoch,
+                        learning_rate=learning_rate,
+                        lr_decays=lr_decays,
+                        save_ckpt_freq=save_ckpt_freq,
+                        adam_lr=adam_lr,  
+                        scheduler_gamma=scheduler_gamma,
+                        main_log_dir=main_log_dir,
                         device=device,
-                        **kwargs)
+                        split=split,
+                        train_sum_dir=train_sum_dir)
 
     def run_inference(self, data):
         cfg = self.cfg
@@ -239,4 +260,5 @@ class SemanticSegmentation(BasePipeline):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format( save_path))
      
+
 PIPELINE._register_module(SemanticSegmentation, "tf")

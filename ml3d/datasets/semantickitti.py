@@ -22,22 +22,43 @@ class SemanticKITTI(BaseDataset):
     """
     SemanticKITTI dataset, used in visualizer, training, or test
     """
-    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+    
+    def __init__(self, 
+                dataset_path,
+                name='SemanticKITTI',
+                cache_dir='./logs/cache', 
+                use_cache=False,  
+                class_weights=[
+                    55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 78858,
+                    240942562, 17294618, 170599734, 6369672, 230413074, 101130274,
+                    476491114, 9833174, 129609852, 4506626, 1168181
+                ],
+                test_result_folder='./test',
+                test_split=['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'],
+                training_split=['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'],
+                validation_split=['08'],
+                all_split=[
+                    '00', '01', '02', '03', '04', '05', '06', '07', '09', '08',
+                    '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'
+                ]):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-        self.default_cfg_name = "semantickitti.yml"
-
-        super().__init__(cfg=cfg, 
-                        dataset_path=dataset_path, 
-                        **kwargs)
+        super().__init__(dataset_path=dataset_path, 
+                        name=name,
+                        cache_dir=cache_dir, 
+                        use_cache=use_cache, 
+                        class_weights=class_weights,
+                        test_result_folder=test_result_folder,
+                        test_split=test_split, 
+                        training_split=training_split, 
+                        validation_split=validation_split,
+                        all_split=all_split)
 
         cfg = self.cfg
 
@@ -121,9 +142,7 @@ class SemanticKITTI(BaseDataset):
     def save_test_result_kpconv(self, results, inputs):
         cfg = self.cfg
         for j in range(1):
-            # name = inputs['attr']['name']
             name = inputs['attr']['name']
-            # print(name)
             name_seq, name_points = name.split("_")
 
             test_path = join(cfg.test_result_folder, 'sequences')
@@ -132,12 +151,9 @@ class SemanticKITTI(BaseDataset):
             make_dir(save_path)
 
             test_file_name = name_points
-            # proj_inds = inputs['data']['proj_inds'][j].cpu().numpy()
             
             proj_inds = inputs['data'].reproj_inds[0]
-            # proj_inds = inputs.proj_inds
             probs = results[proj_inds, :]
-            # probs = results[j][proj_inds, :]
           
             pred = np.argmax(probs, 1)
 
@@ -207,7 +223,8 @@ class SemanticKITTISplit():
         else:
             labels = DataProcessing.load_label_kitti(label_path, self.remap_lut_val)
 
-        data = {'point': points, 
+        data = {'point': points[:,0:3], 
+                'intensity': points[:,3],
                 'feat' : None,
                 'label': labels,
                 }
