@@ -485,7 +485,7 @@ class KPFCNN(BaseModel):
                 # Subsampled points
                 pool_p, pool_b = tf_batch_subsampling(stacked_points,
                                                       stacks_lengths,
-                                                      sampleDl=dl)
+                                                      dl)
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
@@ -634,9 +634,12 @@ class KPFCNN(BaseModel):
     def inference_begin(self, data):
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
-
+  
     def inference_preprocess(self):
-        flat_inputs = self.transform_inference(self.inference_data)
+        flat_inputs, point_inds, stacks_lengths = self.transform_inference(self.inference_data)
+        self.test_meta = {}
+        self.test_meta['inds'] = point_inds
+        self.test_meta['lens'] = stacks_lengths
 
         self.inference_input = flat_inputs
 
@@ -646,9 +649,20 @@ class KPFCNN(BaseModel):
         results = tf.reshape(results, (-1, self.cfg.num_classes))
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
+        test_smooth = 0.98
+        probs = np.zeros(shape=[self.inference_data['search_tree'].data.shape[0], self.cfg.num_classes], dtype=np.float32)
+        inds = self.test_meta['inds']
+  
+        l = 0
+        r = 0
+        for len in self.test_meta['lens']:
+            r += len
+            probs[inds[l:r]] = probs[inds[l:r]] * test_smooth + (1 - test_smooth)*results[l : r]
+            l += len
 
-        proj_inds = self.inference_data['proj_inds']
-        predict_scores = results[proj_inds] # TODO: check [proj_inds][0] may be correct.
+        reproj_inds = self.inference_data['proj_inds']
+
+        predict_scores = probs[reproj_inds]
         inference_result = {
             'predict_labels' : np.argmax(predict_scores, 1),
             'predict_scores' : predict_scores
@@ -667,20 +681,28 @@ class KPFCNN(BaseModel):
         ci_list = []
         
         points = np.array(data['search_tree'].data)
+        potentials = np.random.rand(points.shape[0]) * 1e-3
 
-        for i in range(points.shape[0]):
+        while(np.min(potentials) < 0.5):
             cloud_ind = 0
-            point_ind = i
+            point_ind = int(np.argmin(potentials))
+
             center_point = points[point_ind, :].reshape(1, -1)
             pick_point = center_point
+
             input_inds = data['search_tree'].query_radius(
                 pick_point, r = cfg.in_radius)[0]
             
             n = input_inds.shape[0]
-            
+
+            dists = np.sum(np.square((points[input_inds] - pick_point).astype(np.float32)), axis=1)
+            tuckeys = np.square(1 - dists/np.square(cfg.in_radius))
+            tuckeys[dists > np.square(cfg.in_radius)] = 0
+            potentials[input_inds] += tuckeys
+
             input_points = (points[input_inds] - pick_point).astype(np.float32)
-            input_colors = data['feat'][input_inds]
-            input_labels = np.zeros(input_points.shape[0])
+            input_colors = data['feat'][input_inds].astype(np.float32)
+            input_labels = np.zeros(input_points.shape[0]).astype(np.int32)
 
             if n > 0:
                 p_list += [input_points]
@@ -692,19 +714,19 @@ class KPFCNN(BaseModel):
         stacked_points = np.concatenate(p_list, axis=0), #TODO : convert to tensor.
         stacked_colors = np.concatenate(c_list, axis=0),
         point_labels = np.concatenate(pl_list, axis=0),
-        stacks_lengths = np.array([tp.shape[0] for tp in p_list]),
+        stacks_lengths = np.array([tp.shape[0] for tp in p_list], dtype=np.int32),
         point_inds = np.concatenate(pi_list, axis=0),
         cloud_inds = np.array(ci_list, dtype=np.int32)
 
         input_list = self.transform(
-            stacked_points,
-            stacked_colors,
-            point_labels,
-            stacks_lengths,
-            point_inds,
-            cloud_inds
+            tf.convert_to_tensor(np.array(stacked_points[0], dtype=np.float32)),
+            tf.convert_to_tensor(np.array(stacked_colors[0], dtype=np.float32)),
+            tf.convert_to_tensor(np.array(point_labels[0], dtype=np.int32)),
+            tf.convert_to_tensor(np.array(stacks_lengths[0], dtype=np.int32)),
+            tf.convert_to_tensor(np.array(point_inds[0], dtype=np.int32)),
+            tf.convert_to_tensor(np.array(cloud_inds, dtype=np.int32))
         )
-        return input_list
+        return input_list, np.array(point_inds[0]), np.array(stacks_lengths[0])
 
     def preprocess(self, data, attr):
         cfg = self.cfg
@@ -825,8 +847,6 @@ class KPFCNN(BaseModel):
                 pick_point = center_point + noise.astype(center_point.dtype)
 
                 # Indices of points in input region
-                # input_inds = self.input_trees[data_split][cloud_ind].query_radius(pick_point,
-                #                                                                 r=cfg.in_radius)[0]
                 input_inds = data['search_tree'].query_radius(
                     pick_point, r=cfg.in_radius)[0]
 

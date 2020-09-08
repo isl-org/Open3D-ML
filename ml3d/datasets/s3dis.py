@@ -257,9 +257,6 @@ class S3DIS(BaseDataset):
                 data_list.append(np.concatenate([pc, labels], 1))
 
             pc_label = np.concatenate(data_list, 0)
-            xyz_min = np.amin(pc_label[:, 0:3],
-                              axis=0)  # TODO : can be moved to preprocess
-            pc_label[:, 0:3] -= xyz_min
 
             xyz = pc_label[:, :3].astype(np.float32)
             colors = pc_label[:, 3:6].astype(np.uint8)

@@ -6,16 +6,6 @@ from pathlib import Path
 from .utils.kernels.kernel_points import load_kernels as create_kernel_points
 
 
-def tf_batch_subsampling(points, batches_len, sampleDl):
-    return tf_batch_subsampling_module.batch_grid_subsampling(
-        points, batches_len, sampleDl)
-
-
-def tf_batch_neighbors(queries, supports, q_batches, s_batches, radius):
-    return tf_batch_neighbors_module.batch_ordered_neighbors(
-        queries, supports, q_batches, s_batches, radius)
-
-
 def get_weight(shape):
     # tf.set_random_seed(42)
     initial = tf.keras.initializers.TruncatedNormal(mean=0.0,
