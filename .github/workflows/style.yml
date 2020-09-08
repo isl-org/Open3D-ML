@@ -1,0 +1,29 @@
+name: Style check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  style-check:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Set up Python version
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.6
+      - name: Install dependencies
+        run: |
+          sudo apt-get install --yes clang-format-10
+          python -m pip install -U yapf==0.30.0 nbformat
+      - name: Run style check
+        run: |
+          python ci/check_style.py
