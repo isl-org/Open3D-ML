@@ -78,7 +78,9 @@ class TFDataloader():
         loader = loader.map(map_func=self.transform,
                             num_parallel_calls=num_threads)
 
-        if ('batcher' not in self.model_cfg
+        print(self.model_cfg.batcher)
+        print(vars(self.model_cfg))
+        if ( self.model_cfg.__getattr__('batcher') is not None
                 or self.model_cfg.batcher == 'DefaultBatcher'):
             loader = loader.batch(batch_size)
 

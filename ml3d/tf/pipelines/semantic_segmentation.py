@@ -8,6 +8,7 @@ from os.path import exists, join, isfile, dirname, abspath
 
 import tensorflow as tf
 
+from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
@@ -28,24 +29,49 @@ if gpus:
   except RuntimeError as e:
     print(e)
 
+class SemanticSegmentation(BasePipeline):
+    def __init__(self,
+                model,
+                dataset=None,
+                name='SemanticSegmentation', 
+                batch_size=4,
+                val_batch_size=4,
+                test_batch_size=3,
+                max_epoch=100,  # maximum epoch during training
+                learning_rate=1e-2,  # initial learning rate
+                lr_decays=0.95,
+                save_ckpt_freq=20,
+                adam_lr=1e-2,
+                scheduler_gamma=0.95,
+                main_log_dir='./logs/',
+                device='gpu',
+                split='train',
+                train_sum_dir='train_log'):
+    
 
-class SemanticSegmentation():
-    def __init__(self, model, dataset, cfg):
-        self.model = model
-        self.dataset = dataset
-        self.cfg = cfg
-
-        make_dir(cfg.main_log_dir)
-        cfg.logs_dir = join(cfg.main_log_dir, 
-                    model.__class__.__name__ + '_TF')
-        make_dir(cfg.logs_dir)
+        super().__init__(model=model, 
+                        dataset=dataset, 
+                        name=name,
+                        batch_size=batch_size,
+                        val_batch_size=val_batch_size,
+                        test_batch_size=test_batch_size,
+                        max_epoch=max_epoch,
+                        learning_rate=learning_rate,
+                        lr_decays=lr_decays,
+                        save_ckpt_freq=save_ckpt_freq,
+                        adam_lr=adam_lr,  
+                        scheduler_gamma=scheduler_gamma,
+                        main_log_dir=main_log_dir,
+                        device=device,
+                        split=split,
+                        train_sum_dir=train_sum_dir)
 
         # tf.config.gpu.set_per_process_memory_growth(True)
 
 
         # dataset.cfg.num_points = model.cfg.num_points
 
-    def run_inference(self, points, device):
+    def run_inference(self, data):
         # TODO
         pass
 
@@ -208,4 +234,5 @@ class SemanticSegmentation():
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format( save_path))
      
+
 PIPELINE._register_module(SemanticSegmentation, "tf")

@@ -1,9 +1,7 @@
 import numpy as np
 import yaml
-import torch
 from os.path import join, exists, dirname, abspath
 
-# use relative import for being compatible with Open3d main repo 
 from ...utils import Config, make_dir
 
 class BasePipeline(object):
@@ -13,7 +11,6 @@ class BasePipeline(object):
     def __init__(self,
                 model,
                 dataset=None, 
-                device='gpu',
                 **kwargs):
         """
         Initialize
@@ -25,12 +22,11 @@ class BasePipeline(object):
         Returns:
             class: The corresponding class.
         """
-
-        self.cfg = Config(kwargs)
-
         if kwargs['name'] is None:
             raise KeyError(
             "Please give a name to the pipeline")
+            
+        self.cfg = Config(kwargs)
         self.name = self.cfg.name
 
         self.model = model
@@ -40,9 +36,6 @@ class BasePipeline(object):
         self.cfg.logs_dir = join(self.cfg.main_log_dir, 
                         model.__class__.__name__ + '_torch')
         make_dir(self.cfg.logs_dir)
-
-        self.device = torch.device('cuda' if torch.cuda.is_available() 
-                                    and device == 'gpu' else 'cpu')
 
     def get_loss(self):
         raise NotImplementedError()

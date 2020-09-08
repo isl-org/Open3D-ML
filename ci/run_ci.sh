@@ -23,7 +23,7 @@ python -m pip install -U Cython
 # 2. clone Open3D and install dependencies
 # For now we have to clone the o3dml_integration branch of open3d
 #
-git clone --recursive --branch o3dml_integration  https://github.com/intel-isl/Open3D.git
+git clone --recursive --branch master  https://github.com/intel-isl/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -U tensorflow==$TENSORFLOW_VER

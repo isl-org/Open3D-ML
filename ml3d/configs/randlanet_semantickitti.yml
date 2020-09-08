@@ -1,85 +1,26 @@
 dataset:
   name: SemanticKITTI
-  all_split:
-  - '00'
-  - '01'
-  - '02'
-  - '03'
-  - '04'
-  - '05'
-  - '06'
-  - '07'
-  - '09'
-  - '08'
-  - '10'
-  - '11'
-  - '12'
-  - '13'
-  - '14'
-  - '15'
-  - '16'
-  - '17'
-  - '18'
-  - '19'
-  - '20'
-  - '21'
+  dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights:
-  - 55437630
-  - 320797
-  - 541736
-  - 2578735
-  - 3274484
-  - 552662
-  - 184064
-  - 78858
-  - 240942562
-  - 17294618
-  - 170599734
-  - 6369672
-  - 230413074
-  - 101130274
-  - 476491114
-  - 9833174
-  - 129609852
-  - 4506626
-  - 1168181
-  dataset_path: ../dataset/SemanticKITTI/
+  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
+    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
+    476491114, 9833174, 129609852, 4506626, 1168181]
   test_result_folder: ./test
-  test_split:
-  - '11'
-  - '12'
-  - '13'
-  - '14'
-  - '15'
-  - '16'
-  - '17'
-  - '18'
-  - '19'
-  - '20'
-  - '21'
-  test_split_number: 11
-  training_split:
-  - '00'
-  - '01'
-  - '02'
-  - '03'
-  - '04'
-  - '05'
-  - '06'
-  - '07'
-  - 09
-  - '10'
+  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
+  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
+  '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  validation_split: ['08']
   use_cache: false
   validation_split:
-  - 08
+  - '08'
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ./ml3d/torch/checkpoint/randlanet_semantickitti.pth
-  d_feature: 8
-  d_in: 3
-  d_out:
+  ckpt_path: # path/to/your/checkpoint
+  dim_feature: 8
+  dim_input: 3
+  dim_output:
   - 16
   - 64
   - 128

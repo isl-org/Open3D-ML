@@ -1,33 +1,22 @@
 dataset:
   name: ParisLille3D
+  dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights:
-  - 5181602
-  - 5012952
-  - 6830086
-  - 1311528
-  - 10476365
-  - 946982
-  - 334860
-  - 269353
-  - 269353
-  dataset_path: ../dataset/Paris_Lille_3D/
+  class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353, 269353]
   ignored_label_inds:
   - 0
   num_points: 65536
   prepro_grid_size: 0.06
-  test_dir: ../dataset/Paris_Lille_3D/test_10_classes/
   test_result_folder: ./test
-  train_dir: ../dataset/Paris_Lille_3D/training_10_classes/
   val_files:
   - Lille2.ply
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ./ml3d/torch/checkpoint/randlanet_parislille3d.pth
-  d_feature: 8
-  d_in: 3
-  d_out:
+  ckpt_path: # path/to/your/checkpoint
+  dim_feature: 8
+  dim_input: 3
+  dim_output:
   - 16
   - 64
   - 128

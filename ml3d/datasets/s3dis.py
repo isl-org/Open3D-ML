@@ -9,7 +9,6 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
-from ..utils import make_dir, DATASET
 from .utils import DataProcessing
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
@@ -20,22 +19,41 @@ class S3DIS(BaseDataset):
     """
     S3DIS dataset, used in visualizer, training, or test
     """
-    def __init__(self, cfg=None, dataset_path=None, **kwargs):
+    
+    def __init__(self, 
+                dataset_path,
+                name='S3DIS',
+                cache_dir='./logs/cache', 
+                use_cache=False,  
+                prepro_grid_size=0.04,
+                class_weights=[
+                    3370714, 2856755, 4919229, 318158, 375640, 478001, 974733, 650464,
+                    791496, 88727, 1284130, 229758, 2272837
+                ],
+                num_points=40960,
+                test_area_idx=3,
+                ignored_label_inds=[],
+                
+                test_result_folder='./test'
+                ):
         """
         Initialize
         Args:
-            cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
             kwargs:
         Returns:
             class: The corresponding class.
         """
-        self.default_cfg_name = "s3dis.yml"
-
-        super().__init__(cfg=cfg, 
-                        dataset_path=dataset_path, 
-                        **kwargs)
+        super().__init__(dataset_path=dataset_path, 
+                        name=name,
+                        cache_dir=cache_dir, 
+                        use_cache=use_cache, 
+                        class_weights=class_weights,
+                        test_result_folder=test_result_folder,
+                        prepro_grid_size=prepro_grid_size, 
+                        num_points=num_points, 
+                        test_area_idx=test_area_idx,
+                        ignored_label_inds=ignored_label_inds)
 
         cfg = self.cfg
 
@@ -62,16 +80,16 @@ class S3DIS(BaseDataset):
 
         self.test_split = 'Area_' + str(cfg.test_area_idx)
 
-        self.pc_path = Path(self.dataset_path) / 'original_ply'
+        self.pc_path = join(self.cfg.dataset_path, 'original_ply')
+        
         if not exists(self.pc_path):
             print("creating dataset")
-            self.create_ply_files(self.dataset_path, self.label_to_names)
+            self.create_ply_files(self.cfg.dataset_path, self.label_to_names)
 
         # TODO : if num of ply files < 272, then create.
 
         self.all_files = glob.glob(
-            str(Path(self.dataset_path) / 'original_ply' / '*.ply'))
-        # print(len(self.all_files))
+            str(Path(self.cfg.dataset_path) / 'original_ply' / '*.ply'))
 
     def get_split(self, split):
         return S3DISSplit(self, split=split)
@@ -81,23 +99,24 @@ class S3DIS(BaseDataset):
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split in ['test', 'testing']:
+        if split in ['test', 'testing', 'val', 'validation']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) in f
             ]
-        else:
+        elif split in ['train', 'training']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) not in f
             ]
-
-        random.shuffle(file_list)
+        elif split in ['all']:
+            file_list = self.all_files
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
         return file_list
 
     def get_data(self, file_path, is_test=False):
-        # print("get data = " + file_path)
         file_path = Path(file_path)
         kdtree_path = Path(
             file_path
@@ -229,9 +248,11 @@ class S3DIS(BaseDataset):
 
     @staticmethod
     def create_ply_files(dataset_path, class_names):
-        os.makedirs(Path(dataset_path) / 'original_ply', exist_ok=True)
+        os.makedirs(join(dataset_path, 'original_ply') , exist_ok=True)
         anno_file = Path(
-            abspath(__file__)).parent / 'meta' / 's3dis_annotation_paths.txt'
+            abspath(__file__)).parent / '_resources' / 's3dis_annotation_paths.txt'
+        print(anno_file)
+        anno_file = str(anno_file)
         anno_paths = [line.rstrip() for line in open(anno_file)]
         anno_paths = [Path(dataset_path) / p for p in anno_paths]
 
