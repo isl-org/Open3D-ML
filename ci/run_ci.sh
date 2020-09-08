@@ -25,7 +25,7 @@ python -m pip install -U Cython
 #
 git clone --recursive --branch master https://github.com/intel-isl/Open3D.git
 cd Open3D
-git checkout 8a7a77c10d4f0339fb5c52b913235f6e5a23b937 # Sept 08, 2020
+git checkout a694668f94b9fee9edf3a9145a0d7fea00cf1f24 # Sept 08, 2020
 cd ..
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
