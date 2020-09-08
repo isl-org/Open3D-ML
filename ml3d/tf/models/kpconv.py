@@ -14,7 +14,9 @@ from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
-from open3d.ml.tf.ops import *
+from open3d.ml.tf.ops import batch_grid_subsampling as tf_batch_subsampling
+from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
+
 
 class KPFCNN(BaseModel):
     def __init__(self, cfg=None, **kwargs):

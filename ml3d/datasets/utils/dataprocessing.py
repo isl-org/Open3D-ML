@@ -3,8 +3,8 @@ import os, argparse, pickle, sys
 import open3d.core as o3c
 
 from os.path import exists, join, isfile, dirname, abspath, split
-from open3d.pybind.ml.contrib import subsample
-from open3d.pybind.ml.contrib import knn_search
+from open3d.ml.contrib import subsample
+from open3d.ml.contrib import knn_search
 
 
 class DataProcessing:

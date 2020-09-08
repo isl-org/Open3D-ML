@@ -6,9 +6,9 @@ import open3d.core as o3c
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
-from open3d.pybind.ml.contrib import subsample_batch
+from open3d.ml.contrib import subsample_batch
 
-from open3d.pybind.ml.contrib import radius_search
+from open3d.ml.contrib import radius_search
 
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
