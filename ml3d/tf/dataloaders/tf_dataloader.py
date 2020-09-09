@@ -13,6 +13,7 @@ from sklearn.neighbors import KDTree
 
 
 class TFDataloader():
+
     def __init__(self,
                  *args,
                  dataset=None,
@@ -34,8 +35,7 @@ class TFDataloader():
             self.cache_convert = dataset_helper.Cache(
                 self.preprocess,
                 cache_dir=cache_dir,
-                cache_key=dataset_helper._get_hash(
-                    repr(self.preprocess)[:-15]))
+                cache_key=dataset_helper._get_hash(repr(self.preprocess)[:-15]))
 
             uncached = [
                 idx for idx in range(len(dataset)) if dataset.get_attr(idx)
@@ -43,8 +43,7 @@ class TFDataloader():
             ]
             if len(uncached) > 0:
                 print("cache key : {}".format(repr(self.preprocess)[:-15]))
-                for idx in tqdm(range(len(dataset)),
-                                desc='preprocess'):
+                for idx in tqdm(range(len(dataset)), desc='preprocess'):
                     attr = dataset.get_attr(idx)
                     data = dataset.get_data(idx)
                     name = attr['name']
@@ -71,14 +70,13 @@ class TFDataloader():
     def get_loader(self, batch_size=1, num_threads=3):
         gen_func, gen_types, gen_shapes = self.get_batch_gen(self)
 
-        loader = tf.data.Dataset.from_generator(gen_func, gen_types,
-                                                gen_shapes)
+        loader = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
 
         loader = loader.map(map_func=self.transform,
                             num_parallel_calls=num_threads)
 
-        if ('batcher' not in self.model_cfg.keys()
-                or self.model_cfg.batcher == 'DefaultBatcher'):
+        if ('batcher' not in self.model_cfg.keys() or
+                self.model_cfg.batcher == 'DefaultBatcher'):
             loader = loader.batch(batch_size)
 
         return loader

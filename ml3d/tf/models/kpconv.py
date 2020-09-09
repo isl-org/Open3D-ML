@@ -10,7 +10,7 @@ from pathlib import Path
 from sklearn.neighbors import KDTree
 import pudb
 
-# use relative import for being compatible with Open3d main repo 
+# use relative import for being compatible with Open3d main repo
 from open3d.ml.tf.ops import *
 from .network_blocks import *
 from .base_model import BaseModel
@@ -22,127 +22,130 @@ from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
 
 
 class KPFCNN(BaseModel):
-    def __init__(self, 
-                name='KPFCNN',
-                ign_lbls=[0],
-                lbl_values=[
-                    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
-                ],
-                num_classes=19,  # Number of valid classes
-                ignored_label_inds=[0],
-                ckpt_path=None,
-                dataset_task='',
-                input_threads=10,
-                batcher='ConcatBatcher',
-                architecture=[
-                    'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb',
-                    'resnetb_strided', 'resnetb', 'resnetb', 'resnetb_strided', 'resnetb',
-                    'resnetb', 'resnetb_strided', 'resnetb', 'nearest_upsample', 'unary',
-                    'nearest_upsample', 'unary', 'nearest_upsample', 'unary',
-                    'nearest_upsample', 'unary'
-                ],
-                in_radius=4.0,
-                val_radius=4.0,
-                n_frames=1,
-                max_in_points=100000,
-                max_val_points=100000,
-                batch_num=8,
-                val_batch_num=8,
-                num_kernel_points=15,
-                first_subsampling_dl=0.06,
-                conv_radius=2.5,
-                deform_radius=6.0,
-                KP_extent=1.2,
-                KP_influence='linear',
-                aggregation_mode='sum',
-                first_features_dim=128,
-                in_features_dim=2,
-                modulated=False,
-                use_batch_norm=True,
-                batch_norm_momentum=0.02,
-                deform_fitting_mode='point2point',
-                deform_fitting_power=1.0, 
-                deform_lr_factor=0.1,  
-                repulse_extent=1.2, 
-                max_epoch=800,
-                learning_rate=1e-2,
-                momentum=0.98,
-                lr_decays=0.98477,
-                grad_clip_norm=100.0,
-                epoch_steps=500,
-                validation_size=200,
-                checkpoint_gap=50,
-                augment_scale_anisotropic=True,
-                augment_symmetries=[True, False, False],
-                augment_rotation='vertical',
-                augment_scale_min=0.8,
-                augment_scale_max=1.2,
-                augment_noise=0.001,
-                augment_color=0.8,
-                saving=True,
-                saving_path=None,
-                in_points_dim=3,
-                fixed_kernel_points='center',
-                class_w=[],
-                num_layers=5,
-                **kwargs):
+
+    def __init__(
+            self,
+            name='KPFCNN',
+            ign_lbls=[0],
+            lbl_values=[
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19
+            ],
+            num_classes=19,  # Number of valid classes
+            ignored_label_inds=[0],
+            ckpt_path=None,
+            dataset_task='',
+            input_threads=10,
+            batcher='ConcatBatcher',
+            architecture=[
+                'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb',
+                'resnetb_strided', 'resnetb', 'resnetb', 'resnetb_strided',
+                'resnetb', 'resnetb', 'resnetb_strided', 'resnetb',
+                'nearest_upsample', 'unary', 'nearest_upsample', 'unary',
+                'nearest_upsample', 'unary', 'nearest_upsample', 'unary'
+            ],
+            in_radius=4.0,
+            val_radius=4.0,
+            n_frames=1,
+            max_in_points=100000,
+            max_val_points=100000,
+            batch_num=8,
+            val_batch_num=8,
+            num_kernel_points=15,
+            first_subsampling_dl=0.06,
+            conv_radius=2.5,
+            deform_radius=6.0,
+            KP_extent=1.2,
+            KP_influence='linear',
+            aggregation_mode='sum',
+            first_features_dim=128,
+            in_features_dim=2,
+            modulated=False,
+            use_batch_norm=True,
+            batch_norm_momentum=0.02,
+            deform_fitting_mode='point2point',
+            deform_fitting_power=1.0,
+            deform_lr_factor=0.1,
+            repulse_extent=1.2,
+            max_epoch=800,
+            learning_rate=1e-2,
+            momentum=0.98,
+            lr_decays=0.98477,
+            grad_clip_norm=100.0,
+            epoch_steps=500,
+            validation_size=200,
+            checkpoint_gap=50,
+            augment_scale_anisotropic=True,
+            augment_symmetries=[True, False, False],
+            augment_rotation='vertical',
+            augment_scale_min=0.8,
+            augment_scale_max=1.2,
+            augment_noise=0.001,
+            augment_color=0.8,
+            saving=True,
+            saving_path=None,
+            in_points_dim=3,
+            fixed_kernel_points='center',
+            class_w=[],
+            num_layers=5,
+            **kwargs):
 
         super().__init__(name=name,
-                        ign_lbls=ign_lbls,
-                        lbl_values=lbl_values,
-                        num_classes=num_classes,  
-                        ignored_label_inds=ignored_label_inds,
-                        ckpt_path=ckpt_path,
-                        dataset_task=dataset_task,
-                        input_threads=input_threads,
-                        batcher=batcher,
-                        architecture=architecture,
-                        in_radius=in_radius,
-                        val_radius=val_radius,
-                        n_frames=n_frames,
-                        max_in_points=max_in_points,
-                        max_val_points=max_val_points,
-                        batch_num=batch_num,
-                        val_batch_num=val_batch_num,
-                        num_kernel_points=num_kernel_points,
-                        first_subsampling_dl=first_subsampling_dl,
-                        conv_radius=conv_radius,
-                        deform_radius=deform_radius,
-                        KP_extent=KP_extent,
-                        KP_influence=KP_influence,
-                        aggregation_mode=aggregation_mode,
-                        first_features_dim=first_features_dim,
-                        in_features_dim=in_features_dim,
-                        modulated=modulated,
-                        use_batch_norm=use_batch_norm,
-                        batch_norm_momentum=batch_norm_momentum,
-                        deform_fitting_mode=deform_fitting_mode,
-                        deform_fitting_power=deform_fitting_power, 
-                        deform_lr_factor=deform_lr_factor,  
-                        repulse_extent=repulse_extent, 
-                        max_epoch=max_epoch,
-                        learning_rate=learning_rate,
-                        momentum=momentum,
-                        lr_decays=lr_decays,
-                        grad_clip_norm=grad_clip_norm,
-                        epoch_steps=epoch_steps,
-                        validation_size=validation_size,
-                        checkpoint_gap=checkpoint_gap,
-                        augment_scale_anisotropic=augment_scale_anisotropic,
-                        augment_symmetries=augment_symmetries,
-                        augment_rotation=augment_rotation,
-                        augment_scale_min=augment_scale_min,
-                        augment_scale_max=augment_scale_max,
-                        augment_noise=augment_noise,
-                        augment_color=augment_color,
-                        saving=saving,
-                        saving_path=saving_path,
-                        in_points_dim=in_points_dim,
-                        fixed_kernel_points=fixed_kernel_points,
-                        class_w=class_w,
-                        num_layers=num_layers,
-                        **kwargs)
-        
+                         ign_lbls=ign_lbls,
+                         lbl_values=lbl_values,
+                         num_classes=num_classes,
+                         ignored_label_inds=ignored_label_inds,
+                         ckpt_path=ckpt_path,
+                         dataset_task=dataset_task,
+                         input_threads=input_threads,
+                         batcher=batcher,
+                         architecture=architecture,
+                         in_radius=in_radius,
+                         val_radius=val_radius,
+                         n_frames=n_frames,
+                         max_in_points=max_in_points,
+                         max_val_points=max_val_points,
+                         batch_num=batch_num,
+                         val_batch_num=val_batch_num,
+                         num_kernel_points=num_kernel_points,
+                         first_subsampling_dl=first_subsampling_dl,
+                         conv_radius=conv_radius,
+                         deform_radius=deform_radius,
+                         KP_extent=KP_extent,
+                         KP_influence=KP_influence,
+                         aggregation_mode=aggregation_mode,
+                         first_features_dim=first_features_dim,
+                         in_features_dim=in_features_dim,
+                         modulated=modulated,
+                         use_batch_norm=use_batch_norm,
+                         batch_norm_momentum=batch_norm_momentum,
+                         deform_fitting_mode=deform_fitting_mode,
+                         deform_fitting_power=deform_fitting_power,
+                         deform_lr_factor=deform_lr_factor,
+                         repulse_extent=repulse_extent,
+                         max_epoch=max_epoch,
+                         learning_rate=learning_rate,
+                         momentum=momentum,
+                         lr_decays=lr_decays,
+                         grad_clip_norm=grad_clip_norm,
+                         epoch_steps=epoch_steps,
+                         validation_size=validation_size,
+                         checkpoint_gap=checkpoint_gap,
+                         augment_scale_anisotropic=augment_scale_anisotropic,
+                         augment_symmetries=augment_symmetries,
+                         augment_rotation=augment_rotation,
+                         augment_scale_min=augment_scale_min,
+                         augment_scale_max=augment_scale_max,
+                         augment_noise=augment_noise,
+                         augment_color=augment_color,
+                         saving=saving,
+                         saving_path=saving_path,
+                         in_points_dim=in_points_dim,
+                         fixed_kernel_points=fixed_kernel_points,
+                         class_w=class_w,
+                         num_layers=num_layers,
+                         **kwargs)
+
         cfg = self.cfg
 
         # From config parameter, compute higher bound of neighbors number in a neighborhood
@@ -243,8 +246,7 @@ class KPFCNN(BaseModel):
                 out_dim = out_dim // 2
 
         self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False,
-                                       0)
+        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
 
         self.valid_labels = np.sort(
             [c for c in lbl_values if c not in ign_lbls])
@@ -258,8 +260,7 @@ class KPFCNN(BaseModel):
         inputs['points'] = flat_inputs[:cfg.num_layers]
         inputs['neighbors'] = flat_inputs[cfg.num_layers:2 * cfg.num_layers]
         inputs['pools'] = flat_inputs[2 * cfg.num_layers:3 * cfg.num_layers]
-        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 *
-                                          cfg.num_layers]
+        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 * cfg.num_layers]
 
         ind = 4 * cfg.num_layers
         inputs['features'] = flat_inputs[ind]
@@ -309,11 +310,11 @@ class KPFCNN(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
 
-        optimizer = tf.keras.optimizers.SGD(learning_rate=cfg_pipeline.learning_rate, 
-                                    momentum=cfg_pipeline.momentum)
+        optimizer = tf.keras.optimizers.SGD(
+            learning_rate=cfg_pipeline.learning_rate,
+            momentum=cfg_pipeline.momentum)
 
         return optimizer
-
 
     def get_loss(self, Loss, logits, inputs):
         """
@@ -353,7 +354,7 @@ class KPFCNN(BaseModel):
         # Initiate batch inds tensor
         num_batches = tf.shape(stacks_len)[0]
         num_points = tf.reduce_sum(stacks_len)
-        batch_inds_0 = tf.zeros((num_points, ), dtype=tf.int32)
+        batch_inds_0 = tf.zeros((num_points,), dtype=tf.int32)
 
         # Define body of the while loop
         def body(batch_i, point_i, b_inds):
@@ -362,15 +363,14 @@ class KPFCNN(BaseModel):
             num_before = tf.cond(tf.less(batch_i, 1), lambda: tf.zeros(
                 (), dtype=tf.int32),
                                  lambda: tf.reduce_sum(stacks_len[:batch_i]))
-            num_after = tf.cond(
-                tf.less(batch_i, num_batches - 1),
-                lambda: tf.reduce_sum(stacks_len[batch_i + 1:]),
-                lambda: tf.zeros((), dtype=tf.int32))
+            num_after = tf.cond(tf.less(batch_i, num_batches - 1),
+                                lambda: tf.reduce_sum(stacks_len[batch_i + 1:]),
+                                lambda: tf.zeros((), dtype=tf.int32))
 
             # Update current element indices
-            inds_before = tf.zeros((num_before, ), dtype=tf.int32)
-            inds_in = tf.fill((num_in, ), batch_i)
-            inds_after = tf.zeros((num_after, ), dtype=tf.int32)
+            inds_before = tf.zeros((num_before,), dtype=tf.int32)
+            inds_in = tf.fill((num_in,), batch_i)
+            inds_after = tf.zeros((num_after,), dtype=tf.int32)
             n_inds = tf.concat([inds_before, inds_in, inds_after], axis=0)
 
             b_inds += n_inds
@@ -464,7 +464,7 @@ class KPFCNN(BaseModel):
         if cfg.augment_rotation == 'vertical':
 
             # Choose a random angle for each element
-            theta = tf.random.uniform((num_batches, ),
+            theta = tf.random.uniform((num_batches,),
                                       minval=0,
                                       maxval=2 * np.pi)
 
@@ -480,11 +480,11 @@ class KPFCNN(BaseModel):
 
             # Apply rotations
             stacked_points = tf.reshape(
-                tf.matmul(tf.expand_dims(stacked_points, axis=1),
-                          stacked_rots), [-1, 3])
+                tf.matmul(tf.expand_dims(stacked_points, axis=1), stacked_rots),
+                [-1, 3])
 
         elif cfg.augment_rotation == 'none':
-            R = tf.eye(3, batch_shape=(num_batches, ))
+            R = tf.eye(3, batch_shape=(num_batches,))
 
         else:
             raise ValueError('Unknown rotation augmentation : ' +
@@ -567,8 +567,7 @@ class KPFCNN(BaseModel):
             # Convolution neighbors indices
             if layer_blocks:
                 # Convolutions are done in this layer, compute the neighbors with the good radius
-                if np.any(['deformable' in blck
-                           for blck in layer_blocks[:-1]]):
+                if np.any(['deformable' in blck for blck in layer_blocks[:-1]]):
                     r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
@@ -587,8 +586,7 @@ class KPFCNN(BaseModel):
 
                 # Subsampled points
                 pool_p, pool_b = tf_batch_subsampling(stacked_points,
-                                                      stacks_lengths,
-                                                      dl)
+                                                      stacks_lengths, dl)
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
@@ -608,7 +606,7 @@ class KPFCNN(BaseModel):
                 # No pooling in the end of this layer, no pooling indices required
                 pool_i = tf.zeros((0, 1), dtype=tf.int32)
                 pool_p = tf.zeros((0, 3), dtype=tf.float32)
-                pool_b = tf.zeros((0, ), dtype=tf.int32)
+                pool_b = tf.zeros((0,), dtype=tf.int32)
                 up_i = tf.zeros((0, 1), dtype=tf.int32)
 
             # Reduce size of neighbors matrices by eliminating furthest point
@@ -691,7 +689,7 @@ class KPFCNN(BaseModel):
         if cfg.in_features_dim in [4, 5]:
             num_batches = batch_inds[-1] + 1
             s = tf.cast(
-                tf.less(tf.random.uniform((num_batches, )), cfg.augment_color),
+                tf.less(tf.random.uniform((num_batches,)), cfg.augment_color),
                 tf.float32)
             stacked_s = tf.gather(s, batch_inds)
             stacked_colors = stacked_colors * tf.expand_dims(stacked_s, axis=1)
@@ -701,8 +699,7 @@ class KPFCNN(BaseModel):
             pass
         elif cfg.in_features_dim == 2:
             stacked_features = tf.concat(
-                (stacked_features, stacked_original_coordinates[:, 2:]),
-                axis=1)
+                (stacked_features, stacked_original_coordinates[:, 2:]), axis=1)
         elif cfg.in_features_dim == 3:
             stacked_features = stacked_colors
         elif cfg.in_features_dim == 4:
@@ -734,9 +731,10 @@ class KPFCNN(BaseModel):
     def inference_begin(self, data):
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
-  
+
     def inference_preprocess(self):
-        flat_inputs, point_inds, stacks_lengths = self.transform_inference(self.inference_data)
+        flat_inputs, point_inds, stacks_lengths = self.transform_inference(
+            self.inference_data)
         self.test_meta = {}
         self.test_meta['inds'] = point_inds
         self.test_meta['lens'] = stacks_lengths
@@ -750,22 +748,27 @@ class KPFCNN(BaseModel):
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
         test_smooth = 0.98
-        probs = np.zeros(shape=[self.inference_data['search_tree'].data.shape[0], self.cfg.num_classes], dtype=np.float32)
+        probs = np.zeros(shape=[
+            self.inference_data['search_tree'].data.shape[0],
+            self.cfg.num_classes
+        ],
+                         dtype=np.float32)
         inds = self.test_meta['inds']
-  
+
         l = 0
         r = 0
         for len in self.test_meta['lens']:
             r += len
-            probs[inds[l:r]] = probs[inds[l:r]] * test_smooth + (1 - test_smooth)*results[l : r]
+            probs[inds[l:r]] = probs[inds[l:r]] * test_smooth + (
+                1 - test_smooth) * results[l:r]
             l += len
 
         reproj_inds = self.inference_data['proj_inds']
 
         predict_scores = probs[reproj_inds]
         inference_result = {
-            'predict_labels' : np.argmax(predict_scores, 1),
-            'predict_scores' : predict_scores
+            'predict_labels': np.argmax(predict_scores, 1),
+            'predict_scores': predict_scores
         }
 
         self.inference_result = inference_result
@@ -779,24 +782,26 @@ class KPFCNN(BaseModel):
         pl_list = []
         pi_list = []
         ci_list = []
-        
+
         points = np.array(data['search_tree'].data)
         potentials = np.random.rand(points.shape[0]) * 1e-3
 
-        while(np.min(potentials) < 0.5):
+        while (np.min(potentials) < 0.5):
             cloud_ind = 0
             point_ind = int(np.argmin(potentials))
 
             center_point = points[point_ind, :].reshape(1, -1)
             pick_point = center_point
 
-            input_inds = data['search_tree'].query_radius(
-                pick_point, r = cfg.in_radius)[0]
-            
+            input_inds = data['search_tree'].query_radius(pick_point,
+                                                          r=cfg.in_radius)[0]
+
             n = input_inds.shape[0]
 
-            dists = np.sum(np.square((points[input_inds] - pick_point).astype(np.float32)), axis=1)
-            tuckeys = np.square(1 - dists/np.square(cfg.in_radius))
+            dists = np.sum(np.square(
+                (points[input_inds] - pick_point).astype(np.float32)),
+                           axis=1)
+            tuckeys = np.square(1 - dists / np.square(cfg.in_radius))
             tuckeys[dists > np.square(cfg.in_radius)] = 0
             potentials[input_inds] += tuckeys
 
@@ -814,7 +819,8 @@ class KPFCNN(BaseModel):
         stacked_points = np.concatenate(p_list, axis=0),
         stacked_colors = np.concatenate(c_list, axis=0),
         point_labels = np.concatenate(pl_list, axis=0),
-        stacks_lengths = np.array([tp.shape[0] for tp in p_list], dtype=np.int32),
+        stacks_lengths = np.array([tp.shape[0] for tp in p_list],
+                                  dtype=np.int32),
         point_inds = np.concatenate(pi_list, axis=0),
         cloud_inds = np.array(ci_list, dtype=np.int32)
 
@@ -824,8 +830,7 @@ class KPFCNN(BaseModel):
             tf.convert_to_tensor(np.array(point_labels[0], dtype=np.int32)),
             tf.convert_to_tensor(np.array(stacks_lengths[0], dtype=np.int32)),
             tf.convert_to_tensor(np.array(point_inds[0], dtype=np.int32)),
-            tf.convert_to_tensor(np.array(cloud_inds, dtype=np.int32))
-        )
+            tf.convert_to_tensor(np.array(cloud_inds, dtype=np.int32)))
         return input_list, np.array(point_inds[0]), np.array(stacks_lengths[0])
 
     def preprocess(self, data, attr):
@@ -839,7 +844,7 @@ class KPFCNN(BaseModel):
             feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            
+
         data = dict()
 
         sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
@@ -933,7 +938,8 @@ class KPFCNN(BaseModel):
                 center_point = points[point_ind, :].reshape(1, -1)
 
                 # Add noise to the center point
-                noise = np.random.normal(scale=cfg.in_radius/10, size=center_point.shape)
+                noise = np.random.normal(scale=cfg.in_radius / 10,
+                                         size=center_point.shape)
                 pick_point = center_point + noise.astype(center_point.dtype)
 
                 # Indices of points in input region
@@ -966,8 +972,9 @@ class KPFCNN(BaseModel):
                 # In case batch is full, yield it and reset it
                 if batch_n + n > batch_limit and batch_n > 0:
 
-                    yield (np.concatenate(p_list, axis=0),
-                           np.concatenate(c_list, axis=0),
+                    yield (np.concatenate(p_list,
+                                          axis=0), np.concatenate(c_list,
+                                                                  axis=0),
                            np.concatenate(pl_list, axis=0),
                            np.array([tp.shape[0] for tp in p_list]),
                            np.concatenate(pi_list, axis=0),
@@ -1008,5 +1015,6 @@ class KPFCNN(BaseModel):
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
+
 
 MODEL._register_module(KPFCNN, 'tf')

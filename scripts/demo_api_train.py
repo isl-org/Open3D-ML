@@ -1,8 +1,9 @@
-from ml3d.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, 
-                                S3DIS, Toronto3D)
-from ml3d.torch.pipelines import SemanticSegmentation 
+from ml3d.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
+                           Toronto3D)
+from ml3d.torch.pipelines import SemanticSegmentation
 from ml3d.torch.models import RandLANet
 from ml3d.utils import Config, get_module
+
 
 def demo_read_data():
     # read data from datasets
@@ -32,10 +33,11 @@ def demo_train():
                             use_cache=True)
 
     model = RandLANet(
-                ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth",
-                dim_input=3)
+        ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth",
+        dim_input=3)
 
-    pipeline = SemanticSegmentation(model=model, dataset=dataset,
+    pipeline = SemanticSegmentation(model=model,
+                                    dataset=dataset,
                                     max_epoch=100,
                                     batch_size=4,
                                     device="gpu")
@@ -45,26 +47,24 @@ def demo_train():
 
 def demo_inference():
     # Inference and test example
-    from ml3d.tf.pipelines import SemanticSegmentation 
+    from ml3d.tf.pipelines import SemanticSegmentation
     from ml3d.tf.models import RandLANet
 
     Pipeline = get_module("pipeline", "SemanticSegmentation", "tf")
     Model = get_module("model", "RandLANet", "tf")
     Dataset = get_module("dataset", "SemanticKITTI")
 
-    # Initialize using default configuration in 
+    # Initialize using default configuration in
     # "ml3d/configs/default_cfgs/randlanet.yml"
     RandLANet = Model(
         ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth")
 
     # Initialize by specifying config file path
     cfg = Config.load_from_file("ml3d/configs/default_cfgs/semantickitti.yml")
-    cfg.use_cache=False
+    cfg.use_cache = False
     SemanticKITTI = Dataset(**cfg)
 
-
-    pipeline = Pipeline(model=RandLANet, 
-                        dataset=SemanticKITTI)
+    pipeline = Pipeline(model=RandLANet, dataset=SemanticKITTI)
 
     # inference
     # get data

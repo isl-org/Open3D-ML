@@ -8,6 +8,7 @@ from open3d.ml.contrib import knn_search
 
 
 class DataProcessing:
+
     @staticmethod
     def grid_subsampling(points,
                          features=None,
