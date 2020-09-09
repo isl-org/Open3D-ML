@@ -434,7 +434,6 @@ class KPFCNN(BaseModel):
         # Safe check
         if n < 2:
             print("sample n < 2!")
-            exit()
 
         # Project predictions on the frame points
         search_tree = KDTree(in_pts, leaf_size=50)
@@ -1312,6 +1311,11 @@ class KPConv(nn.Module):
         # Apply distance weights [n_points, n_kpoints, in_fdim]
         print(all_weights.size())
         print(neighb_x.size())
+        print(all_weights.get_device())
+        print(neighb_x.get_device())
+        a = torch.randn((4, 2, 3), device='cuda:0')
+        b = torch.randn((4, 3, 5), device='cuda:0')
+        torch.matmul(a,b)
         weighted_features = torch.matmul(all_weights, neighb_x)
 
         # Apply modulations
