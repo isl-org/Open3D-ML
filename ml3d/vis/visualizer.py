@@ -744,7 +744,11 @@ class Visualizer:
         self._play.set_on_clicked(self._on_start_animation)
 
     def _on_bgcolor_changed(self, new_color):
-        self._3d.set_background_color(new_color)
+        bg_color = [
+            new_color.red, new_color.green,
+            new_color.blue, new_color.alpha
+        ]
+        self.window.renderer.set_clear_color(bg_color)
 
     def _on_datasource_changed(self, attr_name, idx):
         self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name)
