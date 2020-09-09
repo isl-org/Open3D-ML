@@ -110,4 +110,16 @@ class Custom3D:
         else:
             raise ValueError("Invalid split {}".format(split))
 
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
+
 DATASET._register_module(Custom3D)

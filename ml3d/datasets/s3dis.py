@@ -140,6 +140,19 @@ class S3DIS(BaseDataset):
 
         return points, feat, search_tree, labels
 
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
+
+
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
         # Format list input to the right form

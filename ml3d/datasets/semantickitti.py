@@ -131,7 +131,7 @@ class SemanticKITTI(BaseDataset):
         save_path = join(test_path, name_seq, 'predictions')
         make_dir(save_path)
         test_file_name = name_points
-        
+
         pred = results['predict_labels']
 
         store_path = join(save_path, name_points + '.label')
