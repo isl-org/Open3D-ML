@@ -34,7 +34,8 @@ class Toronto3D(BaseDataset):
         num_points=65536,
         prepro_grid_size=0.06,
         class_weights=[
-            5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
+            41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634,
+            374721
         ],
         ignored_label_inds=[0],
         train_files=['L001.ply', 'L003.ply', 'L004.ply'],
@@ -105,6 +106,18 @@ class Toronto3D(BaseDataset):
             raise ValueError("Invalid split {}".format(split))
 
         return files
+
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
 
 
 class Toronto3DSplit():
