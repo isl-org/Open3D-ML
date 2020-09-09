@@ -163,7 +163,7 @@ class SemanticSegmentation(BasePipeline):
                                       preprocess=model.preprocess,
                                       transform=model.transform,
                                       use_cache=dataset.cfg.use_cache)
-        valid_loader = DataLoader(train_split,
+        valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
                                   shuffle=True,
                                   collate_fn=batcher.collate_fn)

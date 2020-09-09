@@ -32,8 +32,8 @@ class ParisLille3D(BaseDataset):
                  use_cache=False,
                  num_points=65536,
                  class_weights=[
-                     5181602, 5012952, 6830086, 1311528, 10476365, 946982,
-                     334860, 269353, 269353
+                     65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,
+                     4212295, 10599237
                  ],
                  test_result_folder='./test',
                  val_files=['Lille2.ply'],
@@ -104,6 +104,18 @@ class ParisLille3D(BaseDataset):
             raise ValueError("Invalid split {}".format(split))
 
         return files
+
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
 
 
 class ParisLille3DSplit():
