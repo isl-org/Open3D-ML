@@ -41,6 +41,8 @@ class SemanticKittiCustomBatch:
             batch_n += n
             if batch_n > batch_limit:
                 break
+            if len(data['l_list'].shape) < 1:
+                continue
 
             p_list += [data['p_list']]
             f_list += [data['f_list']]
