@@ -11,7 +11,8 @@ from sklearn.neighbors import KDTree
 
 # use relative import for being compatible with Open3d main repo 
 from .base_model import BaseModel
-from ...utils import MODEL, helper_tf
+from ..utils import helper_tf
+from ...utils import MODEL
 from ...datasets.utils import DataProcessing
 
 class RandLANet(BaseModel):

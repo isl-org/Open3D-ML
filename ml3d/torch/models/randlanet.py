@@ -32,7 +32,7 @@ class RandLANet(BaseModel):
                     4096 * 11 // 4, 4096 * 11 // 16, 
                     4096 * 11 // 64, 4096 * 11 // 256
                 ],
-                dim_input=3,
+                dim_input=3, # 3 + feature_dimension.
                 dim_feature=8,
                 dim_output=[16, 64, 128, 256],
                 grid_size=0.06,
@@ -142,8 +142,6 @@ class RandLANet(BaseModel):
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
-
-                                               is_binary=False)
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
