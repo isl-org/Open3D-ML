@@ -1,4 +1,17 @@
-export BASE_DIR="../../../dataset/Paris_Lille3D"
+#!/bin/bash
+  
+if [ "$#" -ne 1 ]; then
+    echo "Please, provide the base directory to store the dataset."
+    exit 1
+fi
+
+if ! command -v unzip &> /dev/null
+then
+    echo "Error: unzip could not be found. Please, install it to continue"
+    exit
+fi
+
+BASE_DIR="$1"/Paris_Lille3D
 
 mkdir -p $BASE_DIR
 
@@ -13,5 +26,6 @@ cd $BASE_DIR
 unzip test_10_classes.zip
 unzip training_10_classes.zip
 
-rm test_10_classes.zip
-rm training_10_classes.zip
+mkdir -p $BASE_DIR/zip_files
+mv test_10_classes.zip $BASE_DIR/zip_files
+mv training_10_classes.zip $BASE_DIR/zip_files
