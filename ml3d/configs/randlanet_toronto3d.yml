@@ -1,4 +1,5 @@
 dataset:
+  name: Toronto3D
   cache_dir: ./logs/cache
   dataset_path: # path/to/your/dataset
   class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353]
@@ -49,6 +50,7 @@ model:
   - 4
   - 2
 pipeline:
+  name: SemanticSegmentation
   adam_lr: 0.01
   batch_size: 1
   learning_rate: 0.01

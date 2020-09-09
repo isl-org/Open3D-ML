@@ -32,7 +32,8 @@ class S3DIS(BaseDataset):
                  num_points=40960,
                  test_area_idx=3,
                  ignored_label_inds=[],
-                 test_result_folder='./test'):
+                 test_result_folder='./test',
+                 **kwargs):
         """
         Initialize
         Args:
@@ -50,7 +51,8 @@ class S3DIS(BaseDataset):
                          prepro_grid_size=prepro_grid_size,
                          num_points=num_points,
                          test_area_idx=test_area_idx,
-                         ignored_label_inds=ignored_label_inds)
+                         ignored_label_inds=ignored_label_inds,
+                         **kwargs)
 
         cfg = self.cfg
 

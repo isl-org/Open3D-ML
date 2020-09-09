@@ -36,7 +36,8 @@ class ParisLille3D(BaseDataset):
                      334860, 269353, 269353
                  ],
                  test_result_folder='./test',
-                 val_files=['Lille2.ply']):
+                 val_files=['Lille2.ply'],
+                 **kwargs):
         """
         Initialize
         Args:
@@ -52,7 +53,8 @@ class ParisLille3D(BaseDataset):
                          class_weights=class_weights,
                          num_points=num_points,
                          test_result_folder=test_result_folder,
-                         val_files=val_files)
+                         val_files=val_files,
+                         **kwargs)
 
         cfg = self.cfg
 

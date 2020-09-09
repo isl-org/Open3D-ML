@@ -39,6 +39,7 @@ class Semantic3D(BaseDataset):
         ],
         ignored_label_inds=[0],
         val_split=1,
+        **kwargs
     ):
         """
         Initialize
@@ -56,7 +57,8 @@ class Semantic3D(BaseDataset):
                          num_points=num_points,
                          prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
-                         val_split=val_split)
+                         val_split=val_split,
+                         **kwargs)
 
         cfg = self.cfg
 

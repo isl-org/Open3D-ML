@@ -40,6 +40,7 @@ class Toronto3D(BaseDataset):
         train_files=['L001.ply', 'L003.ply', 'L004.ply'],
         val_files=['L002.ply'],
         test_files=['L002.ply'],
+        **kwargs
     ):
         """
         Initialize
@@ -59,7 +60,8 @@ class Toronto3D(BaseDataset):
                          ignored_label_inds=ignored_label_inds,
                          train_files=train_files,
                          test_files=test_files,
-                         val_files=val_files)
+                         val_files=val_files,
+                         **kwargs)
 
         cfg = self.cfg
 

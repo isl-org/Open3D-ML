@@ -46,7 +46,8 @@ class SemanticKITTI(BaseDataset):
                      '00', '01', '02', '03', '04', '05', '06', '07', '09', '08',
                      '10', '11', '12', '13', '14', '15', '16', '17', '18', '19',
                      '20', '21'
-                 ]):
+                 ],
+                 **kwargs):
         """
         Initialize
         Args:
@@ -64,7 +65,8 @@ class SemanticKITTI(BaseDataset):
                          test_split=test_split,
                          training_split=training_split,
                          validation_split=validation_split,
-                         all_split=all_split)
+                         all_split=all_split,
+                         **kwargs)
 
         cfg = self.cfg
 
