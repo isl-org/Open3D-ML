@@ -32,7 +32,7 @@ class BasePipeline(object):
 
         make_dir(self.cfg.main_log_dir)
         self.cfg.logs_dir = join(self.cfg.main_log_dir,
-                                 model.__class__.__name__ + '_torch')
+                                 model.__class__.__name__ + '_tf')
         make_dir(self.cfg.logs_dir)
 
     def get_loss(self):
