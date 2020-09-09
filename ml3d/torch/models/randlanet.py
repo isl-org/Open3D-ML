@@ -105,16 +105,17 @@ class RandLANet(BaseModel):
 
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        if (points.shape[0] < self.cfg.num_points):
+        num_points = self.cfg.num_points
+        center_point = points[pick_idx, :].reshape(1, -1)
+
+        if (points.shape[0] < num_points):
             select_idx = np.array(range(points.shape[0]))
-            diff = self.cfg.num_points - points.shape[0]
+            diff = num_points - points.shape[0]
             select_idx = list(select_idx) + list(
                 random.choices(select_idx, k=diff))
             random.shuffle(select_idx)
         else:
-            center_point = points[pick_idx, :].reshape(1, -1)
-            select_idx = search_tree.query(center_point,
-                                           k=self.cfg.num_points)[1][0]
+            select_idx = search_tree.query(center_point, k=num_points)[1][0]
 
         # select_idx = DataProcessing.shuffle_idx(select_idx)
         random.shuffle(select_idx)
@@ -124,6 +125,9 @@ class RandLANet(BaseModel):
             select_feat = None
         else:
             select_feat = feat[select_idx]
+
+        select_points = select_points - center_point  # TODO : add noise to center point
+
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
@@ -166,9 +170,7 @@ class RandLANet(BaseModel):
             self.crop_pc(pc, feat, label, tree, pick_idx)
 
         if min_posbility_idx is not None:
-            dists = np.sum(np.square(
-                (selected_pc - pc[pick_idx]).astype(np.float32)),
-                           axis=1)
+            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
