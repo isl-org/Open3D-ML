@@ -24,6 +24,7 @@ jobs:
         run: |
           sudo apt-get install --yes clang-format-10
           python -m pip install -U yapf==0.30.0 nbformat
+          python -m pip install -U future-fstrings
       - name: Run style check
         run: |
           python ci/check_style.py
