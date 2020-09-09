@@ -284,7 +284,10 @@ class SemanticSegmentation(BasePipeline):
         # print(acc_dicts[-1])
 
     def load_ckpt(self, ckpt_path, is_train=True):
-        if exists(ckpt_path):
+        if ckpt_path is None or not exists(ckpt_path):
+            first_epoch = 0
+            log.info('No checkpoint')
+        else:
             #path = max(list((cfg.ckpt_path).glob('*.pth')))
             log.info(f'Loading checkpoint {ckpt_path}')
             ckpt = torch.load(ckpt_path)
@@ -297,9 +300,6 @@ class SemanticSegmentation(BasePipeline):
                 if 'scheduler_state_dict' in ckpt:
                     log.info(f'Loading checkpoint scheduler_state_dict')
                     self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
-        else:
-            first_epoch = 0
-            log.info('No checkpoint')
 
         return first_epoch
 
