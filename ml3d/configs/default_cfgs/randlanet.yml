@@ -2,7 +2,7 @@ name: RandLANet
 batcher: DefaultBatcher
 ckpt_path: # path/to/your/checkpoint
 dim_feature: 8
-dim_input: 3
+dim_input: 3 # 3 + feature dimension.
 dim_output:
 - 16
 - 64

@@ -237,9 +237,9 @@ def write_ply(filename, field_list, field_names, triangular_faces=None):
     """
 
     # Format list input to the right form
-    field_list = list(field_list) if (type(field_list) == list
-                                      or type(field_list) == tuple) else list(
-                                          (field_list, ))
+    field_list = list(field_list) if (type(field_list) == list or
+                                      type(field_list) == tuple) else list(
+                                          (field_list,))
     for i, field in enumerate(field_list):
         if field.ndim < 2:
             field_list[i] = field.reshape(-1, 1)
@@ -277,8 +277,7 @@ def write_ply(filename, field_list, field_names, triangular_faces=None):
 
         # Add faces if needded
         if triangular_faces is not None:
-            header.append('element face {:d}'.format(
-                triangular_faces.shape[0]))
+            header.append('element face {:d}'.format(triangular_faces.shape[0]))
             header.append('property list uchar int vertex_indices')
 
         # End of header
@@ -309,12 +308,10 @@ def write_ply(filename, field_list, field_names, triangular_faces=None):
 
         if triangular_faces is not None:
             triangular_faces = triangular_faces.astype(np.int32)
-            type_list = [('k', 'uint8')] + [(str(ind), 'int32')
-                                            for ind in range(3)]
+            type_list = [('k', 'uint8')
+                        ] + [(str(ind), 'int32') for ind in range(3)]
             data = np.empty(triangular_faces.shape[0], dtype=type_list)
-            data['k'] = np.full((triangular_faces.shape[0], ),
-                                3,
-                                dtype=np.uint8)
+            data['k'] = np.full((triangular_faces.shape[0],), 3, dtype=np.uint8)
             data['0'] = triangular_faces[:, 0]
             data['1'] = triangular_faces[:, 1]
             data['2'] = triangular_faces[:, 2]

@@ -14,28 +14,25 @@ from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
 
 
-
 class S3DIS(BaseDataset):
     """
     S3DIS dataset, used in visualizer, training, or test
     """
-    
-    def __init__(self, 
-                dataset_path,
-                name='S3DIS',
-                cache_dir='./logs/cache', 
-                use_cache=False,  
-                prepro_grid_size=0.04,
-                class_weights=[
-                    3370714, 2856755, 4919229, 318158, 375640, 478001, 974733, 650464,
-                    791496, 88727, 1284130, 229758, 2272837
-                ],
-                num_points=40960,
-                test_area_idx=3,
-                ignored_label_inds=[],
-                
-                test_result_folder='./test'
-                ):
+
+    def __init__(self,
+                 dataset_path,
+                 name='S3DIS',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 prepro_grid_size=0.04,
+                 class_weights=[
+                     3370714, 2856755, 4919229, 318158, 375640, 478001, 974733,
+                     650464, 791496, 88727, 1284130, 229758, 2272837
+                 ],
+                 num_points=40960,
+                 test_area_idx=3,
+                 ignored_label_inds=[],
+                 test_result_folder='./test'):
         """
         Initialize
         Args:
@@ -44,16 +41,16 @@ class S3DIS(BaseDataset):
         Returns:
             class: The corresponding class.
         """
-        super().__init__(dataset_path=dataset_path, 
-                        name=name,
-                        cache_dir=cache_dir, 
-                        use_cache=use_cache, 
-                        class_weights=class_weights,
-                        test_result_folder=test_result_folder,
-                        prepro_grid_size=prepro_grid_size, 
-                        num_points=num_points, 
-                        test_area_idx=test_area_idx,
-                        ignored_label_inds=ignored_label_inds)
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         class_weights=class_weights,
+                         test_result_folder=test_result_folder,
+                         prepro_grid_size=prepro_grid_size,
+                         num_points=num_points,
+                         test_area_idx=test_area_idx,
+                         ignored_label_inds=ignored_label_inds)
 
         cfg = self.cfg
 
@@ -73,15 +70,14 @@ class S3DIS(BaseDataset):
             12: 'clutter'
         }
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([])
 
         self.test_split = 'Area_' + str(cfg.test_area_idx)
 
         self.pc_path = join(self.cfg.dataset_path, 'original_ply')
-        
+
         if not exists(self.pc_path):
             print("creating dataset")
             self.create_ply_files(self.cfg.dataset_path, self.label_to_names)
@@ -143,9 +139,9 @@ class S3DIS(BaseDataset):
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
         # Format list input to the right form
-        field_list = list(field_list) if (
-            type(field_list) == list or type(field_list) == tuple) else list(
-                (field_list, ))
+        field_list = list(field_list) if (type(field_list) == list or
+                                          type(field_list) == tuple) else list(
+                                              (field_list,))
         for i, field in enumerate(field_list):
             if field.ndim < 2:
                 field_list[i] = field.reshape(-1, 1)
@@ -215,10 +211,10 @@ class S3DIS(BaseDataset):
 
             if triangular_faces is not None:
                 triangular_faces = triangular_faces.astype(np.int32)
-                type_list = [('k', 'uint8')] + [(str(ind), 'int32')
-                                                for ind in range(3)]
+                type_list = [('k', 'uint8')
+                            ] + [(str(ind), 'int32') for ind in range(3)]
                 data = np.empty(triangular_faces.shape[0], dtype=type_list)
-                data['k'] = np.full((triangular_faces.shape[0], ),
+                data['k'] = np.full((triangular_faces.shape[0],),
                                     3,
                                     dtype=np.uint8)
                 data['0'] = triangular_faces[:, 0]
@@ -248,9 +244,9 @@ class S3DIS(BaseDataset):
 
     @staticmethod
     def create_ply_files(dataset_path, class_names):
-        os.makedirs(join(dataset_path, 'original_ply') , exist_ok=True)
-        anno_file = Path(
-            abspath(__file__)).parent / '_resources' / 's3dis_annotation_paths.txt'
+        os.makedirs(join(dataset_path, 'original_ply'), exist_ok=True)
+        anno_file = Path(abspath(
+            __file__)).parent / '_resources' / 's3dis_annotation_paths.txt'
         print(anno_file)
         anno_file = str(anno_file)
         anno_paths = [line.rstrip() for line in open(anno_file)]
@@ -278,9 +274,6 @@ class S3DIS(BaseDataset):
                 data_list.append(np.concatenate([pc, labels], 1))
 
             pc_label = np.concatenate(data_list, 0)
-            xyz_min = np.amin(pc_label[:, 0:3],
-                              axis=0)  # TODO : can be moved to preprocess
-            pc_label[:, 0:3] -= xyz_min
 
             xyz = pc_label[:, :3].astype(np.float32)
             colors = pc_label[:, 3:6].astype(np.uint8)
@@ -290,8 +283,8 @@ class S3DIS(BaseDataset):
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
 
 
-
 class S3DISSplit():
+
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -318,7 +311,7 @@ class S3DISSplit():
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
 
-        labels = np.zeros((points.shape[0], ), dtype=np.int32)
+        labels = np.zeros((points.shape[0],), dtype=np.int32)
         if (self.split != 'test'):
             labels = data['class']
 
@@ -332,5 +325,6 @@ class S3DISSplit():
 
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
+
 
 DATASET._register_module(S3DIS)

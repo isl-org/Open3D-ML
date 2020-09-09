@@ -51,7 +51,7 @@ cmake -DBUNDLE_OPEN3D_ML=ON \
 make -j"$NPROC" install-pip-package
 
 #
-# 5. run examples/tests in the Open3D-ML repo outside of the repo directory to 
+# 5. run examples/tests in the Open3D-ML repo outside of the repo directory to
 #    make sure that the installed package works.
 #
 popd

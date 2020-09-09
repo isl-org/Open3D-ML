@@ -67,8 +67,7 @@ def default_collate(batch):
     elif isinstance(elem, container_abcs.Mapping):
         return {key: default_collate([d[key] for d in batch]) for key in elem}
     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
-        return elem_type(*(default_collate(samples)
-                           for samples in zip(*batch)))
+        return elem_type(*(default_collate(samples) for samples in zip(*batch)))
     elif isinstance(elem, container_abcs.Sequence):
         # check to make sure that the elements in batch have consistent size
         it = iter(batch)
@@ -84,9 +83,9 @@ def default_collate(batch):
 
 class DefaultBatcher(object):
     """docstring for BaseBatcher"""
+
     def __init__(self):
         super(DefaultBatcher, self).__init__()
-
 
     def collate_fn(self, batch):
         batching_result = default_collate(batch)

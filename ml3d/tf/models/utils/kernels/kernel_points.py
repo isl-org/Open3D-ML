@@ -166,7 +166,7 @@ def spherical_Lloyd(radius,
     warning = False
 
     # moving vectors of kernel points saved to detect convergence
-    max_moves = np.zeros((0, ))
+    max_moves = np.zeros((0,))
 
     for iter in range(max_iter):
 

@@ -37,18 +37,12 @@ except:
         "nbformat not found. Install with `pip install nbformat`.")
 print("Using nbformat version {}".format(nbformat.__version__))
 
-PYTHON_FORMAT_DIRS = [
-    "."
-]
+PYTHON_FORMAT_DIRS = ["."]
 
-JUPYTER_FORMAT_DIRS = [
-    "."
-]
+JUPYTER_FORMAT_DIRS = ["."]
 
 # Note: also modify CPP_FORMAT_DIRS in check_cpp_style.cmake.
-CPP_FORMAT_DIRS = [
-    "."
-]
+CPP_FORMAT_DIRS = ["."]
 
 
 def _glob_files(directories, extensions):

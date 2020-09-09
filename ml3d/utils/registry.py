@@ -5,6 +5,7 @@ class Registry(object):
     """
     docstring for Registry
     """
+
     def __init__(self, name):
         self._name = name
         self._module_dict = dict()
@@ -22,7 +23,8 @@ class Registry(object):
         else:
             if not isinstance(framework, str):
                 raise TypeError("framework must be a string, "
-                    "either tf or torch, but got {}".format(type(framework)))
+                                "either tf or torch, but got {}".format(
+                                    type(framework)))
             return self._module_dict[framework].get(key, None)
 
     @property
@@ -45,18 +47,21 @@ class Registry(object):
         else:
             if not isinstance(framework, str):
                 raise TypeError("framework must be a string, "
-                    "either tf or torch, but got {}".format(type(framework)))
+                                "either tf or torch, but got {}".format(
+                                    type(framework)))
             if framework in self.module_dict:
                 self.module_dict[framework][module_name] = module_class
             else:
                 self.module_dict[framework] = dict()
                 self.module_dict[framework][module_name] = module_class
 
-
     def register_module(self, framework=None, name=None):
+
         def _register(cls):
             self._register_module(cls, framework=framework, module_name=name)
+
         return _register
+
 
 def get_from_name(module_name, registry, framework):
     """Build a module from config dict.
@@ -68,16 +73,15 @@ def get_from_name(module_name, registry, framework):
         object: The constructed object.
     """
     if not isinstance(module_name, str):
-        raise TypeError("module_name must be a string".format(type(module_name)))
+        raise TypeError("module_name must be a string".format(
+            type(module_name)))
     if not isinstance(registry, Registry):
         raise TypeError("registry must be an Registry object, "
                         "but got {}".format(type(module_name)))
-            
+
     obj_cls = registry.get(module_name, framework)
     if obj_cls is None:
-        raise KeyError(
-            "{} - {} is not in the {} registry".format(module_name,    
-                                                        framework, 
-                                                        registry.name))
+        raise KeyError("{} - {} is not in the {} registry".format(
+            module_name, framework, registry.name))
 
     return obj_cls

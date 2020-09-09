@@ -9,6 +9,7 @@ from addict import Dict
 
 
 class ConfigDict(Dict):
+
     def __missing__(self, name):
         raise KeyError(name)
 
@@ -46,6 +47,7 @@ def add_args(parser, cfg, prefix=''):
 
 class Config(object):
     """docstring for Config"""
+
     def __init__(self, cfg_dict=None):
         if cfg_dict is None:
             cfg_dict = dict()
@@ -59,6 +61,7 @@ class Config(object):
 
     def dump(self, *args, **kwargs):
         """Dump to a string."""
+
         def convert_to_dict(cfg_node, key_list):
             if not isinstance(cfg_node, ConfigDict):
                 return cfg_node
@@ -79,19 +82,17 @@ class Config(object):
         Merge the dict parsed by MultipleKVAction into this cfg.
         """
         # merge args to cfg
-        if args.device is not None: cfg.pipeline.device = args.device
-        if args.split is not None: cfg.pipeline.split = args.split
+        if args.device is not None:
+            cfg.pipeline.device = args.device
+        if args.split is not None:
+            cfg.pipeline.split = args.split
         if args.main_log_dir is not None:
             cfg.pipeline.main_log_dir = args.main_log_dir
         if args.dataset_path is not None:
             cfg.dataset.dataset_path = args.dataset_path
         # if args.cfg_model is not None:
 
-        extra_cfg_dict = {
-            'model': {},
-            'dataset': {},
-            'pipeline': {}
-        }
+        extra_cfg_dict = {'model': {}, 'dataset': {}, 'pipeline': {}}
 
         for full_key, v in extra_dict.items():
             d = extra_cfg_dict
@@ -102,15 +103,14 @@ class Config(object):
             subkey = key_list[-1]
             d[subkey] = v
 
-        cfg_dict_dataset = Config._merge_a_into_b(cfg.dataset, 
-                                                extra_cfg_dict['dataset'])
-        cfg_dict_pipeline = Config._merge_a_into_b(cfg.pipeline, 
-                                                extra_cfg_dict['pipeline'])
-        cfg_dict_model = Config._merge_a_into_b(cfg.model, 
+        cfg_dict_dataset = Config._merge_a_into_b(cfg.dataset,
+                                                  extra_cfg_dict['dataset'])
+        cfg_dict_pipeline = Config._merge_a_into_b(cfg.pipeline,
+                                                   extra_cfg_dict['pipeline'])
+        cfg_dict_model = Config._merge_a_into_b(cfg.model,
                                                 extra_cfg_dict['model'])
-  
-        return cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model
 
+        return cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model
 
     @staticmethod
     def merge_module_cfg_file(args, extra_dict):
@@ -118,11 +118,10 @@ class Config(object):
         Merge the dict parsed by MultipleKVAction into this cfg.
         """
         # merge args to cfg
-        cfg_dataset = Config.load_from_file(args.cfg_dataset) 
+        cfg_dataset = Config.load_from_file(args.cfg_dataset)
         cfg_model = Config.load_from_file(args.cfg_model)
         cfg_pipeline = Config.load_from_file(args.cfg_pipeline)
- 
- 
+
         cfg_dict = {
             'dataset': cfg_dataset.cfg_dict,
             'model': cfg_model.cfg_dict,
@@ -130,18 +129,16 @@ class Config(object):
         }
         cfg = Config(cfg_dict)
 
-        if args.device is not None: cfg.pipeline.device = args.device
-        if args.split is not None: cfg.pipeline.split = args.split
+        if args.device is not None:
+            cfg.pipeline.device = args.device
+        if args.split is not None:
+            cfg.pipeline.split = args.split
         if args.main_log_dir is not None:
             cfg.pipeline.main_log_dir = args.main_log_dir
         if args.dataset_path is not None:
             cfg.dataset.dataset_path = args.dataset_path
 
-        extra_cfg_dict = {
-            'model': {},
-            'dataset': {},
-            'pipeline': {}
-        }
+        extra_cfg_dict = {'model': {}, 'dataset': {}, 'pipeline': {}}
 
         for full_key, v in extra_dict.items():
             d = extra_cfg_dict
@@ -152,15 +149,14 @@ class Config(object):
             subkey = key_list[-1]
             d[subkey] = v
 
-        cfg_dict_dataset = Config._merge_a_into_b(cfg.dataset, 
-                                                extra_cfg_dict['dataset'])
-        cfg_dict_pipeline = Config._merge_a_into_b(cfg.pipeline, 
-                                                extra_cfg_dict['pipeline'])
-        cfg_dict_model = Config._merge_a_into_b(cfg.model, 
+        cfg_dict_dataset = Config._merge_a_into_b(cfg.dataset,
+                                                  extra_cfg_dict['dataset'])
+        cfg_dict_pipeline = Config._merge_a_into_b(cfg.pipeline,
+                                                   extra_cfg_dict['pipeline'])
+        cfg_dict_model = Config._merge_a_into_b(cfg.model,
                                                 extra_cfg_dict['model'])
 
         return cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model
-
 
     @staticmethod
     def _merge_a_into_b(a, b):
@@ -173,10 +169,11 @@ class Config(object):
             if isinstance(v, dict) and k in b:
                 if not isinstance(b[k], dict):
                     raise TypeError(
-                        "{}={} in child config cannot inherit from base ".format(k, v)+
-                        "because {} is a dict in the child config but is of ".format(k)+
-                        "type {} in base config.  ".format(type(b[k]))
-                        )
+                        "{}={} in child config cannot inherit from base ".
+                        format(k, v) +
+                        "because {} is a dict in the child config but is of ".
+                        format(k) +
+                        "type {} in base config.  ".format(type(b[k])))
                 b[k] = Config._merge_a_into_b(v, b[k])
             else:
                 if v is None:
@@ -209,8 +206,8 @@ class Config(object):
                 temp_config_file = tempfile.NamedTemporaryFile(
                     dir=temp_config_dir, suffix='.py')
                 temp_config_name = os.path.basename(temp_config_file.name)
-                shutil.copyfile(
-                    filename, os.path.join(temp_config_dir, temp_config_name))
+                shutil.copyfile(filename,
+                                os.path.join(temp_config_dir, temp_config_name))
                 temp_module_name = os.path.splitext(temp_config_name)[0]
                 sys.path.insert(0, temp_config_dir)
                 mod = import_module(temp_module_name)
@@ -225,7 +222,7 @@ class Config(object):
                 # close temp file
                 temp_config_file.close()
 
-        if filename.endswith('.yaml') or filename.endswith('.yml') :
+        if filename.endswith('.yaml') or filename.endswith('.yml'):
             with open(filename) as f:
                 cfg_dict = yaml.safe_load(f)
 

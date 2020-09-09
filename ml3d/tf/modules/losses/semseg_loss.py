@@ -5,6 +5,7 @@ from ....datasets.utils import DataProcessing as DP
 
 class SemSegLoss(object):
     """Loss functions for semantic segmentation"""
+
     def __init__(self, pipeline, model, dataset):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss
@@ -13,8 +14,7 @@ class SemSegLoss(object):
 
         if 'class_weights' in dataset.cfg.keys():
             weights = DP.get_class_weights(dataset.cfg.class_weights)
-            self.class_weights = tf.convert_to_tensor(weights,
-                                                      dtype=tf.float32)
+            self.class_weights = tf.convert_to_tensor(weights, dtype=tf.float32)
 
     def weighted_CrossEntropyLoss(self, logits, labels):
         # calculate the weighted cross entropy according to the inverse frequency
@@ -45,7 +45,7 @@ class SemSegLoss(object):
 
         # Reduce label values in the range of logit shape
         reducing_list = tf.range(self.num_classes, dtype=tf.int32)
-        inserted_value = tf.zeros((1, ), dtype=tf.int32)
+        inserted_value = tf.zeros((1,), dtype=tf.int32)
         for ign_label in self.ignored_label_inds:
             reducing_list = tf.concat([
                 reducing_list[:ign_label], inserted_value,

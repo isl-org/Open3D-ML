@@ -7,6 +7,7 @@ import tensorflow as tf
 
 
 class ExpandDims(tf.keras.layers.Layer):
+
     def __init__(self, axis=-1):
         super(ExpandDims, self).__init__()
         self.axis = axis
@@ -19,6 +20,7 @@ class ExpandDims(tf.keras.layers.Layer):
 
 
 class conv2d(tf.keras.layers.Layer):
+
     def __init__(self,
                  batchNorm,
                  out_planes,
@@ -57,6 +59,7 @@ class conv2d(tf.keras.layers.Layer):
 
 
 class conv2d_transpose(tf.keras.layers.Layer):
+
     def __init__(self,
                  batchNorm,
                  out_planes,
