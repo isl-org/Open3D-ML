@@ -335,10 +335,8 @@ class KPFCNN(BaseModel):
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
 
-        logp = torch.distributions.utils.probs_to_logits(scores,
-                                                         is_binary=False)
         # Cross entropy loss
-        self.output_loss = Loss.weighted_CrossEntropyLoss(logp, labels)
+        self.output_loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         # Regularization of deformable offsets
         if self.deform_fitting_mode == 'point2point':
