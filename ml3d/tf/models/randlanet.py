@@ -5,53 +5,56 @@ import tensorflow as tf
 import numpy as np
 import time
 import random
+import pudb
 from sklearn.neighbors import KDTree
 
-
-# use relative import for being compatible with Open3d main repo 
+# use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
-from ...utils import MODEL, helper_tf
+from ..utils import helper_tf
+from ...utils import MODEL
 from ...datasets.utils import DataProcessing
 
-class RandLANet(BaseModel):
-    def __init__(self, 
-                name='RandLANet',
-                k_n=16,  # KNN,
-                num_layers=4,  # Number of layers
-                num_points=4096 * 11,  # Number of input points
-                num_classes=19,  # Number of valid classes
-                ignored_label_inds=[0],
-                sub_grid_size=0.06,  # preprocess_parameter
-                sub_sampling_ratio=[4, 4, 4, 4],
-                num_sub_points=[
-                    4096 * 11 // 4, 4096 * 11 // 16, 
-                    4096 * 11 // 64, 4096 * 11 // 256
-                ],
-                dim_input=3,
-                dim_feature=8,
-                dim_output=[16, 64, 128, 256],
-                grid_size=0.06,
-                batcher='DefaultBatcher',
-                ckpt_path=None,
-                **kwargs):
 
-        super().__init__(
-            name=name,
-            k_n=k_n,
-            num_layers=num_layers,
-            num_points=num_points,
-            num_classes=num_classes,
-            ignored_label_inds=ignored_label_inds,
-            sub_grid_size=sub_grid_size,
-            sub_sampling_ratio=sub_sampling_ratio,
-            num_sub_points=num_sub_points,
-            dim_input=dim_input,
-            dim_feature=dim_feature,
-            dim_output=dim_output,
-            grid_size=grid_size,
-            batcher=batcher,
-            ckpt_path=ckpt_path,
-            **kwargs)
+class RandLANet(BaseModel):
+
+    def __init__(
+            self,
+            name='RandLANet',
+            k_n=16,  # KNN,
+            num_layers=4,  # Number of layers
+            num_points=4096 * 11,  # Number of input points
+            num_classes=19,  # Number of valid classes
+            ignored_label_inds=[0],
+            sub_grid_size=0.06,  # preprocess_parameter
+            sub_sampling_ratio=[4, 4, 4, 4],
+            num_sub_points=[
+                4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
+                4096 * 11 // 256
+            ],
+            dim_input=3,
+            dim_feature=8,
+            dim_output=[16, 64, 128, 256],
+            grid_size=0.06,
+            batcher='DefaultBatcher',
+            ckpt_path=None,
+            **kwargs):
+
+        super().__init__(name=name,
+                         k_n=k_n,
+                         num_layers=num_layers,
+                         num_points=num_points,
+                         num_classes=num_classes,
+                         ignored_label_inds=ignored_label_inds,
+                         sub_grid_size=sub_grid_size,
+                         sub_sampling_ratio=sub_sampling_ratio,
+                         num_sub_points=num_sub_points,
+                         dim_input=dim_input,
+                         dim_feature=dim_feature,
+                         dim_output=dim_output,
+                         grid_size=grid_size,
+                         batcher=batcher,
+                         ckpt_path=ckpt_path,
+                         **kwargs)
 
         cfg = self.cfg
 
@@ -96,11 +99,8 @@ class RandLANet(BaseModel):
         f_dropout = tf.keras.layers.Dropout(0.5)
         setattr(self, 'dropout1', f_dropout)
 
-        f_layer_fc3 = helper_tf.conv2d(False,
-                                       cfg.num_classes,
-                                       activation=False)
+        f_layer_fc3 = helper_tf.conv2d(False, cfg.num_classes, activation=False)
         setattr(self, 'fc', f_layer_fc3)
-
 
     def init_att_pooling(self, d, dim_output, name):
         att_activation = tf.keras.layers.Dense(d, activation=None)
@@ -114,7 +114,8 @@ class RandLANet(BaseModel):
 
         setattr(self, name + 'bdmlp1', f_pc)
 
-        self.init_att_pooling(dim_input * 2, dim_output // 2, name + 'att_pooling_1')
+        self.init_att_pooling(dim_input * 2, dim_output // 2,
+                              name + 'att_pooling_1')
 
         f_xyz = helper_tf.conv2d(True, dim_output // 2)
         setattr(self, name + 'mlp2', f_xyz)
@@ -205,7 +206,8 @@ class RandLANet(BaseModel):
 
         return f_pc_agg
 
-    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output, name):
+    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output,
+                                  name):
         m_conv2d = getattr(self, name + 'mlp1')
         f_pc = m_conv2d(feature, training=self.training)
 
@@ -257,14 +259,14 @@ class RandLANet(BaseModel):
         # Decoder
         f_decoder_list = []
         for j in range(self.cfg.num_layers):
-            f_interp_i = self.nearest_interpolation(feature,
-                                                    interp_idx[-j - 1])
+            f_interp_i = self.nearest_interpolation(feature, interp_idx[-j - 1])
             name = 'Decoder_layer_' + str(j)
 
             m_transposeconv2d = getattr(self, name)
             concat_feature = tf.concat([f_encoder_list[-j - 2], f_interp_i],
                                        axis=3)
-            f_decoder_i = m_transposeconv2d(concat_feature, training=self.training)
+            f_decoder_i = m_transposeconv2d(concat_feature,
+                                            training=self.training)
 
             feature = f_decoder_i
             f_decoder_list.append(f_decoder_i)
@@ -287,11 +289,12 @@ class RandLANet(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            cfg_pipeline.adam_lr, decay_steps=100000, decay_rate=cfg_pipeline.scheduler_gamma)
+            cfg_pipeline.adam_lr,
+            decay_steps=100000,
+            decay_rate=cfg_pipeline.scheduler_gamma)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         return optimizer
-
 
     def get_loss(self, Loss, results, inputs):
         """
@@ -344,10 +347,11 @@ class RandLANet(BaseModel):
         interp_idx = tf.reshape(interp_idx, [batch_size, up_num_points])
 
         interpolatedim_features = tf.gather(feature,
-                                          interp_idx,
-                                          axis=1,
-                                          batch_dims=1)
-        interpolatedim_features = tf.expand_dims(interpolatedim_features, axis=2)
+                                            interp_idx,
+                                            axis=1,
+                                            batch_dims=1)
+        interpolatedim_features = tf.expand_dims(interpolatedim_features,
+                                                 axis=2)
         return interpolatedim_features
 
     @staticmethod
@@ -400,26 +404,39 @@ class RandLANet(BaseModel):
 
                 pc, feat, label, _ = self.crop_pc(data['point'], data['feat'],
                                                   data['label'],
-                                                  data['search_tree'],
-                                                  pick_idx)
-            
+                                                  data['search_tree'], pick_idx)
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
 
         gen_func = gen
         gen_types = (tf.float32, tf.float32, tf.int32)
-        gen_shapes = ([None, 3], [None, 3], [None])
+        gen_shapes = ([None, 3], [None, cfg.d_in], [None])
 
         return gen_func, gen_types, gen_shapes
 
-    def transform(self, pc, feat, label):
+    def transform_inference(self, data, min_posbility_idx):
         cfg = self.cfg
+        inputs = dict()
 
-        if (feat is not None):
-            features = tf.concat([pc, feat], axis=1)
-        else:
-            features = pc
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']
+
+        pick_idx = min_posbility_idx
+
+        selected_pc, feat, label, selected_idx = self.crop_pc(
+            pc, feat, label, tree, pick_idx)
+        dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+
+        delta = np.square(1 - dists / np.max(dists))
+
+        self.possibility[selected_idx] += delta
+        inputs['point_inds'] = selected_idx
+
+        pc = selected_pc
+        features = feat
 
         input_points = []
         input_neighbors = []
@@ -427,14 +444,46 @@ class RandLANet(BaseModel):
         input_up_samples = []
 
         for i in range(cfg.num_layers):
-            neighbour_idx = tf.py_function(DataProcessing.knn_search,
-                                           [pc, pc, cfg.k_n], tf.int32)
+            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            up_i = DataProcessing.knn_search(sub_points, pc, 1)
+            input_points.append(pc)
+            input_neighbors.append(neighbour_idx.astype(np.int64))
+            input_pools.append(pool_i.astype(np.int64))
+            input_up_samples.append(up_i.astype(np.int64))
+            pc = sub_points
+
+        inputs['xyz'] = input_points
+        inputs['neigh_idx'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = features
+
+        inputs['labels'] = label.astype(np.int64)
+
+        return inputs
+        # input_list = input_points + input_neighbors + input_pools + input_up_samples
+        # input_list += [feat, label]
+
+    def transform(self, pc, feat, label):
+        cfg = self.cfg
+
+        input_points = []
+        input_neighbors = []
+        input_pools = []
+        input_up_samples = []
+
+        for i in range(cfg.num_layers):
+            neighbour_idx = tf.numpy_function(DataProcessing.knn_search,
+                                              [pc, pc, cfg.k_n], tf.int32)
 
             sub_points = pc[:tf.shape(pc)[0] // cfg.sub_sampling_ratio[i], :]
             pool_i = neighbour_idx[:tf.shape(pc)[0] //
                                    cfg.sub_sampling_ratio[i], :]
-            up_i = tf.py_function(DataProcessing.knn_search,
-                                  [sub_points, pc, 1], tf.int32)
+            up_i = tf.numpy_function(DataProcessing.knn_search,
+                                     [sub_points, pc, 1], tf.int32)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx)
             input_pools.append(pool_i)
@@ -442,32 +491,80 @@ class RandLANet(BaseModel):
             pc = sub_points
 
         input_list = input_points + input_neighbors + input_pools + input_up_samples
-        input_list += [features, label]
+        input_list += [feat, label]
 
         return input_list
+
+    def inference_begin(self, data):
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
+
+    def inference_preprocess(self):
+        min_posbility_idx = np.argmin(self.possibility)
+        data = self.transform_inference(self.inference_data, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        # inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data[
+            'interp_idx']
+        flat_inputs += [data['features'], data['labels']]
+
+        for i in range(len(flat_inputs)):
+            flat_inputs[i] = np.expand_dims(flat_inputs[i], 0)
+
+        return flat_inputs
+
+    def inference_end(self, results):
+        inputs = self.inference_input
+        results = tf.reshape(results, (-1, self.cfg.num_classes))
+        results = tf.nn.softmax(results, axis=-1)
+        results = results.cpu().numpy()
+
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds']
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def preprocess(self, data, attr):
         cfg = self.cfg
 
         points = data['point'][:, 0:3]
-        labels = data['label']
-        split = attr['split']
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32)
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
             feat = np.concatenate([points, feat], axis=1)
 
+        assert self.cfg.d_in == feat.shape[
+            1], "Wrong feature dimension, please update d_in(3 + feature_dimension) in config"
+
+        split = attr['split']
+
         data = dict()
 
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_subsampling(
-                points, labels=labels, grid_size=cfg.grid_size)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-                points, features=feat, labels=labels, grid_size=cfg.grid_size)
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+            points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
@@ -476,7 +573,7 @@ class RandLANet(BaseModel):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -484,5 +581,5 @@ class RandLANet(BaseModel):
 
         return data
 
-MODEL._register_module(RandLANet, 'tf')
 
+MODEL._register_module(RandLANet, 'tf')

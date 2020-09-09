@@ -3,13 +3,15 @@ import yaml
 import torch
 from os.path import join, exists, dirname, abspath
 
-# use relative import for being compatible with Open3d main repo 
+# use relative import for being compatible with Open3d main repo
 from ...utils import Config
+
 
 class BaseModel(torch.nn.Module):
     """
     Base dataset class
     """
+
     def __init__(self, **kwargs):
         """
         Initialize
@@ -22,10 +24,8 @@ class BaseModel(torch.nn.Module):
             class: The corresponding class.
         """
         super().__init__()
- 
+
         self.cfg = Config(kwargs)
-
-
 
     def get_loss(self):
         raise NotImplementedError()

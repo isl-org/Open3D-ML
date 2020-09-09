@@ -26,46 +26,47 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
 class SemanticSegmentation(BasePipeline):
-    def __init__(self,
-                model,
-                dataset=None,
-                name='SemanticSegmentation', 
-                batch_size=4,
-                val_batch_size=4,
-                test_batch_size=3,
-                max_epoch=100,  # maximum epoch during training
-                learning_rate=1e-2,  # initial learning rate
-                lr_decays=0.95,
-                save_ckpt_freq=20,
-                adam_lr=1e-2,
-                scheduler_gamma=0.95,
-                main_log_dir='./logs/',
-                device='gpu',
-                split='train',
-                train_sum_dir='train_log',
-                **kwargs):
-    
 
-        super().__init__(model=model, 
-                        dataset=dataset, 
-                        name=name,
-                        batch_size=batch_size,
-                        val_batch_size=val_batch_size,
-                        test_batch_size=test_batch_size,
-                        max_epoch=max_epoch,
-                        learning_rate=learning_rate,
-                        lr_decays=lr_decays,
-                        save_ckpt_freq=save_ckpt_freq,
-                        adam_lr=adam_lr,  
-                        scheduler_gamma=scheduler_gamma,
-                        main_log_dir=main_log_dir,
-                        device=device,
-                        split=split,
-                        train_sum_dir=train_sum_dir,
-                        **kwargs)
+    def __init__(
+            self,
+            model,
+            dataset=None,
+            name='SemanticSegmentation',
+            batch_size=4,
+            val_batch_size=4,
+            test_batch_size=3,
+            max_epoch=100,  # maximum epoch during training
+            learning_rate=1e-2,  # initial learning rate
+            lr_decays=0.95,
+            save_ckpt_freq=20,
+            adam_lr=1e-2,
+            scheduler_gamma=0.95,
+            main_log_dir='./logs/',
+            device='gpu',
+            split='train',
+            train_sum_dir='train_log',
+            **kwargs):
 
-        
+        super().__init__(model=model,
+                         dataset=dataset,
+                         name=name,
+                         batch_size=batch_size,
+                         val_batch_size=val_batch_size,
+                         test_batch_size=test_batch_size,
+                         max_epoch=max_epoch,
+                         learning_rate=learning_rate,
+                         lr_decays=lr_decays,
+                         save_ckpt_freq=save_ckpt_freq,
+                         adam_lr=adam_lr,
+                         scheduler_gamma=scheduler_gamma,
+                         main_log_dir=main_log_dir,
+                         device=device,
+                         split=split,
+                         train_sum_dir=train_sum_dir,
+                         **kwargs)
+
     def run_inference(self, data):
         cfg = self.cfg
         model = self.model
@@ -83,7 +84,7 @@ class SemanticSegmentation(BasePipeline):
                 results = model(inputs['data'])
                 if model.inference_end(inputs, results):
                     break
-   
+
         return model.inference_result
 
     def run_test(self):
@@ -106,19 +107,18 @@ class SemanticSegmentation(BasePipeline):
 
         batcher = self.get_batcher(device, split='test')
 
-        test_split = TorchDataloader(
-            dataset=dataset.get_split('test'),
-            preprocess=model.preprocess,
-            transform=model.transform,
-            use_cache=dataset.cfg.use_cache,
-            shuffle=False)
+        test_split = TorchDataloader(dataset=dataset.get_split('test'),
+                                     preprocess=model.preprocess,
+                                     transform=model.transform,
+                                     use_cache=dataset.cfg.use_cache,
+                                     shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path, False)
 
         datset_split = self.dataset.get_split('test')
 
         log.info("Started testing")
-        
+
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
                 attr = datset_split.get_attr(idx)
@@ -150,26 +150,23 @@ class SemanticSegmentation(BasePipeline):
         batcher = self.get_batcher(device)
 
         train_split = TorchDataloader(dataset=dataset.get_split('training'),
-                                    preprocess=model.preprocess,
-                                    transform=model.transform,
-                                    use_cache=dataset.cfg.use_cache)
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache)
 
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   shuffle=True,
                                   collate_fn=batcher.collate_fn)
 
-        valid_split = TorchDataloader(
-            dataset=dataset.get_split('validation'),
-            preprocess=model.preprocess,
-            transform=model.transform,
-            use_cache=dataset.cfg.use_cache)
-        valid_loader = DataLoader(
-            valid_split,
-            batch_size=cfg.val_batch_size,
-            shuffle=True,
-            collate_fn=batcher.collate_fn)
-
+        valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache)
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.val_batch_size,
+                                  shuffle=True,
+                                  collate_fn=batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -287,7 +284,10 @@ class SemanticSegmentation(BasePipeline):
         # print(acc_dicts[-1])
 
     def load_ckpt(self, ckpt_path, is_train=True):
-        if exists(ckpt_path):
+        if ckpt_path is None or not exists(ckpt_path):
+            first_epoch = 0
+            log.info('No checkpoint')
+        else:
             #path = max(list((cfg.ckpt_path).glob('*.pth')))
             log.info(f'Loading checkpoint {ckpt_path}')
             ckpt = torch.load(ckpt_path)
@@ -300,9 +300,6 @@ class SemanticSegmentation(BasePipeline):
                 if 'scheduler_state_dict' in ckpt:
                     log.info(f'Loading checkpoint scheduler_state_dict')
                     self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
-        else:
-            first_epoch = 0
-            log.info('No checkpoint')
 
         return first_epoch
 
@@ -350,5 +347,6 @@ class SemanticSegmentation(BasePipeline):
         valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
 
         return valid_scores, valid_labels
+
 
 PIPELINE._register_module(SemanticSegmentation, "torch")

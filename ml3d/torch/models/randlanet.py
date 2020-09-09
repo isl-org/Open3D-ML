@@ -9,7 +9,7 @@ from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
-# use relative import for being compatible with Open3d main repo 
+# use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
@@ -19,43 +19,45 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
-    def __init__(self, 
-                name='RandLANet',
-                k_n=16,  # KNN,
-                num_layers=4,  # Number of layers
-                num_points=4096 * 11,  # Number of input points
-                num_classes=19,  # Number of valid classes
-                ignored_label_inds=[0],
-                sub_grid_size=0.06,  # preprocess_parameter
-                sub_sampling_ratio=[4, 4, 4, 4],
-                num_sub_points=[
-                    4096 * 11 // 4, 4096 * 11 // 16, 
-                    4096 * 11 // 64, 4096 * 11 // 256
-                ],
-                dim_input=3,
-                dim_feature=8,
-                dim_output=[16, 64, 128, 256],
-                grid_size=0.06,
-                batcher='DefaultBatcher',
-                ckpt_path=None,
-                **kwargs):
+
+    def __init__(
+            self,
+            name='RandLANet',
+            k_n=16,  # KNN,
+            num_layers=4,  # Number of layers
+            num_points=4096 * 11,  # Number of input points
+            num_classes=19,  # Number of valid classes
+            ignored_label_inds=[0],
+            sub_grid_size=0.06,  # preprocess_parameter
+            sub_sampling_ratio=[4, 4, 4, 4],
+            num_sub_points=[
+                4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
+                4096 * 11 // 256
+            ],
+            dim_input=3,  # 3 + feature_dimension.
+            dim_feature=8,
+            dim_output=[16, 64, 128, 256],
+            grid_size=0.06,
+            batcher='DefaultBatcher',
+            ckpt_path=None,
+            **kwargs):
 
         super().__init__(name=name,
-                        k_n=k_n,
-                        num_layers=num_layers,
-                        num_points=num_points,
-                        num_classes=num_classes,
-                        ignored_label_inds=ignored_label_inds,
-                        sub_grid_size=sub_grid_size,
-                        sub_sampling_ratio=sub_sampling_ratio,
-                        num_sub_points=num_sub_points,
-                        dim_input=dim_input,
-                        dim_feature=dim_feature,
-                        dim_output=dim_output,
-                        grid_size=grid_size,
-                        batcher=batcher,
-                        ckpt_path=ckpt_path,
-                        **kwargs)
+                         k_n=k_n,
+                         num_layers=num_layers,
+                         num_points=num_points,
+                         num_classes=num_classes,
+                         ignored_label_inds=ignored_label_inds,
+                         sub_grid_size=sub_grid_size,
+                         sub_sampling_ratio=sub_sampling_ratio,
+                         num_sub_points=num_sub_points,
+                         dim_input=dim_input,
+                         dim_feature=dim_feature,
+                         dim_output=dim_output,
+                         grid_size=grid_size,
+                         batcher=batcher,
+                         ckpt_path=ckpt_path,
+                         **kwargs)
         cfg = self.cfg
 
         dim_feature = cfg.dim_feature
@@ -84,7 +86,8 @@ class RandLANet(BaseModel):
             dim_input = d_encoder_list[-j - 2] + dim_feature
             dim_output = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_torch.conv2d_transpose(True, dim_input, dim_output)
+            f_decoder_i = helper_torch.conv2d_transpose(True, dim_input,
+                                                        dim_output)
             setattr(self, name, f_decoder_i)
             dim_feature = d_encoder_list[-j - 2]
 
@@ -102,16 +105,17 @@ class RandLANet(BaseModel):
 
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        if (points.shape[0] < self.cfg.num_points):
+        num_points = self.cfg.num_points
+        center_point = points[pick_idx, :].reshape(1, -1)
+
+        if (points.shape[0] < num_points):
             select_idx = np.array(range(points.shape[0]))
-            diff = self.cfg.num_points - points.shape[0]
+            diff = num_points - points.shape[0]
             select_idx = list(select_idx) + list(
                 random.choices(select_idx, k=diff))
             random.shuffle(select_idx)
         else:
-            center_point = points[pick_idx, :].reshape(1, -1)
-            select_idx = search_tree.query(center_point,
-                                           k=self.cfg.num_points)[1][0]
+            select_idx = search_tree.query(center_point, k=num_points)[1][0]
 
         # select_idx = DataProcessing.shuffle_idx(select_idx)
         random.shuffle(select_idx)
@@ -121,11 +125,13 @@ class RandLANet(BaseModel):
             select_feat = None
         else:
             select_feat = feat[select_idx]
+
+        select_points = select_points - center_point  # TODO : add noise to center point
+
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(),
-                                     lr=cfg_pipeline.adam_lr)
+        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
@@ -142,12 +148,9 @@ class RandLANet(BaseModel):
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
-
-                                               is_binary=False)
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
-
 
     def transform(self, data, attr, min_posbility_idx=None):
         cfg = self.cfg
@@ -167,9 +170,7 @@ class RandLANet(BaseModel):
             self.crop_pc(pc, feat, label, tree, pick_idx)
 
         if min_posbility_idx is not None:
-            dists = np.sum(np.square(
-                (selected_pc - pc[pick_idx]).astype(np.float32)),
-                           axis=1)
+            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
@@ -185,8 +186,7 @@ class RandLANet(BaseModel):
             neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
 
             sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:pc.shape[0] //
-                                   cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
             up_i = DataProcessing.knn_search(sub_points, pc, 1)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx.astype(np.int64))
@@ -246,7 +246,11 @@ class RandLANet(BaseModel):
         cfg = self.cfg
 
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
-        labels = np.array(data['label'], dtype=np.int32)
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32)
 
         if 'feat' not in data.keys() or data['feat'] is None:
             feat = points
@@ -268,7 +272,7 @@ class RandLANet(BaseModel):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split == "test":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -287,7 +291,8 @@ class RandLANet(BaseModel):
         f_pc = helper_torch.conv2d(True, 10, dim_input)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_att_pooling(dim_input * 2, dim_output // 2, name + 'att_pooling_1')
+        self.init_att_pooling(dim_input * 2, dim_output // 2,
+                              name + 'att_pooling_1')
 
         f_xyz = helper_torch.conv2d(True, dim_input, dim_output // 2)
         setattr(self, name + 'mlp2', f_xyz)
@@ -300,10 +305,16 @@ class RandLANet(BaseModel):
 
         self.init_building_block(dim_output // 2, dim_output, name + 'LFA')
 
-        f_pc = helper_torch.conv2d(True, dim_output, dim_output * 2, activation=False)
+        f_pc = helper_torch.conv2d(True,
+                                   dim_output,
+                                   dim_output * 2,
+                                   activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_torch.conv2d(True, dim_input, dim_output * 2, activation=False)
+        shortcut = helper_torch.conv2d(True,
+                                       dim_input,
+                                       dim_output * 2,
+                                       activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
@@ -383,7 +394,8 @@ class RandLANet(BaseModel):
 
         return f_pc_agg
 
-    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output, name):
+    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output,
+                                  name):
         m_conv2d = getattr(self, name + 'mlp1')
         f_pc = m_conv2d(feature)
 
@@ -437,8 +449,7 @@ class RandLANet(BaseModel):
         # Decoder
         f_decoder_list = []
         for j in range(self.cfg.num_layers):
-            f_interp_i = self.nearest_interpolation(feature,
-                                                    interp_idx[-j - 1])
+            f_interp_i = self.nearest_interpolation(feature, interp_idx[-j - 1])
             name = 'Decoder_layer_' + str(j)
 
             m_transposeconv2d = getattr(self, name)
@@ -511,5 +522,6 @@ class RandLANet(BaseModel):
         interpolatedim_features = torch.gather(feature, 2, interp_idx)
         interpolatedim_features = interpolatedim_features.unsqueeze(3)
         return interpolatedim_features
+
 
 MODEL._register_module(RandLANet, 'torch')

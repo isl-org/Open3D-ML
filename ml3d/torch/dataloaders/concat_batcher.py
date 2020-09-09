@@ -9,10 +9,7 @@ from os.path import exists, join, isdir
 
 from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 
-
 from torch.utils.data import Sampler, get_worker_info
-
-
 
 
 class SemanticKittiCustomBatch:
@@ -37,13 +34,15 @@ class SemanticKittiCustomBatch:
         batch_limit = int(self.cfg.batch_limit)
 
         for batch in batches:
-        # Stack batch
+            # Stack batch
             data = batch['data']
 
             n = data['p_list'].shape[0]
             batch_n += n
             if batch_n > batch_limit:
                 break
+            if len(data['l_list'].shape) < 1:
+                continue
 
             p_list += [data['p_list']]
             f_list += [data['f_list']]
@@ -64,14 +63,12 @@ class SemanticKittiCustomBatch:
         labels = np.concatenate(l_list, axis=0)
         frame_inds = np.array(fi_list, dtype=np.int32)
         frame_centers = np.stack(p0_list, axis=0)
-        stack_lengths = np.array([pp.shape[0] for pp in p_list],
-                                 dtype=np.int32)
+        stack_lengths = np.array([pp.shape[0] for pp in p_list], dtype=np.int32)
         scales = np.array(s_list, dtype=np.float32)
         rots = np.stack(R_list, axis=0)
 
         # Input features (Use reflectance, input height or all coordinates)
-        stacked_features = np.ones_like(stacked_points[:, :1],
-                                        dtype=np.float32)
+        stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
         if self.cfg.in_features_dim == 1:
             pass
         elif self.cfg.in_features_dim == 2:
@@ -245,8 +242,8 @@ class SemanticKittiCustomBatch:
         for block_i, block in enumerate(arch):
 
             # Get all blocks of the layer
-            if not ('pool' in block or 'strided' in block or 'global' in block
-                    or 'upsample' in block):
+            if not ('pool' in block or 'strided' in block or
+                    'global' in block or 'upsample' in block):
                 layer_blocks += [block]
                 continue
 
@@ -301,15 +298,14 @@ class SemanticKittiCustomBatch:
                 # No pooling in the end of this layer, no pooling indices required
                 pool_i = np.zeros((0, 1), dtype=np.int32)
                 pool_p = np.zeros((0, 3), dtype=np.float32)
-                pool_b = np.zeros((0, ), dtype=np.int32)
+                pool_b = np.zeros((0,), dtype=np.int32)
                 up_i = np.zeros((0, 1), dtype=np.int32)
 
             # Reduce size of neighbors matrices by eliminating furthest point
             conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
             pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
             if up_i.shape[0] > 0:
-                up_i = self.big_neighborhood_filter(up_i,
-                                                    len(input_points) + 1)
+                up_i = self.big_neighborhood_filter(up_i, len(input_points) + 1)
 
             # Updating input lists
             input_points += [stacked_points]
@@ -445,6 +441,7 @@ class SemanticKittiCustomBatch:
 
 class ConcatBatcher(object):
     """docstring for BaseBatcher"""
+
     def __init__(self, device):
         super(ConcatBatcher, self).__init__()
         self.device = device
@@ -454,4 +451,4 @@ class ConcatBatcher(object):
         batching_result.to(self.device)
         #print(batching_result['data']['features'].size())
         #exit()
-        return {'data': batching_result, 'attr':[]}
+        return {'data': batching_result, 'attr': []}

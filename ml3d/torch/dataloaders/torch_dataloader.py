@@ -23,6 +23,7 @@ from ...utils import dataset_helper
 
 
 class TorchDataloader(Dataset):
+
     def __init__(self,
                  *args,
                  dataset=None,
@@ -47,8 +48,7 @@ class TorchDataloader(Dataset):
                 ['name'] not in self.cache_convert.cached_ids
             ]
             if len(uncached) > 0:
-                for idx in tqdm(range(len(dataset)),
-                                desc=desc):
+                for idx in tqdm(range(len(dataset)), desc=desc):
                     attr = dataset.get_attr(idx)
                     data = dataset.get_data(idx)
                     name = attr['name']

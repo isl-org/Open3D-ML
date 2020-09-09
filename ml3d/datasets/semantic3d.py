@@ -25,19 +25,21 @@ class Semantic3D(BaseDataset):
     """
     SemanticKITTI dataset, used in visualizer, training, or test
     """
-    def __init__(self, 
-                dataset_path, 
-                name='Toronto3D',
-                cache_dir='./logs/cache',
-                use_cache=False,  
-                num_points=65536,
-                prepro_grid_size=0.06,
-                class_weights=[
-                    5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
-                ],
-                ignored_label_inds=[0],
-                val_split=1,
-                ):
+
+    def __init__(
+        self,
+        dataset_path,
+        name='Toronto3D',
+        cache_dir='./logs/cache',
+        use_cache=False,
+        num_points=65536,
+        prepro_grid_size=0.06,
+        class_weights=[
+            5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
+        ],
+        ignored_label_inds=[0],
+        val_split=1,
+    ):
         """
         Initialize
         Args:
@@ -46,15 +48,15 @@ class Semantic3D(BaseDataset):
         Returns:
             class: The corresponding class.
         """
-        super().__init__(dataset_path=dataset_path, 
-                        name=name,
-                        cache_dir=cache_dir, 
-                        use_cache=use_cache, 
-                        class_weights=class_weights,
-                        num_points=num_points,
-                        prepro_grid_size=prepro_grid_size,
-                        ignored_label_inds=ignored_label_inds,
-                        val_split=val_split)
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         class_weights=class_weights,
+                         num_points=num_points,
+                         prepro_grid_size=prepro_grid_size,
+                         ignored_label_inds=ignored_label_inds,
+                         val_split=val_split)
 
         cfg = self.cfg
 
@@ -70,8 +72,7 @@ class Semantic3D(BaseDataset):
             8: 'cars'
         }
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
@@ -130,6 +131,7 @@ class Semantic3D(BaseDataset):
 
 
 class Semantic3DSplit():
+
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -164,7 +166,7 @@ class Semantic3DSplit():
                                  dtype=np.int32).values
             labels = np.array(labels, dtype=np.int32)
         else:
-            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
@@ -176,5 +178,6 @@ class Semantic3DSplit():
 
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
+
 
 DATASET._register_module(Semantic3D)

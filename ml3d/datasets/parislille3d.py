@@ -13,7 +13,6 @@ import logging
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
 
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
@@ -25,19 +24,19 @@ class ParisLille3D(BaseDataset):
     """
     ParisLille3D dataset, used in visualizer, training, or test
     """
-    def __init__(self, 
-                dataset_path,
-                name='ParisLille3D',
-                cache_dir='./logs/cache', 
-                use_cache=False,  
-                num_points=65536,
-                class_weights=[
-                    65075320, 33014819, 656096, 61715, 296523, 4052947, 172132, 4212295,
-                    10599237
-                ],
-                test_result_folder='./test',
-                val_files=['Lille2.ply']
-                ):
+
+    def __init__(self,
+                 dataset_path,
+                 name='ParisLille3D',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 num_points=65536,
+                 class_weights=[
+                     65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,
+                     4212295, 10599237
+                 ],
+                 test_result_folder='./test',
+                 val_files=['Lille2.ply']):
         """
         Initialize
         Args:
@@ -46,14 +45,14 @@ class ParisLille3D(BaseDataset):
         Returns:
             class: The corresponding class.
         """
-        super().__init__(dataset_path=dataset_path, 
-                        name=name,
-                        cache_dir=cache_dir, 
-                        use_cache=use_cache, 
-                        class_weights=class_weights,
-                        num_points=num_points,
-                        test_result_folder=test_result_folder,
-                        val_files=val_files)
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         class_weights=class_weights,
+                         num_points=num_points,
+                         test_result_folder=test_result_folder,
+                         val_files=val_files)
 
         cfg = self.cfg
 
@@ -71,8 +70,7 @@ class ParisLille3D(BaseDataset):
         }
 
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
@@ -117,7 +115,9 @@ class ParisLille3D(BaseDataset):
         store_path = join(path, name + '.npy')
         np.save(store_path, pred)
 
+
 class ParisLille3DSplit():
+
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -143,7 +143,7 @@ class ParisLille3DSplit():
         if (self.split != 'test'):
             labels = np.array(data['class'], dtype=np.int32)
         else:
-            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
 
         data = {'point': points, 'feat': None, 'label': labels}
 
@@ -156,5 +156,5 @@ class ParisLille3DSplit():
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
-DATASET._register_module(ParisLille3D)
 
+DATASET._register_module(ParisLille3D)

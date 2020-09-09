@@ -41,6 +41,7 @@ model:
   - 4
   - 2
 pipeline:
+  name: SemanticSegmentation
   adam_lr: 0.01
   batch_size: 2
   learning_rate: 0.01

@@ -16,6 +16,7 @@ dataset:
   - L004.ply
   val_files:
   - L002.ply
+  use_cache: True
 model:
   name: KPConv
   KP_extent: 1.0
@@ -84,7 +85,6 @@ model:
   max_in_points: 100000
   max_val_points: 100000
   modulated: false
-  momentum: 0.98
   n_frames: 1
   num_classes: 8
   num_kernel_points: 15
@@ -97,6 +97,7 @@ model:
   val_radius: 2.0
   validation_size: 200
 pipeline:
+  momentum: 0.98
   adam_lr: 0.01
   batch_size: 1
   learning_rate: 0.01

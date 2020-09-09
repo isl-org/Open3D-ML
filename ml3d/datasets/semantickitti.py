@@ -22,25 +22,31 @@ class SemanticKITTI(BaseDataset):
     """
     SemanticKITTI dataset, used in visualizer, training, or test
     """
-    
-    def __init__(self, 
-                dataset_path,
-                name='SemanticKITTI',
-                cache_dir='./logs/cache', 
-                use_cache=False,  
-                class_weights=[
-                    55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 78858,
-                    240942562, 17294618, 170599734, 6369672, 230413074, 101130274,
-                    476491114, 9833174, 129609852, 4506626, 1168181
-                ],
-                test_result_folder='./test',
-                test_split=['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'],
-                training_split=['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'],
-                validation_split=['08'],
-                all_split=[
-                    '00', '01', '02', '03', '04', '05', '06', '07', '09', '08',
-                    '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21'
-                ]):
+
+    def __init__(self,
+                 dataset_path,
+                 name='SemanticKITTI',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 class_weights=[
+                     55437630, 320797, 541736, 2578735, 3274484, 552662, 184064,
+                     78858, 240942562, 17294618, 170599734, 6369672, 230413074,
+                     101130274, 476491114, 9833174, 129609852, 4506626, 1168181
+                 ],
+                 test_result_folder='./test',
+                 test_split=[
+                     '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
+                     '21'
+                 ],
+                 training_split=[
+                     '00', '01', '02', '03', '04', '05', '06', '07', '09', '10'
+                 ],
+                 validation_split=['08'],
+                 all_split=[
+                     '00', '01', '02', '03', '04', '05', '06', '07', '09', '08',
+                     '10', '11', '12', '13', '14', '15', '16', '17', '18', '19',
+                     '20', '21'
+                 ]):
         """
         Initialize
         Args:
@@ -49,16 +55,16 @@ class SemanticKITTI(BaseDataset):
         Returns:
             class: The corresponding class.
         """
-        super().__init__(dataset_path=dataset_path, 
-                        name=name,
-                        cache_dir=cache_dir, 
-                        use_cache=use_cache, 
-                        class_weights=class_weights,
-                        test_result_folder=test_result_folder,
-                        test_split=test_split, 
-                        training_split=training_split, 
-                        validation_split=validation_split,
-                        all_split=all_split)
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         class_weights=class_weights,
+                         test_result_folder=test_result_folder,
+                         test_split=test_split,
+                         training_split=training_split,
+                         validation_split=validation_split,
+                         all_split=all_split)
 
         cfg = self.cfg
 
@@ -97,15 +103,14 @@ class SemanticKITTI(BaseDataset):
         remap_dict_val = DATA["learning_map"]
         max_key = max(remap_dict_val.keys())
         remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
-        remap_lut_val[list(remap_dict_val.keys())] = list(remap_dict_val.values())
+        remap_lut_val[list(remap_dict_val.keys())] = list(
+            remap_dict_val.values())
 
         self.remap_lut_val = remap_lut_val
         self.remap_lut = remap_lut
 
-
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)
-
 
     def is_tested(self, attr):
         cfg = self.cfg
@@ -116,10 +121,9 @@ class SemanticKITTI(BaseDataset):
         test_file_name = name_points
         store_path = join(save_path, name_points + '.label')
         if exists(store_path):
-            return True 
+            return True
         else:
             return False
-
 
     def save_test_result(self, results, attr):
         cfg = self.cfg
@@ -151,17 +155,16 @@ class SemanticKITTI(BaseDataset):
             make_dir(save_path)
 
             test_file_name = name_points
-            
+
             proj_inds = inputs['data'].reproj_inds[0]
             probs = results[proj_inds, :]
-          
+
             pred = np.argmax(probs, 1)
 
             store_path = join(save_path, name_points + '.label')
             pred = pred + 1
             pred = remap_lut[pred].astype(np.uint32)
             pred.tofile(store_path)
-
 
     def get_split_list(self, split):
         cfg = self.cfg
@@ -180,8 +183,8 @@ class SemanticKITTI(BaseDataset):
             raise ValueError("Invalid split {}".format(split))
 
         for seq_id in seq_list:
-            pc_path = join(dataset_path, 'dataset', 
-                                'sequences', seq_id, 'velodyne')
+            pc_path = join(dataset_path, 'dataset', 'sequences', seq_id,
+                           'velodyne')
             file_list.append(
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
@@ -190,8 +193,8 @@ class SemanticKITTI(BaseDataset):
         return file_list
 
 
-
 class SemanticKITTISplit():
+
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -201,7 +204,6 @@ class SemanticKITTISplit():
             dataset.test_list = path_list
 
         log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
 
         self.path_list = path_list
         self.split = split
@@ -219,15 +221,18 @@ class SemanticKITTISplit():
         if not exists(label_path):
             labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
             if self.split not in ['test', 'all']:
-                raise ValueError("label file not found for {}".format(label_path))
+                raise ValueError(
+                    "label file not found for {}".format(label_path))
         else:
-            labels = DataProcessing.load_label_kitti(label_path, self.remap_lut_val)
+            labels = DataProcessing.load_label_kitti(label_path,
+                                                     self.remap_lut_val)
 
-        data = {'point': points[:,0:3], 
-                'intensity': points[:,3],
-                'feat' : None,
-                'label': labels,
-                }
+        data = {
+            'point': points[:, 0:3],
+            'intensity': points[:, 3],
+            'feat': None,
+            'label': labels,
+        }
 
         return data
 
@@ -239,5 +244,6 @@ class SemanticKITTISplit():
 
         attr = {'name': name, 'path': pc_path, 'split': self.split}
         return attr
+
 
 DATASET._register_module(SemanticKITTI)

@@ -40,6 +40,7 @@ def _composedecorator(*decs):
                 pass
 
     """
+
     def deco(f):
         for dec in reversed(decs):
             f = dec(f)
@@ -150,8 +151,7 @@ def _assert_shape_eq(inp, tgt_shape, dim=None):
     if dim is None:
         if inp.shape != tgt_shape:
             raise ValueError('Size mismatch. Input and target have different '
-                             'shapes: {0} vs {1}.'.format(
-                                 inp.shape, tgt_shape))
+                             'shapes: {0} vs {1}.'.format(inp.shape, tgt_shape))
     else:
         if inp.shape[dim] != tgt_shape[dim]:
             raise ValueError('Size mismatch. Input and target have different '
@@ -186,6 +186,7 @@ class Cache(object):
             cache_dir (str): Directory where objects will be cached. Default
                              to 'cache'.
     """
+
     def __init__(self, func: Callable, cache_dir: [str, Path], cache_key: str):
         self.func = func
         self.cache_dir = Path(cache_dir) / str(cache_key)

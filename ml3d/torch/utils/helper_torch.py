@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 class conv2d_transpose(nn.Module):
+
     def __init__(self,
                  batchNorm,
                  in_planes,
@@ -42,6 +43,7 @@ class conv2d_transpose(nn.Module):
 
 
 class conv2d(nn.Module):
+
     def __init__(self,
                  batchNorm,
                  in_planes,
