@@ -40,6 +40,7 @@ class RandLANet(BaseModel):
             grid_size=0.06,
             batcher='DefaultBatcher',
             ckpt_path=None,
+            only_coords_for_feature=False,
             **kwargs):
 
         super().__init__(name=name,
@@ -62,8 +63,7 @@ class RandLANet(BaseModel):
 
         dim_feature = cfg.dim_feature
         self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
-        self.batch_normalization = nn.BatchNorm2d(dim_feature,
-                                                  eps=1e-6)
+        self.batch_normalization = nn.BatchNorm2d(dim_feature, eps=1e-6)
 
         d_encoder_list = []
 
@@ -177,7 +177,6 @@ class RandLANet(BaseModel):
             feat = selected_pc
         else:
             feat = np.concatenate([selected_pc, feat], axis=1)
-        
 
         if min_posbility_idx is not None:
             dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
