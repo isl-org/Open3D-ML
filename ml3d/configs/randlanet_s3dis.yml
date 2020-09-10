@@ -9,6 +9,7 @@ dataset:
   prepro_grid_size: 0.04
   test_area_idx: 3
   test_result_folder: ./test
+  use_cache: False
 model:
   name: RandLANet
   batcher: DefaultBatcher

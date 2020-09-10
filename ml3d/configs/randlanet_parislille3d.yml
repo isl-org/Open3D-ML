@@ -10,6 +10,7 @@ dataset:
   test_result_folder: ./test
   val_files:
   - Lille2.ply
+  use_cache: False
 model:
   name: RandLANet
   batcher: DefaultBatcher

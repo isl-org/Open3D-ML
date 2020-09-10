@@ -411,7 +411,7 @@ class RandLANet(BaseModel):
 
         gen_func = gen
         gen_types = (tf.float32, tf.float32, tf.int32)
-        gen_shapes = ([None, 3], [None, cfg.d_in], [None])
+        gen_shapes = ([None, 3], [None, cfg.dim_input], [None])
 
         return gen_func, gen_types, gen_shapes
 
@@ -556,8 +556,8 @@ class RandLANet(BaseModel):
             feat = np.array(data['feat'], dtype=np.float32)
             feat = np.concatenate([points, feat], axis=1)
 
-        assert self.cfg.d_in == feat.shape[
-            1], "Wrong feature dimension, please update d_in(3 + feature_dimension) in config"
+        assert self.cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
         split = attr['split']
 
