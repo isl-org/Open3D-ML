@@ -49,6 +49,7 @@ model:
   - 4
   - 4
   - 2
+  only_coords_for_feature: true
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

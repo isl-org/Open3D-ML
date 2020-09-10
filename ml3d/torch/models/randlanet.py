@@ -63,8 +63,7 @@ class RandLANet(BaseModel):
         dim_feature = cfg.dim_feature
         self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
         self.batch_normalization = nn.BatchNorm2d(dim_feature,
-                                                  eps=1e-6,
-                                                  momentum=0.99)
+                                                  eps=1e-6)
 
         d_encoder_list = []
 
@@ -102,7 +101,6 @@ class RandLANet(BaseModel):
                                           cfg.num_classes,
                                           activation=False)
         setattr(self, 'fc', f_layer_fc3)
-
 
         self.m_dropout = nn.Dropout(0.5)
 
@@ -161,9 +159,9 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point'] 
+        pc = data['point']
         label = data['label']
-        feat = data['feat'] 
+        feat = data['feat']
         tree = data['search_tree']
 
         if min_posbility_idx is None:  # training
@@ -175,9 +173,11 @@ class RandLANet(BaseModel):
         selected_pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
 
-
-        feat = np.concatenate([selected_pc, feat], axis=1)
-       
+        if cfg.only_coords_for_feature:
+            feat = selected_pc
+        else:
+            feat = np.concatenate([selected_pc, feat], axis=1)
+        
 
         if min_posbility_idx is not None:
             dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
@@ -476,7 +476,6 @@ class RandLANet(BaseModel):
 
         m_conv2d = getattr(self, 'fc2')
         f_layer_fc2 = m_conv2d(f_layer_fc1)
-
 
         f_layer_drop = self.m_dropout(f_layer_fc2)
 

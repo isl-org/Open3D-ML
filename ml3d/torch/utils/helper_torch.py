@@ -22,7 +22,7 @@ class conv2d_transpose(nn.Module):
         self.weights = self.conv.weight
         self.batchNorm = batchNorm
 
-        self.batch_normalization = nn.BatchNorm2d(out_planes, momentum=0.99)
+        self.batch_normalization = nn.BatchNorm2d(out_planes)
 
         if activation:
             self.activation_fn = nn.LeakyReLU(0.2)
@@ -31,13 +31,8 @@ class conv2d_transpose(nn.Module):
 
     def forward(self, x):
         x = self.conv(x)
-        #print(x.permute(0,2,3,1)),
-        #                                    eps=1e-6, momentum=0.99
-
         if self.batchNorm:
             x = self.batch_normalization(x)
-        #print(x.permute(0,2,3,1))
-        #exit()
         x = self.activation_fn(x)
         return x
 
@@ -61,7 +56,7 @@ class conv2d(nn.Module):
         self.weights = self.conv.weight
         self.batchNorm = batchNorm
         if self.batchNorm:
-            self.batch_normalization = nn.BatchNorm2d(out_planes, momentum=0.99)
+            self.batch_normalization = nn.BatchNorm2d(out_planes)
 
         if activation:
             self.activation_fn = nn.LeakyReLU(0.2, inplace=True)
