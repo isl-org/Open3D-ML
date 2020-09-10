@@ -1,4 +1,17 @@
-export BASE_DIR="../dataset/Semantic3D/"
+#!/bin/bash
+
+if [ "$#" -ne 1 ]; then
+    echo "Please, provide the base directory to store the dataset."
+    exit 1
+fi
+
+if ! command -v 7z &> /dev/null
+then
+    echo "Error: 7z could not be found. Please, install it to continue."
+    exit
+fi
+
+BASE_DIR="$1"/Semantic3D
 
 # Training data
 wget -c -N http://semantic3d.net/data/point-clouds/training1/bildstein_station1_xyz_intensity_rgb.7z -P $BASE_DIR
@@ -43,7 +56,7 @@ done
 
 mv $BASE_DIR/station1_xyz_intensity_rgb.txt $BASE_DIR/neugasse_station1_xyz_intensity_rgb.txt
 
-for entry in "$BASE_DIR"/*.7z
-do
-  rm "$entry"
-done
+# cleanup
+mkdir -p $BASE_DIR/zip_files
+mv *.7z $BASE_DIR/zip_files
+
