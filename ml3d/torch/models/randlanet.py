@@ -103,6 +103,9 @@ class RandLANet(BaseModel):
                                           activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
+
+        self.m_dropout = nn.Dropout(0.5)
+
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
         num_points = self.cfg.num_points
@@ -128,8 +131,8 @@ class RandLANet(BaseModel):
 
         select_points = select_points - center_point  # TODO : add noise to center point
 
-        select_points = select_points / np.linalg.norm(select_points)
-        select_feat = select_feat / np.linalg.norm(select_feat)
+        # select_points = select_points / np.linalg.norm(select_points)
+        # select_feat = select_feat / np.linalg.norm(select_feat)
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
@@ -158,9 +161,9 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point']
+        pc = data['point'] / 1e4
         label = data['label']
-        feat = data['feat']
+        feat = data['feat'] / 1e4
         tree = data['search_tree']
 
 
@@ -475,8 +478,8 @@ class RandLANet(BaseModel):
         m_conv2d = getattr(self, 'fc2')
         f_layer_fc2 = m_conv2d(f_layer_fc1)
 
-        m_dropout = nn.Dropout(0.5)
-        f_layer_drop = m_dropout(f_layer_fc2)
+
+        f_layer_drop = self.m_dropout(f_layer_fc2)
 
         test_hidden = f_layer_fc2.permute(0, 2, 3, 1)
 

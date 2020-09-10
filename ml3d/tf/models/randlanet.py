@@ -59,7 +59,6 @@ class RandLANet(BaseModel):
         cfg = self.cfg
 
         dim_feature = cfg.dim_feature
-
         self.fc0 = tf.keras.layers.Dense(dim_feature, activation=None)
         self.batch_normalization = tf.keras.layers.BatchNormalization(
             -1, 0.99, 1e-6)
@@ -406,6 +405,7 @@ class RandLANet(BaseModel):
                                                   data['label'],
                                                   data['search_tree'], pick_idx)
 
+
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
 
@@ -419,9 +419,9 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point']
+        pc = data['point'] 
         label = data['label']
-        feat = data['feat']
+        feat = data['feat'] 
         tree = data['search_tree']
 
         pick_idx = min_posbility_idx
@@ -470,6 +470,9 @@ class RandLANet(BaseModel):
     def transform(self, pc, feat, label):
         cfg = self.cfg
 
+        pc = pc/1e4
+        feat = feat/1e4
+
         input_points = []
         input_neighbors = []
         input_pools = []
@@ -489,6 +492,7 @@ class RandLANet(BaseModel):
             input_pools.append(pool_i)
             input_up_samples.append(up_i)
             pc = sub_points
+
 
         input_list = input_points + input_neighbors + input_pools + input_up_samples
         input_list += [feat, label]
@@ -550,11 +554,12 @@ class RandLANet(BaseModel):
         else:
             labels = np.array(data['label'], dtype=np.int32)
 
-        if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points.copy()
-        else:
-            feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
+        # if 'feat' not in data.keys() or data['feat'] is None:
+        #     feat = points.copy()
+        # else:
+        #     feat = np.array(data['feat'], dtype=np.float32)
+        #     feat = np.concatenate([points, feat], axis=1)
+        feat = points
 
         assert self.cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
