@@ -128,6 +128,8 @@ class RandLANet(BaseModel):
 
         select_points = select_points - center_point  # TODO : add noise to center point
 
+        select_points = select_points / np.linalg.norm(select_points)
+        select_feat = select_feat / np.linalg.norm(select_feat)
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
