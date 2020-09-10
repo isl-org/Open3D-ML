@@ -161,9 +161,9 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point'] / 1e4
+        pc = data['point'] 
         label = data['label']
-        feat = data['feat'] / 1e4
+        feat = data['feat'] 
         tree = data['search_tree']
 
 
@@ -176,6 +176,10 @@ class RandLANet(BaseModel):
 
         selected_pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
+
+
+        feat = np.concatenate([selected_pc, feat], axis=1)
+       
 
         if min_posbility_idx is not None:
             dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
@@ -260,13 +264,12 @@ class RandLANet(BaseModel):
         else:
             labels = np.array(data['label'], dtype=np.int32)
 
-        # if 'feat' not in data.keys() or data['feat'] is None:
-        #     feat = points
-        # else:
-        #     feat = np.array(data['feat'], dtype=np.float32)
-        #     feat = np.concatenate([points, feat], axis=1)
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = points
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
 
-        feat = points
+        # feat = points
 
         split = attr['split']
 
