@@ -1162,9 +1162,7 @@ class KPConv(nn.Module):
 
         # Apply network weights [n_kpoints, n_points, out_fdim]
         weighted_features = weighted_features.permute((1, 0, 2))
-        print(weighted_features.size(), self.weights.size())
-        print("===")
-        # exit()
+       
         kernel_outputs = torch.matmul(weighted_features, self.weights)
 
         # Convolution sum [n_points, out_fdim]
@@ -2029,16 +2027,16 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
     :param radius: float32
     :return: neighbors indices
     """
-    print("------")
-    import sys
-    np.set_printoptions(threshold=sys.maxsize)
-    print(queries.tolist())
-    print(supports.tolist())
-    print(queries.shape)
-    print(supports.shape)
-    print(q_batches)
-    print(s_batches)
-    print(radius)
+    # print("------")
+    # import sys
+    # np.set_printoptions(threshold=sys.maxsize)
+    # print(queries.tolist())
+    # print(supports.tolist())
+    # print(queries.shape)
+    # print(supports.shape)
+    # print(q_batches)
+    # print(s_batches)
+    # print(radius)
 
     ret = radius_search(
         o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
