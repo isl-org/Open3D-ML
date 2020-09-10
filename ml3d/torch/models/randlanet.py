@@ -166,8 +166,6 @@ class RandLANet(BaseModel):
         feat = data['feat'] 
         tree = data['search_tree']
 
-
-
         if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
         else:
@@ -274,8 +272,6 @@ class RandLANet(BaseModel):
         split = attr['split']
 
         data = dict()
-
-
 
         sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
             points, features=feat, labels=labels, grid_size=cfg.grid_size)

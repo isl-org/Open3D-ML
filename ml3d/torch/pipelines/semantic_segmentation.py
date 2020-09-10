@@ -197,7 +197,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
-          
+
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
                 self.ious.append(iou)
@@ -219,7 +219,7 @@ class SemanticSegmentation(BasePipeline):
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
                     acc = Metric.acc(predict_scores, gt_labels)
-              
+
                     iou = Metric.iou(predict_scores, gt_labels)
 
                     self.valid_losses.append(loss.cpu().item())
