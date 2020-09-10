@@ -1,18 +1,16 @@
 dataset:
-  name: SemanticKITTI
-  # dataset_path: path/to/your/datasets 
-  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
-    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
-    476491114, 9833174, 129609852, 4506626, 1168181]
+  name: S3DIS
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
+  478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
+  dataset_path: ../dataset/S3DIS/
+  ignored_label_inds: []
+  num_points: 40960
+  prepro_grid_size: 0.04
+  test_area_idx: 3
   test_result_folder: ./test
-  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
-  training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
-  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
-  '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
-  validation_split: ['08']
   use_cache: false
-  validation_split:
-  - '08'
 model:
   name: KPFCNN
   KP_extent: 1.2
@@ -62,7 +60,7 @@ model:
   deform_fitting_power: 1.0
   deform_radius: 6.0
   first_features_dim: 128
-  first_subsampling_dl: 0.06
+  first_subsampling_dl: 0.03
   fixed_kernel_points: center
   ign_lbls:
   - 0
@@ -70,7 +68,7 @@ model:
   - 0
   in_features_dim: 2
   in_points_dim: 3
-  in_radius: 4.0
+  in_radius: 1.5
   input_threads: 10
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
   max_in_points: 20000

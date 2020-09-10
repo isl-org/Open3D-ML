@@ -160,6 +160,9 @@ class RandLANet(BaseModel):
         label = data['label']
         feat = data['feat']
         tree = data['search_tree']
+
+
+
         if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
         else:
@@ -252,15 +255,19 @@ class RandLANet(BaseModel):
         else:
             labels = np.array(data['label'], dtype=np.int32)
 
-        if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
-        else:
-            feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
+        # if 'feat' not in data.keys() or data['feat'] is None:
+        #     feat = points
+        # else:
+        #     feat = np.array(data['feat'], dtype=np.float32)
+        #     feat = np.concatenate([points, feat], axis=1)
+
+        feat = points
 
         split = attr['split']
 
         data = dict()
+
+
 
         sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
             points, features=feat, labels=labels, grid_size=cfg.grid_size)

@@ -231,8 +231,7 @@ class SemanticKITTISplit():
 
         data = {
             'point': points[:, 0:3],
-            'intensity': points[:, 3],
-            'feat': None,
+            'feat': points[:, 3:],
             'label': labels,
         }
 

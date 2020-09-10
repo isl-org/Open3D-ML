@@ -109,6 +109,7 @@ class SemanticSegmentation(BasePipeline):
         model = self.model
         dataset = self.dataset
 
+
         cfg = self.cfg
 
         log.info(model)

@@ -159,6 +159,7 @@ class Toronto3DSplit():
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
+
         return data
 
     def get_attr(self, idx):
