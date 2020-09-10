@@ -41,6 +41,7 @@ class Toronto3D(BaseDataset):
         train_files=['L001.ply', 'L003.ply', 'L004.ply'],
         val_files=['L002.ply'],
         test_files=['L002.ply'],
+        test_result_folder='./test',
     ):
         """
         Initialize
