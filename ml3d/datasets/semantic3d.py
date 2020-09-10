@@ -39,6 +39,7 @@ class Semantic3D(BaseDataset):
         ],
         ignored_label_inds=[0],
         val_split=1,
+        test_result_folder='./test',
     ):
         """
         Initialize

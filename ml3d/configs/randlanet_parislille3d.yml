@@ -2,7 +2,7 @@ dataset:
   name: ParisLille3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353, 269353]
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
   ignored_label_inds:
   - 0
   num_points: 65536
@@ -43,6 +43,7 @@ model:
   - 4
   - 2
 pipeline:
+  name: SemanticSegmentation
   adam_lr: 0.01
   batch_size: 1
   learning_rate: 0.01
