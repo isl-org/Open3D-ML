@@ -323,9 +323,10 @@ class S3DISSplit():
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
 
-        labels = np.zeros((points.shape[0],), dtype=np.int32)
         if (self.split != 'test'):
-            labels = data['class']
+            labels = np.array(data['class'], dtype=np.int32).reshape((-1,))
+        else:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
 
         data = {'point': points, 'feat': feat, 'label': labels}
 

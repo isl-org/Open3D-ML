@@ -61,6 +61,7 @@ class Toronto3D(BaseDataset):
                          ignored_label_inds=ignored_label_inds,
                          train_files=train_files,
                          test_files=test_files,
+                         test_result_folder=test_result_folder,
                          val_files=val_files)
 
         cfg = self.cfg
