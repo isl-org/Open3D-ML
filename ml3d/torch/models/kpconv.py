@@ -10,7 +10,6 @@ from sklearn.neighbors import KDTree
 from open3d.ml.contrib import subsample_batch
 from open3d.ml.contrib import radius_search
 
-
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
@@ -512,7 +511,7 @@ class KPFCNN(BaseModel):
 
     def transform_train(self, data, attr):
         # Read points
-        points = data['point'] 
+        points = data['point']
         sem_labels = data['label']
         feat = data['feat']
 
@@ -534,7 +533,6 @@ class KPFCNN(BaseModel):
 
         num_merged = 0
         f_inc = 0
-
 
         # Apply pose (without np.dot to avoid multi-threading)
         hpoints = np.hstack((points, np.ones_like(points[:, :1])))
@@ -565,12 +563,10 @@ class KPFCNN(BaseModel):
         new_coords = np.hstack((points, feat))
         new_coords = new_coords[rand_order, :]
 
-     
         # Increment merge count
         merged_points = np.vstack((merged_points, new_points))
-        merged_labels = np.hstack((merged_labels, sem_labels)) 
+        merged_labels = np.hstack((merged_labels, sem_labels))
         merged_coords = np.vstack((merged_coords, new_coords))
-
 
         # print(merged_points.shape)
         # print(self.cfg.first_subsampling_dl)
@@ -634,7 +630,6 @@ class KPFCNN(BaseModel):
             'cfg': self.cfg
         }
         return data
-
 
     def inference_begin(self, data):
         self.inference_data = data
@@ -1111,7 +1106,6 @@ class KPConv(nn.Module):
                                 1) * int(s_pts.shape[0] - 1)
         else:
             new_neighb_inds = neighb_inds
-     
 
         # Get Kernel point influences [n_points, n_kpoints, n_neighbors]
         if self.KP_influence == 'constant':
@@ -1150,7 +1144,6 @@ class KPConv(nn.Module):
 
         # Get the features of each neighborhood [n_points, n_neighbors, in_fdim]
         neighb_x = gather(x, new_neighb_inds)
-   
 
         # Apply distance weights [n_points, n_kpoints, in_fdim]
 
@@ -1162,7 +1155,7 @@ class KPConv(nn.Module):
 
         # Apply network weights [n_kpoints, n_points, out_fdim]
         weighted_features = weighted_features.permute((1, 0, 2))
-       
+
         kernel_outputs = torch.matmul(weighted_features, self.weights)
 
         # Convolution sum [n_points, out_fdim]
@@ -1341,12 +1334,11 @@ class SimpleBlock(nn.Module):
             q_pts = batch.points[self.layer_ind + 1]
             s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.pools[self.layer_ind]
-      
+
         else:
             q_pts = batch.points[self.layer_ind]
             s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.neighbors[self.layer_ind]
-     
 
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
         return self.leaky_relu(self.batch_norm(x))
@@ -2045,7 +2037,7 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
         radius).numpy()
 
     num_points = ret.shape[0]
-    corret_ret = np.where(ret==-1, num_points, ret)
+    corret_ret = np.where(ret == -1, num_points, ret)
     # print(corret_ret)
     return corret_ret
 
