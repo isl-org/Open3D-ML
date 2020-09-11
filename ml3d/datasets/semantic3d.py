@@ -26,23 +26,6 @@ class Semantic3D(BaseDataset):
     SemanticKITTI dataset, used in visualizer, training, or test
     """
 
-<<<<<<< HEAD
-    def __init__(
-        self,
-        dataset_path,
-        name='Toronto3D',
-        cache_dir='./logs/cache',
-        use_cache=False,
-        num_points=65536,
-        prepro_grid_size=0.06,
-        class_weights=[
-            5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353
-        ],
-        ignored_label_inds=[0],
-        val_split=1,
-        test_result_folder='./test',
-    ):
-=======
     def __init__(self,
                  dataset_path,
                  name='Toronto3D',
@@ -58,7 +41,6 @@ class Semantic3D(BaseDataset):
                  val_split=1,
                  test_result_folder='./test',
                  **kwargs):
->>>>>>> master
         """
         Initialize
         Args:
@@ -75,13 +57,9 @@ class Semantic3D(BaseDataset):
                          num_points=num_points,
                          prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
-<<<<<<< HEAD
-                         test_result_folder=test_result_folder,
-                         val_split=val_split)
-=======
                          val_split=val_split,
+                         test_result_folder=test_result_folder,
                          **kwargs)
->>>>>>> master
 
         cfg = self.cfg
 
