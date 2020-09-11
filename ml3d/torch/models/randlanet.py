@@ -172,7 +172,14 @@ class RandLANet(BaseModel):
         selected_pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
 
-        feat = np.concatenate([selected_pc, feat], axis=1)
+        if feat is None:
+            feat = selected_pc.copy()
+        else:
+            feat = np.concatenate([selected_pc, feat], axis=1)
+
+        assert cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+
 
         if min_posbility_idx is not None:
             dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
@@ -255,21 +262,25 @@ class RandLANet(BaseModel):
         if 'label' not in data.keys() or data['label'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
-            labels = np.array(data['label'], dtype=np.int32)
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-
-        # feat = points
 
         split = attr['split']
 
         data = dict()
 
-        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-            points, features=feat, labels=labels, grid_size=cfg.grid_size)
+        if (feat is None):
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
+                points, labels=labels, grid_size=cfg.grid_size)
+            sub_feat = None
+
+        else:
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+                points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 

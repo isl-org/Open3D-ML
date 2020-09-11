@@ -283,6 +283,7 @@ class RandLANet(BaseModel):
         f_layer_fc3 = m_conv2d(f_layer_drop, training=self.training)
 
         f_out = tf.squeeze(f_layer_fc3, [2])
+        # f_out = tf.nn.softmax(f_out)
 
         return f_out
 
@@ -405,7 +406,12 @@ class RandLANet(BaseModel):
                                                   data['label'],
                                                   data['search_tree'], pick_idx)
 
-                feat = np.concatenate([pc, feat], axis=1)
+                if feat is None:
+                    feat = pc.copy()
+                else:
+                    feat = np.concatenate([pc, feat], axis=1)
+                assert self.cfg.dim_input == feat.shape[
+                    1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
@@ -552,22 +558,25 @@ class RandLANet(BaseModel):
         if 'label' not in data.keys() or data['label'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
-            labels = np.array(data['label'], dtype=np.int32)
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points.copy()
+            feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-
-        assert self.cfg.dim_input == feat.shape[
-            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
         split = attr['split']
 
         data = dict()
 
-        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-            points, features=feat, labels=labels, grid_size=cfg.grid_size)
+        if (feat is None):
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
+                points, labels=labels, grid_size=cfg.grid_size)
+            sub_feat = None
+
+        else:
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+                points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
