@@ -172,7 +172,6 @@ class RandLANet(BaseModel):
         selected_pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
 
-
         feat = np.concatenate([selected_pc, feat], axis=1)
 
         if min_posbility_idx is not None:

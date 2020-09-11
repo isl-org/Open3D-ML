@@ -405,7 +405,6 @@ class RandLANet(BaseModel):
                                                   data['label'],
                                                   data['search_tree'], pick_idx)
 
-          
                 feat = np.concatenate([pc, feat], axis=1)
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
