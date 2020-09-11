@@ -252,17 +252,29 @@ class Visualizer:
 
             em = window.theme.font_size
             self.dialog = gui.Dialog(title)
+            self._label = gui.Label(title + "                    ")
             self._layout = gui.Vert(0, gui.Margins(em, em, em, em))
             self.dialog.add_child(self._layout)
-            self._layout.add_child(gui.Label(title + "                    "))
+            self._layout.add_child(self._label)
             self._layout.add_fixed(0.5 * em)
             self._progress = gui.ProgressBar()
             self._progress.value = 0.0
             self._layout.add_child(self._progress)
 
-        def post_update(self):
-            gui.Application.instance.post_to_main_thread(self._window,
-                                                         self.update)
+        def set_text(self, text):
+            self._label.text = text + "                    "
+
+        def post_update(self, text=None):
+            if text is None:
+                gui.Application.instance.post_to_main_thread(self._window,
+                                                             self.update)
+            else:
+                def update_with_text():
+                    self.update()
+                    self._label.text = text
+
+                gui.Application.instance.post_to_main_thread(self._window,
+                                                             update_with_text)
 
         def update(self):
             value = min(1.0, self._progress.value + 1.0 / self._n_items)
@@ -580,11 +592,16 @@ class Visualizer:
         # Progress has: len(names) items + ui_done_callback
         progress_dlg = Visualizer.ProgressDialog("Loading...", self.window,
                                                  len(names) + 1)
+        progress_dlg.set_text("Loading " + names[0] + "...")
 
         def load_thread():
-            for name in names:
-                self._objects.load(name)
-                progress_dlg.post_update()
+            for i in range(0, len(names)):
+                self._objects.load(names[i])
+                if i + 1 < len(names):
+                    text = "Loading " + names[i + 1] + "..."
+                else:
+                    text = "Creating GPU objects..."
+                progress_dlg.post_update(text)
 
             gui.Application.instance.post_to_main_thread(self.window,
                                                          ui_done_callback)
