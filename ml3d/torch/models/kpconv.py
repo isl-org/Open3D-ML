@@ -88,7 +88,6 @@ class KPFCNN(BaseModel):
             fixed_kernel_points='center',
             class_w=[],
             num_layers=5,
-            only_coords_for_feature=False,
             **kwargs):
 
         super().__init__(name=name,

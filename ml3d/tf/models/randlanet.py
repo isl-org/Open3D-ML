@@ -37,7 +37,6 @@ class RandLANet(BaseModel):
             grid_size=0.06,
             batcher='DefaultBatcher',
             ckpt_path=None,
-            only_coords_for_feature=False,
             **kwargs):
 
         super().__init__(name=name,
@@ -406,10 +405,8 @@ class RandLANet(BaseModel):
                                                   data['label'],
                                                   data['search_tree'], pick_idx)
 
-                if cfg.only_coords_for_feature:
-                    feat = pc
-                else:
-                    feat = np.concatenate([pc, feat], axis=1)
+          
+                feat = np.concatenate([pc, feat], axis=1)
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
