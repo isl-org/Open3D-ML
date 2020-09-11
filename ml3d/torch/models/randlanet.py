@@ -180,7 +180,6 @@ class RandLANet(BaseModel):
         assert cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
-
         if min_posbility_idx is not None:
             dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))

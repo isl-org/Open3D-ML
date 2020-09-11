@@ -134,7 +134,7 @@ class SemanticSegmentation(BasePipeline):
             join(cfg.logs_dir, cfg.train_sum_dir))
 
         self.optimizer = model.get_optimizer(cfg)
-        self.load_ckpt(ckpt_path = model.cfg.ckpt_path)
+        self.load_ckpt(ckpt_path=model.cfg.ckpt_path)
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
             # --------------------- training
