@@ -1,5 +1,7 @@
 import numpy as np
 import yaml
+import tensorflow as tf
+
 from os.path import join, exists, dirname, abspath
 
 from ...utils import Config, make_dir
