@@ -49,7 +49,7 @@ wget -c -N http://semantic3d.net/data/point-clouds/testing1/stgallencathedral_st
 wget -c -N http://semantic3d.net/data/point-clouds/testing1/stgallencathedral_station3_intensity_rgb.7z -P $BASE_DIR
 wget -c -N http://semantic3d.net/data/point-clouds/testing1/stgallencathedral_station6_intensity_rgb.7z -P $BASE_DIR
 
-for entry in "$BASE_DIR"/*
+for entry in "$BASE_DIR"/*.7z
 do
   7z x "$entry" -o$(dirname "$entry") -y
 done

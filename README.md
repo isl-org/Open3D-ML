@@ -71,7 +71,7 @@ python scripts/run.py torch -m RandLANet \
 
 # Use a config file to train this model with tensorflow
 python scripts/run.py tf -c ml3d/configs/kpconv_semantickitti.yml \
---pipeline.batch_size 2
+--dataset_path ../--pipeline.batch_size 2
 ```
 Arguments can be
 - `-p, --pipeline`: pipeline name, SemanticSegmentation by default

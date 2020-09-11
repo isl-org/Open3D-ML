@@ -16,13 +16,13 @@ dataset:
   - L004.ply
   use_cache: true
   val_files:
-  - L002.ply
+  - L001.ply
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: #./logs/RandLANet_torch/checkpoint/ckpt_480.pth # path/to/your/checkpoint
   dim_feature: 8
-  dim_input: 6
+  dim_input: 3
   dim_output:
   - 16
   - 64
@@ -55,9 +55,9 @@ pipeline:
   batch_size: 1
   learning_rate: 0.01
   main_log_dir: ./logs
-  max_epoch: 100
+  max_epoch: 10000
   save_ckpt_freq: 20
-  scheduler_gamma: 0.95
+  scheduler_gamma: 0.99
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1

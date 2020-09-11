@@ -101,7 +101,7 @@ pipeline:
   saving: true
   saving_path: null
   scheduler_gamma: 0.98477
-  test_batch_size: 1
+  test_batch_size: 8
   train_sum_dir: train_log
   val_batch_size: 8
   validation_size: 200

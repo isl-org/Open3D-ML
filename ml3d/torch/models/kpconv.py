@@ -6,8 +6,8 @@ import open3d.core as o3c
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
-from open3d.ml.contrib import subsample_batch
 
+from open3d.ml.contrib import subsample_batch
 from open3d.ml.contrib import radius_search
 
 # use relative import for being compatible with Open3d main repo
@@ -434,7 +434,6 @@ class KPFCNN(BaseModel):
         # Safe check
         if n < 2:
             print("sample n < 2!")
-            exit()
 
         # Project predictions on the frame points
         search_tree = KDTree(in_pts, leaf_size=50)
@@ -511,11 +510,18 @@ class KPFCNN(BaseModel):
         return [self.cfg.num_layers] + input_list
 
     def transform_train(self, data, attr):
+        # Read points
+        points = data['point']
+        sem_labels = data['label']
+        feat = data['feat']
+
+        dim_points = points.shape[1]
+        dim_features = feat.shape[1] + dim_points
 
         # Initiate merged points
-        merged_points = np.zeros((0, 3), dtype=np.float32)
+        merged_points = np.zeros((0, dim_points), dtype=np.float32)
         merged_labels = np.zeros((0,), dtype=np.int32)
-        merged_coords = np.zeros((0, 4), dtype=np.float32)
+        merged_coords = np.zeros((0, dim_features), dtype=np.float32)
 
         # Get center of the first frame in world coordinates
         p_origin = np.zeros((1, 4))
@@ -527,10 +533,6 @@ class KPFCNN(BaseModel):
 
         num_merged = 0
         f_inc = 0
-
-        # Read points
-        points = data['point']
-        sem_labels = data['label']
 
         # Apply pose (without np.dot to avoid multi-threading)
         hpoints = np.hstack((points, np.ones_like(points[:, :1])))
@@ -558,20 +560,22 @@ class KPFCNN(BaseModel):
         new_points = new_points[rand_order, :3]
         sem_labels = sem_labels[rand_order]
 
-        intensity = np.expand_dims(data['intensity'], 1)
-        new_coords = np.hstack((points, intensity))
+        new_coords = np.hstack((points, feat))
         new_coords = new_coords[rand_order, :]
 
         # Increment merge count
         merged_points = np.vstack((merged_points, new_points))
-        merged_labels = sem_labels  #np.hstack((merged_labels, sem_labels))
+        merged_labels = np.hstack((merged_labels, sem_labels))
         merged_coords = np.vstack((merged_coords, new_coords))
 
+        # print(merged_points.shape)
+        # print(self.cfg.first_subsampling_dl)
         in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
             merged_points,
             features=merged_coords,
             labels=merged_labels,
             grid_size=self.cfg.first_subsampling_dl)
+        # print(in_pts.shape)
 
         # Number collected
         n = in_pts.shape[0]
@@ -626,174 +630,6 @@ class KPFCNN(BaseModel):
             'cfg': self.cfg
         }
         return data
-
-    def _transform_train(self, data, attr):
-
-        p_list = []
-        f_list = []
-        l_list = []
-        fi_list = []
-        p0_list = []
-        s_list = []
-        R_list = []
-        r_inds_list = []
-        r_mask_list = []
-        val_labels_list = []
-        batch_n = 0
-
-        # Initiate merged points
-        merged_points = np.zeros((0, 3), dtype=np.float32)
-        merged_labels = np.zeros((0,), dtype=np.int32)
-        merged_coords = np.zeros((0, 4), dtype=np.float32)
-
-        # Get center of the first frame in world coordinates
-        p_origin = np.zeros((1, 4))
-        p_origin[0, 3] = 1
-        p0 = p_origin[:, :3]
-        p0 = np.squeeze(p0)
-        o_pts = None
-        o_labels = None
-
-        num_merged = 0
-        f_inc = 0
-
-        # Read points
-        points = data['point']
-        sem_labels = data['label']
-
-        # Apply pose (without np.dot to avoid multi-threading)
-        hpoints = np.hstack((points, np.ones_like(points[:, :1])))
-        new_points = hpoints
-        #new_points[:, 3:] = points[:, 3:]
-
-        # In case of validation, keep the original points in memory
-        if attr['split'] in ['validation', 'test']:
-            o_pts = new_points[:, :3].astype(np.float32)
-            o_labels = sem_labels.astype(np.int32)
-
-        # In case radius smaller than 50m, chose new center on a point of the wanted class or not
-        # TODO balance
-        if self.cfg.in_radius < 50.0 and f_inc == 0:
-            wanted_ind = np.random.choice(new_points.shape[0])
-            p0 = new_points[wanted_ind, :3]
-
-        # Eliminate points further than config.in_radius
-        mask = np.sum(np.square(new_points[:, :3] - p0),
-                      axis=1) < self.cfg.in_radius**2
-        mask_inds = np.where(mask)[0].astype(np.int32)
-
-        # Shuffle points
-        rand_order = np.random.permutation(mask_inds)
-        new_points = new_points[rand_order, :3]
-        sem_labels = sem_labels[rand_order]
-
-        new_coords = points[rand_order, :]
-
-        # Increment merge count
-        merged_points = np.vstack((merged_points, new_points))
-        merged_labels = sem_labels  #np.hstack((merged_labels, sem_labels))
-        merged_coords = np.vstack((merged_coords, new_coords))
-
-        in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
-            merged_points,
-            features=merged_coords,
-            labels=merged_labels,
-            sampleDl=self.cfg.first_subsampling_dl)
-
-        # Number collected
-        n = in_pts.shape[0]
-        # Safe check
-        if n < 2:
-            print("sample n < 2!")
-            exit()
-
-        # Randomly drop some points (augmentation process and safety for GPU memory consumption)
-        if n > self.cfg.max_in_points:
-            input_inds = np.random.choice(n,
-                                          size=self.cfg.max_in_points,
-                                          replace=False)
-            in_pts = in_pts[input_inds, :]
-            in_fts = in_fts[input_inds, :]
-            in_lbls = in_lbls[input_inds]
-            n = input_inds.shape[0]
-
-        # Before augmenting, compute reprojection inds (only for validation and test)
-        if attr['split'] in ['validation', 'test']:
-
-            # get val_points that are in range
-            radiuses = np.sum(np.square(o_pts - p0), axis=1)
-            reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
-
-            # Project predictions on the frame points
-            search_tree = KDTree(in_pts, leaf_size=50)
-            proj_inds = search_tree.query(o_pts[reproj_mask, :],
-                                          return_distance=False)
-            proj_inds = np.squeeze(proj_inds).astype(np.int32)
-        else:
-            proj_inds = np.zeros((0,))
-            reproj_mask = np.zeros((0,))
-
-        # Data augmentation
-        in_pts, scale, R = self.augmentation_transform(in_pts)
-
-        print(in_pts.shape)
-        # Color augmentation
-        if np.random.rand() > self.cfg.augment_color:
-            in_fts[:, 3:] *= 0
-
-        # Stack batch
-        p_list += [in_pts]
-        f_list += [in_fts]
-        l_list += [np.squeeze(in_lbls)]
-        #fi_list += [[s_ind, f_ind]]
-        p0_list += [p0]
-        s_list += [scale]
-        R_list += [R]
-        r_inds_list += [proj_inds]
-        r_mask_list += [reproj_mask]
-        val_labels_list += [o_labels]
-
-        stacked_points = np.concatenate(p_list, axis=0)
-        features = np.concatenate(f_list, axis=0)
-        labels = np.concatenate(l_list, axis=0)
-        frame_inds = np.array(fi_list, dtype=np.int32)
-        frame_centers = np.stack(p0_list, axis=0)
-        stack_lengths = np.array([pp.shape[0] for pp in p_list], dtype=np.int32)
-        scales = np.array(s_list, dtype=np.float32)
-        rots = np.stack(R_list, axis=0)
-
-        # Input features (Use reflectance, input height or all coordinates)
-        stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
-        if self.cfg.in_features_dim == 1:
-            pass
-        elif self.cfg.in_features_dim == 2:
-            # Use original height coordinate
-            stacked_features = np.hstack((stacked_features, features[:, 2:3]))
-        elif self.cfg.in_features_dim == 3:
-            # Use height + reflectance
-            stacked_features = np.hstack((stacked_features, features[:, 2:]))
-        elif self.cfg.in_features_dim == 4:
-            # Use all coordinates
-            stacked_features = np.hstack((stacked_features, features[:3]))
-        elif self.cfg.in_features_dim == 5:
-            # Use all coordinates + reflectance
-            stacked_features = np.hstack((stacked_features, features))
-        else:
-            raise ValueError(
-                'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
-            )
-
-        input_list = self.segmentation_inputs(stacked_points, stacked_features,
-                                              labels.astype(np.int64),
-                                              stack_lengths)
-
-        # Add scale and rotation for testing
-        input_list += [
-            scales, rots, frame_inds, frame_centers, r_inds_list, r_mask_list,
-            val_labels_list
-        ]
-
-        return [self.cfg.num_layers] + input_list
 
     def inference_begin(self, data):
         self.inference_data = data
@@ -1310,8 +1146,7 @@ class KPConv(nn.Module):
         neighb_x = gather(x, new_neighb_inds)
 
         # Apply distance weights [n_points, n_kpoints, in_fdim]
-        print(all_weights.size())
-        print(neighb_x.size())
+
         weighted_features = torch.matmul(all_weights, neighb_x)
 
         # Apply modulations
@@ -1320,6 +1155,7 @@ class KPConv(nn.Module):
 
         # Apply network weights [n_kpoints, n_points, out_fdim]
         weighted_features = weighted_features.permute((1, 0, 2))
+
         kernel_outputs = torch.matmul(weighted_features, self.weights)
 
         # Convolution sum [n_points, out_fdim]
@@ -1498,6 +1334,7 @@ class SimpleBlock(nn.Module):
             q_pts = batch.points[self.layer_ind + 1]
             s_pts = batch.points[self.layer_ind]
             neighb_inds = batch.pools[self.layer_ind]
+
         else:
             q_pts = batch.points[self.layer_ind]
             s_pts = batch.points[self.layer_ind]
@@ -2182,12 +2019,27 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
     :param radius: float32
     :return: neighbors indices
     """
+    # print("------")
+    # import sys
+    # np.set_printoptions(threshold=sys.maxsize)
+    # print(queries.tolist())
+    # print(supports.tolist())
+    # print(queries.shape)
+    # print(supports.shape)
+    # print(q_batches)
+    # print(s_batches)
+    # print(radius)
 
-    return radius_search(
+    ret = radius_search(
         o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
         o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
         o3c.Tensor.from_numpy(np.array(s_batches, dtype=np.int32)),
         radius).numpy()
+
+    num_points = ret.shape[0]
+    corret_ret = np.where(ret == -1, num_points, ret)
+    # print(corret_ret)
+    return corret_ret
 
 
 def batch_grid_subsampling(points,
