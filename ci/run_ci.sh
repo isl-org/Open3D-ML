@@ -4,13 +4,13 @@
 # - NPROC
 #
 TENSORFLOW_VER="2.3.0"
-TORCH_GLNX_VER=("1.5.0+cu101" "1.4.0+cpu")
+TORCH_GLNX_VER=("1.5.0+cu101" "1.6.0+cpu")
 YAPF_VER="0.30.0"
 
 set -euo pipefail
 
 # 1. Prepare the Open3D-ML repo and install dependencies
-PATH_TO_OPEN3D_ML=$(pwd)
+export PATH_TO_OPEN3D_ML=$(pwd)
 # the build system of the main repo expects a master branch. make sure master exists
 git checkout -b master || true
 pip install -r requirements.txt
@@ -23,7 +23,7 @@ python -m pip install -U Cython
 # 2. clone Open3D and install dependencies
 # For now we have to clone the o3dml_integration branch of open3d
 #
-git clone --recursive --branch o3dml_integration  https://github.com/intel-isl/Open3D.git
+git clone --recursive --branch master  https://github.com/intel-isl/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -U tensorflow==$TENSORFLOW_VER
@@ -51,7 +51,7 @@ cmake -DBUNDLE_OPEN3D_ML=ON \
 make -j"$NPROC" install-pip-package
 
 #
-# 5. run examples/tests in the Open3D-ML repo outside of the repo directory to 
+# 5. run examples/tests in the Open3D-ML repo outside of the repo directory to
 #    make sure that the installed package works.
 #
 popd

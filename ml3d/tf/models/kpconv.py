@@ -10,16 +10,143 @@ from pathlib import Path
 from sklearn.neighbors import KDTree
 import pudb
 
+# use relative import for being compatible with Open3d main repo
+from open3d.ml.tf.ops import *
+from .network_blocks import *
+from .base_model import BaseModel
+from ...utils import MODEL
 from ...datasets.utils.dataprocessing import DataProcessing
 from .network_blocks import *
+from open3d.ml.tf.ops import batch_grid_subsampling as tf_batch_subsampling
+from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
 
 
-class KPFCNN(tf.keras.Model):
-    def __init__(self, cfg):
-        super(KPFCNN, self).__init__()
+class KPFCNN(BaseModel):
 
-        # Model parameters
-        self.cfg = cfg
+    def __init__(
+            self,
+            name='KPFCNN',
+            ign_lbls=[0],
+            lbl_values=[
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19
+            ],
+            num_classes=19,  # Number of valid classes
+            ignored_label_inds=[0],
+            ckpt_path=None,
+            dataset_task='',
+            input_threads=10,
+            batcher='ConcatBatcher',
+            architecture=[
+                'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb',
+                'resnetb_strided', 'resnetb', 'resnetb', 'resnetb_strided',
+                'resnetb', 'resnetb', 'resnetb_strided', 'resnetb',
+                'nearest_upsample', 'unary', 'nearest_upsample', 'unary',
+                'nearest_upsample', 'unary', 'nearest_upsample', 'unary'
+            ],
+            in_radius=4.0,
+            val_radius=4.0,
+            n_frames=1,
+            max_in_points=100000,
+            max_val_points=100000,
+            batch_num=8,
+            val_batch_num=8,
+            num_kernel_points=15,
+            first_subsampling_dl=0.06,
+            conv_radius=2.5,
+            deform_radius=6.0,
+            KP_extent=1.2,
+            KP_influence='linear',
+            aggregation_mode='sum',
+            first_features_dim=128,
+            in_features_dim=2,
+            modulated=False,
+            use_batch_norm=True,
+            batch_norm_momentum=0.02,
+            deform_fitting_mode='point2point',
+            deform_fitting_power=1.0,
+            deform_lr_factor=0.1,
+            repulse_extent=1.2,
+            max_epoch=800,
+            learning_rate=1e-2,
+            momentum=0.98,
+            lr_decays=0.98477,
+            grad_clip_norm=100.0,
+            epoch_steps=500,
+            validation_size=200,
+            checkpoint_gap=50,
+            augment_scale_anisotropic=True,
+            augment_symmetries=[True, False, False],
+            augment_rotation='vertical',
+            augment_scale_min=0.8,
+            augment_scale_max=1.2,
+            augment_noise=0.001,
+            augment_color=0.8,
+            saving=True,
+            saving_path=None,
+            in_points_dim=3,
+            fixed_kernel_points='center',
+            class_w=[],
+            num_layers=5,
+            **kwargs):
+
+        super().__init__(name=name,
+                         ign_lbls=ign_lbls,
+                         lbl_values=lbl_values,
+                         num_classes=num_classes,
+                         ignored_label_inds=ignored_label_inds,
+                         ckpt_path=ckpt_path,
+                         dataset_task=dataset_task,
+                         input_threads=input_threads,
+                         batcher=batcher,
+                         architecture=architecture,
+                         in_radius=in_radius,
+                         val_radius=val_radius,
+                         n_frames=n_frames,
+                         max_in_points=max_in_points,
+                         max_val_points=max_val_points,
+                         batch_num=batch_num,
+                         val_batch_num=val_batch_num,
+                         num_kernel_points=num_kernel_points,
+                         first_subsampling_dl=first_subsampling_dl,
+                         conv_radius=conv_radius,
+                         deform_radius=deform_radius,
+                         KP_extent=KP_extent,
+                         KP_influence=KP_influence,
+                         aggregation_mode=aggregation_mode,
+                         first_features_dim=first_features_dim,
+                         in_features_dim=in_features_dim,
+                         modulated=modulated,
+                         use_batch_norm=use_batch_norm,
+                         batch_norm_momentum=batch_norm_momentum,
+                         deform_fitting_mode=deform_fitting_mode,
+                         deform_fitting_power=deform_fitting_power,
+                         deform_lr_factor=deform_lr_factor,
+                         repulse_extent=repulse_extent,
+                         max_epoch=max_epoch,
+                         learning_rate=learning_rate,
+                         momentum=momentum,
+                         lr_decays=lr_decays,
+                         grad_clip_norm=grad_clip_norm,
+                         epoch_steps=epoch_steps,
+                         validation_size=validation_size,
+                         checkpoint_gap=checkpoint_gap,
+                         augment_scale_anisotropic=augment_scale_anisotropic,
+                         augment_symmetries=augment_symmetries,
+                         augment_rotation=augment_rotation,
+                         augment_scale_min=augment_scale_min,
+                         augment_scale_max=augment_scale_max,
+                         augment_noise=augment_noise,
+                         augment_color=augment_color,
+                         saving=saving,
+                         saving_path=saving_path,
+                         in_points_dim=in_points_dim,
+                         fixed_kernel_points=fixed_kernel_points,
+                         class_w=class_w,
+                         num_layers=num_layers,
+                         **kwargs)
+
+        cfg = self.cfg
 
         # From config parameter, compute higher bound of neighbors number in a neighborhood
         hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1)**3))
@@ -119,8 +246,7 @@ class KPFCNN(tf.keras.Model):
                 out_dim = out_dim // 2
 
         self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False,
-                                       0)
+        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
 
         self.valid_labels = np.sort(
             [c for c in lbl_values if c not in ign_lbls])
@@ -134,8 +260,7 @@ class KPFCNN(tf.keras.Model):
         inputs['points'] = flat_inputs[:cfg.num_layers]
         inputs['neighbors'] = flat_inputs[cfg.num_layers:2 * cfg.num_layers]
         inputs['pools'] = flat_inputs[2 * cfg.num_layers:3 * cfg.num_layers]
-        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 *
-                                          cfg.num_layers]
+        inputs['upsamples'] = flat_inputs[3 * cfg.num_layers:4 * cfg.num_layers]
 
         ind = 4 * cfg.num_layers
         inputs['features'] = flat_inputs[ind]
@@ -161,7 +286,7 @@ class KPFCNN(tf.keras.Model):
 
         return inputs
 
-    def call(self, flat_inputs):
+    def call(self, flat_inputs, training=False):
         cfg = self.cfg
         inputs = self.organise_inputs(flat_inputs)
 
@@ -171,12 +296,12 @@ class KPFCNN(tf.keras.Model):
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_conn.append(x)
-            x = block_op(x, inputs)
+            x = block_op(x, inputs, training=training)
 
         for block_i, block_op in enumerate(self.decoder_blocks):
             if block_i in self.decoder_concats:
                 x = tf.concat([x, skip_conn.pop()], axis=1)
-            x = block_op(x, inputs)
+            x = block_op(x, inputs, training=training)
 
         x = self.head_mlp(x, inputs)
         x = self.head_softmax(x, inputs)
@@ -185,11 +310,11 @@ class KPFCNN(tf.keras.Model):
 
     def get_optimizer(self, cfg_pipeline):
 
-        optimizer = tf.keras.optimizers.SGD(learning_rate=cfg_pipeline.learning_rate, 
-                                    momentum=cfg_pipeline.momentum)
+        optimizer = tf.keras.optimizers.SGD(
+            learning_rate=cfg_pipeline.learning_rate,
+            momentum=cfg_pipeline.momentum)
 
         return optimizer
-
 
     def get_loss(self, Loss, logits, inputs):
         """
@@ -216,142 +341,6 @@ class KPFCNN(tf.keras.Model):
         # crop neighbors matrix
         return neighbors[:, :self.neighborhood_limits[layer]]
 
-    def regularization_losses(self):
-
-        #####################
-        # Regularization loss
-        #####################
-
-        # Get L2 norm of all weights
-        regularization_losses = [
-            tf.nn.l2_loss(v) for v in tf.global_variables()
-            if 'weights' in v.name
-        ]
-        self.regularization_loss = self.cfg.weights_decay * tf.add_n(
-            regularization_losses)
-
-        ##############################
-        # Gaussian regularization loss
-        ##############################
-
-        gaussian_losses = []
-        for v in tf.global_variables():
-            if 'kernel_extents' in v.name:
-
-                # Layer index
-                layer = int(v.name.split('/')[1].split('_')[-1])
-
-                # Radius of convolution for this layer
-                conv_radius = cfg.first_subsampling_dl * self.cfg.density_parameter * (
-                    2**(layer - 1))
-
-                # Target extent
-                target_extent = conv_radius / 1.5
-                gaussian_losses += [tf.nn.l2_loss(v - target_extent)]
-
-        if len(gaussian_losses) > 0:
-            self.gaussian_loss = self.cfg.gaussian_decay * tf.add_n(
-                gaussian_losses)
-        else:
-            self.gaussian_loss = tf.constant(0, dtype=tf.float32)
-
-        #############################
-        # Offsets regularization loss
-        #############################
-
-        offset_losses = []
-
-        if self.cfg.offsets_loss == 'permissive':
-
-            for op in tf.get_default_graph().get_operations():
-                if op.name.endswith('deformed_KP'):
-
-                    # Get deformed positions
-                    deformed_positions = op.outputs[0]
-
-                    # Layer index
-                    layer = int(op.name.split('/')[1].split('_')[-1])
-
-                    # Radius of deformed convolution for this layer
-                    conv_radius = cfg.first_subsampling_dl * self.cfg.density_parameter * (
-                        2**layer)
-
-                    # Normalized KP locations
-                    KP_locs = deformed_positions / conv_radius
-
-                    # Loss will be zeros inside radius and linear outside radius
-                    # Mean => loss independent from the number of input points
-                    radius_outside = tf.maximum(0.0,
-                                                tf.norm(KP_locs, axis=2) - 1.0)
-                    offset_losses += [tf.reduce_mean(radius_outside)]
-
-        elif self.cfg.offsets_loss == 'fitting':
-
-            for op in tf.get_default_graph().get_operations():
-
-                if op.name.endswith('deformed_d2'):
-
-                    # Get deformed distances
-                    deformed_d2 = op.outputs[0]
-
-                    # Layer index
-                    layer = int(op.name.split('/')[1].split('_')[-1])
-
-                    # Radius of deformed convolution for this layer
-                    KP_extent = cfg.first_subsampling_dl * cfg.KP_extent * (
-                        2**layer)
-
-                    # Get the distance to closest input point
-                    KP_min_d2 = tf.reduce_min(deformed_d2, axis=1)
-
-                    # Normalize KP locations to be independant from layers
-                    KP_min_d2 = KP_min_d2 / (KP_extent**2)
-
-                    # Loss will be the square distance to closest input point.
-                    # Mean => loss independent from the number of input points
-                    offset_losses += [tf.reduce_mean(KP_min_d2)]
-
-                if op.name.endswith('deformed_KP'):
-
-                    # Get deformed positions
-                    deformed_KP = op.outputs[0]
-
-                    # Layer index
-                    layer = int(op.name.split('/')[1].split('_')[-1])
-
-                    # Radius of deformed convolution for this layer
-                    KP_extent = cfg.first_subsampling_dl * cfg.KP_extent * (
-                        2**layer)
-
-                    # Normalized KP locations
-                    KP_locs = deformed_KP / KP_extent
-
-                    # Point should not be close to each other
-                    for i in range(cfg.num_kernel_points):
-                        other_KP = tf.stop_gradient(
-                            tf.concat(
-                                [KP_locs[:, :i, :], KP_locs[:, i + 1:, :]],
-                                axis=1))
-                        distances = tf.sqrt(
-                            tf.reduce_sum(tf.square(other_KP -
-                                                    KP_locs[:, i:i + 1, :]),
-                                          axis=2))
-                        repulsive_losses = tf.reduce_sum(tf.square(
-                            tf.maximum(0.0, 1.5 - distances)),
-                                                         axis=1)
-                        offset_losses += [tf.reduce_mean(repulsive_losses)]
-
-        elif self.cfg.offsets_loss != 'none':
-            raise ValueError('Unknown offset loss')
-
-        if len(offset_losses) > 0:
-            self.offsets_loss = self.cfg.offsets_decay * tf.add_n(
-                offset_losses)
-        else:
-            self.offsets_loss = tf.constant(0, dtype=tf.float32)
-
-        return self.offsets_loss + self.gaussian_loss + self.regularization_loss
-
     def parameters_log(self):
 
         self.cfg.save(self.saving_path)
@@ -365,7 +354,7 @@ class KPFCNN(tf.keras.Model):
         # Initiate batch inds tensor
         num_batches = tf.shape(stacks_len)[0]
         num_points = tf.reduce_sum(stacks_len)
-        batch_inds_0 = tf.zeros((num_points, ), dtype=tf.int32)
+        batch_inds_0 = tf.zeros((num_points,), dtype=tf.int32)
 
         # Define body of the while loop
         def body(batch_i, point_i, b_inds):
@@ -374,15 +363,14 @@ class KPFCNN(tf.keras.Model):
             num_before = tf.cond(tf.less(batch_i, 1), lambda: tf.zeros(
                 (), dtype=tf.int32),
                                  lambda: tf.reduce_sum(stacks_len[:batch_i]))
-            num_after = tf.cond(
-                tf.less(batch_i, num_batches - 1),
-                lambda: tf.reduce_sum(stacks_len[batch_i + 1:]),
-                lambda: tf.zeros((), dtype=tf.int32))
+            num_after = tf.cond(tf.less(batch_i, num_batches - 1),
+                                lambda: tf.reduce_sum(stacks_len[batch_i + 1:]),
+                                lambda: tf.zeros((), dtype=tf.int32))
 
             # Update current element indices
-            inds_before = tf.zeros((num_before, ), dtype=tf.int32)
-            inds_in = tf.fill((num_in, ), batch_i)
-            inds_after = tf.zeros((num_after, ), dtype=tf.int32)
+            inds_before = tf.zeros((num_before,), dtype=tf.int32)
+            inds_in = tf.fill((num_in,), batch_i)
+            inds_after = tf.zeros((num_after,), dtype=tf.int32)
             n_inds = tf.concat([inds_before, inds_in, inds_after], axis=0)
 
             b_inds += n_inds
@@ -472,14 +460,11 @@ class KPFCNN(tf.keras.Model):
         # Parameter
         num_batches = batch_inds[-1] + 1
 
-        ##########
         # Rotation
-        ##########
-
         if cfg.augment_rotation == 'vertical':
 
             # Choose a random angle for each element
-            theta = tf.random.uniform((num_batches, ),
+            theta = tf.random.uniform((num_batches,),
                                       minval=0,
                                       maxval=2 * np.pi)
 
@@ -495,20 +480,17 @@ class KPFCNN(tf.keras.Model):
 
             # Apply rotations
             stacked_points = tf.reshape(
-                tf.matmul(tf.expand_dims(stacked_points, axis=1),
-                          stacked_rots), [-1, 3])
+                tf.matmul(tf.expand_dims(stacked_points, axis=1), stacked_rots),
+                [-1, 3])
 
         elif cfg.augment_rotation == 'none':
-            R = tf.eye(3, batch_shape=(num_batches, ))
+            R = tf.eye(3, batch_shape=(num_batches,))
 
         else:
             raise ValueError('Unknown rotation augmentation : ' +
                              cfg.augment_rotation)
 
-        #######
         # Scale
-        #######
-
         # Choose random scales for each example
         min_s = cfg.augment_scale_min
         max_s = cfg.augment_scale_max
@@ -533,10 +515,7 @@ class KPFCNN(tf.keras.Model):
         # Apply scales
         stacked_points = stacked_points * stacked_scales
 
-        #######
         # Noise
-        #######
-
         noise = tf.random.normal(tf.shape(stacked_points),
                                  stddev=cfg.augment_noise)
         stacked_points = stacked_points + noise
@@ -558,9 +537,6 @@ class KPFCNN(tf.keras.Model):
             stacks_lengths, tf.float32)
         stacked_weights = tf.gather(batch_weights, batch_inds)
 
-        # KPConv specific parameters
-        density_parameter = 5.0
-
         # Starting radius of convolutions
         r_normal = cfg.first_subsampling_dl * cfg.KP_extent * 2.5
 
@@ -574,10 +550,7 @@ class KPFCNN(tf.keras.Model):
         input_upsamples = []
         input_batches_len = []
 
-        ######################
         # Loop over the blocks
-        ######################
-
         for block_i, block in enumerate(cfg.architecture):
 
             # Stop when meeting a global pooling or upsampling
@@ -592,13 +565,10 @@ class KPFCNN(tf.keras.Model):
                     continue
 
             # Convolution neighbors indices
-            # *****************************
-
             if layer_blocks:
                 # Convolutions are done in this layer, compute the neighbors with the good radius
-                if np.any(['deformable' in blck
-                           for blck in layer_blocks[:-1]]):
-                    r = r_normal * density_parameter / (cfg.KP_extent * 2.5)
+                if np.any(['deformable' in blck for blck in layer_blocks[:-1]]):
+                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
                 conv_i = tf_batch_neighbors(stacked_points, stacked_points,
@@ -608,8 +578,6 @@ class KPFCNN(tf.keras.Model):
                 conv_i = tf.zeros((0, 1), dtype=tf.int32)
 
             # Pooling neighbors indices
-            # *************************
-
             # If end of layer is a pooling operation
             if 'pool' in block or 'strided' in block:
 
@@ -618,12 +586,11 @@ class KPFCNN(tf.keras.Model):
 
                 # Subsampled points
                 pool_p, pool_b = tf_batch_subsampling(stacked_points,
-                                                      stacks_lengths,
-                                                      sampleDl=dl)
+                                                      stacks_lengths, dl)
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
-                    r = r_normal * density_parameter / (cfg.KP_extent * 2.5)
+                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
                 else:
                     r = r_normal
 
@@ -639,7 +606,7 @@ class KPFCNN(tf.keras.Model):
                 # No pooling in the end of this layer, no pooling indices required
                 pool_i = tf.zeros((0, 1), dtype=tf.int32)
                 pool_p = tf.zeros((0, 3), dtype=tf.float32)
-                pool_b = tf.zeros((0, ), dtype=tf.int32)
+                pool_b = tf.zeros((0,), dtype=tf.int32)
                 up_i = tf.zeros((0, 1), dtype=tf.int32)
 
             # Reduce size of neighbors matrices by eliminating furthest point
@@ -663,10 +630,7 @@ class KPFCNN(tf.keras.Model):
             r_normal *= 2
             layer_blocks = []
 
-        ###############
         # Return inputs
-        ###############
-
         # Batch unstacking (with last layer indices for optionnal classif loss)
         stacked_batch_inds_0 = self.stack_batch_inds(input_batches_len[0])
 
@@ -725,7 +689,7 @@ class KPFCNN(tf.keras.Model):
         if cfg.in_features_dim in [4, 5]:
             num_batches = batch_inds[-1] + 1
             s = tf.cast(
-                tf.less(tf.random.uniform((num_batches, )), cfg.augment_color),
+                tf.less(tf.random.uniform((num_batches,)), cfg.augment_color),
                 tf.float32)
             stacked_s = tf.gather(s, batch_inds)
             stacked_colors = stacked_colors * tf.expand_dims(stacked_s, axis=1)
@@ -735,8 +699,7 @@ class KPFCNN(tf.keras.Model):
             pass
         elif cfg.in_features_dim == 2:
             stacked_features = tf.concat(
-                (stacked_features, stacked_original_coordinates[:, 2:]),
-                axis=1)
+                (stacked_features, stacked_original_coordinates[:, 2:]), axis=1)
         elif cfg.in_features_dim == 3:
             stacked_features = stacked_colors
         elif cfg.in_features_dim == 4:
@@ -765,6 +728,111 @@ class KPFCNN(tf.keras.Model):
 
         return input_list
 
+    def inference_begin(self, data):
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+
+    def inference_preprocess(self):
+        flat_inputs, point_inds, stacks_lengths = self.transform_inference(
+            self.inference_data)
+        self.test_meta = {}
+        self.test_meta['inds'] = point_inds
+        self.test_meta['lens'] = stacks_lengths
+
+        self.inference_input = flat_inputs
+
+        return flat_inputs
+
+    def inference_end(self, results):
+        results = tf.reshape(results, (-1, self.cfg.num_classes))
+        results = tf.nn.softmax(results, axis=-1)
+        results = results.cpu().numpy()
+        test_smooth = 0.98
+        probs = np.zeros(shape=[
+            self.inference_data['search_tree'].data.shape[0],
+            self.cfg.num_classes
+        ],
+                         dtype=np.float32)
+        inds = self.test_meta['inds']
+
+        l = 0
+        r = 0
+        for len in self.test_meta['lens']:
+            r += len
+            probs[inds[l:r]] = probs[inds[l:r]] * test_smooth + (
+                1 - test_smooth) * results[l:r]
+            l += len
+
+        reproj_inds = self.inference_data['proj_inds']
+
+        predict_scores = probs[reproj_inds]
+        inference_result = {
+            'predict_labels': np.argmax(predict_scores, 1),
+            'predict_scores': predict_scores
+        }
+
+        self.inference_result = inference_result
+        return True
+
+    def transform_inference(self, data):
+        cfg = self.cfg
+
+        p_list = []
+        c_list = []
+        pl_list = []
+        pi_list = []
+        ci_list = []
+
+        points = np.array(data['search_tree'].data)
+        potentials = np.random.rand(points.shape[0]) * 1e-3
+
+        while (np.min(potentials) < 0.5):
+            cloud_ind = 0
+            point_ind = int(np.argmin(potentials))
+
+            center_point = points[point_ind, :].reshape(1, -1)
+            pick_point = center_point
+
+            input_inds = data['search_tree'].query_radius(pick_point,
+                                                          r=cfg.in_radius)[0]
+
+            n = input_inds.shape[0]
+
+            dists = np.sum(np.square(
+                (points[input_inds] - pick_point).astype(np.float32)),
+                           axis=1)
+            tuckeys = np.square(1 - dists / np.square(cfg.in_radius))
+            tuckeys[dists > np.square(cfg.in_radius)] = 0
+            potentials[input_inds] += tuckeys
+
+            input_points = (points[input_inds] - pick_point).astype(np.float32)
+            input_colors = data['feat'][input_inds].astype(np.float32)
+            input_labels = np.zeros(input_points.shape[0]).astype(np.int32)
+
+            if n > 0:
+                p_list += [input_points]
+                c_list += [np.hstack((input_colors, input_points + pick_point))]
+                pl_list += [input_labels]
+                pi_list += [input_inds]
+                ci_list += [cloud_ind]
+
+        stacked_points = np.concatenate(p_list, axis=0),
+        stacked_colors = np.concatenate(c_list, axis=0),
+        point_labels = np.concatenate(pl_list, axis=0),
+        stacks_lengths = np.array([tp.shape[0] for tp in p_list],
+                                  dtype=np.int32),
+        point_inds = np.concatenate(pi_list, axis=0),
+        cloud_inds = np.array(ci_list, dtype=np.int32)
+
+        input_list = self.transform(
+            tf.convert_to_tensor(np.array(stacked_points[0], dtype=np.float32)),
+            tf.convert_to_tensor(np.array(stacked_colors[0], dtype=np.float32)),
+            tf.convert_to_tensor(np.array(point_labels[0], dtype=np.int32)),
+            tf.convert_to_tensor(np.array(stacks_lengths[0], dtype=np.int32)),
+            tf.convert_to_tensor(np.array(point_inds[0], dtype=np.int32)),
+            tf.convert_to_tensor(np.array(cloud_inds, dtype=np.int32)))
+        return input_list, np.array(point_inds[0]), np.array(stacks_lengths[0])
+
     def preprocess(self, data, attr):
         cfg = self.cfg
 
@@ -773,24 +841,17 @@ class KPFCNN(tf.keras.Model):
         split = attr['split']
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
 
-            
         data = dict()
 
-        if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
-                points, labels=labels, grid_size=cfg.first_subsampling_dl)
-
-        else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-                points,
-                features=feat,
-                labels=labels,
-                grid_size=cfg.first_subsampling_dl)
+        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+            points,
+            features=feat,
+            labels=labels,
+            grid_size=cfg.first_subsampling_dl)
 
         search_tree = KDTree(sub_points)
 
@@ -799,7 +860,7 @@ class KPFCNN(tf.keras.Model):
         data['label'] = np.array(sub_labels)
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -840,7 +901,7 @@ class KPFCNN(tf.keras.Model):
             epoch_n = 500 * cfg.batch_num
             split = dataset.split
 
-            batch_limit = 5000  # TODO : read from calibrate_batch, typically 100 * batch_size required
+            batch_limit = cfg.batch_limit
 
             # Initiate potentials for regular generation
             if not hasattr(self, 'potentials'):
@@ -851,11 +912,6 @@ class KPFCNN(tf.keras.Model):
             self.potentials[split] = []
             self.min_potentials[split] = []
             data_split = split
-
-            #TODO :
-            # for i, tree in enumerate(self.input_trees[data_split]):
-            #     self.potentials[split] += [np.random.rand(tree.data.shape[0]) * 1e-3]
-            #     self.min_potentials[split] += [float(np.min(self.potentials[split][-1]))]
 
             # Initiate concatanation lists
             p_list = []
@@ -869,45 +925,29 @@ class KPFCNN(tf.keras.Model):
             # Generator loop
             for i in range(epoch_n):
                 # Choose a random cloud
-                # cloud_ind = int(np.argmin(self.min_potentials[split]))
                 cloud_ind = random.randint(0, dataset.num_pc - 1)
 
                 data, attr = dataset.read_data(cloud_ind)
 
-                # Choose point ind as minimum of potentials
-                # point_ind = np.argmin(self.potentials[split][cloud_ind])
                 point_ind = np.random.choice(len(data['point']), 1)
 
                 # Get points from tree structure
-                # points = np.array(self.input_trees[data_split][cloud_ind].data, copy=False)
                 points = np.array(data['search_tree'].data, copy=False)
 
                 # Center point of input region
                 center_point = points[point_ind, :].reshape(1, -1)
+
                 # Add noise to the center point
-                # if split != 'ERF':
-                #     noise = np.random.normal(scale=cfg.in_radius/10, size=center_point.shape)
-                #     pick_point = center_point + noise.astype(center_point.dtype)
-                # else:
-                #     pick_point = center_point
-                pick_point = center_point
+                noise = np.random.normal(scale=cfg.in_radius / 10,
+                                         size=center_point.shape)
+                pick_point = center_point + noise.astype(center_point.dtype)
 
                 # Indices of points in input region
-                # input_inds = self.input_trees[data_split][cloud_ind].query_radius(pick_point,
-                #                                                                 r=cfg.in_radius)[0]
                 input_inds = data['search_tree'].query_radius(
                     pick_point, r=cfg.in_radius)[0]
 
                 # Number collected
                 n = input_inds.shape[0]
-
-                # Update potentials (Tuckey weights)
-                # if split != 'ERF':
-                #     dists = np.sum(np.square((points[input_inds] - pick_point).astype(np.float32)), axis=1)
-                #     tukeys = np.square(1 - dists / np.square(in_radius))
-                #     tukeys[dists > np.square(in_radius)] = 0
-                #     self.potentials[split][cloud_ind][input_inds] += tukeys
-                #     self.min_potentials[split][cloud_ind] = float(np.min(self.potentials[split][cloud_ind]))
 
                 # Safe check for very dense areas
                 if n > batch_limit:
@@ -919,21 +959,22 @@ class KPFCNN(tf.keras.Model):
                 # Collect points and colors
                 input_points = (points[input_inds] - pick_point).astype(
                     np.float32)
-                # input_colors = self.input_colors[data_split][cloud_ind][input_inds]
                 input_colors = data['feat'][input_inds]
 
-                if split in ['test']:
+                if split in ['test', 'testing']:
                     input_labels = np.zeros(input_points.shape[0])
                 else:
-                    # input_labels = self.input_labels[data_split][cloud_ind][input_inds]
-                    input_labels = data['label'][input_inds][:, 0]
-                    # input_labels = np.array([self.label_to_idx[l] for l in input_labels])
+                    if len(data['label'][input_inds].shape) == 2:
+                        input_labels = data['label'][input_inds][:, 0]
+                    else:
+                        input_labels = data['label'][input_inds]
 
                 # In case batch is full, yield it and reset it
                 if batch_n + n > batch_limit and batch_n > 0:
 
-                    yield (np.concatenate(p_list, axis=0),
-                           np.concatenate(c_list, axis=0),
+                    yield (np.concatenate(p_list,
+                                          axis=0), np.concatenate(c_list,
+                                                                  axis=0),
                            np.concatenate(pl_list, axis=0),
                            np.array([tp.shape[0] for tp in p_list]),
                            np.concatenate(pi_list, axis=0),
@@ -974,3 +1015,6 @@ class KPFCNN(tf.keras.Model):
         gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
+
+
+MODEL._register_module(KPFCNN, 'tf')

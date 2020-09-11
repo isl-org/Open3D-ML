@@ -5,25 +5,61 @@ import tensorflow as tf
 import numpy as np
 import time
 import random
+import pudb
 from sklearn.neighbors import KDTree
 
+# use relative import for being compatible with Open3d main repo
+from .base_model import BaseModel
 from ..utils import helper_tf
+from ...utils import MODEL
 from ...datasets.utils import DataProcessing
 
-# class RandLANet(tf.keras.Model):
-#     """docstring for RandLANet"""
-#     def __init__(self, cfg):
-#         super(RandLANet, self).__init__()
-#         self.cfg = cfg
 
+class RandLANet(BaseModel):
 
-class RandLANet(tf.keras.Model):
-    def __init__(self, cfg):
-        super(RandLANet, self).__init__()
-        self.cfg = cfg
-        d_feature = cfg.d_feature
+    def __init__(
+            self,
+            name='RandLANet',
+            k_n=16,  # KNN,
+            num_layers=4,  # Number of layers
+            num_points=4096 * 11,  # Number of input points
+            num_classes=19,  # Number of valid classes
+            ignored_label_inds=[0],
+            sub_grid_size=0.06,  # preprocess_parameter
+            sub_sampling_ratio=[4, 4, 4, 4],
+            num_sub_points=[
+                4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
+                4096 * 11 // 256
+            ],
+            dim_input=3,
+            dim_feature=8,
+            dim_output=[16, 64, 128, 256],
+            grid_size=0.06,
+            batcher='DefaultBatcher',
+            ckpt_path=None,
+            **kwargs):
 
-        self.fc0 = tf.keras.layers.Dense(d_feature, activation=None)
+        super().__init__(name=name,
+                         k_n=k_n,
+                         num_layers=num_layers,
+                         num_points=num_points,
+                         num_classes=num_classes,
+                         ignored_label_inds=ignored_label_inds,
+                         sub_grid_size=sub_grid_size,
+                         sub_sampling_ratio=sub_sampling_ratio,
+                         num_sub_points=num_sub_points,
+                         dim_input=dim_input,
+                         dim_feature=dim_feature,
+                         dim_output=dim_output,
+                         grid_size=grid_size,
+                         batcher=batcher,
+                         ckpt_path=ckpt_path,
+                         **kwargs)
+
+        cfg = self.cfg
+
+        dim_feature = cfg.dim_feature
+        self.fc0 = tf.keras.layers.Dense(dim_feature, activation=None)
         self.batch_normalization = tf.keras.layers.BatchNormalization(
             -1, 0.99, 1e-6)
         self.leaky_relu0 = tf.keras.layers.LeakyReLU()
@@ -34,24 +70,24 @@ class RandLANet(tf.keras.Model):
         # Encoder
         for i in range(cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
-            self.init_dilated_res_block(d_feature, cfg.d_out[i], name)
-            d_feature = cfg.d_out[i] * 2
+            self.init_dilated_res_block(dim_feature, cfg.dim_output[i], name)
+            dim_feature = cfg.dim_output[i] * 2
             if i == 0:
-                d_encoder_list.append(d_feature)
-            d_encoder_list.append(d_feature)
+                d_encoder_list.append(dim_feature)
+            d_encoder_list.append(dim_feature)
 
-        feature = helper_tf.conv2d(True, d_feature)
+        feature = helper_tf.conv2d(True, dim_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
         for j in range(cfg.num_layers):
             name = 'Decoder_layer_' + str(j)
-            d_in = d_encoder_list[-j - 2] + d_feature
-            d_out = d_encoder_list[-j - 2]
+            dim_input = d_encoder_list[-j - 2] + dim_feature
+            dim_output = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_tf.conv2d_transpose(True, d_out)
+            f_decoder_i = helper_tf.conv2d_transpose(True, dim_output)
             setattr(self, name, f_decoder_i)
-            d_feature = d_encoder_list[-j - 2]
+            dim_feature = d_encoder_list[-j - 2]
 
         f_layer_fc1 = helper_tf.conv2d(True, 64)
         setattr(self, 'fc1', f_layer_fc1)
@@ -62,40 +98,39 @@ class RandLANet(tf.keras.Model):
         f_dropout = tf.keras.layers.Dropout(0.5)
         setattr(self, 'dropout1', f_dropout)
 
-        f_layer_fc3 = helper_tf.conv2d(False,
-                                       cfg.num_classes,
-                                       activation=False)
+        f_layer_fc3 = helper_tf.conv2d(False, cfg.num_classes, activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
-    def init_att_pooling(self, d, d_out, name):
+    def init_att_pooling(self, d, dim_output, name):
         att_activation = tf.keras.layers.Dense(d, activation=None)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_tf.conv2d(True, d_out)
+        f_agg = helper_tf.conv2d(True, dim_output)
         setattr(self, name + 'mlp', f_agg)
 
-    def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_tf.conv2d(True, d_in)
+    def init_building_block(self, dim_input, dim_output, name):
+        f_pc = helper_tf.conv2d(True, dim_input)
 
         setattr(self, name + 'bdmlp1', f_pc)
 
-        self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
+        self.init_att_pooling(dim_input * 2, dim_output // 2,
+                              name + 'att_pooling_1')
 
-        f_xyz = helper_tf.conv2d(True, d_out // 2)
+        f_xyz = helper_tf.conv2d(True, dim_output // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
-        self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
+        self.init_att_pooling(dim_input * 2, dim_output, name + 'att_pooling_2')
 
-    def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_tf.conv2d(True, d_out // 2)
+    def init_dilated_res_block(self, dim_input, dim_output, name):
+        f_pc = helper_tf.conv2d(True, dim_output // 2)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_building_block(d_out // 2, d_out, name + 'LFA')
+        self.init_building_block(dim_output // 2, dim_output, name + 'LFA')
 
-        f_pc = helper_tf.conv2d(True, d_out * 2, activation=False)
+        f_pc = helper_tf.conv2d(True, dim_output * 2, activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_tf.conv2d(True, d_out * 2, activation=False)
+        shortcut = helper_tf.conv2d(True, dim_output * 2, activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
@@ -170,7 +205,8 @@ class RandLANet(tf.keras.Model):
 
         return f_pc_agg
 
-    def forward_dilated_res_block(self, feature, xyz, neigh_idx, d_out, name):
+    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output,
+                                  name):
         m_conv2d = getattr(self, name + 'mlp1')
         f_pc = m_conv2d(feature, training=self.training)
 
@@ -209,7 +245,7 @@ class RandLANet(tf.keras.Model):
         for i in range(self.cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
             f_encoder_i = self.forward_dilated_res_block(
-                feature, xyz[i], neigh_idx[i], self.cfg.d_out[i], name)
+                feature, xyz[i], neigh_idx[i], self.cfg.dim_output[i], name)
             f_sampled_i = self.random_sample(f_encoder_i, sub_idx[i])
             feature = f_sampled_i
             if i == 0:
@@ -222,14 +258,14 @@ class RandLANet(tf.keras.Model):
         # Decoder
         f_decoder_list = []
         for j in range(self.cfg.num_layers):
-            f_interp_i = self.nearest_interpolation(feature,
-                                                    interp_idx[-j - 1])
+            f_interp_i = self.nearest_interpolation(feature, interp_idx[-j - 1])
             name = 'Decoder_layer_' + str(j)
 
             m_transposeconv2d = getattr(self, name)
             concat_feature = tf.concat([f_encoder_list[-j - 2], f_interp_i],
                                        axis=3)
-            f_decoder_i = m_transposeconv2d(concat_feature, training=self.training)
+            f_decoder_i = m_transposeconv2d(concat_feature,
+                                            training=self.training)
 
             feature = f_decoder_i
             f_decoder_list.append(f_decoder_i)
@@ -247,16 +283,18 @@ class RandLANet(tf.keras.Model):
         f_layer_fc3 = m_conv2d(f_layer_drop, training=self.training)
 
         f_out = tf.squeeze(f_layer_fc3, [2])
+        # f_out = tf.nn.softmax(f_out)
 
         return f_out
 
     def get_optimizer(self, cfg_pipeline):
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            cfg_pipeline.adam_lr, decay_steps=100000, decay_rate=cfg_pipeline.scheduler_gamma)
+            cfg_pipeline.adam_lr,
+            decay_steps=100000,
+            decay_rate=cfg_pipeline.scheduler_gamma)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
 
         return optimizer
-
 
     def get_loss(self, Loss, results, inputs):
         """
@@ -308,12 +346,13 @@ class RandLANet(tf.keras.Model):
         up_num_points = tf.shape(interp_idx)[1]
         interp_idx = tf.reshape(interp_idx, [batch_size, up_num_points])
 
-        interpolated_features = tf.gather(feature,
-                                          interp_idx,
-                                          axis=1,
-                                          batch_dims=1)
-        interpolated_features = tf.expand_dims(interpolated_features, axis=2)
-        return interpolated_features
+        interpolatedim_features = tf.gather(feature,
+                                            interp_idx,
+                                            axis=1,
+                                            batch_dims=1)
+        interpolatedim_features = tf.expand_dims(interpolatedim_features,
+                                                 axis=2)
+        return interpolatedim_features
 
     @staticmethod
     def gather_neighbour(pc, neighbor_idx):
@@ -365,27 +404,55 @@ class RandLANet(tf.keras.Model):
 
                 pc, feat, label, _ = self.crop_pc(data['point'], data['feat'],
                                                   data['label'],
-                                                  data['search_tree'],
-                                                  pick_idx)
+                                                  data['search_tree'], pick_idx)
 
-                label = label[:, 0]
+                if feat is None:
+                    feat = pc.copy()
+                else:
+                    feat = np.concatenate([pc, feat], axis=1)
+                assert self.cfg.dim_input == feat.shape[
+                    1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
 
         gen_func = gen
         gen_types = (tf.float32, tf.float32, tf.int32)
-        gen_shapes = ([None, 3], [None, 3], [None])
+        gen_shapes = ([None, 3], [None, cfg.dim_input], [None])
 
         return gen_func, gen_types, gen_shapes
 
-    def transform(self, pc, feat, label):
+    def transform_inference(self, data, min_posbility_idx):
         cfg = self.cfg
+        inputs = dict()
 
-        if (feat is not None):
-            features = tf.concat([pc, feat], axis=1)
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
+        tree = data['search_tree']
+
+        pick_idx = min_posbility_idx
+
+        selected_pc, feat, label, selected_idx = self.crop_pc(
+            pc, feat, label, tree, pick_idx)
+
+        if feat is None:
+            feat = selected_pc.copy()
         else:
-            features = pc
+            feat = np.concatenate([selected_pc, feat], axis=1)
+
+        assert self.cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+
+        dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+
+        delta = np.square(1 - dists / np.max(dists))
+
+        self.possibility[selected_idx] += delta
+        inputs['point_inds'] = selected_idx
+
+        pc = selected_pc
+        features = feat
 
         input_points = []
         input_neighbors = []
@@ -393,14 +460,49 @@ class RandLANet(tf.keras.Model):
         input_up_samples = []
 
         for i in range(cfg.num_layers):
-            neighbour_idx = tf.py_function(DataProcessing.knn_search,
-                                           [pc, pc, cfg.k_n], tf.int32)
+            neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
+
+            sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
+            up_i = DataProcessing.knn_search(sub_points, pc, 1)
+            input_points.append(pc)
+            input_neighbors.append(neighbour_idx.astype(np.int64))
+            input_pools.append(pool_i.astype(np.int64))
+            input_up_samples.append(up_i.astype(np.int64))
+            pc = sub_points
+
+        inputs['xyz'] = input_points
+        inputs['neigh_idx'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = features
+
+        inputs['labels'] = label.astype(np.int64)
+
+        return inputs
+        # input_list = input_points + input_neighbors + input_pools + input_up_samples
+        # input_list += [feat, label]
+
+    def transform(self, pc, feat, label):
+        cfg = self.cfg
+
+        pc = pc
+        feat = feat
+
+        input_points = []
+        input_neighbors = []
+        input_pools = []
+        input_up_samples = []
+
+        for i in range(cfg.num_layers):
+            neighbour_idx = tf.numpy_function(DataProcessing.knn_search,
+                                              [pc, pc, cfg.k_n], tf.int32)
 
             sub_points = pc[:tf.shape(pc)[0] // cfg.sub_sampling_ratio[i], :]
             pool_i = neighbour_idx[:tf.shape(pc)[0] //
                                    cfg.sub_sampling_ratio[i], :]
-            up_i = tf.py_function(DataProcessing.knn_search,
-                                  [sub_points, pc, 1], tf.int32)
+            up_i = tf.numpy_function(DataProcessing.knn_search,
+                                     [sub_points, pc, 1], tf.int32)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx)
             input_pools.append(pool_i)
@@ -408,31 +510,81 @@ class RandLANet(tf.keras.Model):
             pc = sub_points
 
         input_list = input_points + input_neighbors + input_pools + input_up_samples
-        input_list += [features, label]
+        input_list += [feat, label]
 
         return input_list
+
+    def inference_begin(self, data):
+        self.test_smooth = 0.98
+        attr = {'split': 'test'}
+        self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
+
+    def inference_preprocess(self):
+        min_posbility_idx = np.argmin(self.possibility)
+        data = self.transform_inference(self.inference_data, min_posbility_idx)
+        inputs = {'data': data, 'attr': []}
+        # inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
+
+        flat_inputs = data['xyz'] + data['neigh_idx'] + data['sub_idx'] + data[
+            'interp_idx']
+        flat_inputs += [data['features'], data['labels']]
+
+        for i in range(len(flat_inputs)):
+            flat_inputs[i] = np.expand_dims(flat_inputs[i], 0)
+
+        return flat_inputs
+
+    def inference_end(self, results):
+        inputs = self.inference_input
+        results = tf.reshape(results, (-1, self.cfg.num_classes))
+        results = tf.nn.softmax(results, axis=-1)
+        results = results.cpu().numpy()
+
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        inds = inputs['data']['point_inds']
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def preprocess(self, data, attr):
         cfg = self.cfg
 
         points = data['point'][:, 0:3]
-        labels = data['label']
-        split = attr['split']
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
+
+        split = attr['split']
 
         data = dict()
 
         if (feat is None):
-            sub_points, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.grid_size)
+            sub_feat = None
 
         else:
-            sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
@@ -442,10 +594,13 @@ class RandLANet(tf.keras.Model):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split != "training":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
             data['proj_inds'] = proj_inds
 
         return data
+
+
+MODEL._register_module(RandLANet, 'tf')

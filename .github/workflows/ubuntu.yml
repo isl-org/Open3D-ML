@@ -1,11 +1,12 @@
 name: Ubuntu CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
   pull_request:
-    types: [opened, reopened, synchronize]  # Rebuild on new pushes to PR
+    types: [opened, reopened, synchronize]
 
 jobs:
   ubuntu:
@@ -35,7 +36,7 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v2
         with:
-          python-version: 3.5
+          python-version: 3.6
       # Pre-installed 18.04 packages: https://git.io/JfHmW
       - name: Install ccache
         run: |

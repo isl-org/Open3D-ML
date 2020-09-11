@@ -11,6 +11,8 @@ from tqdm import tqdm
 import logging
 
 from .utils import DataProcessing as DP
+from .base_dataset import BaseDataset
+from ..utils import make_dir, DATASET
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,60 +21,48 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class Semantic3DSplit():
-    def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+class Semantic3D(BaseDataset):
+    """
+    SemanticKITTI dataset, used in visualizer, training, or test
+    """
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+    def __init__(self,
+                 dataset_path,
+                 name='Toronto3D',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 num_points=65536,
+                 prepro_grid_size=0.06,
+                 class_weights=[
+                     5181602, 5012952, 6830086, 1311528, 10476365, 946982,
+                     334860, 269353
+                 ],
+                 ignored_label_inds=[0],
+                 val_split=1,
+                 test_result_folder='./test',
+                 **kwargs):
+        """
+        Initialize
+        Args:
+            dataset_path: path to the dataset
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         class_weights=class_weights,
+                         num_points=num_points,
+                         prepro_grid_size=prepro_grid_size,
+                         ignored_label_inds=ignored_label_inds,
+                         val_split=val_split,
+                         test_result_folder=test_result_folder,
+                         **kwargs)
 
-    def __len__(self):
-        return len(self.path_list)
+        cfg = self.cfg
 
-    def get_data(self, idx):
-        pc_path = self.path_list[idx]
-        log.debug("get_data called {}".format(pc_path))
-
-        pc = pd.read_csv(pc_path,
-                         header=None,
-                         delim_whitespace=True,
-                         dtype=np.float32).values
-
-        points = pc[:, 0:3]
-        feat = pc[:, [4, 5, 6, 3]]
-
-        points = np.array(points, dtype=np.float32)
-        feat = np.array(feat, dtype=np.float32)
-
-        if (self.split != 'test'):
-            labels = pd.read_csv(pc_path.replace(".txt", ".labels"),
-                                 header=None,
-                                 delim_whitespace=True,
-                                 dtype=np.int32).values
-            labels = np.array(labels, dtype=np.int32)
-        else:
-            labels = np.zeros((points.shape[0], ), dtype=np.int32)
-
-        data = {'point': points, 'feat': feat, 'label': labels}
-
-        return data
-
-    def get_attr(self, idx):
-        pc_path = Path(self.path_list[idx])
-        name = pc_path.name.replace('.txt', '')
-
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
-        return attr
-
-
-class Semantic3D:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'Semantic3D'
-        self.dataset_path = cfg.dataset_path
         self.label_to_names = {
             0: 'unlabeled',
             1: 'man-made terrain',
@@ -85,17 +75,15 @@ class Semantic3D:
             8: 'cars'
         }
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
-        self.all_files = glob.glob(str(Path(self.dataset_path) / '*.txt'))
-        random.shuffle(self.all_files)
+        self.all_files = glob.glob(str(Path(self.cfg.dataset_path) / '*.txt'))
 
         self.train_files = [
             f for f in self.all_files if exists(
-                Path(f).parent / Path(f).name.replace('.txt', '.labels'))
+                str(Path(f).parent / Path(f).name.replace('.txt', '.labels')))
         ]
         self.test_files = [
             f for f in self.all_files if f not in self.train_files
@@ -120,13 +108,79 @@ class Semantic3D:
 
     def get_split_list(self, split):
         if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
-            return self.test_files
+            files = self.test_files
         elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
-            return self.train_files
+            files = self.train_files
         elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
-            return self.val_files
+            files = self.val_files
+        elif split in ['all']:
+            files = self.val_files + self.train_files + self.test_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+        return files
+
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
+
+
+class Semantic3DSplit():
+
+    def __init__(self, dataset, split='training'):
+        self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+
+        self.path_list = path_list
+        self.split = split
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.path_list)
+
+    def get_data(self, idx):
+        pc_path = self.path_list[idx]
+        log.debug("get_data called {}".format(pc_path))
+
+        pc = pd.read_csv(pc_path,
+                         header=None,
+                         delim_whitespace=True,
+                         dtype=np.float32).values
+
+        points = pc[:, 0:3]
+        feat = pc[:, [4, 5, 6]]
+
+        points = np.array(points, dtype=np.float32)
+        feat = np.array(feat, dtype=np.float32)
+
+        if (self.split != 'test'):
+            labels = pd.read_csv(pc_path.replace(".txt", ".labels"),
+                                 header=None,
+                                 delim_whitespace=True,
+                                 dtype=np.int32).values
+            labels = np.array(labels, dtype=np.int32).reshape((-1,))
+        else:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+
+        data = {'point': points, 'feat': feat, 'label': labels}
+
+        return data
+
+    def get_attr(self, idx):
+        pc_path = Path(self.path_list[idx])
+        name = pc_path.name.replace('.txt', '')
+
+        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        return attr
+
+
+DATASET._register_module(Semantic3D)

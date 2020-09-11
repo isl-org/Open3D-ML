@@ -10,56 +10,52 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 
 from .utils import DataProcessing
+from .base_dataset import BaseDataset
+from ..utils import make_dir, DATASET
 
 
-class S3DISSplit():
-    def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        print("Found {} pointclouds for {}".format(len(path_list), split))
+class S3DIS(BaseDataset):
+    """
+    S3DIS dataset, used in visualizer, training, or test
+    """
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+    def __init__(self,
+                 dataset_path,
+                 name='S3DIS',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 prepro_grid_size=0.04,
+                 class_weights=[
+                     3370714, 2856755, 4919229, 318158, 375640, 478001, 974733,
+                     650464, 791496, 88727, 1284130, 229758, 2272837
+                 ],
+                 num_points=40960,
+                 test_area_idx=3,
+                 ignored_label_inds=[],
+                 test_result_folder='./test',
+                 **kwargs):
+        """
+        Initialize
+        Args:
+            dataset_path (str): path to the dataset
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         class_weights=class_weights,
+                         test_result_folder=test_result_folder,
+                         prepro_grid_size=prepro_grid_size,
+                         num_points=num_points,
+                         test_area_idx=test_area_idx,
+                         ignored_label_inds=ignored_label_inds,
+                         **kwargs)
 
-    def __len__(self):
-        return len(self.path_list)
+        cfg = self.cfg
 
-    def get_data(self, idx):
-        pc_path = self.path_list[idx]
-        data = PlyData.read(pc_path)['vertex']
-
-        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
-        points[:, 0] = data['x']
-        points[:, 1] = data['y']
-        points[:, 2] = data['z']
-
-        feat = np.zeros(points.shape, dtype=np.float32)
-        feat[:, 0] = data['red']
-        feat[:, 1] = data['green']
-        feat[:, 2] = data['blue']
-
-        labels = np.zeros((points.shape[0], ), dtype=np.int32)
-        if (self.split != 'test'):
-            labels = data['class']
-
-        data = {'point': points, 'feat': feat, 'label': labels}
-
-        return data
-
-    def get_attr(self, idx):
-        pc_path = Path(self.path_list[idx])
-        name = pc_path.name.replace('.ply', '')
-
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
-        return attr
-
-
-class S3DIS:
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'S3DIS'
-        self.dataset_path = cfg.dataset_path
         self.label_to_names = {
             0: 'ceiling',
             1: 'floor',
@@ -76,23 +72,22 @@ class S3DIS:
             12: 'clutter'
         }
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([])
 
         self.test_split = 'Area_' + str(cfg.test_area_idx)
 
-        self.pc_path = Path(self.dataset_path) / 'original_ply'
+        self.pc_path = join(self.cfg.dataset_path, 'original_ply')
+
         if not exists(self.pc_path):
             print("creating dataset")
-            self.create_ply_files(self.dataset_path, self.label_to_names)
+            self.create_ply_files(self.cfg.dataset_path, self.label_to_names)
 
         # TODO : if num of ply files < 272, then create.
 
         self.all_files = glob.glob(
-            str(Path(self.dataset_path) / 'original_ply' / '*.ply'))
-        # print(len(self.all_files))
+            str(Path(self.cfg.dataset_path) / 'original_ply' / '*.ply'))
 
     def get_split(self, split):
         return S3DISSplit(self, split=split)
@@ -102,23 +97,24 @@ class S3DIS:
         dataset_path = cfg.dataset_path
         file_list = []
 
-        if split in ['test', 'testing']:
+        if split in ['test', 'testing', 'val', 'validation']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) in f
             ]
-        else:
+        elif split in ['train', 'training']:
             file_list = [
                 f for f in self.all_files
                 if 'Area_' + str(cfg.test_area_idx) not in f
             ]
-
-        random.shuffle(file_list)
+        elif split in ['all']:
+            file_list = self.all_files
+        else:
+            raise ValueError("Invalid split {}".format(split))
 
         return file_list
 
     def get_data(self, file_path, is_test=False):
-        # print("get data = " + file_path)
         file_path = Path(file_path)
         kdtree_path = Path(
             file_path
@@ -142,12 +138,24 @@ class S3DIS:
 
         return points, feat, search_tree, labels
 
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
+
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
         # Format list input to the right form
-        field_list = list(field_list) if (
-            type(field_list) == list or type(field_list) == tuple) else list(
-                (field_list, ))
+        field_list = list(field_list) if (type(field_list) == list or
+                                          type(field_list) == tuple) else list(
+                                              (field_list,))
         for i, field in enumerate(field_list):
             if field.ndim < 2:
                 field_list[i] = field.reshape(-1, 1)
@@ -217,10 +225,10 @@ class S3DIS:
 
             if triangular_faces is not None:
                 triangular_faces = triangular_faces.astype(np.int32)
-                type_list = [('k', 'uint8')] + [(str(ind), 'int32')
-                                                for ind in range(3)]
+                type_list = [('k', 'uint8')
+                            ] + [(str(ind), 'int32') for ind in range(3)]
                 data = np.empty(triangular_faces.shape[0], dtype=type_list)
-                data['k'] = np.full((triangular_faces.shape[0], ),
+                data['k'] = np.full((triangular_faces.shape[0],),
                                     3,
                                     dtype=np.uint8)
                 data['0'] = triangular_faces[:, 0]
@@ -250,9 +258,11 @@ class S3DIS:
 
     @staticmethod
     def create_ply_files(dataset_path, class_names):
-        os.makedirs(Path(dataset_path) / 'original_ply', exist_ok=True)
-        anno_file = Path(
-            abspath(__file__)).parent / 'meta' / 's3dis_annotation_paths.txt'
+        os.makedirs(join(dataset_path, 'original_ply'), exist_ok=True)
+        anno_file = Path(abspath(
+            __file__)).parent / '_resources' / 's3dis_annotation_paths.txt'
+        print(anno_file)
+        anno_file = str(anno_file)
         anno_paths = [line.rstrip() for line in open(anno_file)]
         anno_paths = [Path(dataset_path) / p for p in anno_paths]
 
@@ -278,9 +288,6 @@ class S3DIS:
                 data_list.append(np.concatenate([pc, labels], 1))
 
             pc_label = np.concatenate(data_list, 0)
-            xyz_min = np.amin(pc_label[:, 0:3],
-                              axis=0)  # TODO : can be moved to preprocess
-            pc_label[:, 0:3] -= xyz_min
 
             xyz = pc_label[:, :3].astype(np.float32)
             colors = pc_label[:, 3:6].astype(np.uint8)
@@ -288,3 +295,51 @@ class S3DIS:
 
             S3DIS.write_ply(str(save_path), (xyz, colors, labels),
                             ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
+
+
+class S3DISSplit():
+
+    def __init__(self, dataset, split='training'):
+        self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
+        print("Found {} pointclouds for {}".format(len(path_list), split))
+
+        self.path_list = path_list
+        self.split = split
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.path_list)
+
+    def get_data(self, idx):
+        pc_path = self.path_list[idx]
+        data = PlyData.read(pc_path)['vertex']
+
+        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
+        points[:, 0] = data['x']
+        points[:, 1] = data['y']
+        points[:, 2] = data['z']
+
+        feat = np.zeros(points.shape, dtype=np.float32)
+        feat[:, 0] = data['red']
+        feat[:, 1] = data['green']
+        feat[:, 2] = data['blue']
+
+        if (self.split != 'test'):
+            labels = np.array(data['class'], dtype=np.int32).reshape((-1,))
+        else:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+
+        data = {'point': points, 'feat': feat, 'label': labels}
+
+        return data
+
+    def get_attr(self, idx):
+        pc_path = Path(self.path_list[idx])
+        name = pc_path.name.replace('.ply', '')
+
+        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        return attr
+
+
+DATASET._register_module(S3DIS)

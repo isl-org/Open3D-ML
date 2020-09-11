@@ -1,0 +1,55 @@
+dataset:
+  name: S3DIS
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
+478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
+  ignored_label_inds: []
+  num_points: 40960
+  prepro_grid_size: 0.04
+  test_area_idx: 3
+  test_result_folder: ./test
+  use_cache: False
+model:
+  name: RandLANet
+  batcher: DefaultBatcher
+  ckpt_path: # path/to/your/checkpoint
+  dim_feature: 8
+  dim_input: 6
+  dim_output:
+  - 16
+  - 64
+  - 128
+  - 256
+  - 512
+  grid_size: 0.04
+  ignored_label_inds: []
+  k_n: 16
+  num_classes: 13
+  num_layers: 5
+  num_points: 40960
+  num_sub_points:
+  - 10240
+  - 2560
+  - 640
+  - 160
+  - 80
+  sub_grid_size: 0.04
+  sub_sampling_ratio:
+  - 4
+  - 4
+  - 4
+  - 4
+  - 2
+pipeline:
+  name: SemanticSegmentation
+  adam_lr: 0.01
+  batch_size: 2
+  learning_rate: 0.01
+  main_log_dir: ./logs
+  max_epoch: 100
+  save_ckpt_freq: 20
+  scheduler_gamma: 0.95
+  test_batch_size: 3
+  train_sum_dir: train_log
+  val_batch_size: 2

@@ -10,6 +10,8 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
+from ..utils import make_dir, DATASET
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
@@ -22,6 +24,7 @@ log = logging.getLogger(__name__)
 
 
 class Custom3DSplit():
+
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -47,7 +50,7 @@ class Custom3DSplit():
         else:
             feat = np.array(data[:, 3:],
                             dtype=np.float32) if data.shape[1] > 3 else None
-            labels = np.zeros((points.shape[0], ), dtype=np.int32)
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
@@ -62,6 +65,7 @@ class Custom3DSplit():
 
 
 class Custom3D:
+
     def __init__(self, cfg):
         self.cfg = cfg
         self.name = 'Custom3D'
@@ -79,8 +83,7 @@ class Custom3D:
         }
 
         self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort(
-            [k for k, v in self.label_to_names.items()])
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
         self.ignored_labels = np.array([0])
 
@@ -107,3 +110,18 @@ class Custom3D:
             return self.train_files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
+
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
+
+
+DATASET._register_module(Custom3D)

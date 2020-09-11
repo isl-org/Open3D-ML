@@ -4,6 +4,7 @@ import numpy as np
 
 class SemSegMetric(object):
     """docstring for SemSegLoss"""
+
     def __init__(self, pipeline, model, dataset):
         super(SemSegMetric, self).__init__()
         # weighted_CrossEntropyLoss

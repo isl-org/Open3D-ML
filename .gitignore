@@ -1,3 +1,4 @@
+.vscode/
 .DS_Store
 __pycache__
 # Distribution / packaging
@@ -24,4 +25,3 @@ test/
 test_kpconv/
 kernels/
 **/.fuse*
-datasets/

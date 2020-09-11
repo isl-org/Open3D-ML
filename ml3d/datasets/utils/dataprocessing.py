@@ -1,14 +1,20 @@
 import numpy as np
 import os, argparse, pickle, sys
-from os.path import exists, join, isfile, dirname, abspath, split
+import open3d.core as o3c
 
-from ...ops.cpp_wrappers.cpp_subsampling import grid_subsampling as cpp_subsampling
-from ...ops.cpp_wrappers.nearest_neighbors.lib.python import nearest_neighbors as nearest_neighbors
+from os.path import exists, join, isfile, dirname, abspath, split
+from open3d.ml.contrib import subsample
+from open3d.ml.contrib import knn_search
 
 
 class DataProcessing:
+
     @staticmethod
-    def grid_subsampling(points, features=None, labels=None, sampleDl=0.1, verbose=0):
+    def grid_subsampling(points,
+                         features=None,
+                         labels=None,
+                         grid_size=0.1,
+                         verbose=0):
         """
         CPP wrapper for a grid subsampling (method = barycenter for points and features)
         :param points: (N, 3) matrix of input points
@@ -20,25 +26,23 @@ class DataProcessing:
         """
 
         if (features is None) and (labels is None):
-            return cpp_subsampling.subsample(points,
-                                             sampleDl=sampleDl,
-                                             verbose=verbose)
+            return subsample(points, sampleDl=grid_size, verbose=verbose)
         elif (labels is None):
-            return cpp_subsampling.subsample(points,
-                                             features=features,
-                                             sampleDl=sampleDl,
-                                             verbose=verbose)
+            return subsample(points,
+                             features=features,
+                             sampleDl=grid_size,
+                             verbose=verbose)
         elif (features is None):
-            return cpp_subsampling.subsample(points,
-                                             classes=labels,
-                                             sampleDl=sampleDl,
-                                             verbose=verbose)
+            return subsample(points,
+                             classes=labels,
+                             sampleDl=grid_size,
+                             verbose=verbose)
         else:
-            return cpp_subsampling.subsample(points,
-                                             features=features,
-                                             classes=labels,
-                                             sampleDl=sampleDl,
-                                             verbose=verbose)
+            return subsample(points,
+                             features=features,
+                             classes=labels,
+                             sampleDl=grid_size,
+                             verbose=verbose)
 
     @staticmethod
     def load_pc_semantic3d(filename):
@@ -85,10 +89,10 @@ class DataProcessing:
         :return: neighbor_idx: neighboring points indexes, B*N2*k
         """
 
-        neighbor_idx = nearest_neighbors.knn(support_pts,
-                                             query_pts,
-                                             k,
-                                             omp=True)
+        neighbor_idx = knn_search(o3c.Tensor.from_numpy(query_pts),
+                                  o3c.Tensor.from_numpy(support_pts),
+                                  k).numpy()
+
         return neighbor_idx.astype(np.int32)
 
     @staticmethod
@@ -117,43 +121,6 @@ class DataProcessing:
         np.random.shuffle(indices)
         data_list = data_list[indices]
         return data_list
-
-    @staticmethod
-    def grid_sub_sampling(points,
-                          features=None,
-                          labels=None,
-                          grid_size=0.1,
-                          verbose=0):
-        """
-        CPP wrapper for a grid sub_sampling (method = barycenter for points and features
-        :param points: (N, 3) matrix of input points
-        :param features: optional (N, d) matrix of features (floating number)
-        :param labels: optional (N,) matrix of integer labels
-        :param grid_size: parameter defining the size of grid voxels
-        :param verbose: 1 to display
-        :return: sub_sampled points, with features and/or labels depending of the input
-        """
-
-        if (features is None) and (labels is None):
-            return cpp_subsampling.compute(points,
-                                           sampleDl=grid_size,
-                                           verbose=verbose)
-        elif labels is None:
-            return cpp_subsampling.compute(points,
-                                           features=features,
-                                           sampleDl=grid_size,
-                                           verbose=verbose)
-        elif features is None:
-            return cpp_subsampling.compute(points,
-                                           classes=labels,
-                                           sampleDl=grid_size,
-                                           verbose=verbose)
-        else:
-            return cpp_subsampling.compute(points,
-                                           features=features,
-                                           classes=labels,
-                                           sampleDl=grid_size,
-                                           verbose=verbose)
 
     @staticmethod
     def IoU_from_confusions(confusions):

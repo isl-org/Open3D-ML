@@ -5,87 +5,91 @@ import numpy as np
 import random
 
 from pathlib import Path
-from os.path import abspath
 from sklearn.neighbors import KDTree
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
 
+# use relative import for being compatible with Open3d main repo
+from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import DataProcessing
-from ...utils import Config
+from ...utils import MODEL
 
 
-class RandLANet(nn.Module):
-    def __init__(self,
-                 cfg=None,
-                 num_layers=4,
-                 d_feature=8,
-                 d_in=3,
-                 d_out=[16, 64, 128, 256],
-                 batcher='DefaultBatcher',
-                 num_classes=8,
-                 num_points=65536,
-                 sub_sampling_ratio=[4, 4, 4, 4, 2],
-                 grid_size=0.06,
-                 k_n=16,
-                 ckpt_name='randlanet_toronto3d.pth',
-                 ignored_label_inds=[0]):
+class RandLANet(BaseModel):
 
-        super(RandLANet, self).__init__()
-        self.name = 'RandLANet'
-        if cfg is None:
-            cfg = dict(
-                num_layers=num_layers,
-                d_feature=d_feature,
-                d_in=d_in,
-                d_out=d_out,
-                batcher=batcher,
-                num_classes=num_classes,
-                k_n=k_n,
-                num_points=num_points,
-                sub_sampling_ratio=sub_sampling_ratio,
-                grid_size=grid_size,
-                ckpt_path=Path(abspath(__file__)).parent.parent /
-                'checkpoint' / ckpt_name,
-                ignored_label_inds=ignored_label_inds,
-            )
-            cfg = Config(cfg)
+    def __init__(
+            self,
+            name='RandLANet',
+            k_n=16,  # KNN,
+            num_layers=4,  # Number of layers
+            num_points=4096 * 11,  # Number of input points
+            num_classes=19,  # Number of valid classes
+            ignored_label_inds=[0],
+            sub_grid_size=0.06,  # preprocess_parameter
+            sub_sampling_ratio=[4, 4, 4, 4],
+            num_sub_points=[
+                4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
+                4096 * 11 // 256
+            ],
+            dim_input=3,  # 3 + feature_dimension.
+            dim_feature=8,
+            dim_output=[16, 64, 128, 256],
+            grid_size=0.06,
+            batcher='DefaultBatcher',
+            ckpt_path=None,
+            **kwargs):
 
-        self.cfg = cfg
-        d_feature = cfg.d_feature
+        super().__init__(name=name,
+                         k_n=k_n,
+                         num_layers=num_layers,
+                         num_points=num_points,
+                         num_classes=num_classes,
+                         ignored_label_inds=ignored_label_inds,
+                         sub_grid_size=sub_grid_size,
+                         sub_sampling_ratio=sub_sampling_ratio,
+                         num_sub_points=num_sub_points,
+                         dim_input=dim_input,
+                         dim_feature=dim_feature,
+                         dim_output=dim_output,
+                         grid_size=grid_size,
+                         batcher=batcher,
+                         ckpt_path=ckpt_path,
+                         **kwargs)
+        cfg = self.cfg
 
-        self.fc0 = nn.Linear(cfg.d_in, d_feature)
-        self.batch_normalization = nn.BatchNorm2d(d_feature,
-                                                  eps=1e-6,
-                                                  momentum=0.99)
+        dim_feature = cfg.dim_feature
+        self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
+        self.batch_normalization = nn.BatchNorm2d(dim_feature, eps=1e-6)
 
         d_encoder_list = []
 
         # Encoder
         for i in range(cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
-            self.init_dilated_res_block(d_feature, cfg.d_out[i], name)
-            d_feature = cfg.d_out[i] * 2
+            self.init_dilated_res_block(dim_feature, cfg.dim_output[i], name)
+            dim_feature = cfg.dim_output[i] * 2
             if i == 0:
-                d_encoder_list.append(d_feature)
-            d_encoder_list.append(d_feature)
+                d_encoder_list.append(dim_feature)
+            d_encoder_list.append(dim_feature)
 
-        feature = helper_torch.conv2d(True, d_feature, d_feature)
+        feature = helper_torch.conv2d(True, dim_feature, dim_feature)
         setattr(self, 'decoder_0', feature)
 
         # Decoder
         for j in range(cfg.num_layers):
             name = 'Decoder_layer_' + str(j)
-            d_in = d_encoder_list[-j - 2] + d_feature
-            d_out = d_encoder_list[-j - 2]
+            dim_input = d_encoder_list[-j - 2] + dim_feature
+            dim_output = d_encoder_list[-j - 2]
 
-            f_decoder_i = helper_torch.conv2d_transpose(True, d_in, d_out)
+            f_decoder_i = helper_torch.conv2d_transpose(True, dim_input,
+                                                        dim_output)
             setattr(self, name, f_decoder_i)
-            d_feature = d_encoder_list[-j - 2]
+            dim_feature = d_encoder_list[-j - 2]
 
-        f_layer_fc1 = helper_torch.conv2d(True, d_feature, 64)
+        f_layer_fc1 = helper_torch.conv2d(True, dim_feature, 64)
         setattr(self, 'fc1', f_layer_fc1)
 
         f_layer_fc2 = helper_torch.conv2d(True, 64, 32)
@@ -97,18 +101,21 @@ class RandLANet(nn.Module):
                                           activation=False)
         setattr(self, 'fc', f_layer_fc3)
 
+        self.m_dropout = nn.Dropout(0.5)
+
     def crop_pc(self, points, feat, labels, search_tree, pick_idx):
         # crop a fixed size point cloud for training
-        if (points.shape[0] < self.cfg.num_points):
+        num_points = self.cfg.num_points
+        center_point = points[pick_idx, :].reshape(1, -1)
+
+        if (points.shape[0] < num_points):
             select_idx = np.array(range(points.shape[0]))
-            diff = self.cfg.num_points - points.shape[0]
+            diff = num_points - points.shape[0]
             select_idx = list(select_idx) + list(
                 random.choices(select_idx, k=diff))
             random.shuffle(select_idx)
         else:
-            center_point = points[pick_idx, :].reshape(1, -1)
-            select_idx = search_tree.query(center_point,
-                                           k=self.cfg.num_points)[1][0]
+            select_idx = search_tree.query(center_point, k=num_points)[1][0]
 
         # select_idx = DataProcessing.shuffle_idx(select_idx)
         random.shuffle(select_idx)
@@ -118,6 +125,11 @@ class RandLANet(nn.Module):
             select_feat = None
         else:
             select_feat = feat[select_idx]
+
+        select_points = select_points - center_point  # TODO : add noise to center point
+
+        # select_points = select_points / np.linalg.norm(select_points)
+        # select_feat = select_feat / np.linalg.norm(select_feat)
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
@@ -138,55 +150,9 @@ class RandLANet(nn.Module):
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
-
-        # logp = torch.distributions.utils.probs_to_logits(scores,
-        #                                                  is_binary=False)
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
-        # predict_labels = torch.max(scores, dim=-2).indices
-
         return loss, labels, scores
-
-
-    # def transform_whole(self, data, attr):
-    #     cfg = self.cfg
-    #     pc = data['point']
-    #     label = data['label']
-    #     feat = data['feat']
-    #     tree = data['search_tree']
-    #     features = feat
-
-    #     input_points = []
-    #     input_neighbors = []
-    #     input_pools = []
-    #     input_up_samples = []
-
-    #     for i in range(cfg.num_layers):
-    #         neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
-
-    #         sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-    #         pool_i = neighbour_idx[:pc.shape[0] //
-    #                                cfg.sub_sampling_ratio[i], :]
-    #         up_i = DataProcessing.knn_search(sub_points, pc, 1)
-    #         input_points.append(pc)
-    #         input_neighbors.append(neighbour_idx.astype(np.int64))
-    #         input_pools.append(pool_i.astype(np.int64))
-    #         input_up_samples.append(up_i.astype(np.int64))
-    #         pc = sub_points
-
-    #     inputs = dict()
-    #     inputs['xyz'] = input_points
-    #     inputs['neigh_idx'] = input_neighbors
-    #     inputs['sub_idx'] = input_pools
-    #     inputs['interp_idx'] = input_up_samples
-    #     inputs['features'] = features
-
-    #     inputs['labels'] = label.astype(np.int64)
-    #     if attr['split'] == "test":
-    #         inputs['proj_inds'] = data['proj_inds'] 
-      
-    #     return inputs
-
 
     def transform(self, data, attr, min_posbility_idx=None):
         cfg = self.cfg
@@ -196,7 +162,8 @@ class RandLANet(nn.Module):
         label = data['label']
         feat = data['feat']
         tree = data['search_tree']
-        if min_posbility_idx is None: # training
+
+        if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
         else:
             pick_idx = min_posbility_idx
@@ -204,9 +171,17 @@ class RandLANet(nn.Module):
 
         selected_pc, feat, label, selected_idx = \
             self.crop_pc(pc, feat, label, tree, pick_idx)
-        
+
+        if feat is None:
+            feat = selected_pc.copy()
+        else:
+            feat = np.concatenate([selected_pc, feat], axis=1)
+
+        assert cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+
         if min_posbility_idx is not None:
-            dists = np.sum(np.square((selected_pc - pc[pick_idx]).astype(np.float32)), axis=1)
+            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
@@ -218,13 +193,11 @@ class RandLANet(nn.Module):
         input_pools = []
         input_up_samples = []
 
-
         for i in range(cfg.num_layers):
             neighbour_idx = DataProcessing.knn_search(pc, pc, cfg.k_n)
 
             sub_points = pc[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
-            pool_i = neighbour_idx[:pc.shape[0] //
-                                   cfg.sub_sampling_ratio[i], :]
+            pool_i = neighbour_idx[:pc.shape[0] // cfg.sub_sampling_ratio[i], :]
             up_i = DataProcessing.knn_search(sub_points, pc, 1)
             input_points.append(pc)
             input_neighbors.append(neighbour_idx.astype(np.int64))
@@ -239,16 +212,7 @@ class RandLANet(nn.Module):
         inputs['features'] = features
 
         inputs['labels'] = label.astype(np.int64)
-        # inputs['input_inds']    = batch_pc_idx
-        # inputs['cloud_inds']    = batch_cloud_idx
-
         return inputs
-
-    # def transform(self, data, attr):
-    #     if attr['split'] == 'test':
-    #         return self.transform_whole(data, attr) 
-    #     else: 
-    #         return self.transform_crop(data, attr)
 
     def inference_begin(self, data):
         self.test_smooth = 0.98
@@ -256,9 +220,9 @@ class RandLANet(nn.Module):
         self.inference_data = self.preprocess(data, attr)
         num_points = self.inference_data['search_tree'].data.shape[0]
         self.possibility = np.random.rand(num_points) * 1e-3
-        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes], dtype=np.float16)
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
         self.batcher = DefaultBatcher()
-
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
@@ -270,14 +234,15 @@ class RandLANet(nn.Module):
         return inputs
 
     def inference_end(self, inputs, results):
-       
+
         results = torch.reshape(results, (-1, self.cfg.num_classes))
-        m_softmax    = torch.nn.Softmax(dim=-1)
+        m_softmax = torch.nn.Softmax(dim=-1)
         results = m_softmax(results)
         results = results.cpu().data.numpy()
         probs = np.reshape(results, [-1, self.cfg.num_classes])
         inds = inputs['data']['point_inds'][0, :]
-        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (1 - self.test_smooth) * probs
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
         if np.min(self.possibility) > 0.5:
             inference_result = {
                 'predict_labels': np.argmax(self.test_probs, 1),
@@ -292,20 +257,29 @@ class RandLANet(nn.Module):
         cfg = self.cfg
 
         points = np.array(data['point'][:, 0:3], dtype=np.float32)
-        labels = np.array(data['label'], dtype=np.int32)
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points
+            feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
 
         split = attr['split']
 
         data = dict()
-    
-        sub_points, sub_feat, sub_labels = DataProcessing.grid_sub_sampling(
-            points, features=feat, labels=labels, grid_size=cfg.grid_size)
+
+        if (feat is None):
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
+                points, labels=labels, grid_size=cfg.grid_size)
+            sub_feat = None
+
+        else:
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+                points, features=feat, labels=labels, grid_size=cfg.grid_size)
 
         search_tree = KDTree(sub_points)
 
@@ -314,7 +288,7 @@ class RandLANet(nn.Module):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split == "test":
+        if split in ["test", "testing"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -322,34 +296,41 @@ class RandLANet(nn.Module):
 
         return data
 
-    def init_att_pooling(self, d, d_out, name):
+    def init_att_pooling(self, d, dim_output, name):
         att_activation = nn.Linear(d, d)
         setattr(self, name + 'fc', att_activation)
 
-        f_agg = helper_torch.conv2d(True, d, d_out)
+        f_agg = helper_torch.conv2d(True, d, dim_output)
         setattr(self, name + 'mlp', f_agg)
 
-    def init_building_block(self, d_in, d_out, name):
-        f_pc = helper_torch.conv2d(True, 10, d_in)
+    def init_building_block(self, dim_input, dim_output, name):
+        f_pc = helper_torch.conv2d(True, 10, dim_input)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_att_pooling(d_in * 2, d_out // 2, name + 'att_pooling_1')
+        self.init_att_pooling(dim_input * 2, dim_output // 2,
+                              name + 'att_pooling_1')
 
-        f_xyz = helper_torch.conv2d(True, d_in, d_out // 2)
+        f_xyz = helper_torch.conv2d(True, dim_input, dim_output // 2)
         setattr(self, name + 'mlp2', f_xyz)
 
-        self.init_att_pooling(d_in * 2, d_out, name + 'att_pooling_2')
+        self.init_att_pooling(dim_input * 2, dim_output, name + 'att_pooling_2')
 
-    def init_dilated_res_block(self, d_in, d_out, name):
-        f_pc = helper_torch.conv2d(True, d_in, d_out // 2)
+    def init_dilated_res_block(self, dim_input, dim_output, name):
+        f_pc = helper_torch.conv2d(True, dim_input, dim_output // 2)
         setattr(self, name + 'mlp1', f_pc)
 
-        self.init_building_block(d_out // 2, d_out, name + 'LFA')
+        self.init_building_block(dim_output // 2, dim_output, name + 'LFA')
 
-        f_pc = helper_torch.conv2d(True, d_out, d_out * 2, activation=False)
+        f_pc = helper_torch.conv2d(True,
+                                   dim_output,
+                                   dim_output * 2,
+                                   activation=False)
         setattr(self, name + 'mlp2', f_pc)
 
-        shortcut = helper_torch.conv2d(True, d_in, d_out * 2, activation=False)
+        shortcut = helper_torch.conv2d(True,
+                                       dim_input,
+                                       dim_output * 2,
+                                       activation=False)
         setattr(self, name + 'shortcut', shortcut)
 
     def forward_gather_neighbour(self, pc, neighbor_idx):
@@ -429,7 +410,8 @@ class RandLANet(nn.Module):
 
         return f_pc_agg
 
-    def forward_dilated_res_block(self, feature, xyz, neigh_idx, d_out, name):
+    def forward_dilated_res_block(self, feature, xyz, neigh_idx, dim_output,
+                                  name):
         m_conv2d = getattr(self, name + 'mlp1')
         f_pc = m_conv2d(feature)
 
@@ -470,7 +452,7 @@ class RandLANet(nn.Module):
         for i in range(self.cfg.num_layers):
             name = 'Encoder_layer_' + str(i)
             f_encoder_i = self.forward_dilated_res_block(
-                feature, xyz[i], neigh_idx[i], self.cfg.d_out[i], name)
+                feature, xyz[i], neigh_idx[i], self.cfg.dim_output[i], name)
             f_sampled_i = self.random_sample(f_encoder_i, sub_idx[i])
             feature = f_sampled_i
             if i == 0:
@@ -483,8 +465,7 @@ class RandLANet(nn.Module):
         # Decoder
         f_decoder_list = []
         for j in range(self.cfg.num_layers):
-            f_interp_i = self.nearest_interpolation(feature,
-                                                    interp_idx[-j - 1])
+            f_interp_i = self.nearest_interpolation(feature, interp_idx[-j - 1])
             name = 'Decoder_layer_' + str(j)
 
             m_transposeconv2d = getattr(self, name)
@@ -501,8 +482,7 @@ class RandLANet(nn.Module):
         m_conv2d = getattr(self, 'fc2')
         f_layer_fc2 = m_conv2d(f_layer_fc1)
 
-        m_dropout = nn.Dropout(0.5)
-        f_layer_drop = m_dropout(f_layer_fc2)
+        f_layer_drop = self.m_dropout(f_layer_fc2)
 
         test_hidden = f_layer_fc2.permute(0, 2, 3, 1)
 
@@ -554,6 +534,9 @@ class RandLANet(nn.Module):
         interp_idx = torch.reshape(interp_idx, (batch_size, up_num_points))
         interp_idx = interp_idx.unsqueeze(1).expand(batch_size, d, -1)
 
-        interpolated_features = torch.gather(feature, 2, interp_idx)
-        interpolated_features = interpolated_features.unsqueeze(3)
-        return interpolated_features
+        interpolatedim_features = torch.gather(feature, 2, interp_idx)
+        interpolatedim_features = interpolatedim_features.unsqueeze(3)
+        return interpolatedim_features
+
+
+MODEL._register_module(RandLANet, 'torch')
