@@ -159,8 +159,6 @@ class SemanticSegmentation(BasePipeline):
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)
                 self.ious.append(iou)
-                print("Accuracy = {}".format(acc))
-                print("IOU = {}".format(iou))
                 step = step + 1
 
             # --------------------- validation

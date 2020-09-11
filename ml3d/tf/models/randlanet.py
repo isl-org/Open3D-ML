@@ -59,7 +59,6 @@ class RandLANet(BaseModel):
         cfg = self.cfg
 
         dim_feature = cfg.dim_feature
-
         self.fc0 = tf.keras.layers.Dense(dim_feature, activation=None)
         self.batch_normalization = tf.keras.layers.BatchNormalization(
             -1, 0.99, 1e-6)
@@ -406,6 +405,8 @@ class RandLANet(BaseModel):
                                                   data['label'],
                                                   data['search_tree'], pick_idx)
 
+                feat = np.concatenate([pc, feat], axis=1)
+
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
 
@@ -469,6 +470,9 @@ class RandLANet(BaseModel):
 
     def transform(self, pc, feat, label):
         cfg = self.cfg
+
+        pc = pc
+        feat = feat
 
         input_points = []
         input_neighbors = []
@@ -554,7 +558,6 @@ class RandLANet(BaseModel):
             feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat = np.concatenate([points, feat], axis=1)
 
         assert self.cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"

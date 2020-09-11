@@ -25,24 +25,23 @@ class Toronto3D(BaseDataset):
     Toronto3D dataset, used in visualizer, training, or test
     """
 
-    def __init__(
-        self,
-        dataset_path,
-        name='Toronto3D',
-        cache_dir='./logs/cache',
-        use_cache=False,
-        num_points=65536,
-        prepro_grid_size=0.06,
-        class_weights=[
-            41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634,
-            374721
-        ],
-        ignored_label_inds=[0],
-        train_files=['L001.ply', 'L003.ply', 'L004.ply'],
-        val_files=['L002.ply'],
-        test_files=['L002.ply'],
-        test_result_folder='./test',
-    ):
+    def __init__(self,
+                 dataset_path,
+                 name='Toronto3D',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 num_points=65536,
+                 prepro_grid_size=0.06,
+                 class_weights=[
+                     41697357, 1745448, 6572572, 19136493, 674897, 897825,
+                     4634634, 374721
+                 ],
+                 ignored_label_inds=[0],
+                 train_files=['L001.ply', 'L003.ply', 'L004.ply'],
+                 val_files=['L002.ply'],
+                 test_files=['L002.ply'],
+                 test_result_folder='./test',
+                 **kwargs):
         """
         Initialize
         Args:
@@ -61,8 +60,9 @@ class Toronto3D(BaseDataset):
                          ignored_label_inds=ignored_label_inds,
                          train_files=train_files,
                          test_files=test_files,
+                         val_files=val_files,
                          test_result_folder=test_result_folder,
-                         val_files=val_files)
+                         **kwargs)
 
         cfg = self.cfg
 

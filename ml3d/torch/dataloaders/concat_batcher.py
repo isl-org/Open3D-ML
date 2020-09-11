@@ -16,6 +16,7 @@ class SemanticKittiCustomBatch:
     """Custom batch definition with memory pinning for SemanticKitti"""
 
     def __init__(self, batches):
+        # print(batches)
 
         self.neighborhood_limits = []
         p_list = []
@@ -41,6 +42,7 @@ class SemanticKittiCustomBatch:
             batch_n += n
             if batch_n > batch_limit:
                 break
+
             if len(data['l_list'].shape) < 1:
                 continue
 
@@ -120,6 +122,7 @@ class SemanticKittiCustomBatch:
         self.neighbors = [
             torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
         ]
+
         ind += L
         self.pools = [
             torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
@@ -449,6 +452,4 @@ class ConcatBatcher(object):
     def collate_fn(self, batches):
         batching_result = SemanticKittiCustomBatch(batches)
         batching_result.to(self.device)
-        #print(batching_result['data']['features'].size())
-        #exit()
         return {'data': batching_result, 'attr': []}
