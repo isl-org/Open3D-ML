@@ -284,6 +284,11 @@ class Visualizer:
     LABELS_NAME = "Labels"
     RAINBOW_NAME = "Colormap (Rainbow)"
     GREYSCALE_NAME = "Colormap (Greyscale)"
+    COLOR_NAME = "RGB (float)"
+
+    X_ATTR_NAME = "x position"
+    Y_ATTR_NAME = "y position"
+    Z_ATTR_NAME = "z position"
 
     class ObjectModel:
         def __init__(self, dataset, indices):
@@ -293,7 +298,7 @@ class Visualizer:
 
             self.data = {}  # name -> tpointcloud
             self.data_names = []  # the order data will be displayed / animated
-            self.known_attrs = set(["labels"])
+            self.known_attrs = set()
 
             for i in indices:
                 info = dataset.get_attr(i)
@@ -329,10 +334,12 @@ class Visualizer:
                 # TensorList can be inplace.
                 xyz = pts[:,[0,1,2]]
                 tcloud.point["intensity"] = Visualizer._make_tcloud_array(pts[:,3], copy=True)
+                self.known_attrs.add("intensity")
                 tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
             else:
                 tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
-            # Only add scalar attributes for now
+
+            # Add scalar attributes
             for k,v in data.items():
                 if v is None:
                     continue
@@ -341,7 +348,25 @@ class Visualizer:
                     attr_name = k
                     if attr_name == "label":
                         attr_name = "labels"
+                    elif attr_name == "feat":
+                        attr_name = "feature"
                     tcloud.point[attr_name] = Visualizer._make_tcloud_array(v, copy=isint)
+                    self.known_attrs.add(attr_name)
+
+            # Dataset-specific handling
+#            if self._dataset.dataset.__class__.__name__ == "Toronto3D":
+#                if "feat" in data:
+#                    attr_name = "feature (RGB)"
+#                    colors = data["feat"]
+#                    assert(len(colors) == len(pts))
+#                    colors = [[float(c[0]) / 255.0, float(c[1]) / 255.0, float(c[2]) / 255.0] for c in colors]
+#                    colors = np.array(colors, dtype='float32')
+#                    tcloud.point[attr_name] = Visualizer._make_tcloud_array(colors)
+#                    self.known_attrs.add(attr_name)
+
+#            # Make the white array once
+#            white = np.array([[1.0, 1.0, 1.0]] * len(pts), dtype='float32')
+#            tcloud.point["white"] = Visualizer._make_tcloud_array(white)
 
             # ---- Debugging ----
             # dist = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2]) for pt in tcloud.point["points"].as_tensor().numpy()]
@@ -363,6 +388,8 @@ class Visualizer:
                 for _,tcloud in self.data.items():
                     if attr_name in tcloud.point:
                         attr = tcloud.point[attr_name].as_tensor().numpy()
+                        if len(attr.shape) > 1:
+                            attr = attr[:,0]
                         attr_min = min(attr_min, min(attr))
                         attr_max = max(attr_max, max(attr))
                         maxattr = max(attr)
@@ -493,6 +520,7 @@ class Visualizer:
         self._shader.add_item(self.LABELS_NAME)
         self._shader.add_item(self.RAINBOW_NAME)
         self._shader.add_item(self.GREYSCALE_NAME)
+#        self._shader.add_item(self.COLOR_NAME)
         self._colormaps[self.RAINBOW_NAME] = Colormap.make_rainbow()
         self._colormaps[self.GREYSCALE_NAME] = Colormap.make_greyscale()
         self._shader.selected_index = 0
@@ -531,6 +559,10 @@ class Visualizer:
         self._colormap_edit.set_on_changed(self._on_colormap_changed)
         self._colormap_panel.add_child(self._colormap_edit.widget)
 
+        #     ... sub-panel: RGB
+        self._rgb_panel = gui.Vert()
+        self._shader_panels.add_child(self._rgb_panel)
+
         properties.add_fixed(em)
         properties.add_child(self._shader_panels)
         self._panel.add_child(properties)
@@ -538,8 +570,7 @@ class Visualizer:
         # Populate tree, etc.
         for name in self._objects.data_names:
             self._add_tree_name(name)
-        for attr_name in self._objects.known_attrs:
-            self._datasource_combobox.add_item(attr_name)
+        self._update_datasource_combobox()
 
     def set_labels(self, labellut):
         self._label_edit.set_labels(labellut)
@@ -654,14 +685,36 @@ class Visualizer:
 
         self._3d.scene.remove_geometry(name)
         attr_name = self._datasource_combobox.selected_text
+        attr = None
+        flag = 0
         if attr_name in tcloud.point:
             attr = tcloud.point[attr_name].as_tensor().numpy()
-            uv = np.column_stack((attr, [0.0] * len(attr)))
+
+        # Update scalar values
+        if attr is not None:
+            if len(attr.shape) == 1:
+                uv = np.column_stack((attr, [0.0] * len(attr)))
+            else:
+                uv = np.column_stack((attr[:,0], [0.0] * len(attr)))
         else:
             uv = [[0.0, 0.0]] * len(tcloud.point["points"].as_tensor().numpy())
         tcloud.point["uv"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(np.array(uv, dtype='float32')), inplace=True)
+        flag |= rendering.Scene.UPDATE_UV0_FLAG
 
-        self._3d.scene.add_geometry(name, tcloud, material)
+        # Update RGB values
+#        if attr is not None:
+#            if len(attr.shape) == 2 and attr.shape[1] == 3:
+#                tcloud.point["colors"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(attr), inplace=True)
+#            else:
+#                tcloud.point["colors"] = tcloud.point["white"]
+#        flag |= rendering.Scene.UPDATE_COLORS_FLAG
+
+        # Update geometry
+        if self._3d.scene.scene.has_geometry(name):
+            self._3d.scene.scene.update_geometry(name, tcloud, flag)
+        else:
+            self._3d.scene.add_geometry(name, tcloud, material)
+
         node = self._name2treenode[name]
         if node is not None:
             self._3d.scene.show_geometry(name, node.checkbox.checked)
@@ -673,6 +726,9 @@ class Visualizer:
             material.shader = "defaultUnlit"
             c = self._color.color_value
             material.base_color = [c.red, c.green, c.blue, 1.0]
+        elif self._shader.selected_text == self.COLOR_NAME:
+            material.shader = "defaultUnlit"
+            material.base_color = [1.0, 1.0, 1.0, 1.0]
         else:
             material.shader = "unlitGradient"
             material.gradient = self._gradient
@@ -709,6 +765,11 @@ class Visualizer:
         material = self._get_material()
         self._3d.scene.update_material(material)
 
+    def _update_datasource_combobox(self):
+        self._datasource_combobox.clear_items()
+        for attr_name in sorted(self._objects.known_attrs):
+            self._datasource_combobox.add_item(attr_name)
+        
     def _on_layout(self, theme):
         frame = self.window.content_rect
         em = theme.font_size
@@ -830,6 +891,8 @@ class Visualizer:
             mlvis._3d.scene.show_geometry(name, True)
 
         def on_done_ui():
+            mlvis._update_datasource_combobox()
+
             # Display labels by default, if available
             for attr_name in ["label", "labels"]:
                 if attr_name in mlvis._objects.known_attrs:
