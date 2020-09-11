@@ -58,6 +58,7 @@ class Semantic3D(BaseDataset):
                          prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
                          val_split=val_split,
+                         test_result_folder=test_result_folder,
                          **kwargs)
 
         cfg = self.cfg
@@ -156,7 +157,7 @@ class Semantic3DSplit():
                          dtype=np.float32).values
 
         points = pc[:, 0:3]
-        feat = pc[:, [4, 5, 6, 3]]
+        feat = pc[:, [4, 5, 6]]
 
         points = np.array(points, dtype=np.float32)
         feat = np.array(feat, dtype=np.float32)
@@ -166,7 +167,7 @@ class Semantic3DSplit():
                                  header=None,
                                  delim_whitespace=True,
                                  dtype=np.int32).values
-            labels = np.array(labels, dtype=np.int32)
+            labels = np.array(labels, dtype=np.int32).reshape((-1,))
         else:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
 
