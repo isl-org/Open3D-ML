@@ -158,7 +158,7 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point'] / 1e4
+        pc = data['point']
         label = data['label']
         feat = data['feat']
         tree = data['search_tree']

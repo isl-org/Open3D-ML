@@ -435,6 +435,15 @@ class RandLANet(BaseModel):
 
         selected_pc, feat, label, selected_idx = self.crop_pc(
             pc, feat, label, tree, pick_idx)
+
+        if feat is None:
+            feat = selected_pc.copy()
+        else:
+            feat = np.concatenate([selected_pc, feat], axis=1)
+
+        assert self.cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+
         dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
 
         delta = np.square(1 - dists / np.max(dists))
