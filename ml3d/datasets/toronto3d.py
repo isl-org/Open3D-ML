@@ -61,6 +61,7 @@ class Toronto3D(BaseDataset):
                          train_files=train_files,
                          test_files=test_files,
                          val_files=val_files,
+                         test_result_folder=test_result_folder,
                          **kwargs)
 
         cfg = self.cfg

@@ -89,7 +89,7 @@ class SemanticSegmentation(BasePipeline):
         dataset = self.dataset
         cfg = self.cfg
 
-        self.load_ckpt()
+        self.load_ckpt(model.cfg.ckpt_path)
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
@@ -134,7 +134,7 @@ class SemanticSegmentation(BasePipeline):
             join(cfg.logs_dir, cfg.train_sum_dir))
 
         self.optimizer = model.get_optimizer(cfg)
-        self.load_ckpt()
+        self.load_ckpt(ckpt_path=model.cfg.ckpt_path)
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
             # --------------------- training
@@ -230,7 +230,7 @@ class SemanticSegmentation(BasePipeline):
 
         # print(acc_dicts[-1])
 
-    def load_ckpt(self):
+    def load_ckpt(self, ckpt_path=''):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
         self.ckpt = tf.train.Checkpoint(step=tf.Variable(1),
@@ -240,11 +240,16 @@ class SemanticSegmentation(BasePipeline):
                                                   train_ckpt_dir,
                                                   max_to_keep=3)
 
-        self.ckpt.restore(self.manager.latest_checkpoint)
-        if self.manager.latest_checkpoint:
-            print("Restored from {}".format(self.manager.latest_checkpoint))
+        if ckpt_path:
+            self.ckpt.restore(ckpt_path)
+            print("Restored from {}".format(ckpt_path))
         else:
-            print("Initializing from scratch.")
+            self.ckpt.restore(self.manager.latest_checkpoint)
+
+            if self.manager.latest_checkpoint:
+                print("Restored from {}".format(self.manager.latest_checkpoint))
+            else:
+                print("Initializing from scratch.")
 
         #if exists(self.model.cfg.ckpt_path):
         #    self.model.load_weights(self.model.cfg.ckpt_path)

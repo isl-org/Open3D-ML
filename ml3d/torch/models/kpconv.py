@@ -2019,7 +2019,7 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
     :param radius: float32
     :return: neighbors indices
     """
-    
+
     ret = radius_search(
         o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
         o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
@@ -2028,7 +2028,7 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
 
     num_points = supports.shape[0]
     corret_ret = np.where(ret == -1, num_points, ret)
-    # print(corret_ret)
+
     return corret_ret
 
 

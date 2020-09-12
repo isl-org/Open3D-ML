@@ -3,9 +3,11 @@ from ml3d.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
 import argparse
 import yaml
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Read from datasets')
-    parser.add_argument('--path_semantickitti', help='path to semantiSemanticKITTI')
+    parser.add_argument('--path_semantickitti',
+                        help='path to semantiSemanticKITTI')
     parser.add_argument('--path_semantick3d', help='path to Semantic3D')
     parser.add_argument('--path_parislille3d', help='path to ParisLille3D')
     parser.add_argument('--path_toronto3d', help='path to Toronto3D')
@@ -16,7 +18,8 @@ def parse_args():
     dict_args = vars(args)
     for k in dict_args:
         v = dict_args[k]
-        print("{}: {}".format(k, v) if v is not None else "{} not given".format(k))
+        print("{}: {}".format(k, v) if v is not None else "{} not given".
+              format(k))
 
     return args
 
@@ -26,7 +29,8 @@ def demo_dataset(args):
     datasets = []
     if args.path_semantickitti is not None:
         datasets.append(
-            SemanticKITTI(dataset_path=args.path_semantickitti, use_cache=False))
+            SemanticKITTI(dataset_path=args.path_semantickitti,
+                          use_cache=False))
     if args.path_parislille3d is not None:
         datasets.append(
             ParisLille3D(dataset_path=args.path_parislille3d, use_cache=False))
@@ -37,8 +41,7 @@ def demo_dataset(args):
         datasets.append(
             Semantic3D(dataset_path=args.path_semantick3d, use_cache=False))
     if args.path_s3dis is not None:
-        datasets.append(
-            S3DIS(dataset_path=args.path_s3dis, use_cache=False))
+        datasets.append(S3DIS(dataset_path=args.path_s3dis, use_cache=False))
 
     for dataset in datasets:
         print(dataset.label_to_names)
