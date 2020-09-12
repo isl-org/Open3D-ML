@@ -7,9 +7,9 @@ from ml3d.utils import Config, get_module
 import argparse
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Read from datasets')
+    parser = argparse.ArgumentParser(description='Demo for training and inference')
     parser.add_argument('--path_semantickitti', help='path to semantiSemanticKITTI', required=True)
-    parser.add_argument('--path_ckpt_randlanet', help='path to RandLANet checkpoint', required=True)
+    parser.add_argument('--path_ckpt_randlanet', help='path to RandLANet checkpoint')
 
     args, _ = parser.parse_known_args()
 
@@ -42,7 +42,7 @@ def demo_inference(args):
     Model = get_module("model", "RandLANet", "tf")
     Dataset = get_module("dataset", "SemanticKITTI")
 
-    RandLANet = Model(ckpt_path=ags.path_ckpt_randlanet)
+    RandLANet = Model(ckpt_path=args.path_ckpt_randlanet)
 
     # Initialize by specifying config file path
     SemanticKITTI = Dataset(args.path_semantickitti, use_cache=False)
@@ -54,7 +54,7 @@ def demo_inference(args):
     train_split = SemanticKITTI.get_split("train")
     data = train_split.get_data(0)
     # restore weights
-    # pipeline.load_ckpt(RandLANet.cfg.ckpt_path, False)
+    
     # run inference
     results = pipeline.run_inference(data)
     print(results)
@@ -65,5 +65,5 @@ def demo_inference(args):
 
 if __name__ == '__main__':
     args = parse_args()
-    demo_inference(args)
     demo_train(args)
+    demo_inference(args)

@@ -2019,24 +2019,14 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
     :param radius: float32
     :return: neighbors indices
     """
-    # print("------")
-    # import sys
-    # np.set_printoptions(threshold=sys.maxsize)
-    # print(queries.tolist())
-    # print(supports.tolist())
-    # print(queries.shape)
-    # print(supports.shape)
-    # print(q_batches)
-    # print(s_batches)
-    # print(radius)
-
+    
     ret = radius_search(
         o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
         o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
         o3c.Tensor.from_numpy(np.array(s_batches, dtype=np.int32)),
         radius).numpy()
 
-    num_points = ret.shape[0]
+    num_points = supports.shape[0]
     corret_ret = np.where(ret == -1, num_points, ret)
     # print(corret_ret)
     return corret_ret
