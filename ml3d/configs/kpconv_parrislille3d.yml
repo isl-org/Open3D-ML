@@ -1,0 +1,108 @@
+dataset: 
+  name: ParisLille3D
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
+  ignored_label_inds:
+  - 0
+  num_points: 65536
+  prepro_grid_size: 0.06
+  test_result_folder: ./test
+  val_files:
+  - Lille2.ply
+  use_cache: False
+model:
+  name: KPFCNN
+  KP_extent: 1.0
+  KP_influence: linear
+  aggregation_mode: sum
+  architecture:
+  - simple
+  - resnetb
+  - resnetb_strided
+  - resnetb
+  - resnetb_strided
+  - resnetb
+  - resnetb_strided
+  - resnetb
+  - resnetb_strided
+  - resnetb
+  - nearest_upsample
+  - unary
+  - nearest_upsample
+  - unary
+  - nearest_upsample
+  - unary
+  - nearest_upsample
+  - unary
+  augment_color: 0.8
+  augment_noise: 0.001
+  augment_rotation: vertical
+  augment_scale_anisotropic: true
+  augment_scale_max: 1.2
+  augment_scale_min: 0.8
+  augment_symmetries:
+  - true
+  - false
+  - false
+  batch_norm_momentum: 0.02
+  batch_num: 8
+  batcher: ConcatBatcher
+  checkpoint_gap: 50
+  ckpt_path: # path/to/your/checkpoint
+  class_w: []
+  conv_radius: 2.5
+  batch_limit: 50000
+  dataset: SemanticKitti
+  dataset_task: ''
+  deform_fitting_mode: point2point
+  deform_fitting_power: 1.0
+  deform_lr_factor: 0.1
+  deform_radius: 6.0
+  density_parameter: 5.0
+  epoch_steps: 500
+  first_features_dim: 128
+  first_subsampling_dl: 0.04
+  fixed_kernel_points: center
+  grad_clip_norm: 100.0
+  ign_lbls:
+  - 0
+  ignored_label_inds:
+  - 0
+  in_features_dim: 2
+  in_points_dim: 3
+  in_radius: 2.0
+  input_threads: 10
+  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  learning_rate: 0.01
+  lr_decays: 0.98477
+  max_epoch: 800
+  max_in_points: 100000
+  max_val_points: 100000
+  modulated: false
+  n_frames: 1
+  num_classes: 8
+  num_kernel_points: 15
+  num_layers: 5
+  repulse_extent: 1.2
+  saving: true
+  saving_path: null
+  use_batch_norm: true
+  val_batch_num: 8
+  val_radius: 2.0
+  validation_size: 200
+pipeline:
+  name: SemanticSegmentation
+  momentum: 0.98
+  adam_lr: 0.01
+  batch_size: 8
+  learning_rate: 0.01
+  deform_lr_factor: 0.1
+  weight_decay: 0.001
+  main_log_dir: ./logs
+  max_epoch: 100
+  save_ckpt_freq: 20
+  scheduler_gamma: 0.95
+  test_batch_size: 8
+  train_sum_dir: train_log
+  val_batch_size: 8

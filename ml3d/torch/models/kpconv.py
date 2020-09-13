@@ -335,6 +335,8 @@ class KPFCNN(BaseModel):
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
 
+        print(scores)
+        print(labels)
         # Cross entropy loss
         self.output_loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
@@ -516,7 +518,12 @@ class KPFCNN(BaseModel):
         feat = data['feat']
 
         dim_points = points.shape[1]
-        dim_features = feat.shape[1] + dim_points
+        if feat is None:
+            dim_features = dim_points
+            new_coords = points
+        else:
+            dim_features = feat.shape[1] + dim_points
+            new_coords = np.hstack((points, feat))
 
         # Initiate merged points
         merged_points = np.zeros((0, dim_points), dtype=np.float32)
@@ -559,8 +566,6 @@ class KPFCNN(BaseModel):
         rand_order = np.random.permutation(mask_inds)
         new_points = new_points[rand_order, :3]
         sem_labels = sem_labels[rand_order]
-
-        new_coords = np.hstack((points, feat))
         new_coords = new_coords[rand_order, :]
 
         # Increment merge count
