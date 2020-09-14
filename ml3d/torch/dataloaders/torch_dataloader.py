@@ -37,7 +37,6 @@ class TorchDataloader(Dataset):
         self.steps_per_epoch = steps_per_epoch
 
         if preprocess is not None and use_cache:
-            desc = 'preprocess'
             cache_dir = getattr(dataset.cfg, 'cache_dir')
             assert cache_dir is not None, 'cache directory is not given'
 
@@ -52,10 +51,12 @@ class TorchDataloader(Dataset):
                 ['name'] not in self.cache_convert.cached_ids
             ]
             if len(uncached) > 0:
-                for idx in tqdm(range(len(dataset)), desc=desc):
+                for idx in tqdm(range(len(dataset)), desc='preprocess'):
                     attr = dataset.get_attr(idx)
-                    data = dataset.get_data(idx)
                     name = attr['name']
+                    if name in self.cache_convert.cached_ids:
+                        continue
+                    data = dataset.get_data(idx)
 
                     self.cache_convert(name, data, attr)
 
