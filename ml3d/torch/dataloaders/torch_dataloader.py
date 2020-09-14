@@ -19,7 +19,7 @@ from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
 from collections import namedtuple
 
-from ...utils import dataset_helper
+from ...utils import Cache, get_hash
 
 
 class TorchDataloader(Dataset):
@@ -30,18 +30,22 @@ class TorchDataloader(Dataset):
                  preprocess=None,
                  transform=None,
                  use_cache=True,
+                 steps_per_epoch=None,
                  **kwargs):
         self.dataset = dataset
         self.preprocess = preprocess
+        self.steps_per_epoch = steps_per_epoch
+
         if preprocess is not None and use_cache:
             desc = 'preprocess'
             cache_dir = getattr(dataset.cfg, 'cache_dir')
             assert cache_dir is not None, 'cache directory is not given'
 
-            self.cache_convert = dataset_helper.Cache(
+
+            self.cache_convert = Cache(
                 preprocess,
                 cache_dir=cache_dir,
-                cache_key=dataset_helper._get_hash(repr(preprocess)))
+                cache_key=get_hash(repr(preprocess)))
 
             uncached = [
                 idx for idx in range(len(dataset)) if dataset.get_attr(idx)
@@ -63,6 +67,8 @@ class TorchDataloader(Dataset):
     def __getitem__(self, index):
         """Returns the item at index idx. """
         dataset = self.dataset
+        index = index % len(dataset)
+
         attr = dataset.get_attr(index)
         if self.cache_convert:
             data = self.cache_convert(attr['name'])
@@ -74,9 +80,13 @@ class TorchDataloader(Dataset):
         if self.transform is not None:
             data = self.transform(data, attr)
 
-        inputs = {'data': data, 'attr': attr}
+        inputs = {'data': data, 'attr': data}
 
         return inputs
 
     def __len__(self):
-        return len(self.dataset)
+        if self.steps_per_epoch is not None:
+            steps_per_epoch = self.steps_per_epoch
+        else:
+            steps_per_epoch = len(self.dataset)
+        return steps_per_epoch

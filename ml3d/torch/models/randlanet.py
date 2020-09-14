@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import random
+import time
 
 from pathlib import Path
 from sklearn.neighbors import KDTree
@@ -14,7 +15,8 @@ from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import (DataProcessing, trans_normalize, 
+                trans_augment, trans_crop_pc)
 from ...utils import MODEL
 
 
@@ -62,7 +64,8 @@ class RandLANet(BaseModel):
 
         dim_feature = cfg.dim_feature
         self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
-        self.batch_normalization = nn.BatchNorm2d(dim_feature, eps=1e-6)
+        self.batch_normalization = nn.BatchNorm2d(dim_feature, momentum=0.01, 
+            eps=1e-6, track_running_stats=False)
 
         d_encoder_list = []
 
@@ -158,10 +161,14 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point']
-        label = data['label']
-        feat = data['feat']
+        pc = data['point'] 
+        label = data['label'] 
+        feat = data['feat'] 
         tree = data['search_tree']
+
+
+        t_normalize = cfg.get('t_normalize', None)
+        pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
@@ -170,7 +177,18 @@ class RandLANet(BaseModel):
 
 
         selected_pc, feat, label, selected_idx = \
-            self.crop_pc(pc, feat, label, tree, pick_idx)
+            trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
+
+
+        t_augment = cfg.get('t_augment', None)
+        pc = trans_augment(pc, t_augment)
+
+        if min_posbility_idx is not None:
+            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+            delta = np.square(1 - dists / np.max(dists))
+            self.possibility[selected_idx] += delta
+            inputs['point_inds'] = selected_idx
+        pc = selected_pc
 
         if feat is None:
             feat = selected_pc.copy()
@@ -180,13 +198,6 @@ class RandLANet(BaseModel):
         assert cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
-        if min_posbility_idx is not None:
-            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
-            delta = np.square(1 - dists / np.max(dists))
-            self.possibility[selected_idx] += delta
-            inputs['point_inds'] = selected_idx
-
-        pc = selected_pc
         features = feat
         input_points = []
         input_neighbors = []

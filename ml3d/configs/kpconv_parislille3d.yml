@@ -2,7 +2,7 @@ dataset:
   name: ParisLille3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132, 4212295, 10599237]
   ignored_label_inds:
   - 0
   num_points: 65536
@@ -11,6 +11,8 @@ dataset:
   val_files:
   - Lille2.ply
   use_cache: False
+  steps_per_epoch_train: 1000
+  steps_per_epoch_valid: 100
 model:
   name: KPFCNN
   KP_extent: 1.0
@@ -52,7 +54,7 @@ model:
   ckpt_path: # path/to/your/checkpoint
   class_w: []
   conv_radius: 2.5
-  batch_limit: 50000
+  batch_limit: 40000
   dataset: SemanticKitti
   dataset_task: ''
   deform_fitting_mode: point2point
@@ -73,15 +75,15 @@ model:
   in_points_dim: 3
   in_radius: 2.0
   input_threads: 10
-  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
   learning_rate: 0.01
   lr_decays: 0.98477
-  max_epoch: 800
+  min_in_points: 20000
   max_in_points: 100000
   max_val_points: 100000
   modulated: false
   n_frames: 1
-  num_classes: 8
+  num_classes: 9
   num_kernel_points: 15
   num_layers: 5
   repulse_extent: 1.2
@@ -95,7 +97,7 @@ pipeline:
   name: SemanticSegmentation
   momentum: 0.98
   adam_lr: 0.01
-  batch_size: 8
+  batch_size: 1
   learning_rate: 0.01
   deform_lr_factor: 0.1
   weight_decay: 0.001
@@ -103,6 +105,6 @@ pipeline:
   max_epoch: 100
   save_ckpt_freq: 20
   scheduler_gamma: 0.95
-  test_batch_size: 8
+  test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 8
+  val_batch_size: 1

@@ -20,9 +20,9 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: #./logs/RandLANet_torch/checkpoint/ckpt_480.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
-  dim_input: 3
+  dim_input: 6
   dim_output:
   - 16
   - 64
@@ -49,6 +49,12 @@ model:
   - 4
   - 4
   - 2
+  normalizing:
+    method: linear
+    points_bias: 0
+    points_scale: 10000
+    feat_bias: 0
+    feat_scale: 255
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
