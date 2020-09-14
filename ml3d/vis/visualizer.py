@@ -67,21 +67,6 @@ class Model:
                 tcloud.point[attr_name] = Visualizer._make_tcloud_array(attr)
                 known_attrs.add(attr_name)
 
-        # Dataset-specific handling
-#        if self._dataset.dataset.__class__.__name__ == "Toronto3D":
-#            if "feat" in data:
-#                attr_name = "feature (RGB)"
-#                colors = data["feat"]
-#                assert(len(colors) == len(pts))
-#                colors = [[float(c[0]) / 255.0, float(c[1]) / 255.0, float(c[2]) / 255.0] for c in colors]
-#                colors = np.array(colors, dtype='float32')
-#                tcloud.point[attr_name] = Visualizer._make_tcloud_array(colors)
-#                known_attrs.add(attr_name)
-
-#        # Make the white array once
-#        white = np.array([[1.0, 1.0, 1.0]] * len(pts), dtype='float32')
-#        tcloud.point["white"] = Visualizer._make_tcloud_array(white)
-
         self.data[name] = tcloud
         self._known_attrs[name] = known_attrs
 
@@ -119,11 +104,16 @@ class Model:
         return self._attr2minmax[attr_name]
 
     def get_available_attrs(self, names):
-        attr_names = set()
+        attr_names = None
         for n in names:
             known = self._known_attrs.get(n)
             if known is not None:
-                attr_names = attr_names.union(known)
+                if attr_names is None:
+                    attr_names = known
+                else:
+                    attr_names = attr_names.intersection(known)
+        if attr_names is None:
+            return []
         return sorted(attr_names)
 
 class DataModel(Model):
@@ -190,6 +180,21 @@ class DatasetModel(Model):
         # data["distance"] = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2])
         #                      for pt in data["point"]]
         # ----
+
+        # Dataset-specific handling
+#        if self._dataset.dataset.__class__.__name__ == "Toronto3D":
+#            if "feat" in data:
+#                attr_name = "feature (RGB)"
+#                colors = data["feat"]
+#                assert(len(colors) == len(pts))
+#                colors = [[float(c[0]) / 255.0, float(c[1]) / 255.0, float(c[2]) / 255.0] for c in colors]
+#                colors = np.array(colors, dtype='float32')
+#                tcloud.point[attr_name] = Visualizer._make_tcloud_array(colors)
+#                known_attrs.add(attr_name)
+
+#        # Make the white array once
+#        white = np.array([[1.0, 1.0, 1.0]] * len(pts), dtype='float32')
+#        tcloud.point["white"] = Visualizer._make_tcloud_array(white)
 
         self.create_point_cloud(data)
 
@@ -489,6 +494,7 @@ class Visualizer:
         self._name2treeid = {}
         self._attrname2lut = {}
         self._colormaps = {}
+        self._shadername2panelidx = {}
         self._gradient = rendering.Gradient()
         self._scalar_min = 0.0
         self._scalar_max = 1.0
@@ -626,6 +632,7 @@ class Visualizer:
         #     ... sub-panel: single color
         self._color_panel = gui.Vert()
         self._shader_panels.add_child(self._color_panel)
+        self._shadername2panelidx[self.SOLID_NAME] = len(self._shadername2panelidx)
         self._color = gui.ColorEdit()
         self._color.color_value = gui.Color(0.5, 0.5, 0.5)
         self._color.set_on_value_changed(self._on_shader_color_changed)
@@ -637,6 +644,7 @@ class Visualizer:
         #     ... sub-panel: labels
         self._labels_panel = gui.Vert()
         self._shader_panels.add_child(self._labels_panel)
+        self._shadername2panelidx[self.LABELS_NAME] = len(self._shadername2panelidx)
         self._label_edit = self.LabelLUTEdit()
         self._label_edit.set_on_changed(self._on_labels_changed)
         self._labels_panel.add_child(gui.Label("Labels"))
@@ -645,6 +653,8 @@ class Visualizer:
         #     ... sub-panel: colormap
         self._colormap_panel = gui.Vert()
         self._shader_panels.add_child(self._colormap_panel)
+        self._shadername2panelidx[self.RAINBOW_NAME] = len(self._shadername2panelidx)
+        self._shadername2panelidx[self.GREYSCALE_NAME] = self._shadername2panelidx[self.RAINBOW_NAME]
         self._colormap_edit = self.ColormapEdit(self.window, em)
         self._colormap_edit.set_on_changed(self._on_colormap_changed)
         self._colormap_panel.add_child(self._colormap_edit.widget)
@@ -652,6 +662,7 @@ class Visualizer:
         #     ... sub-panel: RGB
         self._rgb_panel = gui.Vert()
         self._shader_panels.add_child(self._rgb_panel)
+#        self._shadername2panelidx[self.COLORS_NAME] = len(self._shadername2panelidx)
 
         properties.add_fixed(em)
         properties.add_child(self._shader_panels)
@@ -867,9 +878,16 @@ class Visualizer:
         elif len(available_attrs) > 0:
             self._datasource_combobox.selected_text = available_attrs[0]
         else:
-            self._datasource_combobox.selected_text = ""
-            self._shader.selected_text = self.SOLID_NAME
-            self._update_geometry_colors()
+            # If no attributes, two possibilities:
+            # 1) no geometries are selected: don't change anything
+            # 2) geometries are selected: color solid
+            has_checked = False
+            for n,node in self._name2treenode.items():
+                if node.checkbox.checked:
+                    has_checked = True
+                    break
+            if has_checked:
+                self._set_shader(self.SOLID_NAME)
 
     def _update_shaders_combobox(self):
         current_attr = self._datasource_combobox.selected_text
@@ -881,16 +899,29 @@ class Visualizer:
         if has_lut:
             self._shader.add_item(self.LABELS_NAME)
             self._label_edit.set_labels(self._attrname2lut[current_attr])
+        
+#        self._shader.add_item(self.COLOR_NAME)
         self._shader.add_item(self.RAINBOW_NAME)
         self._shader.add_item(self.GREYSCALE_NAME)
-#        self._shader.add_item(self.COLOR_NAME)
-        self._colormaps[self.RAINBOW_NAME] = Colormap.make_rainbow()
-        self._colormaps[self.GREYSCALE_NAME] = Colormap.make_greyscale()
 
-        if current_shader == self.LABELS_NAME and not has_lut:
-            self._shader.selected_text = self.RAINBOW_NAME
+        if current_shader == self.LABELS_NAME and has_lut:
+            self._set_shader(self.LABELS_NAME)
         else:
-            self._shader.selected_text = current_shader
+            self._set_shader(self.RAINBOW_NAME)
+
+    def _set_shader(self, shader_name, force_update=False):
+        if shader_name == self._shader.selected_text and not force_update:
+            return
+
+        self._shader.selected_text = shader_name
+        idx = self._shadername2panelidx[self._shader.selected_text]
+        self._shader_panels.selected_index = idx
+
+        if shader_name in self._colormaps:
+            cmap = self._colormaps[shader_name]
+            self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
+
+        self._update_geometry_colors()
 
     def _on_layout(self, theme):
         frame = self.window.content_rect
@@ -961,15 +992,8 @@ class Visualizer:
         self._update_geometry()
 
     def _on_shader_changed(self, name, idx):
-        # Last items are all colormaps, so just clamp to n_children - 1
-        idx = min(idx, len(self._shader_panels.get_children()) - 1)
-        self._shader_panels.selected_index = idx
-
-        if name in self._colormaps:
-            cmap = self._colormaps[name]
-            self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
-
-        self._update_geometry_colors()
+        # _shader.current_text is already name, so we need to force an update
+        self._set_shader(name, force_update=True)
 
     def _on_shader_color_changed(self, color):
         self._update_geometry_colors()
@@ -1032,7 +1056,7 @@ class Visualizer:
             for attr_name in ["label", "labels"]:
                 if attr_name in self._get_available_attrs():
                     self._datasource_combobox.selected_text = attr_name
-                    if not self._label_edit.is_empty():
+                    if attr_name in self._attrname2lut:
                         shader_name = self.LABELS_NAME
                     break
             if shader_name is None:
@@ -1040,9 +1064,7 @@ class Visualizer:
                     shader_name = self.SOLID_NAME
                 else:
                     shader_name = self.RAINBOW_NAME
-            self._shader.selected_text = shader_name
-            self._on_shader_changed(self._shader.selected_text,
-                                    self._shader.selected_index)
+            self._set_shader(shader_name)
 
             self._update_geometry()
 #            self._update_geometry_with_progress()
