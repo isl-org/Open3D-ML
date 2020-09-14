@@ -94,7 +94,8 @@ class SemanticKITTI(BaseDataset):
         }
         self.num_classes = len(self.label_to_names)
 
-        data_config = join(dirname(abspath(__file__)), '_resources/', 'semantic-kitti.yaml')
+        data_config = join(dirname(abspath(__file__)), '_resources/',
+                           'semantic-kitti.yaml')
         DATA = yaml.safe_load(open(data_config, 'r'))
         remap_dict = DATA["learning_map_inv"]
 
