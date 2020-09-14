@@ -4,48 +4,41 @@ from ml3d.torch.pipelines import SemanticSegmentation
 from ml3d.torch.models import RandLANet
 from ml3d.utils import Config, get_module
 
-
-def demo_read_data():
-    # read data from datasets
-    dataset = SemanticKITTI(dataset_path="../dataset/SemanticKITTI",
-                            use_cache=False)
-    print(dataset.label_to_names)
-
-    # print names of all pointcould
-    all_split = dataset.get_split('train')
-    for i in range(len(all_split)):
-        attr = all_split.get_attr(i)
-        print(attr['name'])
-
-    print(dataset.cfg.validation_split)
-    # change the validation split
-    dataset.cfg.validation_split = ['01']
-    validation_split = dataset.get_split('val')
-    for i in range(len(validation_split)):
-        data = validation_split.get_data(i)
-        print(data['point'].shape)
+import argparse
 
 
-def demo_train():
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Demo for training and inference')
+    parser.add_argument('--path_semantickitti',
+                        help='path to semantiSemanticKITTI',
+                        required=True)
+    parser.add_argument('--path_ckpt_randlanet',
+                        help='path to RandLANet checkpoint')
+
+    args, _ = parser.parse_known_args()
+
+    dict_args = vars(args)
+    for k in dict_args:
+        v = dict_args[k]
+        print("{}: {}".format(k, v) if v is not None else "{} not given".
+              format(k))
+
+    return args
+
+
+def demo_train(args):
     # Initialize the training by passing parameters
+    dataset = SemanticKITTI(args.path_semantickitti, use_cache=True)
 
-    dataset = SemanticKITTI(dataset_path="../dataset/SemanticKITTI",
-                            use_cache=True)
+    model = RandLANet(dim_input=3)
 
-    model = RandLANet(
-        ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth",
-        dim_input=3)
-
-    pipeline = SemanticSegmentation(model=model,
-                                    dataset=dataset,
-                                    max_epoch=100,
-                                    batch_size=4,
-                                    device="gpu")
+    pipeline = SemanticSegmentation(model=model, dataset=dataset, max_epoch=100)
 
     pipeline.run_train()
 
 
-def demo_inference():
+def demo_inference(args):
     # Inference and test example
     from ml3d.tf.pipelines import SemanticSegmentation
     from ml3d.tf.models import RandLANet
@@ -54,15 +47,10 @@ def demo_inference():
     Model = get_module("model", "RandLANet", "tf")
     Dataset = get_module("dataset", "SemanticKITTI")
 
-    # Initialize using default configuration in
-    # "ml3d/configs/default_cfgs/randlanet.yml"
-    RandLANet = Model(
-        ckpt_path="../dataset/checkpoints/randlanet_semantickitti.pth")
+    RandLANet = Model(ckpt_path=args.path_ckpt_randlanet)
 
     # Initialize by specifying config file path
-    cfg = Config.load_from_file("ml3d/configs/default_cfgs/semantickitti.yml")
-    cfg.use_cache = False
-    SemanticKITTI = Dataset(**cfg)
+    SemanticKITTI = Dataset(args.path_semantickitti, use_cache=False)
 
     pipeline = Pipeline(model=RandLANet, dataset=SemanticKITTI)
 
@@ -71,7 +59,7 @@ def demo_inference():
     train_split = SemanticKITTI.get_split("train")
     data = train_split.get_data(0)
     # restore weights
-    # pipeline.load_ckpt(RandLANet.cfg.ckpt_path, False)
+
     # run inference
     results = pipeline.run_inference(data)
     print(results)
@@ -81,6 +69,6 @@ def demo_inference():
 
 
 if __name__ == '__main__':
-    demo_read_data()
-    demo_inference()
-    demo_train()
+    args = parse_args()
+    demo_train(args)
+    demo_inference(args)

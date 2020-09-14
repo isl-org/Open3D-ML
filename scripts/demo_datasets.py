@@ -1,25 +1,50 @@
 from ml3d.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
                            Toronto3D)
-from ml3d.utils import Config, get_module
+import argparse
+import yaml
 
 
-def demo_dataset():
+def parse_args():
+    parser = argparse.ArgumentParser(description='Read from datasets')
+    parser.add_argument('--path_semantickitti',
+                        help='path to semantiSemanticKITTI')
+    parser.add_argument('--path_semantick3d', help='path to Semantic3D')
+    parser.add_argument('--path_parislille3d', help='path to ParisLille3D')
+    parser.add_argument('--path_toronto3d', help='path to Toronto3D')
+    parser.add_argument('--path_s3dis', help='path to S3DIS')
+
+    args, _ = parser.parse_known_args()
+
+    dict_args = vars(args)
+    for k in dict_args:
+        v = dict_args[k]
+        print("{}: {}".format(k, v) if v is not None else "{} not given".
+              format(k))
+
+    return args
+
+
+def demo_dataset(args):
     # read data from datasets
-
     datasets = []
-    datasets.append(
-        SemanticKITTI(dataset_path="../dataset/SemanticKITTI", use_cache=False))
-    datasets.append(
-        ParisLille3D(dataset_path="../dataset/Paris_Lille3D", use_cache=False))
-    datasets.append(
-        Toronto3D(dataset_path="../dataset/Toronto_3D", use_cache=False))
-    datasets.append(S3DIS(dataset_path="../dataset/S3DIS", use_cache=False))
-    datasets.append(
-        Semantic3D(dataset_path="../dataset/Semantic3D", use_cache=False))
+    if args.path_semantickitti is not None:
+        datasets.append(
+            SemanticKITTI(dataset_path=args.path_semantickitti,
+                          use_cache=False))
+    if args.path_parislille3d is not None:
+        datasets.append(
+            ParisLille3D(dataset_path=args.path_parislille3d, use_cache=False))
+    if args.path_toronto3d is not None:
+        datasets.append(
+            Toronto3D(dataset_path=args.path_toronto3d, use_cache=False))
+    if args.path_semantick3d is not None:
+        datasets.append(
+            Semantic3D(dataset_path=args.path_semantick3d, use_cache=False))
+    if args.path_s3dis is not None:
+        datasets.append(S3DIS(dataset_path=args.path_s3dis, use_cache=False))
 
     for dataset in datasets:
         print(dataset.label_to_names)
-
         # print names of all pointcould
         split = dataset.get_split('test')
         for i in range(len(split)):
@@ -33,4 +58,5 @@ def demo_dataset():
 
 
 if __name__ == '__main__':
-    demo_dataset()
+    args = parse_args()
+    demo_dataset(args)
