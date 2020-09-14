@@ -103,12 +103,12 @@ class Config(object):
             subkey = key_list[-1]
             d[subkey] = v
 
-        cfg_dict_dataset = Config._merge_a_into_b(cfg.dataset,
-                                                  extra_cfg_dict['dataset'])
-        cfg_dict_pipeline = Config._merge_a_into_b(cfg.pipeline,
-                                                   extra_cfg_dict['pipeline'])
-        cfg_dict_model = Config._merge_a_into_b(cfg.model,
-                                                extra_cfg_dict['model'])
+        cfg_dict_dataset = Config._merge_a_into_b(extra_cfg_dict['dataset'],
+                                                  cfg.dataset)
+        cfg_dict_pipeline = Config._merge_a_into_b(extra_cfg_dict['pipeline'],
+                                                   cfg.pipeline)
+        cfg_dict_model = Config._merge_a_into_b(extra_cfg_dict['model'],
+                                                cfg.model)
 
         return cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model
 
