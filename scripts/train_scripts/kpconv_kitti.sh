@@ -8,5 +8,5 @@ if [ "$#" -ne 1 ]; then
 fi
 
 cd ../..
-python scripts/semseg.py $1 -c ml3d/configs/randlanet_semantickitti.yml \
+python scripts/semseg.py $1 -c ml3d/configs/kpconv_semantickitti.yml \
 --dataset_path /export/share/Datasets/SemanticKITTI

@@ -192,9 +192,7 @@ class SemanticSegmentation(BasePipeline):
             self.ious = []
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-           
                 results = model(inputs['data'])
-                print(results.size())
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
 

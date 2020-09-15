@@ -8,5 +8,5 @@ if [ "$#" -ne 1 ]; then
 fi
 
 cd ../..
-python scripts/semseg.py $1 -c ml3d/configs/randlanet_s3dis.yml \
+python scripts/semseg.py $1 -c ml3d/configs/kpconv_s3dis.yml \
 --dataset_path /export/share/Datasets/S3DIS
