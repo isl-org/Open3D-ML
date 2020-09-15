@@ -26,7 +26,6 @@ class KPFCNN(BaseModel):
     def __init__(
             self,
             name='KPFCNN',
-            ign_lbls=[0],
             lbl_values=[
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
                 18, 19
@@ -65,16 +64,8 @@ class KPFCNN(BaseModel):
             batch_norm_momentum=0.02,
             deform_fitting_mode='point2point',
             deform_fitting_power=1.0,
-            deform_lr_factor=0.1,
             repulse_extent=1.2,
-            max_epoch=800,
-            learning_rate=1e-2,
-            momentum=0.98,
-            lr_decays=0.98477,
-            grad_clip_norm=100.0,
-            epoch_steps=500,
             validation_size=200,
-            checkpoint_gap=50,
             augment_scale_anisotropic=True,
             augment_symmetries=[True, False, False],
             augment_rotation='vertical',
@@ -121,16 +112,8 @@ class KPFCNN(BaseModel):
                          batch_norm_momentum=batch_norm_momentum,
                          deform_fitting_mode=deform_fitting_mode,
                          deform_fitting_power=deform_fitting_power,
-                         deform_lr_factor=deform_lr_factor,
                          repulse_extent=repulse_extent,
-                         max_epoch=max_epoch,
-                         learning_rate=learning_rate,
-                         momentum=momentum,
-                         lr_decays=lr_decays,
-                         grad_clip_norm=grad_clip_norm,
-                         epoch_steps=epoch_steps,
                          validation_size=validation_size,
-                         checkpoint_gap=checkpoint_gap,
                          augment_scale_anisotropic=augment_scale_anisotropic,
                          augment_symmetries=augment_symmetries,
                          augment_rotation=augment_rotation,
@@ -844,6 +827,7 @@ class KPFCNN(BaseModel):
             feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
+            feat /= 255.0
 
         data = dict()
 

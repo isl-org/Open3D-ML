@@ -4,7 +4,6 @@ dataset:
   cache_dir: ./logs/cache
   class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
   478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
-  dataset_path: ../dataset/S3DIS/
   ignored_label_inds: []
   num_points: 40960
   prepro_grid_size: 0.04
@@ -62,8 +61,6 @@ model:
   first_features_dim: 128
   first_subsampling_dl: 0.03
   fixed_kernel_points: center
-  ign_lbls:
-  - 0
   ignored_label_inds:
   - 0
   in_features_dim: 2
@@ -85,22 +82,15 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 8
-  checkpoint_gap: 50
-  deform_lr_factor: 0.1
-  epoch_steps: 500
-  grad_clip_norm: 100.0
+  batch_size: 4
   learning_rate: 0.01
   lr_decays: 0.98477
   main_log_dir: ./logs
   max_epoch: 800
-  momentum: 0.98
   save_ckpt_freq: 10
-  saving: true
-  saving_path: null
   scheduler_gamma: 0.98477
-  test_batch_size: 8
+  test_batch_size: 4
   train_sum_dir: train_log
-  val_batch_size: 8
+  val_batch_size: 4
   validation_size: 200
   weight_decay: 0.001
