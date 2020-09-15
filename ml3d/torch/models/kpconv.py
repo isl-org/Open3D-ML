@@ -15,7 +15,7 @@ from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
 from ...utils import MODEL
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import DataProcessing, create_3D_rotations
 
 
 class KPFCNN(BaseModel):

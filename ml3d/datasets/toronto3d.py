@@ -133,6 +133,11 @@ class Toronto3DSplit():
         self.split = split
         self.dataset = dataset
 
+        self.cache_in_memory = self.cfg.get('cache_in_memory', False)
+        if self.cache_in_memory:
+            self.data_list = [None] * len(self.path_list)
+
+
     def __len__(self):
         return len(self.path_list)
 
@@ -140,7 +145,14 @@ class Toronto3DSplit():
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        data = PlyData.read(pc_path)['vertex']
+        if self.cache_in_memory:
+            if self.data_list[idx] is not None:
+                data = self.data_list[idx]
+            else:
+                data = PlyData.read(pc_path)['vertex']
+                self.data_list[idx] = data
+        else:
+            data = PlyData.read(pc_path)['vertex']
 
         points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
         points[:, 0] = data['x']
