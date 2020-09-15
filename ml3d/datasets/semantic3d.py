@@ -157,7 +157,7 @@ class Semantic3DSplit():
                          dtype=np.float32).values
 
         points = pc[:, 0:3]
-        feat = pc[:, [4, 5, 6]]
+        feat = pc[:, [4, 5, 6, 3]]
 
         points = np.array(points, dtype=np.float32)
         feat = np.array(feat, dtype=np.float32)
