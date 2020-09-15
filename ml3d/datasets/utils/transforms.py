@@ -2,28 +2,28 @@ import numpy as np
 import random
 from .operations import create_3D_rotations
 
+
 def trans_normalize(pc, feat, t_normalize):
-	if t_normalize is None or t_normalize.get('method', None) is None:
-		return pc, feat
+    if t_normalize is None or t_normalize.get('method', None) is None:
+        return pc, feat
 
-	method = t_normalize['method']
-	if method == 'linear':
-		points_bias = t_normalize.get('points_bias', pc.mean())
-		pc -= points_bias
+    method = t_normalize['method']
+    if method == 'linear':
+        points_bias = t_normalize.get('points_bias', pc.mean())
+        pc -= points_bias
 
-		points_scale = t_normalize.get('points_scale', pc.max())
-		pc /= points_scale
+        points_scale = t_normalize.get('points_scale', pc.max())
+        pc /= points_scale
 
-		if feat is not None:
-			feat_bias = t_normalize.get('feat_bias', 0)
-			feat_scale = t_normalize.get('feat_scale', 1)
-			feat -= feat_bias
-			feat /= feat_scale
-	elif method == 'coords_only':
-		feat = None
+        if feat is not None:
+            feat_bias = t_normalize.get('feat_bias', 0)
+            feat_scale = t_normalize.get('feat_scale', 1)
+            feat -= feat_bias
+            feat /= feat_scale
+    elif method == 'coords_only':
+        feat = None
 
-	return pc, feat
-
+    return pc, feat
 
 
 def trans_augment(points, t_augment):
@@ -42,8 +42,7 @@ def trans_augment(points, t_augment):
             # Create random rotations
             theta = np.random.rand() * 2 * np.pi
             c, s = np.cos(theta), np.sin(theta)
-            R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]],
-                         dtype=np.float32)
+            R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
 
         elif rotation_method == 'all':
 
@@ -66,7 +65,6 @@ def trans_augment(points, t_augment):
                                     np.reshape(alpha, (1, -1)))[0]
 
     R = R.astype(np.float32)
-
 
     # Choose random scales for each example
     scale_anisotropic = t_augment.get('scale_anisotropic', False)
@@ -100,8 +98,7 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     if (points.shape[0] < num_points):
         select_idx = np.array(range(points.shape[0]))
         diff = num_points - points.shape[0]
-        select_idx = list(select_idx) + list(
-            random.choices(select_idx, k=diff))
+        select_idx = list(select_idx) + list(random.choices(select_idx, k=diff))
         random.shuffle(select_idx)
     else:
         select_idx = search_tree.query(center_point, k=num_points)[1][0]

@@ -511,9 +511,9 @@ class KPFCNN(BaseModel):
 
     def transform_train(self, data, attr):
         # Read points
-        points = data['point'] 
+        points = data['point']
         sem_labels = data['label']
-        feat = data['feat'] 
+        feat = data['feat']
 
         dim_points = points.shape[1]
         if feat is None:
@@ -522,7 +522,6 @@ class KPFCNN(BaseModel):
         else:
             dim_features = feat.shape[1] + dim_points
             new_coords = np.hstack((points, feat))
-
 
         # Initiate merged points
         merged_points = np.zeros((0, dim_points), dtype=np.float32)
@@ -585,7 +584,6 @@ class KPFCNN(BaseModel):
             curr_sem_labels = sem_labels[rand_order]
             curr_new_coords = new_coords[rand_order, :]
 
-
             in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
                 curr_new_points,
                 features=curr_new_coords,
@@ -644,7 +642,6 @@ class KPFCNN(BaseModel):
             data['r_inds_list'] += [proj_inds]
             data['r_mask_list'] += [reproj_mask]
             data['val_labels_list'] += [o_labels]
-
 
         return data
 
@@ -1540,7 +1537,6 @@ from os.path import join, exists
 #       \***************/
 #
 #
-
 
 
 def spherical_Lloyd(radius,

@@ -32,10 +32,10 @@ class TFDataloader():
 
             assert cache_dir is not None, 'cache directory is not given'
 
-            self.cache_convert = Cache(
-                self.preprocess,
-                cache_dir=cache_dir,
-                cache_key=_get_hash(repr(self.preprocess)[:-15]))
+            self.cache_convert = Cache(self.preprocess,
+                                       cache_dir=cache_dir,
+                                       cache_key=_get_hash(
+                                           repr(self.preprocess)[:-15]))
 
             uncached = [
                 idx for idx in range(len(dataset)) if dataset.get_attr(idx)

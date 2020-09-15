@@ -16,16 +16,17 @@ def make_dir(folder_name):
 def get_hash(x: str):
     """Generate a hash from a string.
     """
-    h = hashlib.md5(x.encode()) 
+    h = hashlib.md5(x.encode())
     return h.hexdigest()
 
 
 class Cache(object):
+
     def __init__(self, func: Callable, cache_dir: str, cache_key: str):
         self.func = func
         self.cache_dir = join(cache_dir, cache_key)
         make_dir(self.cache_dir)
-        self.cached_ids = [splitext(p)[0]for p in listdir(self.cache_dir)]
+        self.cached_ids = [splitext(p)[0] for p in listdir(self.cache_dir)]
 
     def __call__(self, unique_id: str, *data):
         fpath = join(self.cache_dir, str('{}.npy'.format(unique_id)))

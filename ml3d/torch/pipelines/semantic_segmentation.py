@@ -149,31 +149,29 @@ class SemanticSegmentation(BasePipeline):
 
         batcher = self.get_batcher(device)
 
-        train_split = TorchDataloader(
-            dataset=dataset.get_split('training'),
-            preprocess=model.preprocess,
-            transform=model.transform,
-            use_cache=dataset.cfg.use_cache,
-            steps_per_epoch=dataset.cfg.get('steps_per_epoch_train', None))
+        train_split = TorchDataloader(dataset=dataset.get_split('training'),
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
 
-        train_loader = DataLoader(
-            train_split,
-            batch_size=cfg.batch_size,
-            shuffle=True,
-            collate_fn=batcher.collate_fn)
+        train_loader = DataLoader(train_split,
+                                  batch_size=cfg.batch_size,
+                                  shuffle=True,
+                                  collate_fn=batcher.collate_fn)
 
-        valid_split = TorchDataloader(
-            dataset=dataset.get_split('validation'),
-            preprocess=model.preprocess,
-            transform=model.transform,
-            use_cache=dataset.cfg.use_cache,
-            steps_per_epoch=dataset.cfg.get('steps_per_epoch_valid', None))
+        valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
 
-        valid_loader = DataLoader(
-            valid_split,
-            batch_size=cfg.val_batch_size,
-            shuffle=True,
-            collate_fn=batcher.collate_fn)
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.val_batch_size,
+                                  shuffle=True,
+                                  collate_fn=batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -202,11 +200,10 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
-           
+
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
                 self.ious.append(iou)
-
 
             self.scheduler.step()
 

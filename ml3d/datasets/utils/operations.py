@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def create_3D_rotations(axis, angle):
     """
     Create rotation matrices from a list of axes and angles. Code from wikipedia on quaternions

@@ -15,8 +15,8 @@ from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
-from ...datasets.utils import (DataProcessing, trans_normalize, 
-                trans_augment, trans_crop_pc)
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
+                               trans_crop_pc)
 from ...utils import MODEL
 
 
@@ -64,8 +64,10 @@ class RandLANet(BaseModel):
 
         dim_feature = cfg.dim_feature
         self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
-        self.batch_normalization = nn.BatchNorm2d(dim_feature, momentum=0.01, 
-            eps=1e-6, track_running_stats=False)
+        self.batch_normalization = nn.BatchNorm2d(dim_feature,
+                                                  momentum=0.01,
+                                                  eps=1e-6,
+                                                  track_running_stats=False)
 
         d_encoder_list = []
 
@@ -161,11 +163,10 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point'] 
-        label = data['label'] 
-        feat = data['feat'] 
+        pc = data['point']
+        label = data['label']
+        feat = data['feat']
         tree = data['search_tree']
-
 
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)
@@ -178,7 +179,6 @@ class RandLANet(BaseModel):
 
         selected_pc, feat, label, selected_idx = \
             trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
-
 
         t_augment = cfg.get('t_augment', None)
         pc = trans_augment(pc, t_augment)

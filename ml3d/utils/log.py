@@ -2,6 +2,7 @@ import logging
 
 
 class LogRecord(logging.LogRecord):
+
     def getMessage(self):
         msg = self.msg
         if self.args:
