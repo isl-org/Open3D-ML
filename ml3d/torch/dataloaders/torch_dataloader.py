@@ -79,7 +79,7 @@ class TorchDataloader(Dataset):
         if self.transform is not None:
             data = self.transform(data, attr)
 
-        inputs = {'data': data, 'attr': data}
+        inputs = {'data': data, 'attr': attr}
 
         return inputs
 

@@ -65,9 +65,7 @@ class RandLANet(BaseModel):
         dim_feature = cfg.dim_feature
         self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
         self.batch_normalization = nn.BatchNorm2d(dim_feature,
-                                                  momentum=0.01,
-                                                  eps=1e-6,
-                                                  track_running_stats=False)
+                                                  eps=1e-6)
 
         d_encoder_list = []
 
