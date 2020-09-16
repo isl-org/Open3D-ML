@@ -595,7 +595,6 @@ class KPFCNN(BaseModel):
             n = in_pts.shape[0]
             # Safe check
             if n < 2:
-                print("sample n < 2!")
                 continue
 
             # Randomly drop some points (augmentation process and safety for GPU memory consumption)
