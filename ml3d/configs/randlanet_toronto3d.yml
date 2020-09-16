@@ -48,6 +48,12 @@ model:
   - 4
   - 4
   - 2
+  normalizing:
+    method: linear
+    points_bias: 0
+    points_scale: 10000
+    feat_bias: 0
+    feat_scale: 255
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

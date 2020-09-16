@@ -79,6 +79,7 @@ pipeline:
   batch_size: 1
   learning_rate: 0.01
   lr_decays: 0.98477
+  deform_lr_factor: 0.1
   main_log_dir: ./logs
   max_epoch: 100
   save_ckpt_freq: 3

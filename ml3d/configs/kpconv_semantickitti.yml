@@ -59,7 +59,6 @@ model:
   deform_fitting_mode: point2point
   deform_fitting_power: 1.0
   deform_radius: 6.0
-  deform_lr_factor: 0.1
   density_parameter: 5.0
   first_features_dim: 128
   first_subsampling_dl: 0.06
@@ -70,6 +69,7 @@ model:
   in_points_dim: 3
   in_radius: 4.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+  min_in_points: 10000
   max_in_points: 20000
   modulated: false
   num_classes: 19
@@ -84,6 +84,7 @@ pipeline:
   batch_size: 8
   learning_rate: 0.01
   lr_decays: 0.98477
+  deform_lr_factor: 0.1
   main_log_dir: ./logs
   max_epoch: 800
   momentum: 0.98

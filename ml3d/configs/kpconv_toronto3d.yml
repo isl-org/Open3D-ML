@@ -17,6 +17,8 @@ dataset:
   val_files:
   - L002.ply
   use_cache: True
+  # steps_per_epoch_train: 1000
+  # steps_per_epoch_valid: 100
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
@@ -60,7 +62,6 @@ model:
   deform_fitting_mode: point2point
   deform_fitting_power: 1.0
   deform_radius: 6.0
-  deform_lr_factor: 0.1
   density_parameter: 5.0
   first_features_dim: 128
   first_subsampling_dl: 0.04
@@ -71,6 +72,7 @@ model:
   in_points_dim: 3
   in_radius: 2.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  min_in_points: 20000
   max_in_points: 100000
   modulated: false
   num_classes: 8
@@ -83,14 +85,15 @@ pipeline:
   name: SemanticSegmentation
   momentum: 0.98
   adam_lr: 0.01
-  batch_size: 8
+  batch_size: 1
   learning_rate: 0.01
   lr_decays: 0.98477
+  deform_lr_factor: 0.1
   weight_decay: 0.001
   main_log_dir: ./logs
-  max_epoch: 100
+  max_epoch: 1000
   save_ckpt_freq: 20
   scheduler_gamma: 0.95
-  test_batch_size: 8
+  test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 8
+  val_batch_size: 1

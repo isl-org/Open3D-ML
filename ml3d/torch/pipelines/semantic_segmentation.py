@@ -154,7 +154,9 @@ class SemanticSegmentation(BasePipeline):
         train_split = TorchDataloader(dataset=dataset.get_split('training'),
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache)
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
 
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
@@ -164,7 +166,10 @@ class SemanticSegmentation(BasePipeline):
         valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache)
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
                                   shuffle=True,
@@ -185,10 +190,8 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             self.accs = []
             self.ious = []
-            step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
-
+            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
@@ -199,12 +202,11 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+                print(results.size(), acc[-1], iou[-1])
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
                 self.ious.append(iou)
-
-                step = step + 1
 
             self.scheduler.step()
 
@@ -215,7 +217,7 @@ class SemanticSegmentation(BasePipeline):
             self.valid_ious = []
             step = 0
             with torch.no_grad():
-                for idx, inputs in enumerate(
+                for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(

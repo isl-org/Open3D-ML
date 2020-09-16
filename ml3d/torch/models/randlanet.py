@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import random
+import time
 
 from pathlib import Path
 from sklearn.neighbors import KDTree
@@ -14,7 +15,8 @@ from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
+                               trans_crop_pc)
 from ...utils import MODEL
 
 
@@ -161,6 +163,9 @@ class RandLANet(BaseModel):
         feat = data['feat']
         tree = data['search_tree']
 
+        t_normalize = cfg.get('t_normalize', None)
+        pc, feat = trans_normalize(pc, feat, t_normalize)
+
         if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
         else:
@@ -168,7 +173,17 @@ class RandLANet(BaseModel):
 
 
         selected_pc, feat, label, selected_idx = \
-            self.crop_pc(pc, feat, label, tree, pick_idx)
+            trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
+
+        t_augment = cfg.get('t_augment', None)
+        pc = trans_augment(pc, t_augment)
+
+        if min_posbility_idx is not None:
+            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+            delta = np.square(1 - dists / np.max(dists))
+            self.possibility[selected_idx] += delta
+            inputs['point_inds'] = selected_idx
+        pc = selected_pc
 
         if feat is None:
             feat = selected_pc.copy()
@@ -178,13 +193,6 @@ class RandLANet(BaseModel):
         assert cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
 
-        if min_posbility_idx is not None:
-            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
-            delta = np.square(1 - dists / np.max(dists))
-            self.possibility[selected_idx] += delta
-            inputs['point_inds'] = selected_idx
-
-        pc = selected_pc
         features = feat
         input_points = []
         input_neighbors = []

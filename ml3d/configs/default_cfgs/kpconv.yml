@@ -43,7 +43,6 @@ conv_radius: 2.5
 deform_fitting_mode: point2point
 deform_fitting_power: 1.0
 deform_radius: 6.0
-deform_lr_factor: 0.1
 density_parameter: 5.0
 first_features_dim: 128
 first_subsampling_dl: 0.06
