@@ -861,8 +861,12 @@ class KPFCNN(BaseModel):
         def spatially_regular_gen():
 
             random_pick_n = None
-            epoch_n = 500 * cfg.batch_num
             split = dataset.split
+
+            if split not in ['train', 'training']:
+                epoch_n = cfg.val_batch_num
+            else:
+                epoch_n = cfg.batch_num
 
             batch_limit = cfg.batch_limit
 
@@ -886,7 +890,7 @@ class KPFCNN(BaseModel):
             batch_n = 0
 
             # Generator loop
-            for i in range(epoch_n):
+            while (epoch_n):
                 # Choose a random cloud
                 cloud_ind = random.randint(0, dataset.num_pc - 1)
 
@@ -934,6 +938,7 @@ class KPFCNN(BaseModel):
 
                 # In case batch is full, yield it and reset it
                 if batch_n + n > batch_limit and batch_n > 0:
+                    epoch_n -= 1
 
                     yield (np.concatenate(p_list,
                                           axis=0), np.concatenate(c_list,

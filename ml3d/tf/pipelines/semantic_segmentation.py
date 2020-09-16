@@ -119,12 +119,12 @@ class SemanticSegmentation(BasePipeline):
         train_split = TFDataloader(dataset=dataset.get_split('training'),
                                    model=model,
                                    use_cache=dataset.cfg.use_cache)
-        train_loader = train_split.get_loader(cfg.batch_size)
+        train_loader, len_train = train_split.get_loader(cfg.batch_size)
 
         valid_split = TFDataloader(dataset=dataset.get_split('validation'),
                                    model=model,
                                    use_cache=dataset.cfg.use_cache)
-        valid_loader = valid_split.get_loader(cfg.val_batch_size)
+        valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
 
         writer = tf.summary.create_file_writer(
             join(cfg.logs_dir, cfg.train_sum_dir))
@@ -139,7 +139,8 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
+            for idx, inputs in enumerate(
+                    tqdm(train_loader, total=len_train, desc='training')):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=True)
                     loss, gt_labels, predict_scores = model.get_loss(
@@ -163,7 +164,8 @@ class SemanticSegmentation(BasePipeline):
             self.valid_losses = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(valid_loader, desc='validation')):
+            for idx, inputs in enumerate(
+                    tqdm(valid_loader, total=len_val, desc='validation')):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(

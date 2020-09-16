@@ -50,7 +50,7 @@ model:
   - false
   batch_limit: 50000
   batch_norm_momentum: 0.02
-  batch_num: 8
+  batch_num: 50
   batcher: ConcatBatcher
   conv_radius: 2.5
   deform_fitting_mode: point2point
@@ -73,7 +73,7 @@ model:
   num_layers: 5
   repulse_extent: 1.2
   use_batch_norm: true
-  val_batch_num: 8
+  val_batch_num: 30
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

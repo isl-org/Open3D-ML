@@ -23,7 +23,9 @@ def parse_args():
     parser.add_argument('--cfg_dataset',
                         help='path to the dataset\'s config file')
     parser.add_argument('--dataset_path', help='path to the dataset')
-    parser.add_argument('--device', help='device to run the pipeline')
+    parser.add_argument('--device',
+                        help='device to run the pipeline',
+                        default='gpu')
     parser.add_argument('--split', help='train or test', default='train')
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')

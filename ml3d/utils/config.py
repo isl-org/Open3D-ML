@@ -178,6 +178,12 @@ class Config(object):
             else:
                 if v is None:
                     continue
+                if v.isnumeric():
+                    v = int(v)
+                elif v == 'True' or v == 'true':
+                    v = True
+                elif v == 'False' or v == 'false':
+                    v = False
                 b[k] = v
         return b
 

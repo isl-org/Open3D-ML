@@ -34,7 +34,7 @@ class TFDataloader():
 
             self.cache_convert = Cache(self.preprocess,
                                        cache_dir=cache_dir,
-                                       cache_key=_get_hash(
+                                       cache_key=get_hash(
                                            repr(self.preprocess)[:-15]))
 
             uncached = [
@@ -78,5 +78,13 @@ class TFDataloader():
         if ('batcher' not in self.model_cfg.keys() or
                 self.model_cfg.batcher == 'DefaultBatcher'):
             loader = loader.batch(batch_size)
+            length = len(self.dataset) / batch_size + 1 if len(
+                self.dataset) % batch_size else len(self.dataset) / batch_size
 
-        return loader
+        else:
+            if self.dataset.split not in ['train', 'training']:
+                length = self.model_cfg.get('val_batch_num', 20)
+            else:
+                length = self.model_cfg.get('batch_num', 20)
+
+        return loader, int(length)
