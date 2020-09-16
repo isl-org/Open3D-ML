@@ -1,24 +1,18 @@
-dataset:
-  name: Toronto3D
+dataset: 
+  name: ParisLille3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634, 374721]
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132, 4212295, 10599237]
   ignored_label_inds:
   - 0
   num_points: 65536
   prepro_grid_size: 0.06
-  test_files:
-  - L002.ply
   test_result_folder: ./test
-  train_files:
-  - L001.ply
-  - L003.ply
-  - L004.ply
   val_files:
-  - L002.ply
-  use_cache: True
-  # steps_per_epoch_train: 1000
-  # steps_per_epoch_valid: 100
+  - Lille2.ply
+  use_cache: False
+  steps_per_epoch_train: 1000
+  steps_per_epoch_valid: 100
 model:
   name: KPFCNN
   KP_extent: 1.0
@@ -79,9 +73,9 @@ model:
   - 0
   in_features_dim: 2
   in_points_dim: 3
-  in_radius: 2
+  in_radius: 2.0
   input_threads: 10
-  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
   learning_rate: 0.01
   lr_decays: 0.98477
   min_in_points: 20000
@@ -89,7 +83,7 @@ model:
   max_val_points: 100000
   modulated: false
   n_frames: 1
-  num_classes: 8
+  num_classes: 9
   num_kernel_points: 15
   num_layers: 5
   repulse_extent: 1.2
@@ -108,7 +102,7 @@ pipeline:
   deform_lr_factor: 0.1
   weight_decay: 0.001
   main_log_dir: ./logs
-  max_epoch: 1000
+  max_epoch: 100
   save_ckpt_freq: 20
   scheduler_gamma: 0.95
   test_batch_size: 1

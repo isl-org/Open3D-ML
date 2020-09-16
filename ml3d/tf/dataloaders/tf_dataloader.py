@@ -6,7 +6,7 @@ import random
 
 import tensorflow as tf
 import numpy as np
-from ...utils import dataset_helper
+from ...utils import Cache, get_hash
 
 from ...datasets.utils import DataProcessing
 from sklearn.neighbors import KDTree
@@ -32,10 +32,10 @@ class TFDataloader():
 
             assert cache_dir is not None, 'cache directory is not given'
 
-            self.cache_convert = dataset_helper.Cache(
-                self.preprocess,
-                cache_dir=cache_dir,
-                cache_key=dataset_helper._get_hash(repr(self.preprocess)[:-15]))
+            self.cache_convert = Cache(self.preprocess,
+                                       cache_dir=cache_dir,
+                                       cache_key=_get_hash(
+                                           repr(self.preprocess)[:-15]))
 
             uncached = [
                 idx for idx in range(len(dataset)) if dataset.get_attr(idx)

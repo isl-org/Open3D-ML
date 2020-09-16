@@ -33,8 +33,10 @@ class BasePipeline(object):
         self.dataset = dataset
 
         make_dir(self.cfg.main_log_dir)
-        self.cfg.logs_dir = join(self.cfg.main_log_dir,
-                                 model.__class__.__name__ + '_tf')
+        dataset_name = dataset.name if dataset is not None else ''
+        self.cfg.logs_dir = join(
+            self.cfg.main_log_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_torch')
         make_dir(self.cfg.logs_dir)
 
         gpus = tf.config.experimental.list_physical_devices('GPU')

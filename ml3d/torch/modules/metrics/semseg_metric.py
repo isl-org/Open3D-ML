@@ -35,13 +35,18 @@ class SemSegMetric(object):
         accuracies = []
         accuracy_mask = predictions == labels
 
+        n_total = 0
+        n_correct = 0
+
         for label in range(num_classes):
             label_mask = labels == label
             per_class_accuracy = (accuracy_mask & label_mask).float().sum()
+            n_correct += per_class_accuracy
             per_class_accuracy /= label_mask.float().sum()
+            n_total += label_mask.float().sum()
             accuracies.append(per_class_accuracy.cpu().item())
         # overall accuracy
-        accuracies.append(accuracy_mask.float().mean().cpu().item())
+        accuracies.append((n_correct / n_total).cpu().item())
         #accuracies = np.array(accuracies)
         return accuracies
 
@@ -65,11 +70,16 @@ class SemSegMetric(object):
 
         ious = []
 
+        n_total = 0
+        n_correct = 0
+
         for label in range(num_classes):
             pred_mask = predictions == label
             labels_mask = labels == label
             iou = (pred_mask & labels_mask).float().sum()
+            n_correct += iou
             iou = iou / (pred_mask | labels_mask).float().sum()
+            n_total += (pred_mask | labels_mask).float().sum()
             ious.append(iou.cpu().item())
-        ious.append(np.nanmean(ious))
+        ious.append((n_correct / n_total).cpu().item())
         return ious

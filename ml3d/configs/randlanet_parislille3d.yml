@@ -10,11 +10,13 @@ dataset:
   test_result_folder: ./test
   val_files:
   - Lille2.ply
-  use_cache: False
+  use_cache: true
+  # steps_per_epoch_train: 1000
+  # steps_per_epoch_valid: 100
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: #./logs/RandLANet_torch/checkpoint/ckpt_120.pth # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 3
   dim_output:
@@ -43,15 +45,25 @@ model:
   - 4
   - 4
   - 2
+  t_augment:
+    turn_on: false
+    rotation_method: vertical
+    scale_anisotropic: false
+    symmetries: true
+    noise_level: 0.01
+    min_s: 0.5
+    max_s: 2
+  t_normalize:
+    method: linear
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
   batch_size: 1
-  learning_rate: 0.01
+  learning_rate: 0.0001
   main_log_dir: ./logs
-  max_epoch: 100
+  max_epoch: 10000
   save_ckpt_freq: 20
-  scheduler_gamma: 0.95
+  scheduler_gamma: 0.99
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1

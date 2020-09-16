@@ -15,7 +15,7 @@ from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
 from ...utils import MODEL
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import DataProcessing, create_3D_rotations
 
 
 class KPFCNN(BaseModel):
@@ -516,7 +516,12 @@ class KPFCNN(BaseModel):
         feat = data['feat']
 
         dim_points = points.shape[1]
-        dim_features = feat.shape[1] + dim_points
+        if feat is None:
+            dim_features = dim_points
+            new_coords = points
+        else:
+            dim_features = feat.shape[1] + dim_points
+            new_coords = np.hstack((points, feat))
 
         # Initiate merged points
         merged_points = np.zeros((0, dim_points), dtype=np.float32)
@@ -532,7 +537,6 @@ class KPFCNN(BaseModel):
         o_labels = None
 
         num_merged = 0
-        f_inc = 0
 
         # Apply pose (without np.dot to avoid multi-threading)
         hpoints = np.hstack((points, np.ones_like(points[:, :1])))
@@ -544,91 +548,100 @@ class KPFCNN(BaseModel):
             o_pts = new_points[:, :3].astype(np.float32)
             o_labels = sem_labels.astype(np.int32)
 
-        # In case radius smaller than 50m, chose new center on a point of the wanted class or not
-        # TODO balance
-        if self.cfg.in_radius < 50.0 and f_inc == 0:
-            wanted_ind = np.random.choice(new_points.shape[0])
-            p0 = new_points[wanted_ind, :3]
-
-        # Eliminate points further than config.in_radius
-        mask = np.sum(np.square(new_points[:, :3] - p0),
-                      axis=1) < self.cfg.in_radius**2
-        mask_inds = np.where(mask)[0].astype(np.int32)
-
-        # Shuffle points
-        rand_order = np.random.permutation(mask_inds)
-        new_points = new_points[rand_order, :3]
-        sem_labels = sem_labels[rand_order]
-
-        new_coords = np.hstack((points, feat))
-        new_coords = new_coords[rand_order, :]
-
-        # Increment merge count
-        merged_points = np.vstack((merged_points, new_points))
-        merged_labels = np.hstack((merged_labels, sem_labels))
-        merged_coords = np.vstack((merged_coords, new_coords))
-
-        # print(merged_points.shape)
-        # print(self.cfg.first_subsampling_dl)
-        in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
-            merged_points,
-            features=merged_coords,
-            labels=merged_labels,
-            grid_size=self.cfg.first_subsampling_dl)
-        # print(in_pts.shape)
-
-        # Number collected
-        n = in_pts.shape[0]
-        # Safe check
-        if n < 2:
-            print("sample n < 2!")
-            # exit()
-
-        # Randomly drop some points (augmentation process and safety for GPU memory consumption)
-        if n > self.cfg.max_in_points:
-            input_inds = np.random.choice(n,
-                                          size=self.cfg.max_in_points,
-                                          replace=False)
-            in_pts = in_pts[input_inds, :]
-            in_fts = in_fts[input_inds, :]
-            in_lbls = in_lbls[input_inds]
-            n = input_inds.shape[0]
-
-        # Before augmenting, compute reprojection inds (only for validation and test)
-        if attr['split'] in ['validation', 'test']:
-
-            # get val_points that are in range
-            radiuses = np.sum(np.square(o_pts - p0), axis=1)
-            reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
-
-            # Project predictions on the frame points
-            search_tree = KDTree(in_pts, leaf_size=50)
-            proj_inds = search_tree.query(o_pts[reproj_mask, :],
-                                          return_distance=False)
-            proj_inds = np.squeeze(proj_inds).astype(np.int32)
-        else:
-            proj_inds = np.zeros((0,))
-            reproj_mask = np.zeros((0,))
-
-        # Data augmentation
-        in_pts, scale, R = self.augmentation_transform(in_pts)
-
-        # Color augmentation
-        if np.random.rand() > self.cfg.augment_color:
-            in_fts[:, 3:] *= 0
-
         data = {
-            'p_list': in_pts,
-            'f_list': in_fts,
-            'l_list': np.squeeze(in_lbls),
-            'p0_list': p0,
-            's_list': scale,
-            'R_list': R,
-            'r_inds_list': proj_inds,
-            'r_mask_list': reproj_mask,
-            'val_labels_list': o_labels,
+            'p_list': [],
+            'f_list': [],
+            'l_list': [],
+            'p0_list': [],
+            's_list': [],
+            'R_list': [],
+            'r_inds_list': [],
+            'r_mask_list': [],
+            'val_labels_list': [],
             'cfg': self.cfg
         }
+
+        curr_num_points = 0
+        max_num_points = min(self.cfg.batch_limit, self.cfg.max_in_points)
+        min_in_points = self.cfg.get('min_in_points', 3)
+        min_in_points = min(min_in_points, self.cfg.max_in_points)
+        while curr_num_points < min_in_points:
+
+            # In case radius smaller than 50m, chose new center on a point of the wanted class or not
+            # TODO balance
+            if self.cfg.in_radius < 50.0:
+                wanted_ind = np.random.choice(new_points.shape[0])
+                p0 = new_points[wanted_ind, :3]
+
+            # Eliminate points further than config.in_radius
+            mask = np.sum(np.square(new_points[:, :3] - p0),
+                          axis=1) < self.cfg.in_radius**2
+            mask_inds = np.where(mask)[0].astype(np.int32)
+
+            # Shuffle points
+            rand_order = np.random.permutation(mask_inds)
+            curr_new_points = new_points[rand_order, :3]
+            curr_sem_labels = sem_labels[rand_order]
+            curr_new_coords = new_coords[rand_order, :]
+
+            in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
+                curr_new_points,
+                features=curr_new_coords,
+                labels=curr_sem_labels,
+                grid_size=self.cfg.first_subsampling_dl)
+            # print(in_pts.shape)
+
+            # Number collected
+            n = in_pts.shape[0]
+            # Safe check
+            if n < 2:
+                continue
+
+            # Randomly drop some points (augmentation process and safety for GPU memory consumption)
+            residual_num_points = max_num_points - curr_num_points
+            if n > residual_num_points:
+                input_inds = np.random.choice(n,
+                                              size=residual_num_points,
+                                              replace=False)
+                in_pts = in_pts[input_inds, :]
+                in_fts = in_fts[input_inds, :]
+                in_lbls = in_lbls[input_inds]
+                n = input_inds.shape[0]
+
+            curr_num_points += n
+
+            # Before augmenting, compute reprojection inds (only for validation and test)
+            if attr['split'] in ['validation', 'test']:
+                # get val_points that are in range
+                radiuses = np.sum(np.square(o_pts - p0), axis=1)
+                reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
+
+                # Project predictions on the frame points
+                search_tree = KDTree(in_pts, leaf_size=50)
+                proj_inds = search_tree.query(o_pts[reproj_mask, :],
+                                              return_distance=False)
+                proj_inds = np.squeeze(proj_inds).astype(np.int32)
+            else:
+                proj_inds = np.zeros((0,))
+                reproj_mask = np.zeros((0,))
+
+            # Data augmentation
+            in_pts, scale, R = self.augmentation_transform(in_pts)
+
+            # Color augmentation
+            if np.random.rand() > self.cfg.augment_color:
+                in_fts[:, 3:] *= 0
+
+            data['p_list'] += [in_pts]
+            data['f_list'] += [in_fts]
+            data['l_list'] += [np.squeeze(in_lbls)]
+            data['p0_list'] += [p0]
+            data['s_list'] += [scale]
+            data['R_list'] += [R]
+            data['r_inds_list'] += [proj_inds]
+            data['r_mask_list'] += [reproj_mask]
+            data['val_labels_list'] += [o_labels]
+
         return data
 
     def inference_begin(self, data):
@@ -1523,36 +1536,6 @@ from os.path import join, exists
 #       \***************/
 #
 #
-
-
-def create_3D_rotations(axis, angle):
-    """
-    Create rotation matrices from a list of axes and angles. Code from wikipedia on quaternions
-    :param axis: float32[N, 3]
-    :param angle: float32[N,]
-    :return: float32[N, 3, 3]
-    """
-
-    t1 = np.cos(angle)
-    t2 = 1 - t1
-    t3 = axis[:, 0] * axis[:, 0]
-    t6 = t2 * axis[:, 0]
-    t7 = t6 * axis[:, 1]
-    t8 = np.sin(angle)
-    t9 = t8 * axis[:, 2]
-    t11 = t6 * axis[:, 2]
-    t12 = t8 * axis[:, 1]
-    t15 = axis[:, 1] * axis[:, 1]
-    t19 = t2 * axis[:, 1] * axis[:, 2]
-    t20 = t8 * axis[:, 0]
-    t24 = axis[:, 2] * axis[:, 2]
-    R = np.stack([
-        t1 + t2 * t3, t7 - t9, t11 + t12, t7 + t9, t1 + t2 * t15, t19 - t20,
-        t11 - t12, t19 + t20, t1 + t2 * t24
-    ],
-                 axis=1)
-
-    return np.reshape(R, (-1, 3, 3))
 
 
 def spherical_Lloyd(radius,
