@@ -243,7 +243,8 @@ class SemanticSegmentation(BasePipeline):
             self.ckpt.restore(self.manager.latest_checkpoint)
 
             if self.manager.latest_checkpoint:
-                log.info("Restored from {}".format(self.manager.latest_checkpoint))
+                log.info("Restored from {}".format(
+                    self.manager.latest_checkpoint))
             else:
                 log.info("Initializing from scratch.")
 
