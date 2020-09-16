@@ -75,7 +75,6 @@ def main():
             except RuntimeError as e:
                 print(e)
 
-
     if args.cfg_file is not None:
         cfg = Config.load_from_file(args.cfg_file)
 
