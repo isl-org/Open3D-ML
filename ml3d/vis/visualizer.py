@@ -94,8 +94,8 @@ class Model:
                     attr = tcloud.point[attr_name].as_tensor().numpy()
                     if len(attr.shape) > 1:
                         attr = attr[:,0]
-                    attr_min = min(attr_min, min(attr))
-                    attr_max = max(attr_max, max(attr))
+                    attr_min = min(attr_min, attr.min())
+                    attr_max = max(attr_max, attr.max())
                     maxattr = max(attr)
             if attr_min <= attr_max:
                 self._attr2minmax[attr_name] = (attr_min, attr_max)
