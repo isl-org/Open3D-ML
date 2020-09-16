@@ -38,10 +38,12 @@ class SemanticSegmentation(BasePipeline):
             save_ckpt_freq=20,
             adam_lr=1e-2,
             scheduler_gamma=0.95,
+            momentum=0.98,
             main_log_dir='./logs/',
             device='gpu',
             split='train',
-            train_sum_dir='train_log'):
+            train_sum_dir='train_log',
+            **kwargs):
 
         super().__init__(model=model,
                          dataset=dataset,
@@ -55,10 +57,12 @@ class SemanticSegmentation(BasePipeline):
                          save_ckpt_freq=save_ckpt_freq,
                          adam_lr=adam_lr,
                          scheduler_gamma=scheduler_gamma,
+                         momentum=momentum,
                          main_log_dir=main_log_dir,
                          device=device,
                          split=split,
-                         train_sum_dir=train_sum_dir)
+                         train_sum_dir=train_sum_dir,
+                         **kwargs)
 
     def run_inference(self, data):
         cfg = self.cfg
@@ -234,18 +238,14 @@ class SemanticSegmentation(BasePipeline):
 
         if ckpt_path:
             self.ckpt.restore(ckpt_path)
-            print("Restored from {}".format(ckpt_path))
+            log.info("Restored from {}".format(ckpt_path))
         else:
             self.ckpt.restore(self.manager.latest_checkpoint)
 
             if self.manager.latest_checkpoint:
-                print("Restored from {}".format(self.manager.latest_checkpoint))
+                log.info("Restored from {}".format(self.manager.latest_checkpoint))
             else:
-                print("Initializing from scratch.")
-
-        #if exists(self.model.cfg.ckpt_path):
-        #    self.model.load_weights(self.model.cfg.ckpt_path)
-        #    log.info("Loading checkpoint {}".format(self.model.cfg.ckpt_path))
+                log.info("Initializing from scratch.")
 
     def save_ckpt(self, epoch):
         save_path = self.manager.save()

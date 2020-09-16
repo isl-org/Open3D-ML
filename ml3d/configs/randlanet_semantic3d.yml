@@ -35,7 +35,6 @@ model:
   - 1024
   - 256
   - 128
-  sub_grid_size: 0.06
   sub_sampling_ratio:
   - 4
   - 4

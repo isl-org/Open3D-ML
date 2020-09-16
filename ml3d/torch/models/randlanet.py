@@ -28,7 +28,6 @@ class RandLANet(BaseModel):
             num_points=4096 * 11,  # Number of input points
             num_classes=19,  # Number of valid classes
             ignored_label_inds=[0],
-            sub_grid_size=0.06,  # preprocess_parameter
             sub_sampling_ratio=[4, 4, 4, 4],
             num_sub_points=[
                 4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
@@ -48,7 +47,6 @@ class RandLANet(BaseModel):
                          num_points=num_points,
                          num_classes=num_classes,
                          ignored_label_inds=ignored_label_inds,
-                         sub_grid_size=sub_grid_size,
                          sub_sampling_ratio=sub_sampling_ratio,
                          num_sub_points=num_sub_points,
                          dim_input=dim_input,

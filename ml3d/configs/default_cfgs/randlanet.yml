@@ -9,8 +9,7 @@ dim_output:
 - 128
 - 256
 grid_size: 0.06
-ignored_label_inds:
-- 0
+ignored_label_inds: []
 k_n: 16
 num_classes: 19
 num_layers: 4
@@ -20,7 +19,6 @@ num_sub_points:
 - 2816
 - 704
 - 176
-sub_grid_size: 0.06
 sub_sampling_ratio:
 - 4
 - 4
