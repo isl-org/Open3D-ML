@@ -550,15 +550,23 @@ class Visualizer:
         # Dataset
         model = gui.CollapsableVert("Dataset", 0, indented_margins)
 
+        vgrid = gui.VGrid(2, 0.25 * em)
+        model.add_child(vgrid)
+        model.add_fixed(0.5 * em)
+
         bgcolor = gui.ColorEdit()
         bgcolor.color_value = gui.Color(1, 1, 1)
         self._on_bgcolor_changed(bgcolor.color_value)
         bgcolor.set_on_value_changed(self._on_bgcolor_changed)
-        h = gui.Horiz(em)
-        h.add_child(gui.Label("BG Color"))
-        h.add_child(bgcolor)
-        model.add_child(h)
-        model.add_fixed(0.5 * em)
+        vgrid.add_child(gui.Label("BG Color"))
+        vgrid.add_child(bgcolor)
+
+        downsample_threshold = gui.Slider(gui.Slider.INT)
+        downsample_threshold.int_value = self._3d.scene.downsample_threshold
+        downsample_threshold.set_limits(1000000, 12000000)
+        downsample_threshold.set_on_value_changed(self._on_downsample_changed)
+        vgrid.add_child(gui.Label("Downsample threshold"))
+        vgrid.add_child(downsample_threshold)
 
         view_tab = gui.TabControl()
         view_tab.set_on_selected_tab_changed(self._on_display_tab_changed)
@@ -932,6 +940,10 @@ class Visualizer:
         self._panel.frame = panel_rect
         self._3d.frame = gui.Rect(frame.x, frame.y,
                                   panel_rect.x - frame.x, frame.height - frame.y)
+
+    def _on_downsample_changed(self, value):
+        self._3d.scene.downsample_threshold = int(value)
+        self._update_geometry()
 
     def _on_display_tab_changed(self, index):
         if index == 1:
