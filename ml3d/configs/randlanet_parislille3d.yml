@@ -44,8 +44,9 @@ model:
   - 4
   - 4
   - 2
+  weight_decay: 0.1
   t_augment:
-    turn_on: false
+    turn_on: true
     rotation_method: vertical
     scale_anisotropic: false
     symmetries: true

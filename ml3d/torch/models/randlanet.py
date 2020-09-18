@@ -41,6 +41,7 @@ class RandLANet(BaseModel):
             grid_size=0.06,
             batcher='DefaultBatcher',
             ckpt_path=None,
+            weight_decay=0.0,
             **kwargs):
 
         super().__init__(name=name,
@@ -57,6 +58,7 @@ class RandLANet(BaseModel):
                          grid_size=grid_size,
                          batcher=batcher,
                          ckpt_path=ckpt_path,
+                         weight_decay=weight_decay,
                          **kwargs)
         cfg = self.cfg
 
@@ -133,7 +135,11 @@ class RandLANet(BaseModel):
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        optimizer = torch.optim.Adam(
+            self.parameters(), 
+            lr=cfg_pipeline.adam_lr, 
+            weight_decay=self.cfg.weight_decay
+            )
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
@@ -158,9 +164,9 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point']
-        label = data['label']
-        feat = data['feat']
+        pc = data['point'].copy()
+        label = data['label'].copy()
+        feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
         t_normalize = cfg.get('t_normalize', None)
@@ -171,22 +177,28 @@ class RandLANet(BaseModel):
         else:
             pick_idx = min_posbility_idx
 
-
         selected_pc, feat, label, selected_idx = \
             trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
-        t_augment = cfg.get('t_augment', None)
-        pc = trans_augment(pc, t_augment)
 
         if min_posbility_idx is not None:
-            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+            picked_pc = pc[pick_idx]
+            dists = np.sum(
+                np.square((selected_pc).astype(np.float32)), 
+                axis=1
+            )
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
         pc = selected_pc
 
+        t_augment = cfg.get('t_augment', None)
+        pc = trans_augment(pc, t_augment)
+
+
+
         if feat is None:
-            feat = selected_pc.copy()
+            feat = pc.copy()
         else:
             feat = np.concatenate([selected_pc, feat], axis=1)
 

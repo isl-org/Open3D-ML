@@ -211,7 +211,7 @@ class SemanticSegmentation(BasePipeline):
             self.scheduler.step()
 
             # --------------------- validation
-            model.eval()
+            # model.eval()
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
