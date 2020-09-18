@@ -244,6 +244,7 @@ class RandLANet(BaseModel):
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
+        print(np.min(self.possibility))
         data = self.transform(self.inference_data, {}, min_posbility_idx)
         inputs = {'data': data, 'attr': []}
         inputs = self.batcher.collate_fn([inputs])

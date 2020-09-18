@@ -113,9 +113,8 @@ class Toronto3D(BaseDataset):
     def is_tested(self, attr):
         cfg = self.cfg
         name = attr['name']
-        test_path = join(cfg.test_result_folder, 'predictions')
-        # test_file_name = name_points
-        store_path = join(test_path, name + '.label')
+        path = cfg.test_result_folder
+        store_path = join(path, name + '.npy')
         if exists(store_path):
             return True
         else:

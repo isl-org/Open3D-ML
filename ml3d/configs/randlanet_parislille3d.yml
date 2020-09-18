@@ -53,8 +53,6 @@ model:
     noise_level: 0.01
     min_s: 0.5
     max_s: 2
-  t_normalize:
-    method: linear
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
