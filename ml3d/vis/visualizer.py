@@ -52,18 +52,21 @@ class Model:
         else:
             tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
 
-        # Add scalar attributes
+        # Add scalar attributes and vector3 attributes
         for k,v in data.items():
             attr = self._convert_to_numpy(v)
             if attr is None:
                 continue
+            attr_name = k
+            if attr_name == "point" or attr_name == "points":
+                continue
             
-            if len(attr.shape) == 1 or (len(attr.shape) == 2 and attr.shape[1] == 1):
-                attr_name = k
-                if attr_name == "label":
-                    attr_name = "labels"
-                elif attr_name == "feat":
-                    attr_name = "feature"
+            if attr_name == "label":
+                attr_name = "labels"
+            elif attr_name == "feat":
+                attr_name = "feature"
+
+            if len(attr.shape) == 1 or (len(attr.shape) == 2 and attr.shape[1] == 1) or (len(attr.shape) == 2 and attr.shape[1] == 3):
                 tcloud.point[attr_name] = Visualizer._make_tcloud_array(attr)
                 known_attrs.add(attr_name)
 
@@ -84,6 +87,13 @@ class Model:
         #     attr = ary.to_numpy()
         else:
             return None
+
+    def get_attr_shape(self, name, attr_name):
+        if name in self.data:
+            tcloud = self.data[name]
+            if attr_name in tcloud.point:
+                return tcloud.point[attr_name].as_tensor().numpy().shape
+        return []
 
     def get_attr_minmax(self, attr_name):
         if attr_name not in self._attr2minmax:
@@ -146,6 +156,8 @@ class DatasetModel(Model):
 
         self._dataset = dataset.get_split(split)
         if len(self._dataset) > 0:
+            if indices is None:
+                indices = range(0, len(self._dataset))
             # Some results from get_split() (like "training") are randomized.
             # Sort, so that the same index always returns the same piece of data.
             path2idx = {}
@@ -175,26 +187,6 @@ class DatasetModel(Model):
         data = self._dataset.get_data(idx)
         data["name"] = name
         data["points"] = data["point"]
-
-        # ---- Debugging ----
-        # data["distance"] = [math.sqrt(pt[0]*pt[0]+pt[1]*pt[1]+pt[2]*pt[2])
-        #                      for pt in data["point"]]
-        # ----
-
-        # Dataset-specific handling
-#        if self._dataset.dataset.__class__.__name__ == "Toronto3D":
-#            if "feat" in data:
-#                attr_name = "feature (RGB)"
-#                colors = data["feat"]
-#                assert(len(colors) == len(pts))
-#                colors = [[float(c[0]) / 255.0, float(c[1]) / 255.0, float(c[2]) / 255.0] for c in colors]
-#                colors = np.array(colors, dtype='float32')
-#                tcloud.point[attr_name] = Visualizer._make_tcloud_array(colors)
-#                known_attrs.add(attr_name)
-
-#        # Make the white array once
-#        white = np.array([[1.0, 1.0, 1.0]] * len(pts), dtype='float32')
-#        tcloud.point["white"] = Visualizer._make_tcloud_array(white)
 
         self.create_point_cloud(data)
 
@@ -481,7 +473,7 @@ class Visualizer:
     LABELS_NAME = "Labels"
     RAINBOW_NAME = "Colormap (Rainbow)"
     GREYSCALE_NAME = "Colormap (Greyscale)"
-    COLOR_NAME = "RGB (float)"
+    COLOR_NAME = "RGB"
 
     X_ATTR_NAME = "x position"
     Y_ATTR_NAME = "y position"
@@ -620,7 +612,7 @@ class Visualizer:
         self._shader.add_item(self.LABELS_NAME)
         self._shader.add_item(self.RAINBOW_NAME)
         self._shader.add_item(self.GREYSCALE_NAME)
-#        self._shader.add_item(self.COLOR_NAME)
+        self._shader.add_item(self.COLOR_NAME)
         self._colormaps[self.RAINBOW_NAME] = Colormap.make_rainbow()
         self._colormaps[self.GREYSCALE_NAME] = Colormap.make_greyscale()
         self._shader.selected_index = 0
@@ -632,11 +624,13 @@ class Visualizer:
 
         # ... shader panels
         self._shader_panels = gui.StackedWidget()
+        panel_idx = 0
 
         #     ... sub-panel: single color
         self._color_panel = gui.Vert()
         self._shader_panels.add_child(self._color_panel)
-        self._shadername2panelidx[self.SOLID_NAME] = len(self._shadername2panelidx)
+        self._shadername2panelidx[self.SOLID_NAME] = panel_idx
+        panel_idx += 1
         self._color = gui.ColorEdit()
         self._color.color_value = gui.Color(0.5, 0.5, 0.5)
         self._color.set_on_value_changed(self._on_shader_color_changed)
@@ -648,7 +642,8 @@ class Visualizer:
         #     ... sub-panel: labels
         self._labels_panel = gui.Vert()
         self._shader_panels.add_child(self._labels_panel)
-        self._shadername2panelidx[self.LABELS_NAME] = len(self._shadername2panelidx)
+        self._shadername2panelidx[self.LABELS_NAME] = panel_idx
+        panel_idx += 1
         self._label_edit = self.LabelLUTEdit()
         self._label_edit.set_on_changed(self._on_labels_changed)
         self._labels_panel.add_child(gui.Label("Labels"))
@@ -657,8 +652,9 @@ class Visualizer:
         #     ... sub-panel: colormap
         self._colormap_panel = gui.Vert()
         self._shader_panels.add_child(self._colormap_panel)
-        self._shadername2panelidx[self.RAINBOW_NAME] = len(self._shadername2panelidx)
-        self._shadername2panelidx[self.GREYSCALE_NAME] = self._shadername2panelidx[self.RAINBOW_NAME]
+        self._shadername2panelidx[self.RAINBOW_NAME] = panel_idx
+        self._shadername2panelidx[self.GREYSCALE_NAME] = panel_idx
+        panel_idx += 1
         self._colormap_edit = self.ColormapEdit(self.window, em)
         self._colormap_edit.set_on_changed(self._on_colormap_changed)
         self._colormap_panel.add_child(self._colormap_edit.widget)
@@ -666,7 +662,16 @@ class Visualizer:
         #     ... sub-panel: RGB
         self._rgb_panel = gui.Vert()
         self._shader_panels.add_child(self._rgb_panel)
-#        self._shadername2panelidx[self.COLORS_NAME] = len(self._shadername2panelidx)
+        self._shadername2panelidx[self.COLOR_NAME] = panel_idx
+        panel_idx += 1
+        self._rgb_combo = gui.Combobox()
+        self._rgb_combo.add_item("255")
+        self._rgb_combo.add_item("1.0")
+        self._rgb_combo.set_on_selection_changed(self._on_rgb_multiplier)
+        h = gui.Horiz(0.5 * em)
+        h.add_child(gui.Label("Max value"))
+        h.add_child(self._rgb_combo)
+        self._rgb_panel.add_child(h)
 
         properties.add_fixed(em)
         properties.add_child(self._shader_panels)
@@ -808,12 +813,13 @@ class Visualizer:
         flag |= rendering.Scene.UPDATE_UV0_FLAG
 
         # Update RGB values
-#        if attr is not None:
-#            if len(attr.shape) == 2 and attr.shape[1] == 3:
-#                tcloud.point["colors"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(attr), inplace=True)
-#            else:
-#                tcloud.point["colors"] = tcloud.point["white"]
-#        flag |= rendering.Scene.UPDATE_COLORS_FLAG
+        if attr is not None and (len(attr.shape) == 2 and attr.shape[1] == 3):
+            max_val = float(self._rgb_combo.selected_text)
+            if max_val <= 0:
+                max_val = 255.0
+            colors = attr * (1.0 / max_val)
+            tcloud.point["colors"] = Visualizer._make_tcloud_array(colors)
+            flag |= rendering.Scene.UPDATE_COLORS_FLAG
 
         # Update geometry
         if self._3d.scene.scene.has_geometry(name):
@@ -829,7 +835,7 @@ class Visualizer:
         self._update_gradient()
         material = rendering.Material()
         if self._shader.selected_text == self.SOLID_NAME:
-            material.shader = "defaultUnlit"
+            material.shader = "unlitSolidColor"
             c = self._color.color_value
             material.base_color = [c.red, c.green, c.blue, 1.0]
         elif self._shader.selected_text == self.COLOR_NAME:
@@ -904,9 +910,12 @@ class Visualizer:
             self._shader.add_item(self.LABELS_NAME)
             self._label_edit.set_labels(self._attrname2lut[current_attr])
         
-#        self._shader.add_item(self.COLOR_NAME)
         self._shader.add_item(self.RAINBOW_NAME)
         self._shader.add_item(self.GREYSCALE_NAME)
+
+        selected_names = self._get_selected_names()
+        if len(selected_names) > 0 and len(self._objects.get_attr_shape(selected_names[0], current_attr)) > 1:
+            self._shader.add_item(self.COLOR_NAME)
 
         if current_shader == self.LABELS_NAME and has_lut:
             self._set_shader(self.LABELS_NAME)
@@ -1019,11 +1028,18 @@ class Visualizer:
         self._colormaps[self._shader.selected_text] = self._colormap_edit.colormap
         self._update_geometry_colors()
 
-    def _get_available_attrs(self):
+    def _on_rgb_multiplier(self, text, idx):
+        self._update_geometry()
+
+    def _get_selected_names(self):
         selected_names = []
         for n,node in self._name2treenode.items():
             if node.checkbox.checked:
                 selected_names.append(n)
+        return selected_names
+
+    def _get_available_attrs(self):
+        selected_names = self._get_selected_names()
         return self._objects.get_available_attrs(selected_names)
 
     @staticmethod
