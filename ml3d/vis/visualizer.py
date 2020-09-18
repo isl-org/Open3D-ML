@@ -527,12 +527,15 @@ class Visualizer:
         ctrl = gui.CollapsableVert("Mouse Controls", 0, indented_margins)
 
         arcball = gui.Button("Arcball")
+        arcball.set_on_clicked(self._on_arcball_mode)
         arcball.horizontal_padding_em = 0.5
         arcball.vertical_padding_em = 0
         fly = gui.Button("Fly")
+        fly.set_on_clicked(self._on_fly_mode)
         fly.horizontal_padding_em = 0.5
         fly.vertical_padding_em = 0
         reset = gui.Button("Reset")
+        reset.set_on_clicked(self._on_reset_camera)
         reset.horizontal_padding_em = 0.5
         reset.vertical_padding_em = 0
         h = gui.Horiz(0.25 * em)
@@ -933,6 +936,16 @@ class Visualizer:
         self._panel.frame = panel_rect
         self._3d.frame = gui.Rect(frame.x, frame.y,
                                   panel_rect.x - frame.x, frame.height - frame.y)
+
+    def _on_arcball_mode(self):
+        self._3d.set_view_controls(gui.SceneWidget.ROTATE_CAMERA)
+
+    def _on_fly_mode(self):
+        self._3d.set_view_controls(gui.SceneWidget.FLY)
+
+    def _on_reset_camera(self):
+        bounds = self._3d.scene.bounding_box
+        self._3d.setup_camera(60, bounds, bounds.get_center())
 
     def _on_display_tab_changed(self, index):
         if index == 1:
