@@ -8,6 +8,6 @@ if [ "$#" -ne 1 ]; then
     exit 1
 fi
 
-cd ../Open3D-ML
+cd ../..
 python scripts/semseg.py $1 -c ml3d/configs/randlanet_toronto3d.yml \
 --dataset_path /export/share/Datasets/Toronto3D

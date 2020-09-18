@@ -75,17 +75,20 @@ class SemanticKittiCustomBatch:
             stacked_features = np.hstack((stacked_features, features[:, 2:3]))
         elif self.cfg.in_features_dim == 3:
             # Use height + reflectance
-            stacked_features = np.hstack((stacked_features, features[:, 2:]))
+            assert features.shape[1] > 3, "feat from dataset can not be None \
+                        or try to set in_features_dim = 1, 2, 4"
+            stacked_features = np.hstack((stacked_features, features[:, 2:4]))
         elif self.cfg.in_features_dim == 4:
             # Use all coordinates
             stacked_features = np.hstack((stacked_features, features[:3]))
-        elif self.cfg.in_features_dim == 5:
+        elif self.cfg.in_features_dim >= 5:
+            assert features.shape[1] > 3, "feat from dataset can not be None \
+                        or try to set in_features_dim = 1, 2, 4"
             # Use all coordinates + reflectance
             stacked_features = np.hstack((stacked_features, features))
         else:
-            raise ValueError(
-                'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
-            )
+            raise ValueError('in_features_dim should be >= 0')
+       
 
         #######################
         # Create network inputs
@@ -330,6 +333,7 @@ class SemanticKittiCustomBatch:
         ###############
         # Return inputs
         ###############
+
 
         # list of network inputs
         li = input_points + input_neighbors + input_pools + input_upsamples + input_stack_lengths
