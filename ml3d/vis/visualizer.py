@@ -1053,6 +1053,8 @@ class Visualizer:
         gui.Application.instance.initialize()
         self._init_user_interface(title, width, height)
 
+        self._3d.scene.downsample_threshold = 400000
+
         # Turn all the objects off except the first one
         for name,node in self._name2treenode.items():
             node.checkbox.checked = False
