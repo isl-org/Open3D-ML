@@ -41,7 +41,7 @@ class Semantic3D(BaseDataset):
             ignored_label_inds=[0],
             val_split=1,
             test_result_folder='./test',
-            pc_size_limit=500,  # In mega bytes.
+            pc_size_limit=2000,  # In mega bytes.
             big_pc_path='./logs/Semantic3D/',
             **kwargs):
         """
@@ -230,13 +230,7 @@ class Semantic3DSplit():
                                  dtype=np.int32).values
             labels = np.array(labels, dtype=np.int32).reshape((-1,))
 
-            points = pc[:, 0:3]
-            axis_range = []
-            for i in range(2):
-                min_i = np.min(points[:, i])
-                max_i = np.max(points[:, i])
-                axis_range.append(max_i - min_i)
-            axis = np.argmax(axis_range)
+            axis = 1 # Longest axis.
 
             inds = pc[:, axis].argsort()
             pc = pc[inds]
