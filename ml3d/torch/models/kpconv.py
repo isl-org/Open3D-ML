@@ -487,7 +487,6 @@ class KPFCNN(BaseModel):
         merged_labels = np.zeros((0,), dtype=np.int32)
         merged_coords = np.zeros((0, dim_features), dtype=np.float32)
 
-
         # Get center of the first frame in world coordinates
         p_origin = np.zeros((1, 4))
         p_origin[0, 3] = 1
@@ -1110,7 +1109,7 @@ class KPConv(nn.Module):
 
         elif self.aggregation_mode != 'sum':
             raise ValueError(
-                "Unknown convolution mode. Should be 'closest' or 'sum'")   
+                "Unknown convolution mode. Should be 'closest' or 'sum'")
 
         # Add a zero feature for shadow neighbors
         x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
@@ -1128,7 +1127,6 @@ class KPConv(nn.Module):
 
         # Apply network weights [n_kpoints, n_points, out_fdim]
         weighted_features = weighted_features.permute((1, 0, 2))
-
 
         kernel_outputs = torch.matmul(weighted_features, self.weights)
 
