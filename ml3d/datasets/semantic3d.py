@@ -26,23 +26,24 @@ class Semantic3D(BaseDataset):
     SemanticKITTI dataset, used in visualizer, training, or test
     """
 
-    def __init__(self,
-                 dataset_path,
-                 name='Semantic3D',
-                 cache_dir='./logs/cache',
-                 use_cache=False,
-                 num_points=65536,
-                 prepro_grid_size=0.06,
-                 class_weights=[
-                     5181602, 5012952, 6830086, 1311528, 10476365, 946982,
-                     334860, 269353
-                 ],
-                 ignored_label_inds=[0],
-                 val_split=1,
-                 test_result_folder='./test',
-                 pc_size_limit=500, # In mega bytes.
-                 big_pc_path='./logs/Semantic3D/',
-                 **kwargs):
+    def __init__(
+            self,
+            dataset_path,
+            name='Semantic3D',
+            cache_dir='./logs/cache',
+            use_cache=False,
+            num_points=65536,
+            prepro_grid_size=0.06,
+            class_weights=[
+                5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860,
+                269353
+            ],
+            ignored_label_inds=[0],
+            val_split=1,
+            test_result_folder='./test',
+            pc_size_limit=500,  # In mega bytes.
+            big_pc_path='./logs/Semantic3D/',
+            **kwargs):
         """
         Initialize
         Args:
@@ -114,11 +115,13 @@ class Semantic3D(BaseDataset):
             if size <= cfg.pc_size_limit:
                 train_files_parts.append(f)
                 continue
-            parts = int(size/cfg.pc_size_limit) + 1
+            parts = int(size / cfg.pc_size_limit) + 1
             train_big_files[f] = parts
             name = Path(f).name
             for i in range(parts):
-                train_files_parts.append(cfg.big_pc_path + name.replace('.txt', '_part_{}.txt'.format(i)))
+                train_files_parts.append(
+                    cfg.big_pc_path +
+                    name.replace('.txt', '_part_{}.txt'.format(i)))
 
         self.train_files = train_files_parts
         self.train_big_files = train_big_files
@@ -130,11 +133,13 @@ class Semantic3D(BaseDataset):
             if size <= cfg.pc_size_limit:
                 val_files_parts.append(f)
                 continue
-            parts = int(size/cfg.pc_size_limit) + 1
+            parts = int(size / cfg.pc_size_limit) + 1
             val_big_files[f] = parts
             name = Path(f).name
             for i in range(parts):
-                val_files_parts.append(cfg.big_pc_path + name.replace('.txt', '_part_{}.txt'.format(i)))
+                val_files_parts.append(
+                    cfg.big_pc_path +
+                    name.replace('.txt', '_part_{}.txt'.format(i)))
 
         self.val_files = val_files_parts
         self.val_big_files = val_big_files
@@ -204,23 +209,25 @@ class Semantic3DSplit():
         for key, parts in tqdm(big_pc_list.items()):
             flag_exists = 1
             for i in range(parts):
-                name = join(cfg.big_pc_path, Path(key).name.replace('.txt', '_part_{}.txt'.format(i)))
+                name = join(
+                    cfg.big_pc_path,
+                    Path(key).name.replace('.txt', '_part_{}.txt'.format(i)))
                 if not exists(name):
                     flag_exists = 0
                     break
-            if(flag_exists):
+            if (flag_exists):
                 continue
 
             log.info("Splitting {} into {} parts".format(Path(key).name, parts))
             pc = pd.read_csv(key,
-                            header=None,
-                            delim_whitespace=True,
-                            dtype=np.float32).values
+                             header=None,
+                             delim_whitespace=True,
+                             dtype=np.float32).values
 
             labels = pd.read_csv(key.replace(".txt", ".labels"),
-                                header=None,
-                                delim_whitespace=True,
-                                dtype=np.int32).values
+                                 header=None,
+                                 delim_whitespace=True,
+                                 dtype=np.int32).values
             labels = np.array(labels, dtype=np.int32).reshape((-1,))
 
             points = pc[:, 0:3]
@@ -237,7 +244,9 @@ class Semantic3DSplit():
             pcs = np.array_split(pc, parts)
             lbls = np.array_split(labels, parts)
             for i in range(parts):
-                name = join(cfg.big_pc_path, Path(key).name.replace('.txt', '_part_{}.txt'.format(i)))
+                name = join(
+                    cfg.big_pc_path,
+                    Path(key).name.replace('.txt', '_part_{}.txt'.format(i)))
                 name_lbl = name.replace('.txt', '.labels')
 
                 shuf = np.arange(pcs[i].shape[0])
@@ -272,7 +281,12 @@ class Semantic3DSplit():
         else:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
 
-        data = {'point': points, 'feat': feat, 'intensity': intensity, 'label': labels}
+        data = {
+            'point': points,
+            'feat': feat,
+            'intensity': intensity,
+            'label': labels
+        }
 
         return data
 
