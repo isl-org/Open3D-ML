@@ -230,7 +230,7 @@ class Semantic3DSplit():
                                  dtype=np.int32).values
             labels = np.array(labels, dtype=np.int32).reshape((-1,))
 
-            axis = 1 # Longest axis.
+            axis = 1  # Longest axis.
 
             inds = pc[:, axis].argsort()
             pc = pc[inds]
