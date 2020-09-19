@@ -41,8 +41,6 @@ class Semantic3D(BaseDataset):
             ignored_label_inds=[0],
             val_split=1,
             test_result_folder='./test',
-            pc_size_limit=2000,  # In mega bytes.
-            big_pc_path='./logs/Semantic3D/',
             **kwargs):
         """
         Initialize
@@ -62,8 +60,6 @@ class Semantic3D(BaseDataset):
                          ignored_label_inds=ignored_label_inds,
                          val_split=val_split,
                          test_result_folder=test_result_folder,
-                         pc_size_limit=pc_size_limit,
-                         big_pc_path=big_pc_path,
                          **kwargs)
 
         cfg = self.cfg
@@ -108,42 +104,6 @@ class Semantic3D(BaseDataset):
         self.train_files = np.sort(
             [f for f in self.train_files if f not in self.val_files])
 
-        train_big_files = {}
-        train_files_parts = []
-        for f in self.train_files:
-            size = Path(f).stat().st_size / 1e6
-            if size <= cfg.pc_size_limit:
-                train_files_parts.append(f)
-                continue
-            parts = int(size / cfg.pc_size_limit) + 1
-            train_big_files[f] = parts
-            name = Path(f).name
-            for i in range(parts):
-                train_files_parts.append(
-                    cfg.big_pc_path +
-                    name.replace('.txt', '_part_{}.txt'.format(i)))
-
-        self.train_files = train_files_parts
-        self.train_big_files = train_big_files
-
-        val_files_parts = []
-        val_big_files = {}
-        for f in self.val_files:
-            size = Path(f).stat().st_size / 1e6
-            if size <= cfg.pc_size_limit:
-                val_files_parts.append(f)
-                continue
-            parts = int(size / cfg.pc_size_limit) + 1
-            val_big_files[f] = parts
-            name = Path(f).name
-            for i in range(parts):
-                val_files_parts.append(
-                    cfg.big_pc_path +
-                    name.replace('.txt', '_part_{}.txt'.format(i)))
-
-        self.val_files = val_files_parts
-        self.val_big_files = val_big_files
-
     def get_split(self, split):
         return Semantic3DSplit(self, split=split)
 
@@ -158,16 +118,6 @@ class Semantic3D(BaseDataset):
             files = self.val_files + self.train_files + self.test_files
         else:
             raise ValueError("Invalid split {}".format(split))
-
-        return files
-
-    def get_big_pc_list(self, split):
-        if split in ['train', 'training']:
-            files = self.train_big_files
-        elif split in ['val', 'validation']:
-            files = self.val_big_files
-        else:
-            files = []
 
         return files
 
@@ -195,59 +145,8 @@ class Semantic3DSplit():
         self.split = split
         self.dataset = dataset
 
-        big_pc_list = dataset.get_big_pc_list(split)
-        if len(big_pc_list):
-            make_dir(self.cfg.big_pc_path)
-            self.split_big_pc(big_pc_list)
-
     def __len__(self):
         return len(self.path_list)
-
-    def split_big_pc(self, big_pc_list):
-        cfg = self.cfg
-        log.info("Splitting large point clouds.")
-        for key, parts in tqdm(big_pc_list.items()):
-            flag_exists = 1
-            for i in range(parts):
-                name = join(
-                    cfg.big_pc_path,
-                    Path(key).name.replace('.txt', '_part_{}.txt'.format(i)))
-                if not exists(name):
-                    flag_exists = 0
-                    break
-            if (flag_exists):
-                continue
-
-            log.info("Splitting {} into {} parts".format(Path(key).name, parts))
-            pc = pd.read_csv(key,
-                             header=None,
-                             delim_whitespace=True,
-                             dtype=np.float32).values
-
-            labels = pd.read_csv(key.replace(".txt", ".labels"),
-                                 header=None,
-                                 delim_whitespace=True,
-                                 dtype=np.int32).values
-            labels = np.array(labels, dtype=np.int32).reshape((-1,))
-
-            axis = 1  # Longest axis.
-
-            inds = pc[:, axis].argsort()
-            pc = pc[inds]
-            labels = labels[inds]
-            pcs = np.array_split(pc, parts)
-            lbls = np.array_split(labels, parts)
-            for i in range(parts):
-                name = join(
-                    cfg.big_pc_path,
-                    Path(key).name.replace('.txt', '_part_{}.txt'.format(i)))
-                name_lbl = name.replace('.txt', '.labels')
-
-                shuf = np.arange(pcs[i].shape[0])
-                np.random.shuffle(shuf)
-
-                np.savetxt(name, pcs[i][shuf])
-                np.savetxt(name_lbl, lbls[i][shuf])
 
     def get_data(self, idx):
         pc_path = self.path_list[idx]

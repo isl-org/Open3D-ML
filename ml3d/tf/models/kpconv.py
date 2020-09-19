@@ -1,5 +1,4 @@
 from os import makedirs
-from os.path import exists
 import time
 import tensorflow as tf
 import numpy as np
