@@ -1,978 +1,0 @@
-INFO - 2020-09-16 22:15:42,463 - semantic_segmentation - DEVICE : cuda
-INFO - 2020-09-16 22:15:42,464 - semantic_segmentation - Logging in file : ./logs/RandLANet_ParisLille3D_torch/log_train_2020-09-16_22:15:42.txt
-INFO - 2020-09-16 22:15:42,466 - parislille3d - Found 3 pointclouds for training
-INFO - 2020-09-16 22:15:42,468 - parislille3d - Found 1 pointclouds for validation
-INFO - 2020-09-16 22:15:42,469 - semantic_segmentation - No checkpoint
-2020-09-16 22:15:42.608815: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
-INFO - 2020-09-16 22:15:44,057 - semantic_segmentation - Started training
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:05,  2.98s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.69s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.43s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.27s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.29s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.29s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:15:52,215 - semantic_segmentation - loss train: 2.369  eval: 2.210
-INFO - 2020-09-16 22:15:52,215 - semantic_segmentation - acc train: 0.119  eval: 0.000
-INFO - 2020-09-16 22:15:52,215 - semantic_segmentation - iou train: 0.064  eval: 0.000
-INFO - 2020-09-16 22:15:52,578 - semantic_segmentation - Epoch   0: save ckpt to ./logs/RandLANet_ParisLille3D_torch/checkpoint
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.19s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.06s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:15:59,571 - semantic_segmentation - loss train: 1.841  eval: 2.676
-INFO - 2020-09-16 22:15:59,573 - semantic_segmentation - acc train: 0.394  eval: 0.178
-INFO - 2020-09-16 22:15:59,573 - semantic_segmentation - iou train: 0.246  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.25s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.13s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.01s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:06,611 - semantic_segmentation - loss train: 1.490  eval: 2.573
-INFO - 2020-09-16 22:16:06,613 - semantic_segmentation - acc train: 0.604  eval: 0.178
-INFO - 2020-09-16 22:16:06,613 - semantic_segmentation - iou train: 0.437  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.89s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  2.00s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:13,734 - semantic_segmentation - loss train: 1.269  eval: 2.202
-INFO - 2020-09-16 22:16:13,736 - semantic_segmentation - acc train: 0.685  eval: 0.178
-INFO - 2020-09-16 22:16:13,736 - semantic_segmentation - iou train: 0.531  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.86s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:20,955 - semantic_segmentation - loss train: 1.114  eval: 2.222
-INFO - 2020-09-16 22:16:20,958 - semantic_segmentation - acc train: 0.748  eval: 0.696
-INFO - 2020-09-16 22:16:20,958 - semantic_segmentation - iou train: 0.605  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.88s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.83s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:27,925 - semantic_segmentation - loss train: 1.028  eval: 2.230
-INFO - 2020-09-16 22:16:27,927 - semantic_segmentation - acc train: 0.771  eval: 0.696
-INFO - 2020-09-16 22:16:27,928 - semantic_segmentation - iou train: 0.632  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.75s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.76s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:34,844 - semantic_segmentation - loss train: 0.877  eval: 2.257
-INFO - 2020-09-16 22:16:34,846 - semantic_segmentation - acc train: 0.764  eval: 0.696
-INFO - 2020-09-16 22:16:34,846 - semantic_segmentation - iou train: 0.626  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.18s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.07s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.16s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.16s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:41,689 - semantic_segmentation - loss train: 0.922  eval: 2.305
-INFO - 2020-09-16 22:16:41,691 - semantic_segmentation - acc train: 0.767  eval: 0.696
-INFO - 2020-09-16 22:16:41,691 - semantic_segmentation - iou train: 0.628  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.84s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.88s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.15s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.15s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:48,598 - semantic_segmentation - loss train: 0.810  eval: 2.349
-INFO - 2020-09-16 22:16:48,600 - semantic_segmentation - acc train: 0.817  eval: 0.696
-INFO - 2020-09-16 22:16:48,601 - semantic_segmentation - iou train: 0.692  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.73s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.87s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.86s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:16:55,522 - semantic_segmentation - loss train: 0.734  eval: 2.411
-INFO - 2020-09-16 22:16:55,524 - semantic_segmentation - acc train: 0.825  eval: 0.696
-INFO - 2020-09-16 22:16:55,524 - semantic_segmentation - iou train: 0.705  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.20s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.09s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:02,464 - semantic_segmentation - loss train: 0.669  eval: 2.438
-INFO - 2020-09-16 22:17:02,466 - semantic_segmentation - acc train: 0.820  eval: 0.696
-INFO - 2020-09-16 22:17:02,466 - semantic_segmentation - iou train: 0.697  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.24s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.09s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.01s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:09,480 - semantic_segmentation - loss train: 0.600  eval: 2.477
-INFO - 2020-09-16 22:17:09,482 - semantic_segmentation - acc train: 0.866  eval: 0.696
-INFO - 2020-09-16 22:17:09,482 - semantic_segmentation - iou train: 0.766  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.83s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.87s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:16,460 - semantic_segmentation - loss train: 0.542  eval: 2.628
-INFO - 2020-09-16 22:17:16,462 - semantic_segmentation - acc train: 0.918  eval: 0.696
-INFO - 2020-09-16 22:17:16,462 - semantic_segmentation - iou train: 0.850  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.94s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.06s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:23,722 - semantic_segmentation - loss train: 0.458  eval: 2.630
-INFO - 2020-09-16 22:17:23,724 - semantic_segmentation - acc train: 0.940  eval: 0.696
-INFO - 2020-09-16 22:17:23,724 - semantic_segmentation - iou train: 0.888  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.84s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.81s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:30,692 - semantic_segmentation - loss train: 0.451  eval: 2.768
-INFO - 2020-09-16 22:17:30,695 - semantic_segmentation - acc train: 0.932  eval: 0.696
-INFO - 2020-09-16 22:17:30,695 - semantic_segmentation - iou train: 0.874  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.85s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.88s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:37,651 - semantic_segmentation - loss train: 0.395  eval: 2.877
-INFO - 2020-09-16 22:17:37,653 - semantic_segmentation - acc train: 0.943  eval: 0.696
-INFO - 2020-09-16 22:17:37,653 - semantic_segmentation - iou train: 0.892  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.73s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.85s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.83s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.88s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.15s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.15s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:44,460 - semantic_segmentation - loss train: 0.361  eval: 3.047
-INFO - 2020-09-16 22:17:44,462 - semantic_segmentation - acc train: 0.951  eval: 0.696
-INFO - 2020-09-16 22:17:44,462 - semantic_segmentation - iou train: 0.908  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.73s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.77s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.90s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:51,442 - semantic_segmentation - loss train: 0.397  eval: 2.920
-INFO - 2020-09-16 22:17:51,444 - semantic_segmentation - acc train: 0.953  eval: 0.696
-INFO - 2020-09-16 22:17:51,444 - semantic_segmentation - iou train: 0.910  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.22s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.07s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.17s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.17s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:17:58,345 - semantic_segmentation - loss train: 0.359  eval: 3.207
-INFO - 2020-09-16 22:17:58,347 - semantic_segmentation - acc train: 0.955  eval: 0.786
-INFO - 2020-09-16 22:17:58,347 - semantic_segmentation - iou train: 0.914  eval: 0.647
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.15s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.02s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:05,208 - semantic_segmentation - loss train: 0.326  eval: 2.957
-INFO - 2020-09-16 22:18:05,210 - semantic_segmentation - acc train: 0.955  eval: 0.696
-INFO - 2020-09-16 22:18:05,211 - semantic_segmentation - iou train: 0.915  eval: 0.534
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.17s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.04s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.90s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.16s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.16s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:12,066 - semantic_segmentation - loss train: 0.290  eval: 3.783
-INFO - 2020-09-16 22:18:12,068 - semantic_segmentation - acc train: 0.962  eval: 0.178
-INFO - 2020-09-16 22:18:12,068 - semantic_segmentation - iou train: 0.927  eval: 0.098
-INFO - 2020-09-16 22:18:12,392 - semantic_segmentation - Epoch  20: save ckpt to ./logs/RandLANet_ParisLille3D_torch/checkpoint
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.75s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.77s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:19,549 - semantic_segmentation - loss train: 0.280  eval: 2.975
-INFO - 2020-09-16 22:18:19,551 - semantic_segmentation - acc train: 0.972  eval: 0.219
-INFO - 2020-09-16 22:18:19,551 - semantic_segmentation - iou train: 0.945  eval: 0.123
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.85s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.84s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.18s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:26,585 - semantic_segmentation - loss train: 0.301  eval: 4.221
-INFO - 2020-09-16 22:18:26,587 - semantic_segmentation - acc train: 0.951  eval: 0.178
-INFO - 2020-09-16 22:18:26,588 - semantic_segmentation - iou train: 0.909  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.79s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.91s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:33,616 - semantic_segmentation - loss train: 0.259  eval: 5.150
-INFO - 2020-09-16 22:18:33,618 - semantic_segmentation - acc train: 0.957  eval: 0.178
-INFO - 2020-09-16 22:18:33,618 - semantic_segmentation - iou train: 0.919  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.15s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.03s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:40,476 - semantic_segmentation - loss train: 0.250  eval: 5.235
-INFO - 2020-09-16 22:18:40,479 - semantic_segmentation - acc train: 0.964  eval: 0.178
-INFO - 2020-09-16 22:18:40,479 - semantic_segmentation - iou train: 0.931  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.73s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.75s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.87s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:47,363 - semantic_segmentation - loss train: 0.254  eval: 6.768
-INFO - 2020-09-16 22:18:47,365 - semantic_segmentation - acc train: 0.969  eval: 0.178
-INFO - 2020-09-16 22:18:47,365 - semantic_segmentation - iou train: 0.940  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.18s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.07s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.90s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:18:54,245 - semantic_segmentation - loss train: 0.225  eval: 5.538
-INFO - 2020-09-16 22:18:54,247 - semantic_segmentation - acc train: 0.971  eval: 0.007
-INFO - 2020-09-16 22:18:54,247 - semantic_segmentation - iou train: 0.944  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.82s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.88s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.17s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.17s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:01,175 - semantic_segmentation - loss train: 0.222  eval: 5.641
-INFO - 2020-09-16 22:19:01,177 - semantic_segmentation - acc train: 0.965  eval: 0.007
-INFO - 2020-09-16 22:19:01,177 - semantic_segmentation - iou train: 0.933  eval: 0.004
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.73s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.88s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.90s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:08,367 - semantic_segmentation - loss train: 0.210  eval: 4.899
-INFO - 2020-09-16 22:19:08,369 - semantic_segmentation - acc train: 0.966  eval: 0.178
-INFO - 2020-09-16 22:19:08,369 - semantic_segmentation - iou train: 0.935  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.87s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.99s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.97s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:15,695 - semantic_segmentation - loss train: 0.194  eval: 6.977
-INFO - 2020-09-16 22:19:15,697 - semantic_segmentation - acc train: 0.971  eval: 0.178
-INFO - 2020-09-16 22:19:15,697 - semantic_segmentation - iou train: 0.945  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.94s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.97s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.09s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.12s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:23,342 - semantic_segmentation - loss train: 0.197  eval: 11.910
-INFO - 2020-09-16 22:19:23,344 - semantic_segmentation - acc train: 0.974  eval: 0.178
-INFO - 2020-09-16 22:19:23,344 - semantic_segmentation - iou train: 0.949  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.30s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.16s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.10s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.29s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.29s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:30,744 - semantic_segmentation - loss train: 0.184  eval: 9.812
-INFO - 2020-09-16 22:19:30,746 - semantic_segmentation - acc train: 0.971  eval: 0.178
-INFO - 2020-09-16 22:19:30,746 - semantic_segmentation - iou train: 0.944  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.32s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.22s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.10s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.04s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:38,137 - semantic_segmentation - loss train: 0.176  eval: 5.853
-INFO - 2020-09-16 22:19:38,139 - semantic_segmentation - acc train: 0.980  eval: 0.178
-INFO - 2020-09-16 22:19:38,139 - semantic_segmentation - iou train: 0.960  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.83s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.97s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:45,457 - semantic_segmentation - loss train: 0.170  eval: 7.445
-INFO - 2020-09-16 22:19:45,459 - semantic_segmentation - acc train: 0.979  eval: 0.178
-INFO - 2020-09-16 22:19:45,459 - semantic_segmentation - iou train: 0.959  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.94s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.90s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.00s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:19:52,687 - semantic_segmentation - loss train: 0.203  eval: 10.985
-INFO - 2020-09-16 22:19:52,690 - semantic_segmentation - acc train: 0.972  eval: 0.178
-INFO - 2020-09-16 22:19:52,690 - semantic_segmentation - iou train: 0.946  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.86s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.88s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:00,048 - semantic_segmentation - loss train: 0.176  eval: 8.996
-INFO - 2020-09-16 22:20:00,050 - semantic_segmentation - acc train: 0.970  eval: 0.178
-INFO - 2020-09-16 22:20:00,050 - semantic_segmentation - iou train: 0.943  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.92s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.02s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:07,313 - semantic_segmentation - loss train: 0.260  eval: 7.877
-INFO - 2020-09-16 22:20:07,315 - semantic_segmentation - acc train: 0.967  eval: 0.178
-INFO - 2020-09-16 22:20:07,315 - semantic_segmentation - iou train: 0.936  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.88s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.89s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.00s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:14,631 - semantic_segmentation - loss train: 0.179  eval: 8.278
-INFO - 2020-09-16 22:20:14,633 - semantic_segmentation - acc train: 0.976  eval: 0.178
-INFO - 2020-09-16 22:20:14,633 - semantic_segmentation - iou train: 0.954  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.37s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.26s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.15s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.09s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.31s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.31s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:22,227 - semantic_segmentation - loss train: 0.396  eval: 12.326
-INFO - 2020-09-16 22:20:22,229 - semantic_segmentation - acc train: 0.959  eval: 0.178
-INFO - 2020-09-16 22:20:22,229 - semantic_segmentation - iou train: 0.922  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.29s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.18s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.06s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.00s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:29,476 - semantic_segmentation - loss train: 0.407  eval: 5.193
-INFO - 2020-09-16 22:20:29,478 - semantic_segmentation - acc train: 0.958  eval: 0.178
-INFO - 2020-09-16 22:20:29,478 - semantic_segmentation - iou train: 0.921  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.82s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:36,697 - semantic_segmentation - loss train: 0.347  eval: 13.866
-INFO - 2020-09-16 22:20:36,699 - semantic_segmentation - acc train: 0.929  eval: 0.178
-INFO - 2020-09-16 22:20:36,699 - semantic_segmentation - iou train: 0.868  eval: 0.098
-INFO - 2020-09-16 22:20:36,918 - semantic_segmentation - Epoch  40: save ckpt to ./logs/RandLANet_ParisLille3D_torch/checkpoint
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.29s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.18s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.07s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:44,211 - semantic_segmentation - loss train: 0.246  eval: 4.438
-INFO - 2020-09-16 22:20:44,213 - semantic_segmentation - acc train: 0.960  eval: 0.745
-INFO - 2020-09-16 22:20:44,213 - semantic_segmentation - iou train: 0.923  eval: 0.594
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.30s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.15s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.07s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:51,407 - semantic_segmentation - loss train: 0.280  eval: 7.199
-INFO - 2020-09-16 22:20:51,409 - semantic_segmentation - acc train: 0.969  eval: 0.178
-INFO - 2020-09-16 22:20:51,409 - semantic_segmentation - iou train: 0.940  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.26s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.13s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.06s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:20:58,640 - semantic_segmentation - loss train: 0.234  eval: 11.312
-INFO - 2020-09-16 22:20:58,642 - semantic_segmentation - acc train: 0.970  eval: 0.178
-INFO - 2020-09-16 22:20:58,642 - semantic_segmentation - iou train: 0.943  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.82s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.84s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.00s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:05,985 - semantic_segmentation - loss train: 0.212  eval: 5.808
-INFO - 2020-09-16 22:21:05,987 - semantic_segmentation - acc train: 0.965  eval: 0.178
-INFO - 2020-09-16 22:21:05,987 - semantic_segmentation - iou train: 0.934  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.34s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.21s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.09s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:13,272 - semantic_segmentation - loss train: 0.190  eval: 8.331
-INFO - 2020-09-16 22:21:13,274 - semantic_segmentation - acc train: 0.967  eval: 0.178
-INFO - 2020-09-16 22:21:13,274 - semantic_segmentation - iou train: 0.937  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.89s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.01s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.97s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:20,632 - semantic_segmentation - loss train: 0.232  eval: 18.224
-INFO - 2020-09-16 22:21:20,634 - semantic_segmentation - acc train: 0.967  eval: 0.178
-INFO - 2020-09-16 22:21:20,634 - semantic_segmentation - iou train: 0.936  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.30s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.18s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.06s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:27,858 - semantic_segmentation - loss train: 0.183  eval: 9.383
-INFO - 2020-09-16 22:21:27,860 - semantic_segmentation - acc train: 0.979  eval: 0.178
-INFO - 2020-09-16 22:21:27,860 - semantic_segmentation - iou train: 0.960  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.79s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:35,065 - semantic_segmentation - loss train: 0.178  eval: 14.594
-INFO - 2020-09-16 22:21:35,067 - semantic_segmentation - acc train: 0.977  eval: 0.178
-INFO - 2020-09-16 22:21:35,067 - semantic_segmentation - iou train: 0.954  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.34s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.20s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.14s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.07s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:42,535 - semantic_segmentation - loss train: 0.169  eval: 14.518
-INFO - 2020-09-16 22:21:42,537 - semantic_segmentation - acc train: 0.977  eval: 0.178
-INFO - 2020-09-16 22:21:42,537 - semantic_segmentation - iou train: 0.955  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.92s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.88s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:49,714 - semantic_segmentation - loss train: 0.163  eval: 14.506
-INFO - 2020-09-16 22:21:49,716 - semantic_segmentation - acc train: 0.979  eval: 0.007
-INFO - 2020-09-16 22:21:49,716 - semantic_segmentation - iou train: 0.959  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.24s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.13s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.02s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:21:56,830 - semantic_segmentation - loss train: 0.158  eval: 14.214
-INFO - 2020-09-16 22:21:56,832 - semantic_segmentation - acc train: 0.976  eval: 0.007
-INFO - 2020-09-16 22:21:56,832 - semantic_segmentation - iou train: 0.953  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.24s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.11s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.04s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:03,963 - semantic_segmentation - loss train: 0.173  eval: 14.888
-INFO - 2020-09-16 22:22:03,965 - semantic_segmentation - acc train: 0.970  eval: 0.007
-INFO - 2020-09-16 22:22:03,965 - semantic_segmentation - iou train: 0.943  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.89s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.86s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:11,121 - semantic_segmentation - loss train: 0.156  eval: 16.106
-INFO - 2020-09-16 22:22:11,123 - semantic_segmentation - acc train: 0.972  eval: 0.007
-INFO - 2020-09-16 22:22:11,124 - semantic_segmentation - iou train: 0.947  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.25s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.15s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.06s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.30s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.30s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:18,454 - semantic_segmentation - loss train: 0.147  eval: 16.196
-INFO - 2020-09-16 22:22:18,457 - semantic_segmentation - acc train: 0.975  eval: 0.178
-INFO - 2020-09-16 22:22:18,457 - semantic_segmentation - iou train: 0.951  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.01s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.96s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.04s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:25,754 - semantic_segmentation - loss train: 0.159  eval: 13.564
-INFO - 2020-09-16 22:22:25,757 - semantic_segmentation - acc train: 0.975  eval: 0.178
-INFO - 2020-09-16 22:22:25,757 - semantic_segmentation - iou train: 0.952  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.78s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.81s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:32,892 - semantic_segmentation - loss train: 0.138  eval: 13.506
-INFO - 2020-09-16 22:22:32,894 - semantic_segmentation - acc train: 0.977  eval: 0.178
-INFO - 2020-09-16 22:22:32,894 - semantic_segmentation - iou train: 0.956  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.24s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.10s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.02s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:40,019 - semantic_segmentation - loss train: 0.137  eval: 8.742
-INFO - 2020-09-16 22:22:40,021 - semantic_segmentation - acc train: 0.978  eval: 0.007
-INFO - 2020-09-16 22:22:40,021 - semantic_segmentation - iou train: 0.957  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.88s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.84s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:47,076 - semantic_segmentation - loss train: 0.130  eval: 10.314
-INFO - 2020-09-16 22:22:47,079 - semantic_segmentation - acc train: 0.977  eval: 0.007
-INFO - 2020-09-16 22:22:47,079 - semantic_segmentation - iou train: 0.955  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.82s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:22:54,236 - semantic_segmentation - loss train: 0.129  eval: 11.470
-INFO - 2020-09-16 22:22:54,238 - semantic_segmentation - acc train: 0.976  eval: 0.007
-INFO - 2020-09-16 22:22:54,238 - semantic_segmentation - iou train: 0.953  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.25s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.14s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.03s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:01,412 - semantic_segmentation - loss train: 0.127  eval: 17.862
-INFO - 2020-09-16 22:23:01,414 - semantic_segmentation - acc train: 0.979  eval: 0.007
-INFO - 2020-09-16 22:23:01,414 - semantic_segmentation - iou train: 0.960  eval: 0.003
-INFO - 2020-09-16 22:23:01,807 - semantic_segmentation - Epoch  60: save ckpt to ./logs/RandLANet_ParisLille3D_torch/checkpoint
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.79s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.92s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:08,907 - semantic_segmentation - loss train: 0.116  eval: 13.685
-INFO - 2020-09-16 22:23:08,909 - semantic_segmentation - acc train: 0.985  eval: 0.007
-INFO - 2020-09-16 22:23:08,909 - semantic_segmentation - iou train: 0.970  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.80s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.82s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:16,064 - semantic_segmentation - loss train: 0.133  eval: 20.968
-INFO - 2020-09-16 22:23:16,066 - semantic_segmentation - acc train: 0.980  eval: 0.007
-INFO - 2020-09-16 22:23:16,066 - semantic_segmentation - iou train: 0.961  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.88s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.87s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.00s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:23,331 - semantic_segmentation - loss train: 0.112  eval: 19.951
-INFO - 2020-09-16 22:23:23,333 - semantic_segmentation - acc train: 0.982  eval: 0.007
-INFO - 2020-09-16 22:23:23,333 - semantic_segmentation - iou train: 0.966  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.92s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.00s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:30,451 - semantic_segmentation - loss train: 0.135  eval: 18.584
-INFO - 2020-09-16 22:23:30,454 - semantic_segmentation - acc train: 0.980  eval: 0.007
-INFO - 2020-09-16 22:23:30,454 - semantic_segmentation - iou train: 0.962  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.86s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.82s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:37,456 - semantic_segmentation - loss train: 0.110  eval: 17.021
-INFO - 2020-09-16 22:23:37,458 - semantic_segmentation - acc train: 0.984  eval: 0.170
-INFO - 2020-09-16 22:23:37,458 - semantic_segmentation - iou train: 0.969  eval: 0.093
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.78s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.79s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:44,443 - semantic_segmentation - loss train: 0.122  eval: 12.595
-INFO - 2020-09-16 22:23:44,445 - semantic_segmentation - acc train: 0.982  eval: 0.178
-INFO - 2020-09-16 22:23:44,445 - semantic_segmentation - iou train: 0.966  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.87s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.97s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:51,532 - semantic_segmentation - loss train: 0.114  eval: 10.378
-INFO - 2020-09-16 22:23:51,534 - semantic_segmentation - acc train: 0.985  eval: 0.178
-INFO - 2020-09-16 22:23:51,534 - semantic_segmentation - iou train: 0.970  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.76s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.78s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:23:58,555 - semantic_segmentation - loss train: 0.110  eval: 10.828
-INFO - 2020-09-16 22:23:58,557 - semantic_segmentation - acc train: 0.985  eval: 0.178
-INFO - 2020-09-16 22:23:58,557 - semantic_segmentation - iou train: 0.971  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.88s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.84s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:05,636 - semantic_segmentation - loss train: 0.112  eval: 6.278
-INFO - 2020-09-16 22:24:05,638 - semantic_segmentation - acc train: 0.985  eval: 0.178
-INFO - 2020-09-16 22:24:05,638 - semantic_segmentation - iou train: 0.971  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.32s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.16s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.07s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:12,814 - semantic_segmentation - loss train: 0.109  eval: 9.207
-INFO - 2020-09-16 22:24:12,816 - semantic_segmentation - acc train: 0.984  eval: 0.007
-INFO - 2020-09-16 22:24:12,816 - semantic_segmentation - iou train: 0.969  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.91s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.03s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:20,195 - semantic_segmentation - loss train: 0.105  eval: 14.861
-INFO - 2020-09-16 22:24:20,197 - semantic_segmentation - acc train: 0.986  eval: 0.011
-INFO - 2020-09-16 22:24:20,197 - semantic_segmentation - iou train: 0.973  eval: 0.006
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.87s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.97s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:27,362 - semantic_segmentation - loss train: 0.106  eval: 11.334
-INFO - 2020-09-16 22:24:27,364 - semantic_segmentation - acc train: 0.987  eval: 0.007
-INFO - 2020-09-16 22:24:27,364 - semantic_segmentation - iou train: 0.974  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.24s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.10s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.03s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:34,458 - semantic_segmentation - loss train: 0.101  eval: 13.830
-INFO - 2020-09-16 22:24:34,460 - semantic_segmentation - acc train: 0.985  eval: 0.170
-INFO - 2020-09-16 22:24:34,461 - semantic_segmentation - iou train: 0.971  eval: 0.093
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.27s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.12s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.05s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.25s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:41,627 - semantic_segmentation - loss train: 0.096  eval: 10.583
-INFO - 2020-09-16 22:24:41,629 - semantic_segmentation - acc train: 0.986  eval: 0.010
-INFO - 2020-09-16 22:24:41,629 - semantic_segmentation - iou train: 0.973  eval: 0.005
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.30s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.15s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.07s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:48,842 - semantic_segmentation - loss train: 0.097  eval: 9.177
-INFO - 2020-09-16 22:24:48,845 - semantic_segmentation - acc train: 0.988  eval: 0.007
-INFO - 2020-09-16 22:24:48,845 - semantic_segmentation - iou train: 0.976  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.80s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.81s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:24:55,994 - semantic_segmentation - loss train: 0.091  eval: 9.286
-INFO - 2020-09-16 22:24:55,996 - semantic_segmentation - acc train: 0.987  eval: 0.007
-INFO - 2020-09-16 22:24:55,996 - semantic_segmentation - iou train: 0.975  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.28s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.15s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.04s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:03,151 - semantic_segmentation - loss train: 0.091  eval: 13.129
-INFO - 2020-09-16 22:25:03,153 - semantic_segmentation - acc train: 0.986  eval: 0.007
-INFO - 2020-09-16 22:25:03,153 - semantic_segmentation - iou train: 0.973  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.82s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.83s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:10,270 - semantic_segmentation - loss train: 0.090  eval: 11.115
-INFO - 2020-09-16 22:25:10,273 - semantic_segmentation - acc train: 0.987  eval: 0.007
-INFO - 2020-09-16 22:25:10,273 - semantic_segmentation - iou train: 0.974  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.24s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.09s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.02s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:17,403 - semantic_segmentation - loss train: 0.094  eval: 8.503
-INFO - 2020-09-16 22:25:17,405 - semantic_segmentation - acc train: 0.987  eval: 0.039
-INFO - 2020-09-16 22:25:17,405 - semantic_segmentation - iou train: 0.975  eval: 0.020
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.99s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.94s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:24,655 - semantic_segmentation - loss train: 0.096  eval: 9.767
-INFO - 2020-09-16 22:25:24,657 - semantic_segmentation - acc train: 0.985  eval: 0.007
-INFO - 2020-09-16 22:25:24,657 - semantic_segmentation - iou train: 0.970  eval: 0.003
-INFO - 2020-09-16 22:25:25,042 - semantic_segmentation - Epoch  80: save ckpt to ./logs/RandLANet_ParisLille3D_torch/checkpoint
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.86s/it]training:  67%|██████▋   | 2/3 [00:04<00:01,  1.96s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.90s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:32,076 - semantic_segmentation - loss train: 0.091  eval: 16.081
-INFO - 2020-09-16 22:25:32,078 - semantic_segmentation - acc train: 0.986  eval: 0.007
-INFO - 2020-09-16 22:25:32,078 - semantic_segmentation - iou train: 0.972  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.77s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.81s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:39,104 - semantic_segmentation - loss train: 0.096  eval: 23.160
-INFO - 2020-09-16 22:25:39,106 - semantic_segmentation - acc train: 0.984  eval: 0.007
-INFO - 2020-09-16 22:25:39,106 - semantic_segmentation - iou train: 0.969  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.20s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.09s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:46,106 - semantic_segmentation - loss train: 0.097  eval: 22.258
-INFO - 2020-09-16 22:25:46,108 - semantic_segmentation - acc train: 0.985  eval: 0.007
-INFO - 2020-09-16 22:25:46,108 - semantic_segmentation - iou train: 0.970  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.23s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.09s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.02s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:25:53,162 - semantic_segmentation - loss train: 0.107  eval: 27.275
-INFO - 2020-09-16 22:25:53,164 - semantic_segmentation - acc train: 0.985  eval: 0.007
-INFO - 2020-09-16 22:25:53,164 - semantic_segmentation - iou train: 0.971  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.76s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.77s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:00,189 - semantic_segmentation - loss train: 0.103  eval: 30.970
-INFO - 2020-09-16 22:26:00,191 - semantic_segmentation - acc train: 0.983  eval: 0.007
-INFO - 2020-09-16 22:26:00,191 - semantic_segmentation - iou train: 0.967  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.19s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.10s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:07,187 - semantic_segmentation - loss train: 0.121  eval: 17.308
-INFO - 2020-09-16 22:26:07,189 - semantic_segmentation - acc train: 0.979  eval: 0.007
-INFO - 2020-09-16 22:26:07,189 - semantic_segmentation - iou train: 0.960  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.86s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.83s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:14,181 - semantic_segmentation - loss train: 0.111  eval: 12.709
-INFO - 2020-09-16 22:26:14,183 - semantic_segmentation - acc train: 0.984  eval: 0.007
-INFO - 2020-09-16 22:26:14,183 - semantic_segmentation - iou train: 0.969  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.90s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.02s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.97s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.28s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:21,514 - semantic_segmentation - loss train: 0.159  eval: 16.434
-INFO - 2020-09-16 22:26:21,516 - semantic_segmentation - acc train: 0.983  eval: 0.007
-INFO - 2020-09-16 22:26:21,517 - semantic_segmentation - iou train: 0.967  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.76s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.78s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.89s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.91s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.20s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:28,467 - semantic_segmentation - loss train: 0.112  eval: 21.889
-INFO - 2020-09-16 22:26:28,469 - semantic_segmentation - acc train: 0.977  eval: 0.007
-INFO - 2020-09-16 22:26:28,469 - semantic_segmentation - iou train: 0.956  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.21s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.11s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:35,505 - semantic_segmentation - loss train: 0.180  eval: 37.001
-INFO - 2020-09-16 22:26:35,507 - semantic_segmentation - acc train: 0.972  eval: 0.007
-INFO - 2020-09-16 22:26:35,507 - semantic_segmentation - iou train: 0.946  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.80s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.81s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.95s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:42,592 - semantic_segmentation - loss train: 0.232  eval: 41.309
-INFO - 2020-09-16 22:26:42,594 - semantic_segmentation - acc train: 0.976  eval: 0.007
-INFO - 2020-09-16 22:26:42,594 - semantic_segmentation - iou train: 0.953  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.77s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.90s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.87s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:49,563 - semantic_segmentation - loss train: 0.157  eval: 44.255
-INFO - 2020-09-16 22:26:49,565 - semantic_segmentation - acc train: 0.973  eval: 0.007
-INFO - 2020-09-16 22:26:49,565 - semantic_segmentation - iou train: 0.948  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.19s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.05s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:26:56,542 - semantic_segmentation - loss train: 0.190  eval: 34.075
-INFO - 2020-09-16 22:26:56,544 - semantic_segmentation - acc train: 0.965  eval: 0.007
-INFO - 2020-09-16 22:26:56,544 - semantic_segmentation - iou train: 0.935  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.20s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.10s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:03,529 - semantic_segmentation - loss train: 0.173  eval: 37.716
-INFO - 2020-09-16 22:27:03,531 - semantic_segmentation - acc train: 0.969  eval: 0.007
-INFO - 2020-09-16 22:27:03,531 - semantic_segmentation - iou train: 0.941  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.22s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.10s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.99s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.19s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:10,516 - semantic_segmentation - loss train: 0.155  eval: 33.204
-INFO - 2020-09-16 22:27:10,519 - semantic_segmentation - acc train: 0.972  eval: 0.007
-INFO - 2020-09-16 22:27:10,519 - semantic_segmentation - iou train: 0.946  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.20s/it]training:  67%|██████▋   | 2/3 [00:03<00:02,  2.06s/it]training: 100%|██████████| 3/3 [00:05<00:00,  2.00s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.27s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:17,581 - semantic_segmentation - loss train: 0.144  eval: 27.735
-INFO - 2020-09-16 22:27:17,583 - semantic_segmentation - acc train: 0.975  eval: 0.007
-INFO - 2020-09-16 22:27:17,584 - semantic_segmentation - iou train: 0.951  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.84s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.85s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.96s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.97s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:24,729 - semantic_segmentation - loss train: 0.134  eval: 22.879
-INFO - 2020-09-16 22:27:24,731 - semantic_segmentation - acc train: 0.976  eval: 0.007
-INFO - 2020-09-16 22:27:24,731 - semantic_segmentation - iou train: 0.955  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.20s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.09s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.98s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.92s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.22s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:31,729 - semantic_segmentation - loss train: 0.127  eval: 26.524
-INFO - 2020-09-16 22:27:31,731 - semantic_segmentation - acc train: 0.978  eval: 0.007
-INFO - 2020-09-16 22:27:31,731 - semantic_segmentation - iou train: 0.957  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.87s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.83s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.94s/it]training: 100%|██████████| 3/3 [00:05<00:00,  1.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.21s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:38,747 - semantic_segmentation - loss train: 0.129  eval: 21.575
-INFO - 2020-09-16 22:27:38,749 - semantic_segmentation - acc train: 0.977  eval: 0.007
-INFO - 2020-09-16 22:27:38,749 - semantic_segmentation - iou train: 0.957  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.29s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.19s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.09s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:46,109 - semantic_segmentation - loss train: 0.129  eval: 16.687
-INFO - 2020-09-16 22:27:46,111 - semantic_segmentation - acc train: 0.977  eval: 0.007
-INFO - 2020-09-16 22:27:46,111 - semantic_segmentation - iou train: 0.956  eval: 0.003
-INFO - 2020-09-16 22:27:46,342 - semantic_segmentation - Epoch 100: save ckpt to ./logs/RandLANet_ParisLille3D_torch/checkpoint
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.83s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.86s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.00s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.29s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.29s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:27:53,722 - semantic_segmentation - loss train: 0.140  eval: 18.309
-INFO - 2020-09-16 22:27:53,724 - semantic_segmentation - acc train: 0.974  eval: 0.011
-INFO - 2020-09-16 22:27:53,724 - semantic_segmentation - iou train: 0.951  eval: 0.005
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.97s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.94s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.05s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.04s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:28:01,126 - semantic_segmentation - loss train: 0.116  eval: 15.260
-INFO - 2020-09-16 22:28:01,128 - semantic_segmentation - acc train: 0.980  eval: 0.154
-INFO - 2020-09-16 22:28:01,128 - semantic_segmentation - iou train: 0.962  eval: 0.083
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.34s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.22s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.10s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.04s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.23s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:28:08,487 - semantic_segmentation - loss train: 0.113  eval: 26.072
-INFO - 2020-09-16 22:28:08,489 - semantic_segmentation - acc train: 0.981  eval: 0.007
-INFO - 2020-09-16 22:28:08,490 - semantic_segmentation - iou train: 0.963  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.95s/it]training:  67%|██████▋   | 2/3 [00:03<00:01,  1.91s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.01s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.00s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:28:15,758 - semantic_segmentation - loss train: 0.124  eval: 26.202
-INFO - 2020-09-16 22:28:15,760 - semantic_segmentation - acc train: 0.980  eval: 0.007
-INFO - 2020-09-16 22:28:15,760 - semantic_segmentation - iou train: 0.962  eval: 0.003
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:02<00:04,  2.42s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.27s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.17s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.09s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.26s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:28:23,296 - semantic_segmentation - loss train: 0.116  eval: 26.129
-INFO - 2020-09-16 22:28:23,298 - semantic_segmentation - acc train: 0.980  eval: 0.010
-INFO - 2020-09-16 22:28:23,298 - semantic_segmentation - iou train: 0.961  eval: 0.005
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.93s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.03s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.97s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.02s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]validation: 100%|██████████| 1/1 [00:01<00:00,  1.24s/it]
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:254: RuntimeWarning: Mean of empty slice
-  valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py:255: RuntimeWarning: Mean of empty slice
-  valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-INFO - 2020-09-16 22:28:30,589 - semantic_segmentation - loss train: 0.122  eval: 16.243
-INFO - 2020-09-16 22:28:30,591 - semantic_segmentation - acc train: 0.978  eval: 0.178
-INFO - 2020-09-16 22:28:30,591 - semantic_segmentation - iou train: 0.958  eval: 0.098
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:01<00:03,  1.93s/it]training:  67%|██████▋   | 2/3 [00:04<00:02,  2.05s/it]training: 100%|██████████| 3/3 [00:06<00:00,  1.99s/it]training: 100%|██████████| 3/3 [00:06<00:00,  2.03s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]slurmstepd-isl-gpu2: error: *** JOB 40633 ON isl-gpu2 CANCELLED AT 2020-09-16T22:28:36 ***

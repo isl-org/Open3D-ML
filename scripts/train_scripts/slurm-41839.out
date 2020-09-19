@@ -1,62 +1,0 @@
-2020-09-18 17:31:40.411656: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
-2020-09-18 17:31:42.109077: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcuda.so.1
-2020-09-18 17:31:42.179870: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1716] Found device 0 with properties: 
-pciBusID: 0000:85:00.0 name: GeForce RTX 2080 Ti computeCapability: 7.5
-coreClock: 1.545GHz coreCount: 68 deviceMemorySize: 10.76GiB deviceMemoryBandwidth: 573.69GiB/s
-2020-09-18 17:31:42.179911: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
-2020-09-18 17:31:42.182027: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcublas.so.10
-2020-09-18 17:31:42.183615: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcufft.so.10
-2020-09-18 17:31:42.183904: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcurand.so.10
-2020-09-18 17:31:42.185726: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusolver.so.10
-2020-09-18 17:31:42.186719: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcusparse.so.10
-2020-09-18 17:31:42.186848: W tensorflow/stream_executor/platform/default/dso_loader.cc:59] Could not load dynamic library 'libcudnn.so.7'; dlerror: libcudnn.so.7: cannot open shared object file: No such file or directory; LD_LIBRARY_PATH: :/usr/local/cuda-10.1/lib64
-2020-09-18 17:31:42.186859: W tensorflow/core/common_runtime/gpu/gpu_device.cc:1753] Cannot dlopen some GPU libraries. Please make sure the missing libraries mentioned above are installed properly if you would like to use GPU. Follow the guide at https://www.tensorflow.org/install/gpu for how to download and setup the required libraries for your platform.
-Skipping registering GPU devices...
-2020-09-18 17:31:42.202402: I tensorflow/core/platform/cpu_feature_guard.cc:142] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN)to use the following CPU instructions in performance-critical operations:  AVX2 FMA
-To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
-2020-09-18 17:31:42.228765: I tensorflow/core/platform/profile_utils/cpu_utils.cc:104] CPU Frequency: 2300020000 Hz
-2020-09-18 17:31:42.228973: I tensorflow/compiler/xla/service/service.cc:168] XLA service 0x561dce3c6cc0 initialized for platform Host (this does not guarantee that XLA will be used). Devices:
-2020-09-18 17:31:42.229001: I tensorflow/compiler/xla/service/service.cc:176]   StreamExecutor device (0): Host, Default Version
-2020-09-18 17:31:42.230721: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1257] Device interconnect StreamExecutor with strength 1 edge matrix:
-2020-09-18 17:31:42.230741: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1263]      
-INFO - 2020-09-18 17:31:42,376 - semantic_segmentation - <ml3d.tf.models.randlanet.RandLANet object at 0x7f0704518f10>
-INFO - 2020-09-18 17:31:42,376 - semantic_segmentation - Logging in file : ./logs/RandLANet_ParisLille3D_tf/log_train_2020-09-18_17:31:42.txt
-INFO - 2020-09-18 17:31:42,377 - parislille3d - Found 3 pointclouds for training
-preprocess:   0%|          | 0/3 [00:00<?, ?it/s]preprocess:  33%|███▎      | 1/3 [03:09<06:18, 189.24s/it]preprocess:  67%|██████▋   | 2/3 [04:27<02:36, 156.05s/it]preprocess: 100%|██████████| 3/3 [07:01<00:00, 155.43s/it]preprocess: 100%|██████████| 3/3 [07:01<00:00, 140.61s/it]
-INFO - 2020-09-18 17:38:44,524 - parislille3d - Found 1 pointclouds for validation
-preprocess:   0%|          | 0/1 [00:00<?, ?it/s]preprocess: 100%|██████████| 1/1 [01:54<00:00, 114.04s/it]preprocess: 100%|██████████| 1/1 [01:54<00:00, 114.04s/it]
-INFO - 2020-09-18 17:40:39,081 - semantic_segmentation - Initializing from scratch.
-INFO - 2020-09-18 17:40:39,082 - semantic_segmentation - === EPOCH 0/10000 ===
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:13<00:27, 13.63s/it]training:  67%|██████▋   | 2/3 [00:19<00:11, 11.43s/it]training: 100%|██████████| 3/3 [00:25<00:00,  9.74s/it]training: 100%|██████████| 3/3 [00:25<00:00,  8.58s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:03<00:00,  3.62s/it]validation: 100%|██████████| 1/1 [00:03<00:00,  3.62s/it]
-INFO - 2020-09-18 17:41:08,444 - semantic_segmentation - loss train: 18.310  eval: 208.408
-INFO - 2020-09-18 17:41:08,445 - semantic_segmentation - acc train: 0.109  eval: 0.056
-INFO - 2020-09-18 17:41:08,445 - semantic_segmentation - iou train: 0.059  eval: 0.029
-INFO - 2020-09-18 17:41:08,989 - semantic_segmentation - Saved checkpoint at: ./logs/RandLANet_ParisLille3D_tf/checkpoint/ckpt-1
-INFO - 2020-09-18 17:41:08,990 - semantic_segmentation - === EPOCH 1/10000 ===
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:12<00:24, 12.43s/it]training:  67%|██████▋   | 2/3 [00:18<00:10, 10.57s/it]training: 100%|██████████| 3/3 [00:24<00:00,  9.16s/it]training: 100%|██████████| 3/3 [00:24<00:00,  8.18s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:03<00:00,  3.44s/it]validation: 100%|██████████| 1/1 [00:03<00:00,  3.45s/it]
-INFO - 2020-09-18 17:41:36,984 - semantic_segmentation - loss train: 15.538  eval: 3776.337
-INFO - 2020-09-18 17:41:36,985 - semantic_segmentation - acc train: 0.152  eval: 0.018
-INFO - 2020-09-18 17:41:36,985 - semantic_segmentation - iou train: 0.083  eval: 0.009
-INFO - 2020-09-18 17:41:37,002 - semantic_segmentation - === EPOCH 2/10000 ===
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:12<00:24, 12.02s/it]training:  67%|██████▋   | 2/3 [00:18<00:10, 10.23s/it]training: 100%|██████████| 3/3 [00:23<00:00,  8.88s/it]training: 100%|██████████| 3/3 [00:23<00:00,  7.93s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:03<00:00,  3.47s/it]validation: 100%|██████████| 1/1 [00:03<00:00,  3.48s/it]
-INFO - 2020-09-18 17:42:04,269 - semantic_segmentation - loss train: 10.496  eval: 9745.766
-INFO - 2020-09-18 17:42:04,269 - semantic_segmentation - acc train: 0.130  eval: 0.047
-INFO - 2020-09-18 17:42:04,270 - semantic_segmentation - iou train: 0.071  eval: 0.024
-INFO - 2020-09-18 17:42:04,287 - semantic_segmentation - === EPOCH 3/10000 ===
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:12<00:25, 12.71s/it]training:  67%|██████▋   | 2/3 [00:19<00:10, 10.79s/it]training: 100%|██████████| 3/3 [00:25<00:00,  9.39s/it]training: 100%|██████████| 3/3 [00:25<00:00,  8.38s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:03<00:00,  3.61s/it]validation: 100%|██████████| 1/1 [00:03<00:00,  3.62s/it]
-INFO - 2020-09-18 17:42:33,052 - semantic_segmentation - loss train: 11.518  eval: 14432.592
-INFO - 2020-09-18 17:42:33,053 - semantic_segmentation - acc train: 0.172  eval: 0.000
-INFO - 2020-09-18 17:42:33,053 - semantic_segmentation - iou train: 0.096  eval: 0.000
-INFO - 2020-09-18 17:42:33,070 - semantic_segmentation - === EPOCH 4/10000 ===
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:12<00:25, 12.59s/it]training:  67%|██████▋   | 2/3 [00:18<00:10, 10.61s/it]training: 100%|██████████| 3/3 [00:24<00:00,  9.22s/it]training: 100%|██████████| 3/3 [00:24<00:00,  8.18s/it]
-validation:   0%|          | 0/1 [00:00<?, ?it/s]validation: 100%|██████████| 1/1 [00:03<00:00,  3.58s/it]validation: 100%|██████████| 1/1 [00:03<00:00,  3.58s/it]
-INFO - 2020-09-18 17:43:01,206 - semantic_segmentation - loss train: 11.370  eval: 6708.832
-INFO - 2020-09-18 17:43:01,206 - semantic_segmentation - acc train: 0.237  eval: 0.000
-INFO - 2020-09-18 17:43:01,206 - semantic_segmentation - iou train: 0.138  eval: 0.000
-INFO - 2020-09-18 17:43:01,225 - semantic_segmentation - === EPOCH 5/10000 ===
-training:   0%|          | 0/3 [00:00<?, ?it/s]training:  33%|███▎      | 1/3 [00:12<00:24, 12.36s/it]slurmstepd-isl-gpu2: error: *** JOB 41839 ON isl-gpu2 CANCELLED AT 2020-09-18T17:43:19 ***
-slurmstepd-isl-gpu2: error: Step 41839.4294967294 hit memory limit at least once during execution. This may or may not result in some failure.
