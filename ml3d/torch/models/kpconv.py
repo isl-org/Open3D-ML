@@ -477,10 +477,8 @@ class KPFCNN(BaseModel):
         dim_points = points.shape[1]
         if feat is None:
             dim_features = dim_points
-            new_coords = points
         else:
             dim_features = feat.shape[1] + dim_points
-            new_coords = np.hstack((points, feat))
 
         # Initiate merged points
         merged_points = np.zeros((0, dim_points), dtype=np.float32)
@@ -537,11 +535,17 @@ class KPFCNN(BaseModel):
                           axis=1) < self.cfg.in_radius**2
             mask_inds = np.where(mask)[0].astype(np.int32)
 
+
             # Shuffle points
             rand_order = np.random.permutation(mask_inds)
-            curr_new_points = new_points[rand_order, :3]
+            curr_new_points = new_points[rand_order, :3] - p0
             curr_sem_labels = sem_labels[rand_order]
-            curr_new_coords = new_coords[rand_order, :]
+
+            if feat is None:
+                curr_new_coords = curr_new_points
+            else:
+                curr_new_coords = np.hstack((curr_new_points, 
+                    feat[rand_order, :]))
 
             in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
                 curr_new_points,
