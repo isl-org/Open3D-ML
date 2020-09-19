@@ -1,0 +1,48 @@
+INFO - 2020-09-18 14:52:49,740 - semantic_segmentation - DEVICE : cuda
+INFO - 2020-09-18 14:52:49,741 - semantic_segmentation - Logging in file : ./logs/RandLANet_SemanticKITTI_torch/log_train_2020-09-18_14:52:49.txt
+INFO - 2020-09-18 14:52:50,410 - semantickitti - Found 19130 pointclouds for training
+INFO - 2020-09-18 14:52:54,724 - semantickitti - Found 4071 pointclouds for validation
+INFO - 2020-09-18 14:52:55,526 - semantic_segmentation - No checkpoint
+2020-09-18 14:52:55.673265: I tensorflow/stream_executor/platform/default/dso_loader.cc:48] Successfully opened dynamic library libcudart.so.10.1
+INFO - 2020-09-18 14:52:57,226 - semantic_segmentation - Started training
+training:   0%|          | 0/19130 [00:00<?, ?it/s]training:   0%|          | 0/19130 [00:00<?, ?it/s]
+regular arguments
+cfg_dataset: null
+cfg_file: ml3d/configs/randlanet_semantickitti.yml
+cfg_model: null
+cfg_pipeline: null
+dataset: null
+dataset_path: /export/share/Datasets/SemanticKITTI
+device: gpu
+framework: torch
+main_log_dir: null
+model: null
+pipeline: SemanticSegmentation
+split: train
+
+extra arguments
+{}
+
+=== EPOCH 0/100 ===
+Traceback (most recent call last):
+  File "scripts/semseg.py", line 118, in <module>
+    main()
+  File "scripts/semseg.py", line 114, in main
+    pipeline.run_train()
+  File "/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/pipelines/semantic_segmentation.py", line 194, in run_train
+    for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+  File "/home/yqiao/software/anaconda3/envs/py37/lib/python3.7/site-packages/tqdm/std.py", line 1130, in __iter__
+    for obj in iterable:
+  File "/home/yqiao/software/anaconda3/envs/py37/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 345, in __next__
+    data = self._next_data()
+  File "/home/yqiao/software/anaconda3/envs/py37/lib/python3.7/site-packages/torch/utils/data/dataloader.py", line 385, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/home/yqiao/software/anaconda3/envs/py37/lib/python3.7/site-packages/torch/utils/data/_utils/fetch.py", line 44, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/yqiao/software/anaconda3/envs/py37/lib/python3.7/site-packages/torch/utils/data/_utils/fetch.py", line 44, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/dataloaders/torch_dataloader.py", line 66, in __getitem__
+    data = self.transform(data, attr)
+  File "/home/yqiao/github/o3dml_train/Open3D-ML/ml3d/torch/models/randlanet.py", line 206, in transform
+    1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+AssertionError: Wrong feature dimension, please update dim_input(3 + feature_dimension) in config

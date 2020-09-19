@@ -1,0 +1,5 @@
+INFO - 2020-09-16 22:28:12,742 - semantic_segmentation - DEVICE : cuda
+INFO - 2020-09-16 22:28:12,743 - semantic_segmentation - Logging in file : ./logs/RandLANet_Semantic3D_torch/log_train_2020-09-16_22:28:12.txt
+INFO - 2020-09-16 22:28:12,744 - semantic3d - Found 13 pointclouds for training
+preprocess:   0%|          | 0/13 [00:00<?, ?it/s]preprocess:   8%|▊         | 1/13 [00:41<08:15, 41.25s/it]preprocess:  15%|█▌        | 2/13 [01:17<07:18, 39.83s/it]/var/spool/slurmd/job40637/slurm_script: line 13: 82416 Killed                  python scripts/semseg.py $1 -c ml3d/configs/randlanet_semantic3d.yml --dataset_path /export/share/Datasets/Semantic3D
+slurmstepd-isl-gpu6: error: Step 40637.4294967294 hit memory limit at least once during execution. This may or may not result in some failure.
