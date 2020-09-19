@@ -11,7 +11,7 @@ dataset:
   all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   validation_split: ['08']
-  use_cache: true
+  use_cache: false
   validation_split:
   - '08'
 model:
