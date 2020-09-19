@@ -28,7 +28,7 @@ class Semantic3D(BaseDataset):
 
     def __init__(self,
                  dataset_path,
-                 name='Toronto3D',
+                 name='Semantic3D',
                  cache_dir='./logs/cache',
                  use_cache=False,
                  num_points=65536,
@@ -157,10 +157,12 @@ class Semantic3DSplit():
                          dtype=np.float32).values
 
         points = pc[:, 0:3]
-        feat = pc[:, [4, 5, 6, 3]]
+        feat = pc[:, [4, 5, 6]]
+        intensity = pc[:, 3]
 
         points = np.array(points, dtype=np.float32)
         feat = np.array(feat, dtype=np.float32)
+        intensity = np.array(intensity, dtype=np.float32)
 
         if (self.split != 'test'):
             labels = pd.read_csv(pc_path.replace(".txt", ".labels"),
@@ -171,7 +173,12 @@ class Semantic3DSplit():
         else:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
 
-        data = {'point': points, 'feat': feat, 'label': labels}
+        data = {
+            'point': points,
+            'feat': feat,
+            'intensity': intensity,
+            'label': labels
+        }
 
         return data
 
