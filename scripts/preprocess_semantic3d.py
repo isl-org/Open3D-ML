@@ -9,17 +9,20 @@ import shutil
 from tqdm import tqdm
 import argparse
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Split large pointclouds in Semantic3D.')
     parser.add_argument('--dataset_path',
                         help='path to Semantic3D',
                         required=True)
-    parser.add_argument('--out_path',
-                        help='Output path', default=None)
+    parser.add_argument('--out_path', help='Output path', default=None)
 
-    parser.add_argument('--size_limit',
-                        help='Maximum size of processed pointcloud in Megabytes.', default=2000, type=int)
+    parser.add_argument(
+        '--size_limit',
+        help='Maximum size of processed pointcloud in Megabytes.',
+        default=2000,
+        type=int)
 
     args, _ = parser.parse_known_args()
 
@@ -30,6 +33,7 @@ def parse_args():
               format(k))
 
     return args
+
 
 def preprocess(args):
     # Split large pointclouds into multiple point clouds.
@@ -45,8 +49,8 @@ def preprocess(args):
     all_files = glob.glob(str(Path(dataset_path) / '*.txt'))
 
     train_files = [
-        f for f in all_files if exists(
-            str(Path(f).parent / Path(f).name.replace('.txt', '.labels')))
+        f for f in all_files
+        if exists(str(Path(f).parent / Path(f).name.replace('.txt', '.labels')))
     ]
 
     files = {}
@@ -65,7 +69,10 @@ def preprocess(args):
         if parts == 1:
             if dataset_path != out_path:
                 shutil.copyfile(key, join(out_path, Path(key).name))
-                shutil.copyfile(key.replace('.txt', '.labels'), join(out_path, Path(key).name.replace('.txt', '.labels')))
+                shutil.copyfile(
+                    key.replace('.txt', '.labels'),
+                    join(out_path,
+                         Path(key).name.replace('.txt', '.labels')))
             continue
         print("Splitting {} into {} parts".format(Path(key).name, parts))
         pc = pd.read_csv(key,

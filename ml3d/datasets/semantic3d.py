@@ -26,22 +26,21 @@ class Semantic3D(BaseDataset):
     SemanticKITTI dataset, used in visualizer, training, or test
     """
 
-    def __init__(
-            self,
-            dataset_path,
-            name='Semantic3D',
-            cache_dir='./logs/cache',
-            use_cache=False,
-            num_points=65536,
-            prepro_grid_size=0.06,
-            class_weights=[
-                5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860,
-                269353
-            ],
-            ignored_label_inds=[0],
-            val_split=1,
-            test_result_folder='./test',
-            **kwargs):
+    def __init__(self,
+                 dataset_path,
+                 name='Semantic3D',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 num_points=65536,
+                 prepro_grid_size=0.06,
+                 class_weights=[
+                     5181602, 5012952, 6830086, 1311528, 10476365, 946982,
+                     334860, 269353
+                 ],
+                 ignored_label_inds=[0],
+                 val_split=1,
+                 test_result_folder='./test',
+                 **kwargs):
         """
         Initialize
         Args:
