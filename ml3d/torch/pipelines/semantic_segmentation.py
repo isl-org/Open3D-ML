@@ -185,7 +185,7 @@ class SemanticSegmentation(BasePipeline):
 
         for epoch in range(0, cfg.max_epoch + 1):
 
-            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
             self.losses = []
             self.accs = []
@@ -215,7 +215,6 @@ class SemanticSegmentation(BasePipeline):
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
-            step = 0
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):

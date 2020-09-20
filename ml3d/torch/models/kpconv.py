@@ -365,7 +365,7 @@ class KPFCNN(BaseModel):
             # In case radius smaller than 50m, chose new center on a point of the wanted class or not
             # TODO balance
 
-            if attr['split'] in ['validation', 'test']:
+            if attr['split'] in ['test']:
                 wanted_ind = np.argmin(self.possibility)
             else:
                 wanted_ind = np.random.choice(new_points.shape[0])
@@ -385,7 +385,7 @@ class KPFCNN(BaseModel):
 
 
             # In case of validation, keep the original points in memory
-            if attr['split'] in ['validation', 'test']:
+            if attr['split'] in ['test']:
                 o_pts = new_points 
                 o_labels = sem_labels.astype(np.int32)
 
@@ -422,7 +422,7 @@ class KPFCNN(BaseModel):
             curr_num_points += n
 
             # Before augmenting, compute reprojection inds (only for validation and test)
-            if attr['split'] in ['validation', 'test']:
+            if attr['split'] in ['test']:
                 # get val_points that are in range
                 radiuses = np.sum(np.square(o_pts - p0), axis=1)
                 reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
