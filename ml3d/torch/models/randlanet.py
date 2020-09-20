@@ -182,7 +182,6 @@ class RandLANet(BaseModel):
 
 
         if min_posbility_idx is not None:
-            picked_pc = pc[pick_idx]
             dists = np.sum(
                 np.square((selected_pc).astype(np.float32)), 
                 axis=1
@@ -244,7 +243,6 @@ class RandLANet(BaseModel):
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
-        print(np.min(self.possibility))
         data = self.transform(self.inference_data, {}, min_posbility_idx)
         inputs = {'data': data, 'attr': []}
         inputs = self.batcher.collate_fn([inputs])
