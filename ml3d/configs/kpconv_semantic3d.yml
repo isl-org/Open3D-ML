@@ -9,7 +9,9 @@ dataset:
   prepro_grid_size: 0.06
   test_result_folder: ./test
   use_cache: true
-  val_split: 1
+  val_files:
+  - bildstein_station3_xyz_intensity_rgb
+  - sg27_station2_intensity_rgb
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint

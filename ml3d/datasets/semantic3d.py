@@ -38,7 +38,10 @@ class Semantic3D(BaseDataset):
                      334860, 269353
                  ],
                  ignored_label_inds=[0],
-                 val_split=1,
+                 val_files=[
+                     'bildstein_station3_xyz_intensity_rgb',
+                     'sg27_station2_intensity_rgb'
+                 ],
                  test_result_folder='./test',
                  **kwargs):
         """
@@ -57,7 +60,7 @@ class Semantic3D(BaseDataset):
                          num_points=num_points,
                          prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
-                         val_split=val_split,
+                         val_files=val_files,
                          test_result_folder=test_result_folder,
                          **kwargs)
 
@@ -89,16 +92,15 @@ class Semantic3D(BaseDataset):
             f for f in self.all_files if f not in self.train_files
         ]
 
-        self.all_split = [0, 1, 4, 5, 3, 4, 3, 0, 1, 2, 3, 4, 2, 0, 5]
-        self.val_split = cfg.val_split
-
         self.train_files = np.sort(self.train_files)
         self.test_files = np.sort(self.test_files)
         self.val_files = []
 
         for i, file_path in enumerate(self.train_files):
-            if self.all_split[i] == self.val_split:
-                self.val_files.append(file_path)
+            for val_file in cfg.val_files:
+                if val_file in file_path:
+                    self.val_files.append(file_path)
+                    break
 
         self.train_files = np.sort(
             [f for f in self.train_files if f not in self.val_files])
