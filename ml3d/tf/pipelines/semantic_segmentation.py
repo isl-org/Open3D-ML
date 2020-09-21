@@ -95,11 +95,19 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
+        Metric = SemSegMetric(self, model, dataset)
+        Loss = SemSegLoss(self, model, dataset)
+
         test_split = dataset.get_split('test')
         for idx in tqdm(range(len(test_split)), desc='test'):
             attr = test_split.get_attr(idx)
             data = test_split.get_data(idx)
             results = self.run_inference(data)
+            scores, labels = Loss.filter_valid_label(results['predict_scores'],
+                                                     data['label'])
+
+            log.info(Metric.acc(scores.numpy(), labels.numpy()))
+            log.info(Metric.iou(scores.numpy(), labels.numpy()))
             dataset.save_test_result(results, attr)
 
     def run_train(self, **kwargs):
