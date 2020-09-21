@@ -85,6 +85,7 @@ class SemanticSegmentation(BasePipeline):
         dataset = self.dataset
         cfg = self.cfg
 
+        self.optimizer = model.get_optimizer(cfg)
         self.load_ckpt(model.cfg.ckpt_path)
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
