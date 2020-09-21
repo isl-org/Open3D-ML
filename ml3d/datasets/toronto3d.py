@@ -82,7 +82,7 @@ class Toronto3D(BaseDataset):
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.array([0])
+        self.ignored_labels = np.array(cfg.ignored_label_inds)
 
         self.train_files = [
             join(self.cfg.dataset_path, f) for f in cfg.train_files
@@ -117,6 +117,9 @@ class Toronto3D(BaseDataset):
 
         pred = results['predict_labels']
         pred = np.array(pred)
+
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
 
         store_path = join(path, self.name, name + '.npy')
         make_dir(Path(store_path).parent)

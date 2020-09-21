@@ -114,6 +114,9 @@ class ParisLille3D(BaseDataset):
         pred = results['predict_labels']
         pred = np.array(pred)
 
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
+
         store_path = join(path, self.name, name + '.npy')
         make_dir(Path(store_path).parent)
         np.save(store_path, pred)

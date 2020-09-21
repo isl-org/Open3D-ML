@@ -143,7 +143,8 @@ class SemanticKITTI(BaseDataset):
         pred = results['predict_labels']
 
         store_path = join(save_path, name_points + '.label')
-        pred = pred + 1
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
         pred = self.remap_lut[pred].astype(np.uint32)
         pred.tofile(store_path)
 

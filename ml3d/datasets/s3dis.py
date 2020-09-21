@@ -8,10 +8,17 @@ import random
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
+import logging
 
 from .utils import DataProcessing
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+)
+log = logging.getLogger(__name__)
 
 
 class S3DIS(BaseDataset):
@@ -146,6 +153,9 @@ class S3DIS(BaseDataset):
 
         pred = results['predict_labels']
         pred = np.array(pred)
+
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
 
         store_path = join(path, self.name, name + '.npy')
         make_dir(Path(store_path).parent)
@@ -304,7 +314,7 @@ class S3DISSplit():
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
-        print("Found {} pointclouds for {}".format(len(path_list), split))
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
 
         self.path_list = path_list
         self.split = split
