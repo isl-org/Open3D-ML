@@ -112,7 +112,7 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     else:
         select_feat = feat[select_idx]
 
-    select_points = select_points - center_point  # TODO : add noise to center point
+    select_points = select_points #- center_point  # TODO : add noise to center point
 
     # select_points = select_points / np.linalg.norm(select_points)
     # select_feat = select_feat / np.linalg.norm(select_feat)

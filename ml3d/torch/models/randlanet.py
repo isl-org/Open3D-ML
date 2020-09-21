@@ -182,8 +182,9 @@ class RandLANet(BaseModel):
 
 
         if min_posbility_idx is not None:
+            center_point = pc[pick_idx, :].reshape(1, -1)
             dists = np.sum(
-                np.square((selected_pc).astype(np.float32)), 
+                np.square((selected_pc - center_point).astype(np.float32)), 
                 axis=1
             )
             delta = np.square(1 - dists / np.max(dists))
@@ -194,12 +195,10 @@ class RandLANet(BaseModel):
         t_augment = cfg.get('t_augment', None)
         pc = trans_augment(pc, t_augment)
 
-
-
         if feat is None:
-            feat = pc.copy()
+            feat = pc.copy()[:,2:]
         else:
-            feat = np.concatenate([selected_pc, feat], axis=1)
+            feat = np.concatenate([pc[:,2:], feat], axis=1)
 
         assert cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"

@@ -211,13 +211,14 @@ class SemanticSegmentation(BasePipeline):
             self.scheduler.step()
 
             # --------------------- validation
-            model.eval()
+            # model.eval()
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
+                
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
