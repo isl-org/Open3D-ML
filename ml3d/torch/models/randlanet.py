@@ -165,9 +165,6 @@ class RandLANet(BaseModel):
         feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
-        t_normalize = cfg.get('t_normalize', None)
-        pc, feat = trans_normalize(pc, feat, t_normalize)
-
         if min_posbility_idx is None:  # training
             pick_idx = np.random.choice(len(pc), 1)
         else:
@@ -176,17 +173,20 @@ class RandLANet(BaseModel):
         selected_pc, feat, label, selected_idx = \
             trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
-
         if min_posbility_idx is not None:
-            # center_point = pc[pick_idx, :].reshape(1, -1)
+            center_point = pc[pick_idx, :].reshape(1, -1)
             dists = np.sum(
-                np.square((selected_pc).astype(np.float32)), 
+                np.square((selected_pc-center_point).astype(np.float32)), 
                 axis=1
             )
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
         pc = selected_pc
+
+
+        t_normalize = cfg.get('t_normalize', None)
+        pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if attr['split'] in ['training', 'train']:
             t_augment = cfg.get('t_augment', None)
