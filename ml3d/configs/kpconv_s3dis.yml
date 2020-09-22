@@ -61,7 +61,7 @@ model:
   first_subsampling_dl: 0.04
   fixed_kernel_points: center
   ignored_label_inds: []
-  in_features_dim: 7
+  in_features_dim: 5
   in_points_dim: 3
   in_radius: 1.5
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
