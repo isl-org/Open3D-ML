@@ -52,7 +52,7 @@ class SemSegMetric(object):
             total_label += num_label
             accuracies.append(per_class_accuracy)
         # overall accuracy
-        accuracies.append(total_corret / total_label)
+        accuracies.append(np.nanmean(accuracies))
         #accuracies = np.array(accuracies)
 
         return accuracies
@@ -91,5 +91,5 @@ class SemSegMetric(object):
             total_i += num_i
             total_u += num_u
             ious.append(iou)
-        ious.append(total_i / total_u)
+        ious.append(np.nanmean(ious))
         return ious
