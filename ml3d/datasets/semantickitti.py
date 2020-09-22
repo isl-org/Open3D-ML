@@ -33,6 +33,7 @@ class SemanticKITTI(BaseDataset):
                      78858, 240942562, 17294618, 170599734, 6369672, 230413074,
                      101130274, 476491114, 9833174, 129609852, 4506626, 1168181
                  ],
+                 ignored_label_inds=[0],
                  test_result_folder='./test',
                  test_split=[
                      '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
@@ -61,6 +62,7 @@ class SemanticKITTI(BaseDataset):
                          cache_dir=cache_dir,
                          use_cache=use_cache,
                          class_weights=class_weights,
+                         ignored_label_inds=ignored_label_inds,
                          test_result_folder=test_result_folder,
                          test_split=test_split,
                          training_split=training_split,
