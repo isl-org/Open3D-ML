@@ -692,6 +692,10 @@ class KPFCNN(BaseModel):
     def inference_begin(self, data):
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
 
     def inference_preprocess(self):
         flat_inputs, point_inds, stacks_lengths = self.transform_inference(
@@ -700,8 +704,6 @@ class KPFCNN(BaseModel):
         self.test_meta['inds'] = point_inds
         self.test_meta['lens'] = stacks_lengths
 
-        self.inference_input = flat_inputs
-
         return flat_inputs
 
     def inference_end(self, results):
@@ -709,31 +711,30 @@ class KPFCNN(BaseModel):
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
         test_smooth = 0.98
-        probs = np.zeros(shape=[
-            self.inference_data['search_tree'].data.shape[0],
-            self.cfg.num_classes
-        ],
-                         dtype=np.float32)
-        inds = self.test_meta['inds']
 
+        inds = self.test_meta['inds']
         l = 0
         r = 0
         for len in self.test_meta['lens']:
             r += len
-            probs[inds[l:r]] = probs[inds[l:r]] * test_smooth + (
-                1 - test_smooth) * results[l:r]
+            self.test_probs[inds[l:r]] = self.test_probs[
+                inds[l:r]] * test_smooth + (1 - test_smooth) * results[l:r]
             l += len
 
-        reproj_inds = self.inference_data['proj_inds']
+        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
 
-        predict_scores = probs[reproj_inds]
-        inference_result = {
-            'predict_labels': np.argmax(predict_scores, 1),
-            'predict_scores': predict_scores
-        }
+        if np.min(self.possibility) > 0.5:
+            reproj_inds = self.inference_data['proj_inds']
+            predict_scores = self.test_probs[reproj_inds]
+            inference_result = {
+                'predict_labels': np.argmax(predict_scores, 1),
+                'predict_scores': predict_scores
+            }
 
-        self.inference_result = inference_result
-        return True
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def transform_inference(self, data):
         cfg = self.cfg
@@ -744,12 +745,12 @@ class KPFCNN(BaseModel):
         pi_list = []
         ci_list = []
 
+        n_points = 0
         points = np.array(data['search_tree'].data)
-        potentials = np.random.rand(points.shape[0]) * 1e-3
 
-        while (np.min(potentials) < 0.5):
+        while (n_points < cfg.batch_limit):
             cloud_ind = 0
-            point_ind = int(np.argmin(potentials))
+            point_ind = int(np.argmin(self.possibility))
 
             center_point = points[point_ind, :].reshape(1, -1)
             pick_point = center_point
@@ -758,17 +759,22 @@ class KPFCNN(BaseModel):
                                                           r=cfg.in_radius)[0]
 
             n = input_inds.shape[0]
+            n_points += n
 
             dists = np.sum(np.square(
                 (points[input_inds] - pick_point).astype(np.float32)),
                            axis=1)
             tuckeys = np.square(1 - dists / np.square(cfg.in_radius))
             tuckeys[dists > np.square(cfg.in_radius)] = 0
-            potentials[input_inds] += tuckeys
+            self.possibility[input_inds] += tuckeys
 
             input_points = (points[input_inds] - pick_point).astype(np.float32)
             input_colors = data['feat'][input_inds].astype(np.float32)
-            input_labels = np.zeros(input_points.shape[0]).astype(np.int32)
+
+            if len(data['label'][input_inds].shape) == 2:
+                input_labels = data['label'][input_inds][:, 0]
+            else:
+                input_labels = data['label'][input_inds]
 
             if n > 0:
                 p_list += [input_points]

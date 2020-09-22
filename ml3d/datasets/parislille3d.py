@@ -107,15 +107,20 @@ class ParisLille3D(BaseDataset):
 
     def save_test_result(self, results, attr):
         cfg = self.cfg
-        name = attr['name']
+        name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
         pred = results['predict_labels']
-        pred = np.array(self.label_to_names[pred])
+        pred = np.array(pred)
 
-        store_path = join(path, name + '.npy')
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
+
+        store_path = join(path, self.name, name + '.npy')
+        make_dir(Path(store_path).parent)
         np.save(store_path, pred)
+        log.info("Saved {} in {}.".format(name, store_path))
 
 
 class ParisLille3DSplit():

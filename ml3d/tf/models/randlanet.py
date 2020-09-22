@@ -547,7 +547,12 @@ class RandLANet(BaseModel):
         inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
+
+        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
+
         if np.min(self.possibility) > 0.5:
+            reproj_inds = self.inference_data['proj_inds']
+            self.test_probs = self.test_probs[reproj_inds]
             inference_result = {
                 'predict_labels': np.argmax(self.test_probs, 1),
                 'predict_scores': self.test_probs

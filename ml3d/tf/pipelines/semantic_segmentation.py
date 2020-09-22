@@ -85,6 +85,7 @@ class SemanticSegmentation(BasePipeline):
         dataset = self.dataset
         cfg = self.cfg
 
+        self.optimizer = model.get_optimizer(cfg)
         self.load_ckpt(model.cfg.ckpt_path)
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
@@ -94,12 +95,34 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
+        Metric = SemSegMetric(self, model, dataset)
+        Loss = SemSegLoss(self, model, dataset)
+
+        accs = []
+        ious = []
+
         test_split = dataset.get_split('test')
         for idx in tqdm(range(len(test_split)), desc='test'):
             attr = test_split.get_attr(idx)
             data = test_split.get_data(idx)
             results = self.run_inference(data)
+            scores, labels = Loss.filter_valid_label(results['predict_scores'],
+                                                     data['label'])
+
+            acc = Metric.acc(scores.numpy(), labels.numpy())
+            iou = Metric.iou(scores.numpy(), labels.numpy())
+            accs.append(acc)
+            ious.append(iou)
+
             dataset.save_test_result(results, attr)
+
+        accs = np.nanmean(np.array(accs), axis=0)
+        ious = np.nanmean(np.array(ious), axis=0)
+
+        log.info("Per class Accuracy : {}".format(accs[:-1]))
+        log.info("Per class IOUs : {}".format(ious[:-1]))
+        log.info("Overall Accuracy : {:.3f}".format(accs[-1]))
+        log.info("Overall IOU : {:.3f}".format(ious[-1]))
 
     def run_train(self, **kwargs):
         model = self.model
@@ -239,7 +262,7 @@ class SemanticSegmentation(BasePipeline):
                                                   max_to_keep=3)
 
         if ckpt_path:
-            self.ckpt.restore(ckpt_path)
+            self.ckpt.restore(ckpt_path).expect_partial()
             log.info("Restored from {}".format(ckpt_path))
         else:
             self.ckpt.restore(self.manager.latest_checkpoint)

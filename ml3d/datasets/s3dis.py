@@ -8,10 +8,17 @@ import random
 from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
+import logging
 
 from .utils import DataProcessing
 from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+)
+log = logging.getLogger(__name__)
 
 
 class S3DIS(BaseDataset):
@@ -140,15 +147,20 @@ class S3DIS(BaseDataset):
 
     def save_test_result(self, results, attr):
         cfg = self.cfg
-        name = attr['name']
+        name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
         pred = results['predict_labels']
-        pred = np.array(self.label_to_names[pred])
+        pred = np.array(pred)
 
-        store_path = join(path, name + '.npy')
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
+
+        store_path = join(path, self.name, name + '.npy')
+        make_dir(Path(store_path).parent)
         np.save(store_path, pred)
+        log.info("Saved {} in {}.".format(name, store_path))
 
     @staticmethod
     def write_ply(filename, field_list, field_names, triangular_faces=None):
@@ -302,7 +314,7 @@ class S3DISSplit():
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
-        print("Found {} pointclouds for {}".format(len(path_list), split))
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
 
         self.path_list = path_list
         self.split = split
@@ -325,10 +337,7 @@ class S3DISSplit():
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
 
-        if (self.split != 'test'):
-            labels = np.array(data['class'], dtype=np.int32).reshape((-1,))
-        else:
-            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        labels = np.array(data['class'], dtype=np.int32).reshape((-1,))
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
