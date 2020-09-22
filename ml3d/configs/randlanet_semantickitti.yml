@@ -11,13 +11,13 @@ dataset:
   all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   validation_split: ['08']
-  use_cache: false
+  use_cache: train
   validation_split:
   - '08'
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # ../dataset/checkpoints/randlanet_semantickitti.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 3
   dim_output:

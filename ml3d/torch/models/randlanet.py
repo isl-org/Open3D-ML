@@ -260,15 +260,6 @@ class RandLANet(BaseModel):
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
-        # print(np.min(self.possibility))
-
-        pred_label = torch.max(results, dim=-1).indices
-        print(inputs['data']['features'])
-        print(pred_label)
-        print(pred_label.min(), pred_label.max())
-        print(results.size())
-
-
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)
             pred_labels = pred_labels[self.inference_proj_inds]

@@ -180,14 +180,6 @@ class Toronto3DSplit():
         feat[:, 2] = data['blue']
 
         labels = np.array(data['scalar_Label'], dtype=np.int32)
-<<<<<<< HEAD
-
-        # if (self.split != 'test'):
-        #     labels = np.array(data['scalar_Label'], dtype=np.int32)
-        # else:
-        #     labels = np.zeros((points.shape[0],), dtype=np.int32)
-=======
->>>>>>> master
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
