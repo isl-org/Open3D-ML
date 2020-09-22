@@ -48,14 +48,18 @@ model:
     noise_level: 0.01
     min_s: 0.9
     max_s: 1.1
+  t_normalize:
+    method: linear
+    points_bias: 0
+    points_scale: 100
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.004
   batch_size: 1
   main_log_dir: ./logs
-  max_epoch: 100
+  max_epoch: 200
   save_ckpt_freq: 5
-  scheduler_gamma: 0.978
+  scheduler_gamma: 0.9886
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1

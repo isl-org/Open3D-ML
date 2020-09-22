@@ -57,7 +57,7 @@ model:
   t_normalize:
     method: linear
     points_bias: 0
-    points_scale: 1
+    points_scale: [100000, 1000000, 100]
     feat_bias: 0
     feat_scale: 255
 pipeline:
@@ -66,9 +66,9 @@ pipeline:
   batch_size: 1
   learning_rate: 0.01
   main_log_dir: ./logs
-  max_epoch: 100
+  max_epoch: 200
   save_ckpt_freq: 5
-  scheduler_gamma: 0.978
+  scheduler_gamma: 0.9886
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1
