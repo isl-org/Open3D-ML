@@ -103,7 +103,6 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     else:
         select_idx = search_tree.query(center_point, k=num_points)[1][0]
 
-    # select_idx = DataProcessing.shuffle_idx(select_idx)
     random.shuffle(select_idx)
     select_points = points[select_idx]
     select_labels = labels[select_idx]

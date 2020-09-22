@@ -31,10 +31,6 @@ class RandLANet(BaseModel):
             num_classes=19,  # Number of valid classes
             ignored_label_inds=[0],
             sub_sampling_ratio=[4, 4, 4, 4],
-            num_sub_points=[
-                4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
-                4096 * 11 // 256
-            ],
             dim_input=3,  # 3 + feature_dimension.
             dim_feature=8,
             dim_output=[16, 64, 128, 256],
@@ -51,7 +47,6 @@ class RandLANet(BaseModel):
                          num_classes=num_classes,
                          ignored_label_inds=ignored_label_inds,
                          sub_sampling_ratio=sub_sampling_ratio,
-                         num_sub_points=num_sub_points,
                          dim_input=dim_input,
                          dim_feature=dim_feature,
                          dim_output=dim_output,
@@ -156,6 +151,7 @@ class RandLANet(BaseModel):
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
+
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores

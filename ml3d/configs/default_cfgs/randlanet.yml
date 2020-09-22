@@ -14,11 +14,6 @@ k_n: 16
 num_classes: 19
 num_layers: 4
 num_points: 45056
-num_sub_points:
-- 11264
-- 2816
-- 704
-- 176
 sub_sampling_ratio:
 - 4
 - 4
