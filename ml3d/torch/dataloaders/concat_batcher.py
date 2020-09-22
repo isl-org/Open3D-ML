@@ -89,6 +89,7 @@ class SemanticKittiCustomBatch:
             # Use color + height
             stacked_features = np.hstack((stacked_features, features[:, 2:6]))
         elif self.cfg.in_features_dim >= 6:
+
             assert features.shape[1] > 3, "feat from dataset can not be None \
                         or try to set in_features_dim = 1, 2, 4"
 

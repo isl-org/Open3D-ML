@@ -2,14 +2,16 @@ dataset:
   name: Semantic3D
   dataset_path: # path/to/your/dataset
   cache_dir: .logs/cache/
-  class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353, 269353]
+  class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353]
   ignored_label_inds:
   - 0
   num_points: 65536
   prepro_grid_size: 0.06
   test_result_folder: ./test
   use_cache: true
-  val_split: 1
+  val_files:
+  - bildstein_station3_xyz_intensity_rgb
+  - sg27_station2_intensity_rgb
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
@@ -64,10 +66,10 @@ model:
   in_features_dim: 5
   in_points_dim: 3
   in_radius: 1.5
-  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   max_in_points: 20000
   modulated: false
-  num_classes: 9
+  num_classes: 8
   num_kernel_points: 15
   num_layers: 5
   repulse_extent: 1.2

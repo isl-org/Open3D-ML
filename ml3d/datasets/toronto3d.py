@@ -82,7 +82,7 @@ class Toronto3D(BaseDataset):
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.array([0])
+        self.ignored_labels = np.array(cfg.ignored_label_inds)
 
         self.train_files = [
             join(self.cfg.dataset_path, f) for f in cfg.train_files
@@ -122,15 +122,20 @@ class Toronto3D(BaseDataset):
             return False
     def save_test_result(self, results, attr):
         cfg = self.cfg
-        name = attr['name']
+        name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
         pred = results['predict_labels']
-        # pred = np.array(self.label_to_names[pred])
+        pred = np.array(pred)
 
-        store_path = join(path, name + '.npy')
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
+
+        store_path = join(path, self.name, name + '.npy')
+        make_dir(Path(store_path).parent)
         np.save(store_path, pred)
+        log.info("Saved {} in {}.".format(name, store_path))
 
 
 class Toronto3DSplit():
@@ -175,11 +180,14 @@ class Toronto3DSplit():
         feat[:, 2] = data['blue']
 
         labels = np.array(data['scalar_Label'], dtype=np.int32)
+<<<<<<< HEAD
 
         # if (self.split != 'test'):
         #     labels = np.array(data['scalar_Label'], dtype=np.int32)
         # else:
         #     labels = np.zeros((points.shape[0],), dtype=np.int32)
+=======
+>>>>>>> master
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
