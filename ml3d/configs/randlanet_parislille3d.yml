@@ -18,7 +18,7 @@ model:
   batcher: DefaultBatcher
   ckpt_path: #./logs/RandLANet_torch/checkpoint/ckpt_120.pth # path/to/your/checkpoint
   dim_feature: 8
-  dim_input: 1
+  dim_input: 3
   dim_output:
   - 16
   - 64
@@ -46,7 +46,7 @@ model:
   - 2
   weight_decay: 0.1
   t_augment:
-    turn_on: true
+    turn_on: false
     rotation_method: vertical
     scale_anisotropic: false
     symmetries: true

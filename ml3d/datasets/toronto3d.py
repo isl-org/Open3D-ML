@@ -116,6 +116,7 @@ class Toronto3D(BaseDataset):
         path = cfg.test_result_folder
         store_path = join(path, name + '.npy')
         if exists(store_path):
+            print("{} already exists.".format(store_path))
             return True
         else:
             return False
@@ -126,7 +127,7 @@ class Toronto3D(BaseDataset):
         make_dir(path)
 
         pred = results['predict_labels']
-        pred = np.array(self.label_to_names[pred])
+        # pred = np.array(self.label_to_names[pred])
 
         store_path = join(path, name + '.npy')
         np.save(store_path, pred)
@@ -173,10 +174,12 @@ class Toronto3DSplit():
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
 
-        if (self.split != 'test'):
-            labels = np.array(data['scalar_Label'], dtype=np.int32)
-        else:
-            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        labels = np.array(data['scalar_Label'], dtype=np.int32)
+
+        # if (self.split != 'test'):
+        #     labels = np.array(data['scalar_Label'], dtype=np.int32)
+        # else:
+        #     labels = np.zeros((points.shape[0],), dtype=np.int32)
 
         data = {'point': points, 'feat': feat, 'label': labels}
 

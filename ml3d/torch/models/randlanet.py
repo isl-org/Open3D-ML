@@ -182,9 +182,9 @@ class RandLANet(BaseModel):
 
 
         if min_posbility_idx is not None:
-            center_point = pc[pick_idx, :].reshape(1, -1)
+            # center_point = pc[pick_idx, :].reshape(1, -1)
             dists = np.sum(
-                np.square((selected_pc - center_point).astype(np.float32)), 
+                np.square((selected_pc).astype(np.float32)), 
                 axis=1
             )
             delta = np.square(1 - dists / np.max(dists))
@@ -192,13 +192,14 @@ class RandLANet(BaseModel):
             inputs['point_inds'] = selected_idx
         pc = selected_pc
 
-        t_augment = cfg.get('t_augment', None)
-        pc = trans_augment(pc, t_augment)
+        if attr['split'] in ['training', 'train']:
+            t_augment = cfg.get('t_augment', None)
+            pc = trans_augment(pc, t_augment)
 
         if feat is None:
-            feat = pc.copy()[:,2:]
+            feat = pc.copy()
         else:
-            feat = np.concatenate([pc[:,2:], feat], axis=1)
+            feat = np.concatenate([pc, feat], axis=1)
 
         assert cfg.dim_input == feat.shape[
             1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
@@ -233,7 +234,9 @@ class RandLANet(BaseModel):
     def inference_begin(self, data):
         self.test_smooth = 0.98
         attr = {'split': 'test'}
+        self.inference_ori_data = data
         self.inference_data = self.preprocess(data, attr)
+        self.inference_proj_inds = self.inference_data['proj_inds']
         num_points = self.inference_data['search_tree'].data.shape[0]
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
@@ -242,8 +245,9 @@ class RandLANet(BaseModel):
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
-        data = self.transform(self.inference_data, {}, min_posbility_idx)
-        inputs = {'data': data, 'attr': []}
+        attr = {'split': 'test'}
+        data = self.transform(self.inference_data, attr, min_posbility_idx)
+        inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
 
@@ -259,11 +263,20 @@ class RandLANet(BaseModel):
         inds = inputs['data']['point_inds'][0, :]
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
+
+        print(np.min(self.possibility))
+
         if np.min(self.possibility) > 0.5:
+            pred_labels = np.argmax(self.test_probs, 1)
+            pred_labels = pred_labels[self.inference_proj_inds]
+            test_probs = self.test_probs[self.inference_proj_inds]
             inference_result = {
-                'predict_labels': np.argmax(self.test_probs, 1),
-                'predict_scores': self.test_probs
+                'predict_labels': pred_labels,
+                'predict_scores': test_probs
             }
+            data = self.inference_ori_data
+            acc = (pred_labels == data['label']-1).mean()
+
             self.inference_result = inference_result
             return True
         else:

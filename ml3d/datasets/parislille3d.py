@@ -111,6 +111,7 @@ class ParisLille3D(BaseDataset):
         path = cfg.test_result_folder
         store_path = join(path, name + '.npy')
         if exists(store_path):
+            print("{} already exists.".format(store_path))
             return True
         else:
             return False
@@ -121,11 +122,10 @@ class ParisLille3D(BaseDataset):
         path = cfg.test_result_folder
         make_dir(path)
 
-        pred = results['predict_labels']
-        pred = np.array(self.label_to_names[pred])
+        pred = results['predict_labels'] + 1
 
-        store_path = join(path, name + '.npy')
-        np.save(store_path, pred)
+        store_path = join(path, name + '.txt')
+        np.savetxt(store_path, pred.astype(np.int32), fmt='%d')
 
 
 class ParisLille3DSplit():

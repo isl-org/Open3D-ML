@@ -15,8 +15,8 @@ dataset:
   val_files:
   - L002.ply
   use_cache: True
-  steps_per_epoch_train: 100
-  steps_per_epoch_valid: 10
+  # steps_per_epoch_train: 100
+  # steps_per_epoch_valid: 10
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint

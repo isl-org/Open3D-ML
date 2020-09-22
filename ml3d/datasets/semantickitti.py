@@ -125,6 +125,7 @@ class SemanticKITTI(BaseDataset):
         test_file_name = name_points
         store_path = join(save_path, name_points + '.label')
         if exists(store_path):
+            print("{} already exists.".format(store_path))
             return True
         else:
             return False

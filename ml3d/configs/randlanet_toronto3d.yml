@@ -5,6 +5,7 @@ dataset:
   class_weights: [41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634, 374721]
   ignored_label_inds:
   - 0
+  num_classes: 8
   num_points: 65536
   prepro_grid_size: 0.06
   test_files:
@@ -22,9 +23,9 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: #../dataset/checkpoints/RandLANet_Toronto3D_torch_ckpt_80.pth
   dim_feature: 8
-  dim_input: 4
+  dim_input: 6
   dim_output:
   - 16
   - 64
@@ -56,9 +57,9 @@ model:
     rotation_method: vertical
     scale_anisotropic: false
     symmetries: true
-    noise_level: 0.01
-    min_s: 0.5
-    max_s: 2
+    noise_level: 0.001
+    min_s: 0.9
+    max_s: 1.1
   t_normalize:
     method: linear
     points_bias: 0
@@ -77,3 +78,5 @@ pipeline:
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1
+  test_continue: false
+  test_compute_metric: true
