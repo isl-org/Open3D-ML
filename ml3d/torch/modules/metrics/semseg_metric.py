@@ -87,16 +87,15 @@ class SemSegMetric(object):
 
     def filter_valid_label_np(self, pred, gt):
         """filter out invalid points"""
-       
+
         ignored_label_inds = self.dataset.cfg.ignored_label_inds
 
         ignored_bool = np.zeros_like(gt, dtype=np.bool)
         for ign_label in ignored_label_inds:
-            ignored_bool = np.logical_or(ignored_bool,
-                                            np.equal(gt, ign_label))
+            ignored_bool = np.logical_or(ignored_bool, np.equal(gt, ign_label))
 
         valid_idx = np.where(np.logical_not(ignored_bool))[0]
-    
+
         valid_pred = pred[valid_idx]
         valid_gt = gt[valid_idx]
 
@@ -106,10 +105,11 @@ class SemSegMetric(object):
 
         for ign_label in ignored_label_inds:
             reducing_list = np.concatenate([
-                reducing_list[:ign_label], inserted_value, reducing_list[ign_label:]
+                reducing_list[:ign_label], inserted_value,
+                reducing_list[ign_label:]
             ], 0)
 
-        valid_gt = reducing_list[valid_pred]
+        valid_gt = reducing_list[valid_gt]
 
         return valid_pred, valid_gt
 
@@ -130,14 +130,13 @@ class SemSegMetric(object):
             iou = iou / (pred_mask | labels_mask).sum()
             n_total += (pred_mask | labels_mask).sum()
             ious.append(iou)
-        # weighted
-        # ious.append((n_correct / n_total))
 
         ious.append(np.nanmean(ious))
         return ious
 
     def acc_np_label(self, pred, gt):
         valid_pred, valid_gt = self.filter_valid_label_np(pred, gt)
+
         num_classes = self.dataset.num_classes
 
         accuracies = []
@@ -153,8 +152,6 @@ class SemSegMetric(object):
             per_class_accuracy /= label_mask.sum()
             n_total += label_mask.sum()
             accuracies.append(per_class_accuracy)
-        # weighted
-        # accuracies.append(n_correct / n_total)
 
         accuracies.append(np.nanmean(accuracies))
         return accuracies

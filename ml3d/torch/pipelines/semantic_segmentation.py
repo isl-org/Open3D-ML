@@ -125,8 +125,7 @@ class SemanticSegmentation(BasePipeline):
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
                 attr = datset_split.get_attr(idx)
-                if (cfg.get('test_continue', True) and 
-                    dataset.is_tested(attr)):
+                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
                     continue
                 data = datset_split.get_data(idx)
                 results = self.run_inference(data)
@@ -141,8 +140,8 @@ class SemanticSegmentation(BasePipeline):
                 dataset.save_test_result(results, attr)
 
         if cfg.get('test_compute_metric', False):
-            log.info("test acc: {}". format(self.test_accs))
-            log.info("test iou: {}". format(self.test_ious))
+            log.info("test acc: {}".format(self.test_accs))
+            log.info("test iou: {}".format(self.test_ious))
 
     def run_train(self):
         model = self.model
@@ -216,13 +215,6 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = metric.acc(predict_scores, gt_labels)
                 iou = metric.iou(predict_scores, gt_labels)
-
-                pred_label = torch.max(predict_scores, dim=-2).indices
-                print(inputs['data']['features'])
-                print(pred_label)
-                print(pred_label.min(), pred_label.max())
-                print(results.size())
-                print(acc[-1], iou[-1])
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
@@ -338,7 +330,6 @@ class SemanticSegmentation(BasePipeline):
                  scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
-
 
 
 PIPELINE._register_module(SemanticSegmentation, "torch")

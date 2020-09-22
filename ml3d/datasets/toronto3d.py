@@ -109,7 +109,6 @@ class Toronto3D(BaseDataset):
 
         return files
 
-
     def is_tested(self, attr):
         cfg = self.cfg
         name = attr['name']
@@ -120,6 +119,7 @@ class Toronto3D(BaseDataset):
             return True
         else:
             return False
+
     def save_test_result(self, results, attr):
         cfg = self.cfg
         name = attr['name'].split('.')[0]

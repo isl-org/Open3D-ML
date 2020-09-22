@@ -130,11 +130,9 @@ class RandLANet(BaseModel):
         return select_points, select_feat, select_labels, select_idx
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(
-            self.parameters(), 
-            lr=cfg_pipeline.adam_lr, 
-            weight_decay=self.cfg.weight_decay
-            )
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     lr=cfg_pipeline.adam_lr,
+                                     weight_decay=self.cfg.weight_decay)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
@@ -174,23 +172,18 @@ class RandLANet(BaseModel):
             trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
         if min_posbility_idx is not None:
-            # center_point = pc[pick_idx, :].reshape(1, -1)
-            dists = np.sum(
-                np.square((selected_pc).astype(np.float32)), 
-                axis=1
-            )
+            dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
         pc = selected_pc
 
-
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
-        # if attr['split'] in ['training', 'train']:
-        #     t_augment = cfg.get('t_augment', None)
-        #     pc = trans_augment(pc, t_augment)
+        if attr['split'] in ['training', 'train']:
+            t_augment = cfg.get('t_augment', None)
+            pc = trans_augment(pc, t_augment)
 
         if feat is None:
             feat = pc.copy()
@@ -256,12 +249,18 @@ class RandLANet(BaseModel):
         results = m_softmax(results)
         results = results.cpu().data.numpy()
         probs = np.reshape(results, [-1, self.cfg.num_classes])
+
+        pred_l = np.argmax(probs, 1)
+
         inds = inputs['data']['point_inds'][0, :]
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
+        print(np.min(self.possibility))
+
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)
+
             pred_labels = pred_labels[self.inference_proj_inds]
             test_probs = self.test_probs[self.inference_proj_inds]
             inference_result = {
@@ -269,8 +268,7 @@ class RandLANet(BaseModel):
                 'predict_scores': test_probs
             }
             data = self.inference_ori_data
-            acc = (pred_labels == data['label']-1).mean()
-
+            acc = (pred_labels == data['label'] - 1).mean()
 
             self.inference_result = inference_result
             return True

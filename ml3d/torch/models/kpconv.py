@@ -338,8 +338,6 @@ class KPFCNN(BaseModel):
 
         num_merged = 0
 
-
-
         data = {
             'p_list': [],
             'f_list': [],
@@ -361,7 +359,6 @@ class KPFCNN(BaseModel):
         while curr_num_points < min_in_points:
             new_points = points.copy()
 
-
             # In case radius smaller than 50m, chose new center on a point of the wanted class or not
             # TODO balance
 
@@ -377,23 +374,21 @@ class KPFCNN(BaseModel):
                           axis=1) < self.cfg.in_radius**2
             mask_inds = np.where(mask)[0].astype(np.int32)
 
-
             # Shuffle points
             rand_order = np.random.permutation(mask_inds)
             curr_new_points = new_points[rand_order]
             curr_sem_labels = sem_labels[rand_order]
 
-
             # In case of validation, keep the original points in memory
             if attr['split'] in ['test']:
-                o_pts = new_points 
+                o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
             if feat is None:
                 curr_new_coords = curr_new_points
             else:
-                curr_new_coords = np.hstack((curr_new_points, 
-                    feat[rand_order, :]))
+                curr_new_coords = np.hstack(
+                    (curr_new_points, feat[rand_order, :]))
 
             in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
                 curr_new_points,
@@ -433,11 +428,9 @@ class KPFCNN(BaseModel):
                                               return_distance=False)
                 proj_inds = np.squeeze(proj_inds).astype(np.int32)
 
-
-                dists = np.sum(
-                    np.square((o_pts[reproj_mask] - p0).astype(np.float32)), 
-                    axis=1
-                )
+                dists = np.sum(np.square(
+                    (o_pts[reproj_mask] - p0).astype(np.float32)),
+                               axis=1)
                 delta = np.square(1 - dists / np.max(dists))
                 self.possibility[reproj_mask] += delta
 
@@ -494,16 +487,13 @@ class KPFCNN(BaseModel):
         # proj_inds = inputs['data'].reproj_inds[0]
         # results = results[proj_inds]
 
-
-
         # Get probs and labels
         lengths = batch.lengths[0].cpu().numpy()
-     
+
         f_inds = batch.frame_inds.cpu().numpy()
         r_inds_list = batch.reproj_inds
         r_mask_list = batch.reproj_masks
         labels_list = batch.val_labels
-
 
         # Get predictions and labels per instance
         # ***************************************
@@ -524,7 +514,7 @@ class KPFCNN(BaseModel):
             if proj_probs.ndim < 2:
                 proj_probs = np.expand_dims(proj_probs, 0)
             # Save probs in a binary file (uint8 format for lighter weight)
-        
+
             frame_probs = self.test_probs[proj_mask, :]
             frame_probs = self.test_smooth * frame_probs + \
                 (1 - self.test_smooth) * proj_probs
