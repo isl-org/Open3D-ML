@@ -697,7 +697,6 @@ class KPFCNN(BaseModel):
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
 
-
     def inference_preprocess(self):
         flat_inputs, point_inds, stacks_lengths = self.transform_inference(
             self.inference_data)
@@ -718,8 +717,8 @@ class KPFCNN(BaseModel):
         r = 0
         for len in self.test_meta['lens']:
             r += len
-            self.test_probs[inds[l:r]] = self.test_probs[inds[l:r]] * test_smooth + (
-                1 - test_smooth) * results[l:r]
+            self.test_probs[inds[l:r]] = self.test_probs[
+                inds[l:r]] * test_smooth + (1 - test_smooth) * results[l:r]
             l += len
 
         # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
@@ -776,7 +775,6 @@ class KPFCNN(BaseModel):
                 input_labels = data['label'][input_inds][:, 0]
             else:
                 input_labels = data['label'][input_inds]
-
 
             if n > 0:
                 p_list += [input_points]
