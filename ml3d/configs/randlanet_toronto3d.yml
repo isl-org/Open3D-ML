@@ -63,7 +63,7 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 1
+  batch_size: 4
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 200

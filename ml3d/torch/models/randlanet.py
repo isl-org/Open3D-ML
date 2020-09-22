@@ -185,12 +185,12 @@ class RandLANet(BaseModel):
         pc = selected_pc
 
 
-        t_normalize = cfg.get('t_normalize', None)
-        pc, feat = trans_normalize(pc, feat, t_normalize)
+        # t_normalize = cfg.get('t_normalize', None)
+        # pc, feat = trans_normalize(pc, feat, t_normalize)
 
-        if attr['split'] in ['training', 'train']:
-            t_augment = cfg.get('t_augment', None)
-            pc = trans_augment(pc, t_augment)
+        # if attr['split'] in ['training', 'train']:
+        #     t_augment = cfg.get('t_augment', None)
+        #     pc = trans_augment(pc, t_augment)
 
         if feat is None:
             feat = pc.copy()

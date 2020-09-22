@@ -55,7 +55,7 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.004
-  batch_size: 1
+  batch_size: 4
   main_log_dir: ./logs
   max_epoch: 200
   save_ckpt_freq: 5
