@@ -23,7 +23,7 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ../dataset/checkpoints/RandLANet_Toronto3D_torch200.pth
+  ckpt_path: ../dataset/checkpoints/ckpt_20.pth
   dim_feature: 8
   dim_input: 6
   dim_output:
@@ -57,13 +57,13 @@ model:
   t_normalize:
     method: linear
     points_bias: 0
-    points_scale: [100000, 1000000, 100]
+    points_scale: 1
     feat_bias: 0
     feat_scale: 255
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 4
+  batch_size: 1
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 200

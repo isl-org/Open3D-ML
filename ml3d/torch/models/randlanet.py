@@ -174,9 +174,9 @@ class RandLANet(BaseModel):
             trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
         if min_posbility_idx is not None:
-            center_point = pc[pick_idx, :].reshape(1, -1)
+            # center_point = pc[pick_idx, :].reshape(1, -1)
             dists = np.sum(
-                np.square((selected_pc-center_point).astype(np.float32)), 
+                np.square((selected_pc).astype(np.float32)), 
                 axis=1
             )
             delta = np.square(1 - dists / np.max(dists))
@@ -185,8 +185,8 @@ class RandLANet(BaseModel):
         pc = selected_pc
 
 
-        # t_normalize = cfg.get('t_normalize', None)
-        # pc, feat = trans_normalize(pc, feat, t_normalize)
+        t_normalize = cfg.get('t_normalize', None)
+        pc, feat = trans_normalize(pc, feat, t_normalize)
 
         # if attr['split'] in ['training', 'train']:
         #     t_augment = cfg.get('t_augment', None)
