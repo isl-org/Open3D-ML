@@ -804,12 +804,14 @@ class Visualizer:
         # Update scalar values
         if attr is not None:
             if len(attr.shape) == 1:
-                uv = np.column_stack((attr, [0.0] * len(attr)))
+                scalar = attr
             else:
-                uv = np.column_stack((attr[:,0], [0.0] * len(attr)))
+                scalar = attr[:,0]
         else:
-            uv = [[0.0, 0.0]] * len(tcloud.point["points"].as_tensor().numpy())
-        tcloud.point["uv"] = o3d.core.TensorList.from_tensor(o3d.core.Tensor(np.array(uv, dtype='float32')), inplace=True)
+            shape = [len(tcloud.point["points"].as_tensor().numpy())]
+            scalar = np.zeros(shape, dtype='float32')
+        tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(scalar)
+
         flag |= rendering.Scene.UPDATE_UV0_FLAG
 
         # Update RGB values
