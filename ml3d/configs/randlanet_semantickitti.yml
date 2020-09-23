@@ -1,6 +1,6 @@
 dataset:
   name: SemanticKITTI
-  dataset_path: # path/to/your/dataset
+  dataset_path:  # path/to/your/dataset
   cache_dir: ./logs/cache
   class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
     78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
@@ -32,11 +32,6 @@ model:
   num_classes: 19
   num_layers: 4
   num_points: 45056
-  num_sub_points:
-  - 11264
-  - 2816
-  - 704
-  - 176
   sub_sampling_ratio:
   - 4
   - 4
@@ -49,7 +44,7 @@ pipeline:
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 100
-  save_ckpt_freq: 20
+  save_ckpt_freq: 2
   scheduler_gamma: 0.95
   test_batch_size: 1
   train_sum_dir: train_log

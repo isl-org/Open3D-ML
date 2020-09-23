@@ -31,12 +31,6 @@ model:
   num_classes: 8
   num_layers: 5
   num_points: 65536
-  num_sub_points:
-  - 16384
-  - 4096
-  - 1024
-  - 256
-  - 128
   sub_sampling_ratio:
   - 4
   - 4

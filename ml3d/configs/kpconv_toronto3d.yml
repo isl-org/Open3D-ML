@@ -5,8 +5,6 @@ dataset:
   class_weights: [41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634, 374721]
   ignored_label_inds:
   - 0
-  num_points: 65536
-  prepro_grid_size: 0.06
   test_files:
   - L002.ply
   test_result_folder: ./test
@@ -17,8 +15,8 @@ dataset:
   val_files:
   - L002.ply
   use_cache: True
-  # steps_per_epoch_train: 1000
-  # steps_per_epoch_valid: 100
+  steps_per_epoch_train: 100
+  steps_per_epoch_valid: 10
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
@@ -86,13 +84,13 @@ pipeline:
   momentum: 0.98
   adam_lr: 0.01
   batch_size: 1
-  learning_rate: 0.01
+  learning_rate: 0.005
   lr_decays: 0.98477
-  deform_lr_factor: 0.1
+  deform_lr_factor: 0.05
   weight_decay: 0.001
   main_log_dir: ./logs
   max_epoch: 1000
-  save_ckpt_freq: 20
+  save_ckpt_freq: 5
   scheduler_gamma: 0.95
   test_batch_size: 1
   train_sum_dir: train_log

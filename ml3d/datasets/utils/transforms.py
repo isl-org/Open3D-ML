@@ -9,10 +9,10 @@ def trans_normalize(pc, feat, t_normalize):
 
     method = t_normalize['method']
     if method == 'linear':
-        points_bias = t_normalize.get('points_bias', pc.mean())
+        points_bias = t_normalize.get('points_bias', 0)
         pc -= points_bias
 
-        points_scale = t_normalize.get('points_scale', pc.max())
+        points_scale = t_normalize.get('points_scale', 1)
         pc /= points_scale
 
         if feat is not None:
@@ -103,7 +103,6 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     else:
         select_idx = search_tree.query(center_point, k=num_points)[1][0]
 
-    # select_idx = DataProcessing.shuffle_idx(select_idx)
     random.shuffle(select_idx)
     select_points = points[select_idx]
     select_labels = labels[select_idx]
@@ -112,8 +111,6 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     else:
         select_feat = feat[select_idx]
 
-    select_points = select_points - center_point  # TODO : add noise to center point
+    select_points = select_points - center_point
 
-    # select_points = select_points / np.linalg.norm(select_points)
-    # select_feat = select_feat / np.linalg.norm(select_feat)
     return select_points, select_feat, select_labels, select_idx

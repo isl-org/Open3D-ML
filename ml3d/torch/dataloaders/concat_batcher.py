@@ -81,10 +81,15 @@ class SemanticKittiCustomBatch:
             stacked_features = np.hstack((stacked_features, features[:, 2:4]))
         elif self.cfg.in_features_dim == 4:
             # Use all coordinates
-            stacked_features = np.hstack((stacked_features, features[:3]))
+            stacked_features = np.hstack((stacked_features, features[:, :3]))
         elif self.cfg.in_features_dim == 5:
+            assert features.shape[1] >= 6, "feat from dataset should have \
+                    at least 3 dims, or try to set in_features_dim = 1, 2, 4"
+
+            # Use color + height
             stacked_features = np.hstack((stacked_features, features[:, 2:6]))
-        elif self.cfg.in_features_dim > 5:
+        elif self.cfg.in_features_dim >= 6:
+
             assert features.shape[1] > 3, "feat from dataset can not be None \
                         or try to set in_features_dim = 1, 2, 4"
 

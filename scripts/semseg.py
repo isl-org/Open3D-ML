@@ -108,10 +108,10 @@ def main():
         model = Model(**cfg_dict_model)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
-    if args.split is 'train':
-        pipeline.run_train()
-    else:
+    if args.split == 'test':
         pipeline.run_test()
+    else:
+        pipeline.run_train()
 
 
 if __name__ == '__main__':

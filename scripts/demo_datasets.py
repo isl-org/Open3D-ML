@@ -2,6 +2,7 @@ from ml3d.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
                            Toronto3D)
 import argparse
 import yaml
+import numpy as np
 
 
 def parse_args():
@@ -42,6 +43,21 @@ def demo_dataset(args):
             Semantic3D(dataset_path=args.path_semantick3d, use_cache=False))
     if args.path_s3dis is not None:
         datasets.append(S3DIS(dataset_path=args.path_s3dis, use_cache=False))
+
+    for dataset in datasets:
+        print(dataset.name)
+        cat_num = len(dataset.label_to_names)
+        num_labels = np.zeros([cat_num])
+
+        split = dataset.get_split('train')
+        for i in range(len(split)):
+            data = split.get_data(i)
+            labels = data['label']
+            for l in range(cat_num):
+                num_labels[l] += (labels == l).sum()
+
+        print(num_labels)
+    exit()
 
     for dataset in datasets:
         print(dataset.label_to_names)

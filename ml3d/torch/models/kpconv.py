@@ -312,163 +312,6 @@ class KPFCNN(BaseModel):
         return loss, labels, scores
 
     def transform(self, data, attr):
-        if attr['split'] == 'test':
-            return self.transform_test(data, attr)
-        else:
-            return self.transform_train(data, attr)
-
-    def transform_test(self, data, attr):
-
-        p_list = []
-        f_list = []
-        l_list = []
-        fi_list = []
-        p0_list = []
-        s_list = []
-        R_list = []
-        r_inds_list = []
-        r_mask_list = []
-        val_labels_list = []
-        batch_n = 0
-
-        # Initiate merged points
-        merged_points = np.zeros((0, 3), dtype=np.float32)
-        merged_labels = np.zeros((0,), dtype=np.int32)
-        merged_coords = np.zeros((0, 4), dtype=np.float32)
-
-        # Get center of the first frame in world coordinates
-        p_origin = np.zeros((1, 4))
-        p_origin[0, 3] = 1
-        #pose0 = self.poses[s_ind][f_ind]
-        #p0 = p_origin.dot(pose0.T)[:, :3]
-        p0 = p_origin[:, :3]
-        p0 = np.squeeze(p0)
-        o_pts = None
-        o_labels = None
-
-        num_merged = 0
-        f_inc = 0
-
-        # Read points
-        points = data['point']
-        sem_labels = data['label']
-
-        # Apply pose (without np.dot to avoid multi-threading)
-        hpoints = np.hstack((points, np.ones_like(points[:, :1])))
-        #new_points = hpoints.dot(pose.T)
-        #new_points = np.sum(np.expand_dims(hpoints, 2) * pose.T, axis=1)
-        # TODO pose
-        new_points = hpoints
-        #new_points[:, 3:] = points[:, 3:]
-
-        # In case of validation, keep the original points in memory
-        o_pts = new_points[:, :3].astype(np.float32)
-        o_labels = sem_labels.astype(np.int32)
-
-        # In case radius smaller than 50m, chose new center on a point of the wanted class or not
-        # TODO balance
-
-        wanted_ind = np.random.choice(new_points.shape[0])
-        p0 = new_points[wanted_ind, :3]
-
-        new_points = new_points[:, :3]
-        sem_labels = sem_labels[:]
-
-        new_coords = points[:, :]
-
-        # Increment merge count
-        merged_points = np.vstack((merged_points, new_points))
-        merged_labels = sem_labels  #np.hstack((merged_labels, sem_labels))
-        merged_coords = np.vstack((merged_coords, new_coords))
-
-        in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
-            merged_points,
-            features=merged_coords,
-            labels=merged_labels,
-            grid_size=self.cfg.first_subsampling_dl)
-
-        # Number collected
-        n = in_pts.shape[0]
-
-        # Safe check
-        if n < 2:
-            print("sample n < 2!")
-
-        # Project predictions on the frame points
-        search_tree = KDTree(in_pts, leaf_size=50)
-        proj_inds = search_tree.query(o_pts[:, :], return_distance=False)
-        proj_inds = np.squeeze(proj_inds).astype(np.int32)
-
-        # Data augmentation
-        in_pts, scale, R = self.augmentation_transform(in_pts)
-
-        # Stack batch
-        p_list += [in_pts]
-        f_list += [in_fts]
-        l_list += [np.squeeze(in_lbls)]
-        #fi_list += [[s_ind, f_ind]]
-        p0_list += [p0]
-        s_list += [scale]
-        R_list += [R]
-        r_inds_list += [proj_inds]
-        r_mask_list += [None]
-        val_labels_list += [o_labels]
-
-        ###################
-        # Concatenate batch
-        ###################
-
-        stacked_points = np.concatenate(p_list, axis=0)
-        features = np.concatenate(f_list, axis=0)
-        labels = np.concatenate(l_list, axis=0)
-        frame_inds = np.array(fi_list, dtype=np.int32)
-        frame_centers = np.stack(p0_list, axis=0)
-        stack_lengths = np.array([pp.shape[0] for pp in p_list], dtype=np.int32)
-        scales = np.array(s_list, dtype=np.float32)
-        rots = np.stack(R_list, axis=0)
-
-        # Input features (Use reflectance, input height or all coordinates)
-        stacked_features = np.ones_like(stacked_points[:, :1], dtype=np.float32)
-        if self.cfg.in_features_dim == 1:
-            pass
-        elif self.cfg.in_features_dim == 2:
-            # Use original height coordinate
-            stacked_features = np.hstack((stacked_features, features[:, 2:3]))
-        elif self.cfg.in_features_dim == 3:
-            # Use height + reflectance
-            stacked_features = np.hstack((stacked_features, features[:, 2:]))
-        elif self.cfg.in_features_dim == 4:
-            # Use all coordinates
-            stacked_features = np.hstack((stacked_features, features[:3]))
-        elif self.cfg.in_features_dim == 5:
-            # Use all coordinates + reflectance
-            stacked_features = np.hstack((stacked_features, features))
-        else:
-            raise ValueError(
-                'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
-            )
-
-        #######################
-        # Create network inputs
-        #######################
-        #
-        #   Points, neighbors, pooling indices for each layers
-        #
-
-        # Get the whole input list
-        input_list = self.segmentation_inputs(stacked_points, stacked_features,
-                                              labels.astype(np.int64),
-                                              stack_lengths)
-
-        # Add scale and rotation for testing
-        input_list += [
-            scales, rots, frame_inds, frame_centers, r_inds_list, r_mask_list,
-            val_labels_list
-        ]
-
-        return [self.cfg.num_layers] + input_list
-
-    def transform_train(self, data, attr):
         # Read points
         points = data['point']
         sem_labels = data['label']
@@ -477,10 +320,8 @@ class KPFCNN(BaseModel):
         dim_points = points.shape[1]
         if feat is None:
             dim_features = dim_points
-            new_coords = points
         else:
             dim_features = feat.shape[1] + dim_points
-            new_coords = np.hstack((points, feat))
 
         # Initiate merged points
         merged_points = np.zeros((0, dim_points), dtype=np.float32)
@@ -496,16 +337,6 @@ class KPFCNN(BaseModel):
         o_labels = None
 
         num_merged = 0
-
-        # Apply pose (without np.dot to avoid multi-threading)
-        hpoints = np.hstack((points, np.ones_like(points[:, :1])))
-
-        new_points = hpoints
-
-        # In case of validation, keep the original points in memory
-        if attr['split'] in ['validation', 'test']:
-            o_pts = new_points[:, :3].astype(np.float32)
-            o_labels = sem_labels.astype(np.int32)
 
         data = {
             'p_list': [],
@@ -524,24 +355,40 @@ class KPFCNN(BaseModel):
         max_num_points = min(self.cfg.batch_limit, self.cfg.max_in_points)
         min_in_points = self.cfg.get('min_in_points', 3)
         min_in_points = min(min_in_points, self.cfg.max_in_points)
+
         while curr_num_points < min_in_points:
+            new_points = points.copy()
 
             # In case radius smaller than 50m, chose new center on a point of the wanted class or not
             # TODO balance
-            if self.cfg.in_radius < 50.0:
+
+            if attr['split'] in ['test']:
+                wanted_ind = np.argmin(self.possibility)
+            else:
                 wanted_ind = np.random.choice(new_points.shape[0])
-                p0 = new_points[wanted_ind, :3]
+
+            p0 = new_points[wanted_ind]
 
             # Eliminate points further than config.in_radius
-            mask = np.sum(np.square(new_points[:, :3] - p0),
+            mask = np.sum(np.square(new_points - p0),
                           axis=1) < self.cfg.in_radius**2
             mask_inds = np.where(mask)[0].astype(np.int32)
 
             # Shuffle points
             rand_order = np.random.permutation(mask_inds)
-            curr_new_points = new_points[rand_order, :3]
+            curr_new_points = new_points[rand_order]
             curr_sem_labels = sem_labels[rand_order]
-            curr_new_coords = new_coords[rand_order, :]
+
+            # In case of validation, keep the original points in memory
+            if attr['split'] in ['test']:
+                o_pts = new_points
+                o_labels = sem_labels.astype(np.int32)
+
+            if feat is None:
+                curr_new_coords = curr_new_points
+            else:
+                curr_new_coords = np.hstack(
+                    (curr_new_points, feat[rand_order, :]))
 
             in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
                 curr_new_points,
@@ -570,7 +417,7 @@ class KPFCNN(BaseModel):
             curr_num_points += n
 
             # Before augmenting, compute reprojection inds (only for validation and test)
-            if attr['split'] in ['validation', 'test']:
+            if attr['split'] in ['test']:
                 # get val_points that are in range
                 radiuses = np.sum(np.square(o_pts - p0), axis=1)
                 reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
@@ -580,6 +427,13 @@ class KPFCNN(BaseModel):
                 proj_inds = search_tree.query(o_pts[reproj_mask, :],
                                               return_distance=False)
                 proj_inds = np.squeeze(proj_inds).astype(np.int32)
+
+                dists = np.sum(np.square(
+                    (o_pts[reproj_mask] - p0).astype(np.float32)),
+                               axis=1)
+                delta = np.square(1 - dists / np.max(dists))
+                self.possibility[reproj_mask] += delta
+
             else:
                 proj_inds = np.zeros((0,))
                 reproj_mask = np.zeros((0,))
@@ -604,13 +458,21 @@ class KPFCNN(BaseModel):
         return data
 
     def inference_begin(self, data):
+        self.test_smooth = 0.98
+        num_points = data['point'].shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
         self.inference_data = data
+
         from ..dataloaders import ConcatBatcher
         self.batcher = ConcatBatcher(self.device)
 
     def inference_preprocess(self):
-        data = self.transform_test(self.inference_data, {})
-        inputs = {'data': data, 'attr': []}
+
+        attr = {'split': 'test'}
+        data = self.transform(self.inference_data, attr)
+        inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
 
@@ -618,19 +480,52 @@ class KPFCNN(BaseModel):
 
     def inference_end(self, inputs, results):
         m_softmax = torch.nn.Softmax(dim=-1)
-        results = m_softmax(results)
-        results = results.cpu().data.numpy()
-        proj_inds = inputs['data'].reproj_inds[0]
-        results = results[proj_inds]
-        predict_scores = results
+        stk_probs = m_softmax(results)
+        stk_probs = results.cpu().data.numpy()
 
-        inference_result = {
-            'predict_labels': np.argmax(predict_scores, 1),
-            'predict_scores': predict_scores
-        }
+        batch = inputs['data']
 
-        self.inference_result = inference_result
-        return True
+        # Get probs and labels
+        lengths = batch.lengths[0].cpu().numpy()
+
+        f_inds = batch.frame_inds.cpu().numpy()
+        r_inds_list = batch.reproj_inds
+        r_mask_list = batch.reproj_masks
+        labels_list = batch.val_labels
+
+        i0 = 0
+        for b_i, length in enumerate(lengths):
+
+            # Get prediction
+            probs = stk_probs[i0:i0 + length]
+            proj_inds = r_inds_list[b_i]
+            proj_mask = r_mask_list[b_i]
+            frame_labels = labels_list[b_i]
+
+            # Project predictions on the frame points
+            proj_probs = probs[proj_inds]
+
+            # Safe check if only one point:
+            if proj_probs.ndim < 2:
+                proj_probs = np.expand_dims(proj_probs, 0)
+            # Save probs in a binary file (uint8 format for lighter weight)
+
+            frame_probs = self.test_probs[proj_mask, :]
+            frame_probs = self.test_smooth * frame_probs + \
+                (1 - self.test_smooth) * proj_probs
+            self.test_probs[proj_mask, :] = frame_probs
+
+            i0 += length
+        print(np.min(self.possibility))
+        if np.min(self.possibility) > 0.5:
+            inference_result = {
+                'predict_labels': np.argmax(self.test_probs, 1),
+                'predict_scores': self.test_probs
+            }
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def big_neighborhood_filter(self, neighbors, layer):
         """
