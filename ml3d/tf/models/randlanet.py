@@ -531,8 +531,8 @@ class RandLANet(BaseModel):
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
-        print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0],
-                             self.possibility.shape[0]))
+        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0],
+        #                      self.possibility.shape[0]))
 
         if np.min(self.possibility) > 0.5:
             reproj_inds = self.inference_data['proj_inds']
