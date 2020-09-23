@@ -48,6 +48,8 @@ class Model:
             # TensorList can be inplace.
             xyz = pts[:,[0,1,2]]
             tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
+            tcloud.point["points_raw"] = Visualizer._make_tcloud_array(pts)
+            known_attrs.add("points_raw")
         else:
             tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
         known_attrs.add("points")
