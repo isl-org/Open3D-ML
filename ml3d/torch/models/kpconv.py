@@ -484,8 +484,6 @@ class KPFCNN(BaseModel):
         stk_probs = results.cpu().data.numpy()
 
         batch = inputs['data']
-        # proj_inds = inputs['data'].reproj_inds[0]
-        # results = results[proj_inds]
 
         # Get probs and labels
         lengths = batch.lengths[0].cpu().numpy()
@@ -495,8 +493,6 @@ class KPFCNN(BaseModel):
         r_mask_list = batch.reproj_masks
         labels_list = batch.val_labels
 
-        # Get predictions and labels per instance
-        # ***************************************
 
         i0 = 0
         for b_i, length in enumerate(lengths):
