@@ -12,7 +12,8 @@ from sklearn.neighbors import KDTree
 from .base_model import BaseModel
 from ..utils import helper_tf
 from ...utils import MODEL
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
+                               trans_crop_pc)
 
 
 class RandLANet(BaseModel):
@@ -387,17 +388,30 @@ class RandLANet(BaseModel):
 
         return select_points, select_feat, select_labels, select_idx
 
-    def get_batch_gen(self, dataset):
+    def get_batch_gen(self, dataset, steps_per_epoch=None):
         cfg = self.cfg
 
         def gen():
-            for i in range(dataset.num_pc):
-                data, attr = dataset.read_data(i)
-                pick_idx = np.random.choice(len(data['point']), 1)
+            n_iters = dataset.num_pc if steps_per_epoch is None else steps_per_epoch
+            for i in range(n_iters):
+                data, attr = dataset.read_data(i % dataset.num_pc)
 
-                pc, feat, label, _ = self.crop_pc(data['point'], data['feat'],
-                                                  data['label'],
-                                                  data['search_tree'], pick_idx)
+                pc = data['point'].copy()
+                label = data['label'].copy()
+                feat = data['feat'].copy() if data['feat'] is not None else None
+                tree = data['search_tree']
+
+                pick_idx = np.random.choice(len(pc), 1)
+                pc, feat, label, _ = trans_crop_pc(pc, feat, label, tree,
+                                                   pick_idx,
+                                                   self.cfg.num_points)
+
+                t_normalize = cfg.get('t_normalize', None)
+                pc, feat = trans_normalize(pc, feat, t_normalize)
+
+                if attr['split'] in ['training', 'train']:
+                    t_augment = cfg.get('t_augment', None)
+                    pc = trans_augment(pc, t_augment)
 
                 if feat is None:
                     feat = pc.copy()

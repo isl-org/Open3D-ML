@@ -19,6 +19,7 @@ class TFDataloader():
                  dataset=None,
                  model=None,
                  use_cache=True,
+                 steps_per_epoch=None,
                  **kwargs):
         self.dataset = dataset
         self.model = model
@@ -26,6 +27,7 @@ class TFDataloader():
         self.transform = model.transform
         self.get_batch_gen = model.get_batch_gen
         self.model_cfg = model.cfg
+        self.steps_per_epoch = steps_per_epoch
 
         if self.preprocess is not None and use_cache:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
@@ -68,7 +70,9 @@ class TFDataloader():
         return data, attr
 
     def get_loader(self, batch_size=1, num_threads=3):
-        gen_func, gen_types, gen_shapes = self.get_batch_gen(self)
+        steps_per_epoch = self.steps_per_epoch * batch_size
+        gen_func, gen_types, gen_shapes = self.get_batch_gen(
+            self, steps_per_epoch)
 
         loader = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
 
@@ -80,6 +84,7 @@ class TFDataloader():
             loader = loader.batch(batch_size)
             length = len(self.dataset) / batch_size + 1 if len(
                 self.dataset) % batch_size else len(self.dataset) / batch_size
+            length = length if self.steps_per_epoch is None else self.steps_per_epoch
 
         else:
             if self.dataset.split not in ['train', 'training']:
