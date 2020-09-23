@@ -1,10 +1,12 @@
 import numpy as np
 import yaml
 import torch
+
 from os.path import join, exists, dirname, abspath
+from pathlib import Path
 
 # use relative import for being compatible with Open3d main repo
-from ...utils import Config, make_dir
+from ...utils import Config, make_dir, get_tb_hash
 
 
 class BasePipeline(object):
@@ -45,6 +47,13 @@ class BasePipeline(object):
         else:
             self.device = torch.device('cuda' if len(device.split(':')) ==
                                        1 else 'cuda:' + device.split(':')[1])
+
+        tensorboard_dir = join(
+            self.cfg.train_sum_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_torch')
+        hsh = get_tb_hash(tensorboard_dir)
+        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+                                    str(hsh) + '_' + Path(tensorboard_dir).name)
 
     def get_loss(self):
         raise NotImplementedError()

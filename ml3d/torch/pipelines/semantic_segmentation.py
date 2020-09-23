@@ -179,7 +179,8 @@ class SemanticSegmentation(BasePipeline):
 
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
 
-        writer = SummaryWriter(join(cfg.logs_dir, cfg.train_sum_dir))
+        writer = SummaryWriter(self.tensorboard_dir)
+        log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
 
@@ -271,11 +272,6 @@ class SemanticSegmentation(BasePipeline):
 
         # send results to tensorboard
         writer.add_scalars('Loss', loss_dict, epoch)
-
-        for i in range(self.model.cfg.num_classes):
-            writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i],
-                               epoch)
-            writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
 
         writer.add_scalars('Overall accuracy', acc_dicts[-1], epoch)
         writer.add_scalars('Mean IoU', iou_dicts[-1], epoch)

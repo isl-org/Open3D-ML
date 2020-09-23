@@ -149,8 +149,8 @@ class SemanticSegmentation(BasePipeline):
                                    use_cache=dataset.cfg.use_cache)
         valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
 
-        writer = tf.summary.create_file_writer(
-            join(cfg.logs_dir, cfg.train_sum_dir))
+        writer = tf.summary.create_file_writer(self.tensorboard_dir)
+        log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         self.optimizer = model.get_optimizer(cfg)
         self.load_ckpt(ckpt_path=model.cfg.ckpt_path)
@@ -238,11 +238,6 @@ class SemanticSegmentation(BasePipeline):
         with writer.as_default():
             for key, val in loss_dict.items():
                 tf.summary.scalar(key, val, epoch)
-            for i in range(self.model.cfg.num_classes):
-                for key, val in acc_dicts[i].items():
-                    tf.summary.scalar("{}/{}".format(key, i), val, epoch)
-                for key, val in iou_dicts[i].items():
-                    tf.summary.scalar("{}/{}".format(key, i), val, epoch)
 
             for key, val in acc_dicts[-1].items():
                 tf.summary.scalar("{}/ Overall".format(key), val, epoch)
