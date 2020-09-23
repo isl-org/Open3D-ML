@@ -118,7 +118,6 @@ class Model:
                     attr = attr[:,channel]
                 attr_min = min(attr_min, attr.min())
                 attr_max = max(attr_max, attr.max())
-                maxattr = max(attr)
             if attr_min <= attr_max:
                 self._attr2minmax[attr_key] = (attr_min, attr_max)
             else:
@@ -930,6 +929,15 @@ class Visualizer:
         else:
             self._set_shader(self.RAINBOW_NAME)
 
+    def _update_attr_range(self):
+        attr_name = self._datasource_combobox.selected_text
+        current_channel = self._colormap_channel.selected_index
+        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name, current_channel)
+
+        if self._shader.selected_text in self._colormaps:
+            cmap = self._colormaps[self._shader.selected_text]
+            self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
+        
     def _set_shader(self, shader_name, force_update=False):
         if shader_name == self._shader.selected_text and not force_update:
             return
@@ -1021,25 +1029,18 @@ class Visualizer:
             else:
                 n_channels = max(1, shape[1])
         current_channel = max(0, self._colormap_channel.selected_index)
+        current_channel = min(n_channels - 1, current_channel)
         self._colormap_channel.clear_items()
         for i in range(0, n_channels):
             self._colormap_channel.add_item(str(i))
-        current_channel = min(n_channels, current_channel)
         self._colormap_channel.selected_index = current_channel
 
-        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name, current_channel)
-
-        if self._shader.selected_text in self._colormaps:
-            cmap = self._colormaps[self._shader.selected_text]
-            self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
-
+        self._update_attr_range()
         self._update_shaders_combobox()
         self._update_geometry()
 
     def _on_channel_changed(self, name, idx):
-        attr_name = self._datasource_combobox.selected_text
-        current_channel = self._colormap_channel.selected_index
-        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name, current_channel)
+        self._update_attr_range()
         self._update_geometry()  # need to recompute scalars array
 
     def _on_shader_changed(self, name, idx):
