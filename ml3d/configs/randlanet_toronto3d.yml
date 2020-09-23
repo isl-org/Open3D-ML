@@ -63,7 +63,7 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 1
+  batch_size: 2
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 200
@@ -71,6 +71,6 @@ pipeline:
   scheduler_gamma: 0.9886
   test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 1
+  val_batch_size: 2
   test_continue: false
   test_compute_metric: true

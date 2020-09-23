@@ -12,7 +12,8 @@ from sklearn.neighbors import KDTree
 from .base_model import BaseModel
 from ..utils import helper_tf
 from ...utils import MODEL
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
+                               trans_crop_pc)
 
 
 class RandLANet(BaseModel):
@@ -360,44 +361,30 @@ class RandLANet(BaseModel):
                        tf.shape(neighbor_idx)[-1], d])
         return features
 
-    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        num_points = self.cfg.num_points
-        center_point = points[pick_idx, :].reshape(1, -1)
-
-        if (points.shape[0] < num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = num_points - points.shape[0]
-            select_idx = list(select_idx) + list(
-                random.choices(select_idx, k=diff))
-            random.shuffle(select_idx)
-        else:
-            select_idx = search_tree.query(center_point, k=num_points)[1][0]
-
-        # select_idx = DataProcessing.shuffle_idx(select_idx)
-        random.shuffle(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        if (feat is None):
-            select_feat = None
-        else:
-            select_feat = feat[select_idx]
-
-        select_points = select_points - center_point  # TODO : add noise to center point
-
-        return select_points, select_feat, select_labels, select_idx
-
-    def get_batch_gen(self, dataset):
+    def get_batch_gen(self, dataset, steps_per_epoch=None):
         cfg = self.cfg
 
         def gen():
-            for i in range(dataset.num_pc):
-                data, attr = dataset.read_data(i)
-                pick_idx = np.random.choice(len(data['point']), 1)
+            n_iters = dataset.num_pc if steps_per_epoch is None else steps_per_epoch
+            for i in range(n_iters):
+                data, attr = dataset.read_data(i % dataset.num_pc)
 
-                pc, feat, label, _ = self.crop_pc(data['point'], data['feat'],
-                                                  data['label'],
-                                                  data['search_tree'], pick_idx)
+                pc = data['point'].copy()
+                label = data['label'].copy()
+                feat = data['feat'].copy() if data['feat'] is not None else None
+                tree = data['search_tree']
+
+                pick_idx = np.random.choice(len(pc), 1)
+                pc, feat, label, _ = trans_crop_pc(pc, feat, label, tree,
+                                                   pick_idx,
+                                                   self.cfg.num_points)
+
+                t_normalize = cfg.get('t_normalize', None)
+                pc, feat = trans_normalize(pc, feat, t_normalize)
+
+                if attr['split'] in ['training', 'train']:
+                    t_augment = cfg.get('t_augment', None)
+                    pc = trans_augment(pc, t_augment)
 
                 if feat is None:
                     feat = pc.copy()
@@ -419,34 +406,35 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point']
-        label = data['label']
-        feat = data['feat']
+        pc = data['point'].copy()
+        label = data['label'].copy()
+        feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
         pick_idx = min_posbility_idx
 
-        selected_pc, feat, label, selected_idx = self.crop_pc(
-            pc, feat, label, tree, pick_idx)
-
-        if feat is None:
-            feat = selected_pc.copy()
-        else:
-            feat = np.concatenate([selected_pc, feat], axis=1)
-
-        assert self.cfg.dim_input == feat.shape[
-            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+        selected_pc, feat, label, selected_idx = trans_crop_pc(
+            pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
         dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
-
         delta = np.square(1 - dists / np.max(dists))
-
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx
 
         pc = selected_pc
-        features = feat
 
+        t_normalize = cfg.get('t_normalize', None)
+        pc, feat = trans_normalize(pc, feat, t_normalize)
+
+        if feat is None:
+            feat = pc.copy()
+        else:
+            feat = np.concatenate([pc, feat], axis=1)
+
+        assert self.cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+
+        features = feat
         input_points = []
         input_neighbors = []
         input_pools = []
@@ -543,7 +531,8 @@ class RandLANet(BaseModel):
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
-        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
+        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0],
+        #                      self.possibility.shape[0]))
 
         if np.min(self.possibility) > 0.5:
             reproj_inds = self.inference_data['proj_inds']

@@ -859,7 +859,7 @@ class KPFCNN(BaseModel):
             select_feat = feat[select_idx]
         return select_points, select_feat, select_labels, select_idx
 
-    def get_batch_gen(self, dataset):
+    def get_batch_gen(self, dataset, steps_per_epoch=None):
 
         cfg = self.cfg
 
@@ -868,10 +868,13 @@ class KPFCNN(BaseModel):
             random_pick_n = None
             split = dataset.split
 
-            if split not in ['train', 'training']:
-                epoch_n = cfg.val_batch_num
+            if steps_per_epoch is not None:
+                epoch_n = steps_per_epoch
             else:
-                epoch_n = cfg.batch_num
+                if split not in ['train', 'training']:
+                    epoch_n = cfg.val_batch_num
+                else:
+                    epoch_n = cfg.batch_num
 
             batch_limit = cfg.batch_limit
 

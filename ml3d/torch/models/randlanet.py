@@ -100,35 +100,6 @@ class RandLANet(BaseModel):
 
         self.m_dropout = nn.Dropout(0.5)
 
-    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        num_points = self.cfg.num_points
-        center_point = points[pick_idx, :].reshape(1, -1)
-
-        if (points.shape[0] < num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = num_points - points.shape[0]
-            select_idx = list(select_idx) + list(
-                random.choices(select_idx, k=diff))
-            random.shuffle(select_idx)
-        else:
-            select_idx = search_tree.query(center_point, k=num_points)[1][0]
-
-        # select_idx = DataProcessing.shuffle_idx(select_idx)
-        random.shuffle(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        if (feat is None):
-            select_feat = None
-        else:
-            select_feat = feat[select_idx]
-
-        select_points = select_points - center_point  # TODO : add noise to center point
-
-        # select_points = select_points / np.linalg.norm(select_points)
-        # select_feat = select_feat / np.linalg.norm(select_feat)
-        return select_points, select_feat, select_labels, select_idx
-
     def get_optimizer(self, cfg_pipeline):
         optimizer = torch.optim.Adam(self.parameters(),
                                      lr=cfg_pipeline.adam_lr,
