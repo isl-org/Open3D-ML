@@ -42,16 +42,15 @@ class Model:
         tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
                                           o3d.core.Device("CPU:0"))
         known_attrs = set()
-        if pts.shape[1] == 4:
+        if pts.shape[1] >= 4:
             # We can't use inplace Tensor creation (e.g. from_numpy())
             # because the resulting arrays won't be contiguous. However,
             # TensorList can be inplace.
             xyz = pts[:,[0,1,2]]
-            tcloud.point["intensity"] = Visualizer._make_tcloud_array(pts[:,3], copy=True)
-            known_attrs.add("intensity")
             tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
         else:
             tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
+        known_attrs.add("points")
 
         # Add scalar attributes and vector3 attributes
         for k,v in data.items():
