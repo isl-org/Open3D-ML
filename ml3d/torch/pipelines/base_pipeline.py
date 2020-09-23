@@ -53,7 +53,7 @@ class BasePipeline(object):
             model.__class__.__name__ + '_' + dataset_name + '_torch')
         hsh = get_tb_hash(tensorboard_dir)
         self.tensorboard_dir = join(self.cfg.train_sum_dir,
-                                    str(hsh) + '_' + Path(tensorboard_dir).name)
+                                    hsh + '_' + Path(tensorboard_dir).name)
 
     def get_loss(self):
         raise NotImplementedError()
