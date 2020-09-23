@@ -493,7 +493,6 @@ class KPFCNN(BaseModel):
         r_mask_list = batch.reproj_masks
         labels_list = batch.val_labels
 
-
         i0 = 0
         for b_i, length in enumerate(lengths):
 
