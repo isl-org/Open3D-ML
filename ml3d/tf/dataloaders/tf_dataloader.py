@@ -70,7 +70,7 @@ class TFDataloader():
         return data, attr
 
     def get_loader(self, batch_size=1, num_threads=3):
-        steps_per_epoch = self.steps_per_epoch * batch_size
+        steps_per_epoch = self.steps_per_epoch * batch_size if self.steps_per_epoch is not None else None
         gen_func, gen_types, gen_shapes = self.get_batch_gen(
             self, steps_per_epoch)
 
