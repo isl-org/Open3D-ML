@@ -13,7 +13,7 @@ def trans_normalize(pc, feat, t_normalize):
         pc -= pc.mean()
 
         points_scale = t_normalize.get('points_scale', 1)
-        pc /= (pc.max() - pc.min())
+        pc /= (pc.max(0) - pc.min(0)).max()
 
         if feat is not None:
             feat_bias = t_normalize.get('feat_bias', 0)
