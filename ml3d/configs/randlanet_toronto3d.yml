@@ -23,7 +23,7 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ../dataset/checkpoints/RandLANet_Toronto3D_torch140.pth  # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 6
   dim_output:
