@@ -66,7 +66,7 @@ class Model:
             elif attr_name == "feat":
                 attr_name = "feature"
 
-            if len(attr.shape) == 1 or (len(attr.shape) == 2 and attr.shape[1] == 1) or (len(attr.shape) == 2 and attr.shape[1] == 3):
+            if len(attr.shape) == 1 or len(attr.shape) == 2:
                 tcloud.point[attr_name] = Visualizer._make_tcloud_array(attr)
                 known_attrs.add(attr_name)
 
@@ -88,30 +88,38 @@ class Model:
         else:
             return None
 
-    def get_attr_shape(self, name, attr_name):
+    def get_attr(self, name, attr_name):
         if name in self.data:
             tcloud = self.data[name]
             if attr_name in tcloud.point:
-                return tcloud.point[attr_name].as_tensor().numpy().shape
+                return tcloud.point[attr_name].as_tensor().numpy()
+        return None
+        
+    def get_attr_shape(self, name, attr_name):
+        attr = self.get_attr(name, attr_name)
+        if attr is not None:
+            return attr.shape
         return []
 
-    def get_attr_minmax(self, attr_name):
-        if attr_name not in self._attr2minmax:
+    def get_attr_minmax(self, attr_name, channel):
+        attr_key = attr_name + ":" + str(channel)
+        if attr_key not in self._attr2minmax:
             attr_min = 1e30
             attr_max = -1e30
-            for _,tcloud in self.data.items():
-                if attr_name in tcloud.point:
-                    attr = tcloud.point[attr_name].as_tensor().numpy()
-                    if len(attr.shape) > 1:
-                        attr = attr[:,0]
-                    attr_min = min(attr_min, attr.min())
-                    attr_max = max(attr_max, attr.max())
-                    maxattr = max(attr)
+            for name,tcloud in self.data.items():
+                attr = self.get_attr(name, attr_name)
+                if attr is None:  # clouds may not have all the same attributes
+                    continue
+                if len(attr.shape) > 1:
+                    attr = attr[:,channel]
+                attr_min = min(attr_min, attr.min())
+                attr_max = max(attr_max, attr.max())
+                maxattr = max(attr)
             if attr_min <= attr_max:
-                self._attr2minmax[attr_name] = (attr_min, attr_max)
+                self._attr2minmax[attr_key] = (attr_min, attr_max)
             else:
                 return (0.0, 0.0)
-        return self._attr2minmax[attr_name]
+        return self._attr2minmax[attr_key]
 
     def get_available_attrs(self, names):
         attr_names = None
@@ -125,6 +133,18 @@ class Model:
         if attr_names is None:
             return []
         return sorted(attr_names)
+
+    def calc_bounds_for(self, name):
+        if name in self.data:
+            tcloud = self.data[name]
+            # Ideally would simply return tcloud.compute_aabb() here, but it can
+            # be very slow on macOS with clang 11.0
+            pts = tcloud.point["points"].as_tensor().numpy()
+            min_val = (pts[:,0].min(), pts[:,1].min(), pts[:,2].min())
+            max_val = (pts[:,0].max(), pts[:,1].max(), pts[:,2].max())
+            return [min_val, max_val]
+        else:
+            return [(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
 
 class DataModel(Model):
     def __init__(self, userdata):
@@ -526,7 +546,7 @@ class Visualizer:
         fly.set_on_clicked(self._on_fly_mode)
         fly.horizontal_padding_em = 0.5
         fly.vertical_padding_em = 0
-        reset = gui.Button("Reset")
+        reset = gui.Button("Re-center")
         reset.set_on_clicked(self._on_reset_camera)
         reset.horizontal_padding_em = 0.5
         reset.vertical_padding_em = 0
@@ -603,8 +623,17 @@ class Visualizer:
         # ... data source
         self._datasource_combobox = gui.Combobox()
         self._datasource_combobox.set_on_selection_changed(self._on_datasource_changed)
-        grid.add_child(gui.Label("Source data"))
-        grid.add_child(self._datasource_combobox)
+        self._colormap_channel = gui.Combobox()
+        self._colormap_channel.add_item("0")
+        self._colormap_channel.set_on_selection_changed(self._on_channel_changed)
+        h = gui.Horiz()
+        h.add_child(self._datasource_combobox)
+        h.add_fixed(em)
+        h.add_child(gui.Label("Index"))
+        h.add_child(self._colormap_channel)
+
+        grid.add_child(gui.Label("Data"))
+        grid.add_child(h)
 
         # ... shader
         self._shader = gui.Combobox()
@@ -686,15 +715,17 @@ class Visualizer:
         self._attrname2lut[attr_name] = lut
 
     def setup_camera(self):
-        bounds = self._3d.scene.bounding_box
+        selected_names = self._get_selected_names()
+        selected_bounds = [self._objects.calc_bounds_for(n)
+                           for n in selected_names]
+        min_val = [1e30, 1e30, 1e30]
+        max_val = [-1e30, -1e30, -1e30]
+        for b in selected_bounds:
+            for i in range(0, 3):
+                min_val[i] = min(min_val[i], b[0][i])
+                max_val[i] = max(max_val[i], b[1][i])
+        bounds = o3d.geometry.AxisAlignedBoundingBox(min_val, max_val)
         self._3d.setup_camera(60, bounds, bounds.get_center())
-
-        old_dont_update = self._dont_update_geometry
-        self._dont_update_geometry = True
-        self._on_datasource_changed(self._datasource_combobox.selected_text,
-                                    self._datasource_combobox.selected_index)
-        self._update_geometry_colors()
-        self._dont_update_geometry = old_dont_update
 
     def show_geometries_under(self, name, show):
         prefix = name
@@ -758,38 +789,6 @@ class Visualizer:
         for n,tcloud in self._objects.data.items():
             self._update_point_cloud(n, tcloud, material)
 
-    """def _update_geometry_with_progress(self):
-        if self._dont_update_geometry:
-            return
-
-        progress_dlg = Visualizer.ProgressDialog("Updating geometry...",
-                                                 self.window,
-                                                 len(self._objects.data))
-
-        material = self._get_material()
-        def make_next(idx):
-            def update():
-                print("[debug] update", idx)
-                n = self._objects.data_names[idx]
-                tcloud = self._objects.data[n]
-                self._update_point_cloud(n, tcloud, material)
-                progress_dlg.update()
-            return update
-
-        def show_dialog():
-            self.window.show_dialog(progress_dlg.dialog)
-
-        def update_thread():
-            gui.Application.instance.post_to_main_thread(self.window,
-                                                         show_dialog)
-            for i in range(0, len(self._objects.data_names)):
-                gui.Application.instance.post_to_main_thread(self.window,
-                                                             make_next(i))
-                gui.Application.instance.post_to_main_thread(self.window,
-                                                             self.window.close_dialog)
-
-        threading.Thread(target=update_thread).start()"""
-
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
             return
@@ -798,15 +797,15 @@ class Visualizer:
         attr_name = self._datasource_combobox.selected_text
         attr = None
         flag = 0
-        if attr_name in tcloud.point:
-            attr = tcloud.point[attr_name].as_tensor().numpy()
+        attr = self._objects.get_attr(name, attr_name)
 
         # Update scalar values
         if attr is not None:
             if len(attr.shape) == 1:
                 scalar = attr
             else:
-                scalar = attr[:,0]
+                channel = max(0, self._colormap_channel.selected_index)
+                scalar = attr[:,channel]
         else:
             shape = [len(tcloud.point["points"].as_tensor().numpy())]
             scalar = np.zeros(shape, dtype='float32')
@@ -815,11 +814,11 @@ class Visualizer:
         flag |= rendering.Scene.UPDATE_UV0_FLAG
 
         # Update RGB values
-        if attr is not None and (len(attr.shape) == 2 and attr.shape[1] == 3):
+        if attr is not None and (len(attr.shape) == 2 and attr.shape[1] >= 3):
             max_val = float(self._rgb_combo.selected_text)
             if max_val <= 0:
                 max_val = 255.0
-            colors = attr * (1.0 / max_val)
+            colors = attr[:,[0,1,2]] * (1.0 / max_val)
             tcloud.point["colors"] = Visualizer._make_tcloud_array(colors)
             flag |= rendering.Scene.UPDATE_COLORS_FLAG
 
@@ -905,6 +904,10 @@ class Visualizer:
         current_attr = self._datasource_combobox.selected_text
         current_shader = self._shader.selected_text
         has_lut = (current_attr in self._attrname2lut)
+        is_scalar = True
+        selected_names = self._get_selected_names()
+        if len(selected_names) > 0 and len(self._objects.get_attr_shape(selected_names[0], current_attr)) > 1:
+            is_scalar = False
 
         self._shader.clear_items()
         self._shader.add_item(self.SOLID_NAME)
@@ -915,8 +918,7 @@ class Visualizer:
         self._shader.add_item(self.RAINBOW_NAME)
         self._shader.add_item(self.GREYSCALE_NAME)
 
-        selected_names = self._get_selected_names()
-        if len(selected_names) > 0 and len(self._objects.get_attr_shape(selected_names[0], current_attr)) > 1:
+        if not is_scalar:
             self._shader.add_item(self.COLOR_NAME)
 
         if current_shader == self.LABELS_NAME and has_lut:
@@ -955,8 +957,7 @@ class Visualizer:
         self._3d.set_view_controls(gui.SceneWidget.FLY)
 
     def _on_reset_camera(self):
-        bounds = self._3d.scene.bounding_box
-        self._3d.setup_camera(60, bounds, bounds.get_center())
+        self.setup_camera()
 
     def _on_display_tab_changed(self, index):
         if index == 1:
@@ -1007,7 +1008,22 @@ class Visualizer:
         self.window.renderer.set_clear_color(bg_color)
 
     def _on_datasource_changed(self, attr_name, idx):
-        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name)
+        selected_names = self._get_selected_names()
+        n_channels = 1
+        if len(selected_names) > 0:
+            shape = self._objects.get_attr_shape(selected_names[0], attr_name)
+            if len(shape) <= 1:
+                n_channels = 1
+            else:
+                n_channels = max(1, shape[1])
+        current_channel = max(0, self._colormap_channel.selected_index)
+        self._colormap_channel.clear_items()
+        for i in range(0, n_channels):
+            self._colormap_channel.add_item(str(i))
+        current_channel = min(n_channels, current_channel)
+        self._colormap_channel.selected_index = current_channel
+
+        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name, current_channel)
 
         if self._shader.selected_text in self._colormaps:
             cmap = self._colormaps[self._shader.selected_text]
@@ -1015,6 +1031,12 @@ class Visualizer:
 
         self._update_shaders_combobox()
         self._update_geometry()
+
+    def _on_channel_changed(self, name, idx):
+        attr_name = self._datasource_combobox.selected_text
+        current_channel = self._colormap_channel.selected_index
+        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name, current_channel)
+        self._update_geometry()  # need to recompute scalars array
 
     def _on_shader_changed(self, name, idx):
         # _shader.current_text is already name, so we need to force an update
@@ -1101,8 +1123,15 @@ class Visualizer:
             self._set_shader(shader_name)
 
             self._update_geometry()
-#            self._update_geometry_with_progress()
             self.setup_camera()
+
+            self._dont_update_geometry = True
+            self._on_datasource_changed(self._datasource_combobox.selected_text,
+                                        self._datasource_combobox.selected_index)
+            self._update_geometry_colors()
+            self._dont_update_geometry = False
+            # _datasource_combobox was empty, now isn't, re-layout.
+            self.window.set_needs_layout()
 
         self._load_geometries(self._objects.data_names, on_done_ui)
         gui.Application.instance.add_window(self.window)
