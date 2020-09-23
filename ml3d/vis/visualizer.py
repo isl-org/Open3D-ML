@@ -1,4 +1,5 @@
-import math  # debugging; remove
+import tensorflow as tf
+import torch
 import numpy as np
 import threading
 import open3d as o3d
@@ -77,14 +78,16 @@ class Model:
         if isinstance(ary, list):
             return np.array(ary, dtype='float32')
         elif isinstance(ary, np.ndarray):
+            if len(ary.shape) == 2 and ary.shape[0] == 1:
+                ary = ary[0]  # "1D" array as 2D: [[1, 2, 3,...]]
             if ary.dtype.name.startswith('int'):
                 return np.array(ary, dtype='float32')
             else:
                 return ary
-        # elif isinstance(ary, tf.tensor):
-        #     attr = ary.to_numpy()
-        # elif isinstance(ary, pytorch.array):
-        #     attr = ary.to_numpy()
+        elif isinstance(ary, tf.Tensor):
+            return self._convert_to_numpy(ary.numpy())
+        elif isinstance(ary, torch.Tensor):
+            return self._convert_to_numpy(ary.numpy())
         else:
             return None
 
