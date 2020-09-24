@@ -32,7 +32,7 @@ class Model:
     def is_loaded(self, name):
         return not self.data[name].is_empty()
 
-    def load(self, name):
+    def load(self, name, fail_if_no_space=False):
         assert (False)  # pure virtual
 
     def unload(self, name):
@@ -169,7 +169,7 @@ class DataModel(Model):
             self._init_data(name)
             self._name2srcdata[name] = d
 
-    def load(self, name):
+    def load(self, name, fail_if_no_space=False):
         if self.is_loaded(name):
             return
 
