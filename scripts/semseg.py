@@ -4,6 +4,7 @@ import os
 import os.path as osp
 import yaml
 import time
+import pprint
 
 
 def parse_args():
@@ -55,7 +56,7 @@ def main():
     args, extra_dict = parse_args()
 
     framework = convert_framework_name(args.framework)
-    if framework is 'torch':
+    if framework == 'torch':
         import ml3d.torch
     else:
         import tensorflow as tf
@@ -108,7 +109,16 @@ def main():
         model = Model(**cfg_dict_model)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
-    if args.split is 'train':
+    pipeline.cfg_tb = {
+        'dataset':
+            pprint.pformat(cfg_dict_dataset, indent=2, sort_dicts=False),
+        'model':
+            pprint.pformat(cfg_dict_model, indent=2, sort_dicts=False),
+        'pipeline':
+            pprint.pformat(cfg_dict_pipeline, indent=2, sort_dicts=False)
+    }
+
+    if args.split == 'train':
         pipeline.run_train()
     else:
         pipeline.run_test()

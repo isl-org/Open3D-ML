@@ -180,6 +180,7 @@ class SemanticSegmentation(BasePipeline):
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
 
         writer = SummaryWriter(self.tensorboard_dir)
+        self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
@@ -271,10 +272,13 @@ class SemanticSegmentation(BasePipeline):
         } for iou, val_iou in zip(ious, valid_ious)]
 
         # send results to tensorboard
-        writer.add_scalars('Loss', loss_dict, epoch)
-
-        writer.add_scalars('Overall accuracy', acc_dicts[-1], epoch)
-        writer.add_scalars('Mean IoU', iou_dicts[-1], epoch)
+        # add_scalars creates clutter: https://github.com/pytorch/pytorch/issues/32651
+        for key, val in loss_dict.items():
+            writer.add_scalar(key, val, epoch)
+        for key, val in acc_dicts[-1].items():
+            writer.add_scalar("{}/ Overall".format(key), val, epoch)
+        for key, val in iou_dicts[-1].items():
+            writer.add_scalar("{}/ Overall".format(key), val, epoch)
 
         log.info(f"loss train: {loss_dict['Training loss']:.3f} "
                  f" eval: {loss_dict['Validation loss']:.3f}")
@@ -349,6 +353,16 @@ class SemanticSegmentation(BasePipeline):
         valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
 
         return valid_scores, valid_labels
+
+    def save_config(self, writer):
+        '''
+        Save experiment configuration with tensorboard summary
+        '''
+        desc = "#TODO: How did we do this? \nRead in a documentation md here"
+        writer.add_text("Description/Experiment procedure", desc, 0)
+        writer.add_text('Configuration/Dataset', self.cfg_tb['dataset'], 0)
+        writer.add_text('Configuration/Model', self.cfg_tb['model'], 0)
+        writer.add_text('Configuration/Pipeline', self.cfg_tb['pipeline'], 0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "torch")

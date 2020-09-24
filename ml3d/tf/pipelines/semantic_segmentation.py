@@ -150,6 +150,7 @@ class SemanticSegmentation(BasePipeline):
         valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
 
         writer = tf.summary.create_file_writer(self.tensorboard_dir)
+        self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         self.optimizer = model.get_optimizer(cfg)
@@ -271,6 +272,19 @@ class SemanticSegmentation(BasePipeline):
     def save_ckpt(self, epoch):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format(save_path))
+
+    def save_config(self, writer):
+        '''
+        Save experiment configuration with tensorboard summary
+        '''
+        with writer.as_default():
+            with tf.name_scope("Description"):
+                desc = "#TODO: How did we do this? \nRead in a documentation md here"
+                tf.summary.text("Experiment procedure", desc, step=0)
+            with tf.name_scope("Configuration"):
+                tf.summary.text('Dataset', self.cfg_tb['dataset'], step=0)
+                tf.summary.text('Model', self.cfg_tb['model'], step=0)
+                tf.summary.text('Pipeline', self.cfg_tb['pipeline'], step=0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "tf")
