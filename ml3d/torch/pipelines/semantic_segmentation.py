@@ -9,6 +9,7 @@ from datetime import datetime
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
+from pathlib import Path
 
 from os.path import exists, join, isfile, dirname, abspath
 
@@ -16,7 +17,7 @@ from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
-from ...utils import make_dir, LogRecord, Config, PIPELINE
+from ...utils import make_dir, LogRecord, Config, PIPELINE, get_runid, code2md
 from ...datasets.utils import DataProcessing
 
 logging.setLogRecordFactory(LogRecord)
@@ -191,6 +192,14 @@ class SemanticSegmentation(BasePipeline):
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
+
+        dataset_name = dataset.name if dataset is not None else ''
+        tensorboard_dir = join(
+            self.cfg.train_sum_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_torch')
+        runid = get_runid(tensorboard_dir)
+        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+                                    runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
         self.save_config(writer)
@@ -369,11 +378,14 @@ class SemanticSegmentation(BasePipeline):
         '''
         Save experiment configuration with tensorboard summary
         '''
-        desc = "#TODO: How did we do this? \nRead in a documentation md here"
-        writer.add_text("Description/Experiment procedure", desc, 0)
-        writer.add_text('Configuration/Dataset', self.cfg_tb['dataset'], 0)
-        writer.add_text('Configuration/Model', self.cfg_tb['model'], 0)
-        writer.add_text('Configuration/Pipeline', self.cfg_tb['pipeline'], 0)
+        writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
+        writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
+        writer.add_text('Configuration/Dataset',
+                        code2md(self.cfg_tb['dataset'], language='json'), 0)
+        writer.add_text('Configuration/Model',
+                        code2md(self.cfg_tb['model'], language='json'), 0)
+        writer.add_text('Configuration/Pipeline',
+                        code2md(self.cfg_tb['pipeline'], language='json'), 0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "torch")

@@ -5,6 +5,7 @@ import sys
 from tqdm import tqdm
 from datetime import datetime
 from os.path import exists, join, isfile, dirname, abspath
+from pathlib import Path
 
 import tensorflow as tf
 
@@ -12,7 +13,7 @@ from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
-from ...utils import make_dir, LogRecord, PIPELINE
+from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -153,6 +154,14 @@ class SemanticSegmentation(BasePipeline):
                                        'steps_per_epoch_valid', None))
         valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
 
+        dataset_name = dataset.name if dataset is not None else ''
+        tensorboard_dir = join(
+            self.cfg.train_sum_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_tf')
+        runid = get_runid(tensorboard_dir)
+        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+                                    runid + '_' + Path(tensorboard_dir).name)
+
         writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
@@ -283,12 +292,20 @@ class SemanticSegmentation(BasePipeline):
         '''
         with writer.as_default():
             with tf.name_scope("Description"):
-                desc = "#TODO: How did we do this? \nRead in a documentation md here"
-                tf.summary.text("Experiment procedure", desc, step=0)
+                tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)
+                tf.summary.text("Command line", self.cfg_tb['cmd_line'], step=0)
             with tf.name_scope("Configuration"):
-                tf.summary.text('Dataset', self.cfg_tb['dataset'], step=0)
-                tf.summary.text('Model', self.cfg_tb['model'], step=0)
-                tf.summary.text('Pipeline', self.cfg_tb['pipeline'], step=0)
+                tf.summary.text('Dataset',
+                                code2md(self.cfg_tb['dataset'],
+                                        language='json'),
+                                step=0)
+                tf.summary.text('Model',
+                                code2md(self.cfg_tb['model'], language='json'),
+                                step=0)
+                tf.summary.text('Pipeline',
+                                code2md(self.cfg_tb['pipeline'],
+                                        language='json'),
+                                step=0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "tf")
