@@ -5,6 +5,7 @@ import threading
 import open3d as o3d
 from open3d.visualization import gui
 from open3d.visualization import rendering
+from collections import deque
 from .colormap import *
 from .labellut import *
 
@@ -178,7 +179,10 @@ class DatasetModel(Model):
         super().__init__()
         self._dataset = None
         self._name2datasetidx = {}
-
+        self._memory_limit = 8192 # memory limit in megabytes
+        self._current_memory_usage = 0
+        self._cached_data = deque()
+        
         self._dataset = dataset.get_split(split)
         if len(self._dataset) > 0:
             if indices is None:
@@ -206,11 +210,19 @@ class DatasetModel(Model):
         else:
             print("[ERROR] Dataset split has no data")
 
-    def load(self, name):
+    def is_loaded(self, name):
+        loaded = super().is_loaded(name)
+        if loaded:
+            # make this point cloud the most recently used
+            self._cached_data.remove(name)
+            self._cached_data.append(name)
+        return loaded
+
+    def load(self, name, fail_if_no_space = False):
         assert(name in self._name2datasetidx)
 
         if self.is_loaded(name):
-            return
+            return True
 
         idx = self._name2datasetidx[name]
         data = self._dataset.get_data(idx)
@@ -218,7 +230,29 @@ class DatasetModel(Model):
         data["points"] = data["point"]
 
         self.create_point_cloud(data)
+        size = self._calculate_pointcloud_size(self.data[name])
+        if size + self._current_memory_usage > self._memory_limit:
+            if fail_if_no_space:
+                self.unload(name)
+                return False
+            else:
+                # Remove oldest from cache
+                remove_name = self._cached_data.popleft()
+                remove_size = self._calculate_pointcloud_size(self.data[remove_name])
+                self._current_memory_usage -= remove_size
+                self.unload(remove_name)
+                # Add new point cloud to cache
+                self._cached_data.append(name)
+                self._current_memory_usage += size
+                return True
+        else:
+            self._current_memory_usage += size
+            self._cached_data.append(name)
+            return True
 
+    def _calculate_pointcloud_size(self, pcloud):
+        return 2000
+        
     def unload(self, name):
         # Only unload if this was loadable; we might have an in-memory,
         # user-specified data created directly through create_point_cloud().
@@ -513,6 +547,7 @@ class Visualizer:
 
         self._name2treenode = {}
         self._name2treeid = {}
+        self._treeid2name = {}
         self._attrname2lut = {}
         self._colormaps = {}
         self._shadername2panelidx = {}
@@ -591,6 +626,7 @@ class Visualizer:
 
         # ... model list
         self._dataset = gui.TreeView()
+        self._dataset.set_on_selection_changed(self._on_dataset_selection_changed)
         view_tab.add_tab("List", self._dataset)
 
         # ... animation slider
@@ -757,19 +793,38 @@ class Visualizer:
                 parent = self._dataset.add_item(parent, cell)
                 self._name2treenode[n] = cell
                 self._name2treeid[n] = parent
+                self._treeid2name[parent] = n
 
         def on_checked(checked):
             self._3d.scene.show_geometry(name, checked)
             self._update_datasource_combobox()  # available attrs could change
 
         cell = gui.CheckableTextTreeCell(names[-1], True, on_checked)
+        cell.label.text_color = gui.Color(1.0, 0.0, 0.0, 1.0)
         node = self._dataset.add_item(parent, cell)
         self._name2treenode[name] = cell
-
+        self._treeid2name[node] = name
+        
         self._slider.set_limits(0, len(self._objects.data_names) - 1)
         if len(self._objects.data_names) == 1:
             self._slider_current.text = name
 
+    def _load_geometry(self, name, ui_done_callback):
+        progress_dlg = Visualizer.ProgressDialog("Loading...", self.window, 2)
+        progress_dlg.set_text("Loading " + name + "...")
+
+        def load_thread():
+            result = self._objects.load(name)
+            progress_dlg.post_update("Loading " + name + "...")
+                
+            gui.Application.instance.post_to_main_thread(self.window,
+                                                         ui_done_callback)
+            gui.Application.instance.post_to_main_thread(self.window,
+                                                        self.window.close_dialog)
+
+        self.window.show_dialog(progress_dlg.dialog)
+        threading.Thread(target=load_thread).start()
+        
     def _load_geometries(self, names, ui_done_callback):
         # Progress has: len(names) items + ui_done_callback
         progress_dlg = Visualizer.ProgressDialog("Loading...", self.window,
@@ -778,13 +833,15 @@ class Visualizer:
 
         def load_thread():
             for i in range(0, len(names)):
-                self._objects.load(names[i])
+                result = self._objects.load(names[i], True)
                 if i + 1 < len(names):
                     text = "Loading " + names[i + 1] + "..."
                 else:
                     text = "Creating GPU objects..."
                 progress_dlg.post_update(text)
-
+                if result:
+                    self._name2treenode[names[i]].label.text_color = gui.Color(0.0, 1.0, 0.0, 1.0)
+                    
             gui.Application.instance.post_to_main_thread(self.window,
                                                          ui_done_callback)
             gui.Application.instance.post_to_main_thread(self.window,
@@ -797,12 +854,19 @@ class Visualizer:
         material = self._get_material()
         for n,tcloud in self._objects.data.items():
             self._update_point_cloud(n, tcloud, material)
+            if not tcloud.is_empty():
+                self._name2treenode[n].label.text_color = gui.Color(0.0, 1.0, 0.0, 1.0)
+            else:
+                self._name2treenode[n].label.text_color = gui.Color(1.0, 0.0, 0.0, 1.0)
 
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
             return
 
         self._3d.scene.remove_geometry(name)
+        if tcloud.is_empty():
+            return
+        
         attr_name = self._datasource_combobox.selected_text
         attr = None
         flag = 0
@@ -975,6 +1039,15 @@ class Visualizer:
     def _on_reset_camera(self):
         self.setup_camera()
 
+    def _on_dataset_selection_changed(self, item):
+        name = self._treeid2name[item]
+
+        def ui_callback():
+            self._update_geometry()
+            
+        if not self._objects.is_loaded(name):
+            self._load_geometry(name, ui_callback)
+    
     def _on_display_tab_changed(self, index):
         if index == 1:
             self._on_animation_slider_changed(self._slider.int_value)
