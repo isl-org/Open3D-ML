@@ -43,6 +43,7 @@ class SemanticSegmentation(BasePipeline):
             save_ckpt_freq=20,
             adam_lr=1e-2,
             scheduler_gamma=0.95,
+            momentum=0.98,
             main_log_dir='./logs/',
             device='gpu',
             split='train',
@@ -61,6 +62,7 @@ class SemanticSegmentation(BasePipeline):
                          save_ckpt_freq=save_ckpt_freq,
                          adam_lr=adam_lr,
                          scheduler_gamma=scheduler_gamma,
+                         momentum=momentum,
                          main_log_dir=main_log_dir,
                          device=device,
                          split=split,
@@ -88,17 +90,15 @@ class SemanticSegmentation(BasePipeline):
         return model.inference_result
 
     def run_test(self):
-        #self.device = device
         model = self.model
         dataset = self.dataset
         device = self.device
         cfg = self.cfg
         model.device = device
-        print(device)
         model.to(device)
-        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        metric = SemSegMetric(self, model, dataset, device)
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
@@ -119,14 +119,29 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
+        self.test_accs = []
+        self.test_ious = []
+
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
                 attr = datset_split.get_attr(idx)
-                if dataset.is_tested(attr):
+                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
                     continue
                 data = datset_split.get_data(idx)
                 results = self.run_inference(data)
+
+                predict_label = results['predict_labels']
+                if cfg.get('test_compute_metric', False):
+                    acc = metric.acc_np_label(predict_label, data['label'])
+                    iou = metric.iou_np_label(predict_label, data['label'])
+                    self.test_accs.append(acc)
+                    self.test_ious.append(iou)
+
                 dataset.save_test_result(results, attr)
+
+        if cfg.get('test_compute_metric', False):
+            log.info("test acc: {}".format(self.test_accs))
+            log.info("test iou: {}".format(self.test_ious))
 
     def run_train(self):
         model = self.model
@@ -145,14 +160,16 @@ class SemanticSegmentation(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLoss(self, model, dataset, device)
-        Metric = SemSegMetric(self, model, dataset, device)
+        metric = SemSegMetric(self, model, dataset, device)
 
         batcher = self.get_batcher(device)
 
         train_split = TorchDataloader(dataset=dataset.get_split('training'),
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache)
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
 
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
@@ -162,7 +179,10 @@ class SemanticSegmentation(BasePipeline):
         valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache)
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
                                   shuffle=True,
@@ -178,15 +198,13 @@ class SemanticSegmentation(BasePipeline):
 
         for epoch in range(0, cfg.max_epoch + 1):
 
-            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
             self.losses = []
             self.accs = []
             self.ious = []
-            step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
-
+            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
@@ -195,14 +213,12 @@ class SemanticSegmentation(BasePipeline):
                 loss.backward()
                 self.optimizer.step()
 
-                acc = Metric.acc(predict_scores, gt_labels)
-                iou = Metric.iou(predict_scores, gt_labels)
+                acc = metric.acc(predict_scores, gt_labels)
+                iou = metric.iou(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
                 self.ious.append(iou)
-
-                step = step + 1
 
             self.scheduler.step()
 
@@ -211,16 +227,15 @@ class SemanticSegmentation(BasePipeline):
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
-            step = 0
             with torch.no_grad():
-                for idx, inputs in enumerate(
+                for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
+
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
-                    acc = Metric.acc(predict_scores, gt_labels)
-
-                    iou = Metric.iou(predict_scores, gt_labels)
+                    acc = metric.acc(predict_scores, gt_labels)
+                    iou = metric.iou(predict_scores, gt_labels)
 
                     self.valid_losses.append(loss.cpu().item())
                     self.valid_accs.append(acc)
@@ -315,40 +330,6 @@ class SemanticSegmentation(BasePipeline):
                  scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
-
-    def filter_valid(self, scores, labels, device):
-        valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
-        valid_labels = labels.reshape(-1).to(device)
-
-        ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            ignored_bool = torch.logical_or(ignored_bool,
-                                            torch.eq(valid_labels, ign_label))
-
-        valid_idx = torch.where(torch.logical_not(ignored_bool))[0].to(device)
-
-        valid_scores = torch.gather(
-            valid_scores, 0,
-            valid_idx.unsqueeze(-1).expand(-1, self.model.cfg.num_classes))
-        valid_labels = torch.gather(valid_labels, 0, valid_idx)
-
-        # Reduce label values in the range of logit shape
-        reducing_list = torch.arange(0,
-                                     self.model.cfg.num_classes,
-                                     dtype=torch.int64)
-        inserted_value = torch.zeros([1], dtype=torch.int64)
-
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            reducing_list = torch.cat([
-                reducing_list[:ign_label], inserted_value,
-                reducing_list[ign_label:]
-            ], 0)
-        valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels)
-
-        valid_labels = valid_labels.unsqueeze(0)
-        valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
-
-        return valid_scores, valid_labels
 
 
 PIPELINE._register_module(SemanticSegmentation, "torch")

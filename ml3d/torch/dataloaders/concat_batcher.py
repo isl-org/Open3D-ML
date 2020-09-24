@@ -38,23 +38,20 @@ class SemanticKittiCustomBatch:
             # Stack batch
             data = batch['data']
 
-            n = data['p_list'].shape[0]
-            batch_n += n
+            for p in data['p_list']:
+                batch_n += p.shape[0]
             if batch_n > batch_limit:
                 break
 
-            if len(data['l_list'].shape) < 1:
-                continue
-
-            p_list += [data['p_list']]
-            f_list += [data['f_list']]
-            l_list += [data['l_list']]
-            p0_list += [data['p0_list']]
-            s_list += [data['s_list']]
-            R_list += [data['R_list']]
-            r_inds_list += [data['r_inds_list']]
-            r_mask_list += [data['r_mask_list']]
-            val_labels_list += [data['val_labels_list']]
+            p_list += data['p_list']
+            f_list += data['f_list']
+            l_list += data['l_list']
+            p0_list += data['p0_list']
+            s_list += data['s_list']
+            R_list += data['R_list']
+            r_inds_list += data['r_inds_list']
+            r_mask_list += data['r_mask_list']
+            val_labels_list += data['val_labels_list']
 
         ###################
         # Concatenate batch
@@ -78,17 +75,28 @@ class SemanticKittiCustomBatch:
             stacked_features = np.hstack((stacked_features, features[:, 2:3]))
         elif self.cfg.in_features_dim == 3:
             # Use height + reflectance
-            stacked_features = np.hstack((stacked_features, features[:, 2:]))
+            assert features.shape[1] > 3, "feat from dataset can not be None \
+                        or try to set in_features_dim = 1, 2, 4"
+
+            stacked_features = np.hstack((stacked_features, features[:, 2:4]))
         elif self.cfg.in_features_dim == 4:
             # Use all coordinates
-            stacked_features = np.hstack((stacked_features, features[:3]))
+            stacked_features = np.hstack((stacked_features, features[:, :3]))
         elif self.cfg.in_features_dim == 5:
+            assert features.shape[1] >= 6, "feat from dataset should have \
+                    at least 3 dims, or try to set in_features_dim = 1, 2, 4"
+
+            # Use color + height
+            stacked_features = np.hstack((stacked_features, features[:, 2:6]))
+        elif self.cfg.in_features_dim >= 6:
+
+            assert features.shape[1] > 3, "feat from dataset can not be None \
+                        or try to set in_features_dim = 1, 2, 4"
+
             # Use all coordinates + reflectance
             stacked_features = np.hstack((stacked_features, features))
         else:
-            raise ValueError(
-                'Only accepted input dimensions are 1, 4 and 7 (without and with XYZ)'
-            )
+            raise ValueError('in_features_dim should be >= 0')
 
         #######################
         # Create network inputs

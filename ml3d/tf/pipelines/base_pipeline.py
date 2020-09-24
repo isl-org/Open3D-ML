@@ -1,5 +1,7 @@
 import numpy as np
 import yaml
+import tensorflow as tf
+
 from os.path import join, exists, dirname, abspath
 
 from ...utils import Config, make_dir
@@ -31,8 +33,10 @@ class BasePipeline(object):
         self.dataset = dataset
 
         make_dir(self.cfg.main_log_dir)
-        self.cfg.logs_dir = join(self.cfg.main_log_dir,
-                                 model.__class__.__name__ + '_tf')
+        dataset_name = dataset.name if dataset is not None else ''
+        self.cfg.logs_dir = join(
+            self.cfg.main_log_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_tf')
         make_dir(self.cfg.logs_dir)
 
     def get_loss(self):

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import random
+import time
 
 from pathlib import Path
 from sklearn.neighbors import KDTree
@@ -14,7 +15,8 @@ from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
-from ...datasets.utils import DataProcessing
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
+                               trans_crop_pc)
 from ...utils import MODEL
 
 
@@ -28,18 +30,14 @@ class RandLANet(BaseModel):
             num_points=4096 * 11,  # Number of input points
             num_classes=19,  # Number of valid classes
             ignored_label_inds=[0],
-            sub_grid_size=0.06,  # preprocess_parameter
             sub_sampling_ratio=[4, 4, 4, 4],
-            num_sub_points=[
-                4096 * 11 // 4, 4096 * 11 // 16, 4096 * 11 // 64,
-                4096 * 11 // 256
-            ],
             dim_input=3,  # 3 + feature_dimension.
             dim_feature=8,
             dim_output=[16, 64, 128, 256],
             grid_size=0.06,
             batcher='DefaultBatcher',
             ckpt_path=None,
+            weight_decay=0.0,
             **kwargs):
 
         super().__init__(name=name,
@@ -48,15 +46,14 @@ class RandLANet(BaseModel):
                          num_points=num_points,
                          num_classes=num_classes,
                          ignored_label_inds=ignored_label_inds,
-                         sub_grid_size=sub_grid_size,
                          sub_sampling_ratio=sub_sampling_ratio,
-                         num_sub_points=num_sub_points,
                          dim_input=dim_input,
                          dim_feature=dim_feature,
                          dim_output=dim_output,
                          grid_size=grid_size,
                          batcher=batcher,
                          ckpt_path=ckpt_path,
+                         weight_decay=weight_decay,
                          **kwargs)
         cfg = self.cfg
 
@@ -103,37 +100,10 @@ class RandLANet(BaseModel):
 
         self.m_dropout = nn.Dropout(0.5)
 
-    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        num_points = self.cfg.num_points
-        center_point = points[pick_idx, :].reshape(1, -1)
-
-        if (points.shape[0] < num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = num_points - points.shape[0]
-            select_idx = list(select_idx) + list(
-                random.choices(select_idx, k=diff))
-            random.shuffle(select_idx)
-        else:
-            select_idx = search_tree.query(center_point, k=num_points)[1][0]
-
-        # select_idx = DataProcessing.shuffle_idx(select_idx)
-        random.shuffle(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        if (feat is None):
-            select_feat = None
-        else:
-            select_feat = feat[select_idx]
-
-        select_points = select_points - center_point  # TODO : add noise to center point
-
-        # select_points = select_points / np.linalg.norm(select_points)
-        # select_feat = select_feat / np.linalg.norm(select_feat)
-        return select_points, select_feat, select_labels, select_idx
-
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     lr=cfg_pipeline.adam_lr,
+                                     weight_decay=self.cfg.weight_decay)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
@@ -150,6 +120,7 @@ class RandLANet(BaseModel):
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
+
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
@@ -158,9 +129,9 @@ class RandLANet(BaseModel):
         cfg = self.cfg
         inputs = dict()
 
-        pc = data['point']
-        label = data['label']
-        feat = data['feat']
+        pc = data['point'].copy()
+        label = data['label'].copy()
+        feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
         if min_posbility_idx is None:  # training
@@ -168,25 +139,31 @@ class RandLANet(BaseModel):
         else:
             pick_idx = min_posbility_idx
 
-
         selected_pc, feat, label, selected_idx = \
-            self.crop_pc(pc, feat, label, tree, pick_idx)
-
-        if feat is None:
-            feat = selected_pc.copy()
-        else:
-            feat = np.concatenate([selected_pc, feat], axis=1)
-
-        assert cfg.dim_input == feat.shape[
-            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+            trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
         if min_posbility_idx is not None:
             dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idx] += delta
             inputs['point_inds'] = selected_idx
-
         pc = selected_pc
+
+        t_normalize = cfg.get('t_normalize', None)
+        pc, feat = trans_normalize(pc, feat, t_normalize)
+
+        if attr['split'] in ['training', 'train']:
+            t_augment = cfg.get('t_augment', None)
+            pc = trans_augment(pc, t_augment)
+
+        if feat is None:
+            feat = pc.copy()
+        else:
+            feat = np.concatenate([pc, feat], axis=1)
+
+        assert cfg.dim_input == feat.shape[
+            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+
         features = feat
         input_points = []
         input_neighbors = []
@@ -217,7 +194,9 @@ class RandLANet(BaseModel):
     def inference_begin(self, data):
         self.test_smooth = 0.98
         attr = {'split': 'test'}
+        self.inference_ori_data = data
         self.inference_data = self.preprocess(data, attr)
+        self.inference_proj_inds = self.inference_data['proj_inds']
         num_points = self.inference_data['search_tree'].data.shape[0]
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
@@ -226,8 +205,9 @@ class RandLANet(BaseModel):
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
-        data = self.transform(self.inference_data, {}, min_posbility_idx)
-        inputs = {'data': data, 'attr': []}
+        attr = {'split': 'test'}
+        data = self.transform(self.inference_data, attr, min_posbility_idx)
+        inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
 
@@ -240,14 +220,25 @@ class RandLANet(BaseModel):
         results = m_softmax(results)
         results = results.cpu().data.numpy()
         probs = np.reshape(results, [-1, self.cfg.num_classes])
+
+        pred_l = np.argmax(probs, 1)
+
         inds = inputs['data']['point_inds'][0, :]
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
+
         if np.min(self.possibility) > 0.5:
+            pred_labels = np.argmax(self.test_probs, 1)
+
+            pred_labels = pred_labels[self.inference_proj_inds]
+            test_probs = self.test_probs[self.inference_proj_inds]
             inference_result = {
-                'predict_labels': np.argmax(self.test_probs, 1),
-                'predict_scores': self.test_probs
+                'predict_labels': pred_labels,
+                'predict_scores': test_probs
             }
+            data = self.inference_ori_data
+            acc = (pred_labels == data['label'] - 1).mean()
+
             self.inference_result = inference_result
             return True
         else:

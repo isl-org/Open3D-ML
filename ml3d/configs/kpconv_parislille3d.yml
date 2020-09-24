@@ -1,22 +1,21 @@
 dataset:
-  name: SemanticKITTI
-  # dataset_path: path/to/your/datasets 
-  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
-    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
-    476491114, 9833174, 129609852, 4506626, 1168181]
+  name: ParisLille3D
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
+  ignored_label_inds:
+  - 0
+  prepro_grid_size: 0.06
   test_result_folder: ./test
-  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
-  training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
-  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
-  '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
-  validation_split: ['08']
-  use_cache: false
-  validation_split:
-  - '08'
+  val_files:
+  - Lille2.ply
+  use_cache: False
+  steps_per_epoch_train: 100
+  steps_per_epoch_valid: 10
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
-  KP_extent: 1.2
+  KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
   architecture:
@@ -24,12 +23,9 @@ model:
   - resnetb
   - resnetb_strided
   - resnetb
-  - resnetb
   - resnetb_strided
   - resnetb
-  - resnetb
   - resnetb_strided
-  - resnetb
   - resnetb
   - resnetb_strided
   - resnetb
@@ -51,7 +47,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 50000
+  batch_limit: 80000
   batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher
@@ -61,18 +57,17 @@ model:
   deform_radius: 6.0
   density_parameter: 5.0
   first_features_dim: 128
-  first_subsampling_dl: 0.06
+  first_subsampling_dl: 0.04
   fixed_kernel_points: center
-  ignored_label_inds:
-  - 0
+  ignored_label_inds: [0]
   in_features_dim: 2
   in_points_dim: 3
-  in_radius: 4.0
-  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-  min_in_points: 10000
-  max_in_points: 20000
+  in_radius: 1.5
+  lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  min_in_points: 20000
+  max_in_points: 50000
   modulated: false
-  num_classes: 19
+  num_classes: 9
   num_kernel_points: 15
   num_layers: 5
   repulse_extent: 1.2
@@ -81,16 +76,16 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 8
+  momentum: 0.98
+  batch_size: 2
   learning_rate: 0.01
   lr_decays: 0.98477
   deform_lr_factor: 0.1
   main_log_dir: ./logs
-  max_epoch: 800
-  momentum: 0.98
-  save_ckpt_freq: 3
-  scheduler_gamma: 0.98477
-  test_batch_size: 4
+  max_epoch: 100
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.95
+  test_batch_size: 2
   train_sum_dir: train_log
-  val_batch_size: 4
+  val_batch_size: 2
   weight_decay: 0.001

@@ -5,8 +5,6 @@ dataset:
   class_weights: [41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634, 374721]
   ignored_label_inds:
   - 0
-  num_points: 65536
-  prepro_grid_size: 0.06
   test_files:
   - L002.ply
   test_result_folder: ./test
@@ -17,8 +15,11 @@ dataset:
   val_files:
   - L002.ply
   use_cache: True
+  steps_per_epoch_train: 100
+  steps_per_epoch_valid: 10
 model:
   name: KPFCNN
+  ckpt_path: # path/to/your/checkpoint
   KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
@@ -51,64 +52,46 @@ model:
   - true
   - false
   - false
-  batch_norm_momentum: 0.02
-  batch_num: 8
-  batcher: ConcatBatcher
-  checkpoint_gap: 50
-  ckpt_path: # path/to/your/checkpoint
-  class_w: []
-  conv_radius: 2.5
   batch_limit: 50000
-  dataset: SemanticKitti
-  dataset_task: ''
+  batch_norm_momentum: 0.02
+  batch_num: 50
+  batcher: ConcatBatcher
+  conv_radius: 2.5
   deform_fitting_mode: point2point
   deform_fitting_power: 1.0
-  deform_lr_factor: 0.1
   deform_radius: 6.0
   density_parameter: 5.0
-  epoch_steps: 500
   first_features_dim: 128
   first_subsampling_dl: 0.04
   fixed_kernel_points: center
-  grad_clip_norm: 100.0
-  ign_lbls:
-  - 0
   ignored_label_inds:
   - 0
-  in_features_dim: 2
+  in_features_dim: 5
   in_points_dim: 3
   in_radius: 2.0
-  input_threads: 10
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  learning_rate: 0.01
-  lr_decays: 0.98477
-  max_epoch: 800
+  min_in_points: 20000
   max_in_points: 100000
-  max_val_points: 100000
   modulated: false
-  n_frames: 1
   num_classes: 8
   num_kernel_points: 15
   num_layers: 5
   repulse_extent: 1.2
-  saving: true
-  saving_path: null
   use_batch_norm: true
-  val_batch_num: 8
-  val_radius: 2.0
-  validation_size: 200
+  val_batch_num: 30
 pipeline:
   name: SemanticSegmentation
   momentum: 0.98
   adam_lr: 0.01
-  batch_size: 8
-  learning_rate: 0.01
-  deform_lr_factor: 0.1
+  batch_size: 1
+  learning_rate: 0.005
+  lr_decays: 0.98477
+  deform_lr_factor: 0.05
   weight_decay: 0.001
   main_log_dir: ./logs
-  max_epoch: 100
-  save_ckpt_freq: 20
+  max_epoch: 1000
+  save_ckpt_freq: 5
   scheduler_gamma: 0.95
-  test_batch_size: 8
+  test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 8
+  val_batch_size: 1

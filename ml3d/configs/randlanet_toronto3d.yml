@@ -5,6 +5,7 @@ dataset:
   class_weights: [41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634, 374721]
   ignored_label_inds:
   - 0
+  num_classes: 8
   num_points: 65536
   prepro_grid_size: 0.06
   test_files:
@@ -16,11 +17,13 @@ dataset:
   - L004.ply
   use_cache: true
   val_files:
-  - L001.ply
+  - L002.ply
+  steps_per_epoch_train: 100
+  steps_per_epoch_valid: 10
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: #./logs/RandLANet_torch/checkpoint/ckpt_480.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 6
   dim_output:
@@ -36,28 +39,38 @@ model:
   num_classes: 8
   num_layers: 5
   num_points: 65536
-  num_sub_points:
-  - 16384
-  - 4096
-  - 1024
-  - 256
-  - 128
-  sub_grid_size: 0.06
   sub_sampling_ratio:
   - 4
   - 4
   - 4
   - 4
   - 2
+  weight_decay: 0
+  t_augment:
+    turn_on: false
+    rotation_method: vertical
+    scale_anisotropic: false
+    symmetries: true
+    noise_level: 0.001
+    min_s: 0.9
+    max_s: 1.1
+  t_normalize:
+    method: linear
+    points_bias: 0
+    points_scale: 1
+    feat_bias: 0
+    feat_scale: 1
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 1
+  batch_size: 2
   learning_rate: 0.01
   main_log_dir: ./logs
-  max_epoch: 10000
-  save_ckpt_freq: 20
-  scheduler_gamma: 0.99
+  max_epoch: 200
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.9886
   test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 1
+  val_batch_size: 2
+  test_continue: false
+  test_compute_metric: true

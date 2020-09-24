@@ -23,7 +23,9 @@ def parse_args():
     parser.add_argument('--cfg_dataset',
                         help='path to the dataset\'s config file')
     parser.add_argument('--dataset_path', help='path to the dataset')
-    parser.add_argument('--device', help='device to run the pipeline')
+    parser.add_argument('--device',
+                        help='device to run the pipeline',
+                        default='gpu')
     parser.add_argument('--split', help='train or test', default='train')
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
@@ -56,7 +58,24 @@ def main():
     if framework is 'torch':
         import ml3d.torch
     else:
+        import tensorflow as tf
         import ml3d.tf
+
+        device = args.device
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        if gpus:
+            try:
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+                if device == 'cpu':
+                    tf.config.set_visible_devices([], 'GPU')
+                elif device == 'gpu':
+                    tf.config.set_visible_devices(gpus[0], 'GPU')
+                else:
+                    idx = device.split(':')[1]
+                    tf.config.set_visible_devices(gpus[int(idx)], 'GPU')
+            except RuntimeError as e:
+                print(e)
 
     if args.cfg_file is not None:
         cfg = Config.load_from_file(args.cfg_file)
@@ -89,10 +108,10 @@ def main():
         model = Model(**cfg_dict_model)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
-    if args.split is 'train':
-        pipeline.run_train()
-    else:
+    if args.split == 'test':
         pipeline.run_test()
+    else:
+        pipeline.run_train()
 
 
 if __name__ == '__main__':

@@ -82,7 +82,7 @@ class Toronto3D(BaseDataset):
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.array([0])
+        self.ignored_labels = np.array(cfg.ignored_label_inds)
 
         self.train_files = [
             join(self.cfg.dataset_path, f) for f in cfg.train_files
@@ -109,17 +109,33 @@ class Toronto3D(BaseDataset):
 
         return files
 
-    def save_test_result(self, results, attr):
+    def is_tested(self, attr):
         cfg = self.cfg
         name = attr['name']
+        path = cfg.test_result_folder
+        store_path = join(path, name + '.npy')
+        if exists(store_path):
+            print("{} already exists.".format(store_path))
+            return True
+        else:
+            return False
+
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
         pred = results['predict_labels']
-        pred = np.array(self.label_to_names[pred])
+        pred = np.array(pred)
 
-        store_path = join(path, name + '.npy')
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
+
+        store_path = join(path, self.name, name + '.npy')
+        make_dir(Path(store_path).parent)
         np.save(store_path, pred)
+        log.info("Saved {} in {}.".format(name, store_path))
 
 
 class Toronto3DSplit():
@@ -133,6 +149,10 @@ class Toronto3DSplit():
         self.split = split
         self.dataset = dataset
 
+        self.cache_in_memory = self.cfg.get('cache_in_memory', False)
+        if self.cache_in_memory:
+            self.data_list = [None] * len(self.path_list)
+
     def __len__(self):
         return len(self.path_list)
 
@@ -140,7 +160,14 @@ class Toronto3DSplit():
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        data = PlyData.read(pc_path)['vertex']
+        if self.cache_in_memory:
+            if self.data_list[idx] is not None:
+                data = self.data_list[idx]
+            else:
+                data = PlyData.read(pc_path)['vertex']
+                self.data_list[idx] = data
+        else:
+            data = PlyData.read(pc_path)['vertex']
 
         points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
         points[:, 0] = data['x']
@@ -152,10 +179,7 @@ class Toronto3DSplit():
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
 
-        if (self.split != 'test'):
-            labels = np.array(data['scalar_Label'], dtype=np.int32)
-        else:
-            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        labels = np.array(data['scalar_Label'], dtype=np.int32)
 
         data = {'point': points, 'feat': feat, 'label': labels}
 

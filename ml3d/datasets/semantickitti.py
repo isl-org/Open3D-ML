@@ -33,6 +33,7 @@ class SemanticKITTI(BaseDataset):
                      78858, 240942562, 17294618, 170599734, 6369672, 230413074,
                      101130274, 476491114, 9833174, 129609852, 4506626, 1168181
                  ],
+                 ignored_label_inds=[0],
                  test_result_folder='./test',
                  test_split=[
                      '11', '12', '13', '14', '15', '16', '17', '18', '19', '20',
@@ -61,6 +62,7 @@ class SemanticKITTI(BaseDataset):
                          cache_dir=cache_dir,
                          use_cache=use_cache,
                          class_weights=class_weights,
+                         ignored_label_inds=ignored_label_inds,
                          test_result_folder=test_result_folder,
                          test_split=test_split,
                          training_split=training_split,
@@ -93,7 +95,9 @@ class SemanticKITTI(BaseDataset):
             19: 'traffic-sign'
         }
         self.num_classes = len(self.label_to_names)
-        data_config = join(cfg.dataset_path, 'dataset', 'semantic-kitti.yaml')
+
+        data_config = join(dirname(abspath(__file__)), '_resources/',
+                           'semantic-kitti.yaml')
         DATA = yaml.safe_load(open(data_config, 'r'))
         remap_dict = DATA["learning_map_inv"]
 
@@ -123,6 +127,7 @@ class SemanticKITTI(BaseDataset):
         test_file_name = name_points
         store_path = join(save_path, name_points + '.label')
         if exists(store_path):
+            print("{} already exists.".format(store_path))
             return True
         else:
             return False
@@ -141,7 +146,8 @@ class SemanticKITTI(BaseDataset):
         pred = results['predict_labels']
 
         store_path = join(save_path, name_points + '.label')
-        pred = pred + 1
+        for ign in cfg.ignored_label_inds:
+            pred[pred >= ign] += 1
         pred = self.remap_lut[pred].astype(np.uint32)
         pred.tofile(store_path)
 
@@ -221,17 +227,17 @@ class SemanticKITTISplit():
         dir, file = split(pc_path)
         label_path = join(dir, '../labels', file[:-4] + '.label')
         if not exists(label_path):
-            labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
+            labels = np.zeros(np.shape(points)[0], dtype=np.int32)
             if self.split not in ['test', 'all']:
                 raise ValueError(
                     "label file not found for {}".format(label_path))
         else:
-            labels = DataProcessing.load_label_kitti(label_path,
-                                                     self.remap_lut_val)
+            labels = DataProcessing.load_label_kitti(
+                label_path, self.remap_lut_val).astype(np.int32)
 
         data = {
             'point': points[:, 0:3],
-            'feat': points[:, 3:],
+            'feat': None,
             'label': labels,
         }
 

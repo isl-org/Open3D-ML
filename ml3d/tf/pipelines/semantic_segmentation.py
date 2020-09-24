@@ -21,14 +21,6 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        print(e)
-
 
 class SemanticSegmentation(BasePipeline):
 
@@ -46,10 +38,12 @@ class SemanticSegmentation(BasePipeline):
             save_ckpt_freq=20,
             adam_lr=1e-2,
             scheduler_gamma=0.95,
+            momentum=0.98,
             main_log_dir='./logs/',
             device='gpu',
             split='train',
-            train_sum_dir='train_log'):
+            train_sum_dir='train_log',
+            **kwargs):
 
         super().__init__(model=model,
                          dataset=dataset,
@@ -63,10 +57,12 @@ class SemanticSegmentation(BasePipeline):
                          save_ckpt_freq=save_ckpt_freq,
                          adam_lr=adam_lr,
                          scheduler_gamma=scheduler_gamma,
+                         momentum=momentum,
                          main_log_dir=main_log_dir,
                          device=device,
                          split=split,
-                         train_sum_dir=train_sum_dir)
+                         train_sum_dir=train_sum_dir,
+                         **kwargs)
 
     def run_inference(self, data):
         cfg = self.cfg
@@ -89,6 +85,7 @@ class SemanticSegmentation(BasePipeline):
         dataset = self.dataset
         cfg = self.cfg
 
+        self.optimizer = model.get_optimizer(cfg)
         self.load_ckpt(model.cfg.ckpt_path)
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
@@ -98,12 +95,34 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
+        Metric = SemSegMetric(self, model, dataset)
+        Loss = SemSegLoss(self, model, dataset)
+
+        accs = []
+        ious = []
+
         test_split = dataset.get_split('test')
         for idx in tqdm(range(len(test_split)), desc='test'):
             attr = test_split.get_attr(idx)
             data = test_split.get_data(idx)
             results = self.run_inference(data)
+            scores, labels = Loss.filter_valid_label(results['predict_scores'],
+                                                     data['label'])
+
+            acc = Metric.acc(scores.numpy(), labels.numpy())
+            iou = Metric.iou(scores.numpy(), labels.numpy())
+            accs.append(acc)
+            ious.append(iou)
+
             dataset.save_test_result(results, attr)
+
+        accs = np.nanmean(np.array(accs), axis=0)
+        ious = np.nanmean(np.array(ious), axis=0)
+
+        log.info("Per class Accuracy : {}".format(accs[:-1]))
+        log.info("Per class IOUs : {}".format(ious[:-1]))
+        log.info("Overall Accuracy : {:.3f}".format(accs[-1]))
+        log.info("Overall IOU : {:.3f}".format(ious[-1]))
 
     def run_train(self, **kwargs):
         model = self.model
@@ -122,13 +141,17 @@ class SemanticSegmentation(BasePipeline):
 
         train_split = TFDataloader(dataset=dataset.get_split('training'),
                                    model=model,
-                                   use_cache=dataset.cfg.use_cache)
-        train_loader = train_split.get_loader(cfg.batch_size)
+                                   use_cache=dataset.cfg.use_cache,
+                                   steps_per_epoch=dataset.cfg.get(
+                                       'steps_per_epoch_train', None))
+        train_loader, len_train = train_split.get_loader(cfg.batch_size)
 
         valid_split = TFDataloader(dataset=dataset.get_split('validation'),
                                    model=model,
-                                   use_cache=dataset.cfg.use_cache)
-        valid_loader = valid_split.get_loader(cfg.val_batch_size)
+                                   use_cache=dataset.cfg.use_cache,
+                                   steps_per_epoch=dataset.cfg.get(
+                                       'steps_per_epoch_valid', None))
+        valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
 
         writer = tf.summary.create_file_writer(
             join(cfg.logs_dir, cfg.train_sum_dir))
@@ -143,7 +166,8 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(train_loader, desc='training')):
+            for idx, inputs in enumerate(
+                    tqdm(train_loader, total=len_train, desc='training')):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=True)
                     loss, gt_labels, predict_scores = model.get_loss(
@@ -167,7 +191,8 @@ class SemanticSegmentation(BasePipeline):
             self.valid_losses = []
             step = 0
 
-            for idx, inputs in enumerate(tqdm(valid_loader, desc='validation')):
+            for idx, inputs in enumerate(
+                    tqdm(valid_loader, total=len_val, desc='validation')):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(
@@ -241,19 +266,16 @@ class SemanticSegmentation(BasePipeline):
                                                   max_to_keep=3)
 
         if ckpt_path:
-            self.ckpt.restore(ckpt_path)
-            print("Restored from {}".format(ckpt_path))
+            self.ckpt.restore(ckpt_path).expect_partial()
+            log.info("Restored from {}".format(ckpt_path))
         else:
             self.ckpt.restore(self.manager.latest_checkpoint)
 
             if self.manager.latest_checkpoint:
-                print("Restored from {}".format(self.manager.latest_checkpoint))
+                log.info("Restored from {}".format(
+                    self.manager.latest_checkpoint))
             else:
-                print("Initializing from scratch.")
-
-        #if exists(self.model.cfg.ckpt_path):
-        #    self.model.load_weights(self.model.cfg.ckpt_path)
-        #    log.info("Loading checkpoint {}".format(self.model.cfg.ckpt_path))
+                log.info("Initializing from scratch.")
 
     def save_ckpt(self, epoch):
         save_path = self.manager.save()

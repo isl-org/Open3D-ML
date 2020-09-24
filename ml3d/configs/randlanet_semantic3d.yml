@@ -1,16 +1,19 @@
 dataset:
   name: Semantic3D
   dataset_path: # path/to/your/dataset
-  cache_dir: .logs/cache/
-  class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353, 269353]
+  cache_dir: ./logs/cache/
+  class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353]
   ignored_label_inds:
   - 0
   num_points: 65536
   prepro_grid_size: 0.06
   test_result_folder: ./test
   use_cache: true
-  val_split: 1
+  val_files:
+  - bildstein_station3_xyz_intensity_rgb
+  - sg27_station2_intensity_rgb
 model:
+  name: RandLANet
   batcher: DefaultBatcher
   ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
@@ -25,17 +28,9 @@ model:
   ignored_label_inds:
   - 0
   k_n: 16
-  name: RandLANet
   num_classes: 8
   num_layers: 5
   num_points: 65536
-  num_sub_points:
-  - 16384
-  - 4096
-  - 1024
-  - 256
-  - 128
-  sub_grid_size: 0.06
   sub_sampling_ratio:
   - 4
   - 4

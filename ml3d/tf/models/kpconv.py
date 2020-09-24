@@ -1,5 +1,4 @@
 from os import makedirs
-from os.path import exists
 import time
 import tensorflow as tf
 import numpy as np
@@ -26,7 +25,6 @@ class KPFCNN(BaseModel):
     def __init__(
             self,
             name='KPFCNN',
-            ign_lbls=[0],
             lbl_values=[
                 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
                 18, 19
@@ -34,8 +32,6 @@ class KPFCNN(BaseModel):
             num_classes=19,  # Number of valid classes
             ignored_label_inds=[0],
             ckpt_path=None,
-            dataset_task='',
-            input_threads=10,
             batcher='ConcatBatcher',
             architecture=[
                 'simple', 'resnetb', 'resnetb_strided', 'resnetb', 'resnetb',
@@ -45,11 +41,9 @@ class KPFCNN(BaseModel):
                 'nearest_upsample', 'unary', 'nearest_upsample', 'unary'
             ],
             in_radius=4.0,
-            val_radius=4.0,
-            n_frames=1,
             max_in_points=100000,
-            max_val_points=100000,
             batch_num=8,
+            batch_limit=30000,
             val_batch_num=8,
             num_kernel_points=15,
             first_subsampling_dl=0.06,
@@ -65,16 +59,7 @@ class KPFCNN(BaseModel):
             batch_norm_momentum=0.02,
             deform_fitting_mode='point2point',
             deform_fitting_power=1.0,
-            deform_lr_factor=0.1,
             repulse_extent=1.2,
-            max_epoch=800,
-            learning_rate=1e-2,
-            momentum=0.98,
-            lr_decays=0.98477,
-            grad_clip_norm=100.0,
-            epoch_steps=500,
-            validation_size=200,
-            checkpoint_gap=50,
             augment_scale_anisotropic=True,
             augment_symmetries=[True, False, False],
             augment_rotation='vertical',
@@ -82,30 +67,22 @@ class KPFCNN(BaseModel):
             augment_scale_max=1.2,
             augment_noise=0.001,
             augment_color=0.8,
-            saving=True,
-            saving_path=None,
             in_points_dim=3,
             fixed_kernel_points='center',
-            class_w=[],
             num_layers=5,
             **kwargs):
 
         super().__init__(name=name,
-                         ign_lbls=ign_lbls,
                          lbl_values=lbl_values,
                          num_classes=num_classes,
                          ignored_label_inds=ignored_label_inds,
                          ckpt_path=ckpt_path,
-                         dataset_task=dataset_task,
-                         input_threads=input_threads,
                          batcher=batcher,
                          architecture=architecture,
                          in_radius=in_radius,
-                         val_radius=val_radius,
-                         n_frames=n_frames,
                          max_in_points=max_in_points,
-                         max_val_points=max_val_points,
                          batch_num=batch_num,
+                         batch_limit=batch_limit,
                          val_batch_num=val_batch_num,
                          num_kernel_points=num_kernel_points,
                          first_subsampling_dl=first_subsampling_dl,
@@ -121,16 +98,7 @@ class KPFCNN(BaseModel):
                          batch_norm_momentum=batch_norm_momentum,
                          deform_fitting_mode=deform_fitting_mode,
                          deform_fitting_power=deform_fitting_power,
-                         deform_lr_factor=deform_lr_factor,
                          repulse_extent=repulse_extent,
-                         max_epoch=max_epoch,
-                         learning_rate=learning_rate,
-                         momentum=momentum,
-                         lr_decays=lr_decays,
-                         grad_clip_norm=grad_clip_norm,
-                         epoch_steps=epoch_steps,
-                         validation_size=validation_size,
-                         checkpoint_gap=checkpoint_gap,
                          augment_scale_anisotropic=augment_scale_anisotropic,
                          augment_symmetries=augment_symmetries,
                          augment_rotation=augment_rotation,
@@ -138,11 +106,8 @@ class KPFCNN(BaseModel):
                          augment_scale_max=augment_scale_max,
                          augment_noise=augment_noise,
                          augment_color=augment_color,
-                         saving=saving,
-                         saving_path=saving_path,
                          in_points_dim=in_points_dim,
                          fixed_kernel_points=fixed_kernel_points,
-                         class_w=class_w,
                          num_layers=num_layers,
                          **kwargs)
 
@@ -340,10 +305,6 @@ class KPFCNN(BaseModel):
         """
         # crop neighbors matrix
         return neighbors[:, :self.neighborhood_limits[layer]]
-
-    def parameters_log(self):
-
-        self.cfg.save(self.saving_path)
 
     def get_batch_inds(self, stacks_len):
         """
@@ -731,6 +692,10 @@ class KPFCNN(BaseModel):
     def inference_begin(self, data):
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = np.random.rand(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
 
     def inference_preprocess(self):
         flat_inputs, point_inds, stacks_lengths = self.transform_inference(
@@ -739,8 +704,6 @@ class KPFCNN(BaseModel):
         self.test_meta['inds'] = point_inds
         self.test_meta['lens'] = stacks_lengths
 
-        self.inference_input = flat_inputs
-
         return flat_inputs
 
     def inference_end(self, results):
@@ -748,31 +711,30 @@ class KPFCNN(BaseModel):
         results = tf.nn.softmax(results, axis=-1)
         results = results.cpu().numpy()
         test_smooth = 0.98
-        probs = np.zeros(shape=[
-            self.inference_data['search_tree'].data.shape[0],
-            self.cfg.num_classes
-        ],
-                         dtype=np.float32)
-        inds = self.test_meta['inds']
 
+        inds = self.test_meta['inds']
         l = 0
         r = 0
         for len in self.test_meta['lens']:
             r += len
-            probs[inds[l:r]] = probs[inds[l:r]] * test_smooth + (
-                1 - test_smooth) * results[l:r]
+            self.test_probs[inds[l:r]] = self.test_probs[
+                inds[l:r]] * test_smooth + (1 - test_smooth) * results[l:r]
             l += len
 
-        reproj_inds = self.inference_data['proj_inds']
+        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
 
-        predict_scores = probs[reproj_inds]
-        inference_result = {
-            'predict_labels': np.argmax(predict_scores, 1),
-            'predict_scores': predict_scores
-        }
+        if np.min(self.possibility) > 0.5:
+            reproj_inds = self.inference_data['proj_inds']
+            predict_scores = self.test_probs[reproj_inds]
+            inference_result = {
+                'predict_labels': np.argmax(predict_scores, 1),
+                'predict_scores': predict_scores
+            }
 
-        self.inference_result = inference_result
-        return True
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
     def transform_inference(self, data):
         cfg = self.cfg
@@ -783,12 +745,12 @@ class KPFCNN(BaseModel):
         pi_list = []
         ci_list = []
 
+        n_points = 0
         points = np.array(data['search_tree'].data)
-        potentials = np.random.rand(points.shape[0]) * 1e-3
 
-        while (np.min(potentials) < 0.5):
+        while (n_points < cfg.batch_limit):
             cloud_ind = 0
-            point_ind = int(np.argmin(potentials))
+            point_ind = int(np.argmin(self.possibility))
 
             center_point = points[point_ind, :].reshape(1, -1)
             pick_point = center_point
@@ -797,17 +759,22 @@ class KPFCNN(BaseModel):
                                                           r=cfg.in_radius)[0]
 
             n = input_inds.shape[0]
+            n_points += n
 
             dists = np.sum(np.square(
                 (points[input_inds] - pick_point).astype(np.float32)),
                            axis=1)
             tuckeys = np.square(1 - dists / np.square(cfg.in_radius))
             tuckeys[dists > np.square(cfg.in_radius)] = 0
-            potentials[input_inds] += tuckeys
+            self.possibility[input_inds] += tuckeys
 
             input_points = (points[input_inds] - pick_point).astype(np.float32)
             input_colors = data['feat'][input_inds].astype(np.float32)
-            input_labels = np.zeros(input_points.shape[0]).astype(np.int32)
+
+            if len(data['label'][input_inds].shape) == 2:
+                input_labels = data['label'][input_inds][:, 0]
+            else:
+                input_labels = data['label'][input_inds]
 
             if n > 0:
                 p_list += [input_points]
@@ -844,6 +811,7 @@ class KPFCNN(BaseModel):
             feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
+            feat /= 255.0
 
         data = dict()
 
@@ -891,15 +859,22 @@ class KPFCNN(BaseModel):
             select_feat = feat[select_idx]
         return select_points, select_feat, select_labels, select_idx
 
-    def get_batch_gen(self, dataset):
+    def get_batch_gen(self, dataset, steps_per_epoch=None):
 
         cfg = self.cfg
 
         def spatially_regular_gen():
 
             random_pick_n = None
-            epoch_n = 500 * cfg.batch_num
             split = dataset.split
+
+            if steps_per_epoch is not None:
+                epoch_n = steps_per_epoch
+            else:
+                if split not in ['train', 'training']:
+                    epoch_n = cfg.val_batch_num
+                else:
+                    epoch_n = cfg.batch_num
 
             batch_limit = cfg.batch_limit
 
@@ -923,7 +898,7 @@ class KPFCNN(BaseModel):
             batch_n = 0
 
             # Generator loop
-            for i in range(epoch_n):
+            while (epoch_n):
                 # Choose a random cloud
                 cloud_ind = random.randint(0, dataset.num_pc - 1)
 
@@ -971,6 +946,7 @@ class KPFCNN(BaseModel):
 
                 # In case batch is full, yield it and reset it
                 if batch_n + n > batch_limit and batch_n > 0:
+                    epoch_n -= 1
 
                     yield (np.concatenate(p_list,
                                           axis=0), np.concatenate(c_list,

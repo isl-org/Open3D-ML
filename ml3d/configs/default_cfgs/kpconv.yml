@@ -1,4 +1,5 @@
-name: KPConv
+name: KPFCNN
+ckpt_path: # path/to/your/checkpoint
 KP_extent: 1.2
 KP_influence: linear
 aggregation_mode: sum
@@ -36,13 +37,9 @@ augment_symmetries:
 - false
 batch_limit: 50000
 batch_norm_momentum: 0.02
-batch_num: 8
+batch_num: 30
 batcher: ConcatBatcher
-ckpt_path: # path/to/your/checkpoint
-class_w: []
 conv_radius: 2.5
-dataset: SemanticKitti
-dataset_task: ''
 deform_fitting_mode: point2point
 deform_fitting_power: 1.0
 deform_radius: 6.0
@@ -50,23 +47,16 @@ density_parameter: 5.0
 first_features_dim: 128
 first_subsampling_dl: 0.06
 fixed_kernel_points: center
-ign_lbls:
-- 0
-ignored_label_inds:
-- 0
-in_features_dim: 2
+ignored_label_inds: []
+in_features_dim: 2 # with colors : 5, without colors : 2
 in_points_dim: 3
 in_radius: 4.0
-input_threads: 10
 lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
 max_in_points: 20000
-max_val_points: 100000
 modulated: false
-n_frames: 1
-num_classes: 19
+num_classes: 19 # number of valid classes.
 num_kernel_points: 15
 num_layers: 5
 repulse_extent: 1.2
 use_batch_norm: true
-val_batch_num: 8
-val_radius: 4.0
+val_batch_num: 30

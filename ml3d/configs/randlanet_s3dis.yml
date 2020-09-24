@@ -28,13 +28,6 @@ model:
   num_classes: 13
   num_layers: 5
   num_points: 40960
-  num_sub_points:
-  - 10240
-  - 2560
-  - 640
-  - 160
-  - 80
-  sub_grid_size: 0.04
   sub_sampling_ratio:
   - 4
   - 4
