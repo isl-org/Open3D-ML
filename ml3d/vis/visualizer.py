@@ -880,6 +880,7 @@ class Visualizer:
 
         def load_thread():
             for i in range(0, len(names)):
+                print
                 result = self._objects.load(names[i], True)
                 if i + 1 < len(names):
                     text = "Loading " + names[i + 1] + "..."
