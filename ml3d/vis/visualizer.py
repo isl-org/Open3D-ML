@@ -1047,6 +1047,12 @@ class Visualizer:
         # _shader.current_text is already name, so we need to force an update
         self._set_shader(name, force_update=True)
 
+        # Disable channel if we are using a vector shader
+        if name == Visualizer.COLOR_NAME:
+            self._colormap_channel.enabled = False
+        else:
+            self._colormap_channel.enabled = True
+
     def _on_shader_color_changed(self, color):
         self._update_geometry_colors()
             
