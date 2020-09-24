@@ -190,7 +190,7 @@ class DatasetModel(Model):
         super().__init__()
         self._dataset = None
         self._name2datasetidx = {}
-        self._memory_limit = 8192  # memory limit in megabytes
+        self._memory_limit = 4001  # memory limit in megabytes
         self._current_memory_usage = 0
         self._cached_data = deque()
 
@@ -914,6 +914,7 @@ class Visualizer:
             else:
                 self._name2treenode[n].label.text_color = gui.Color(
                     1.0, 0.0, 0.0, 1.0)
+                self._name2treenode[n].checkbox.checked = False
 
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
