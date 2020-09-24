@@ -919,16 +919,14 @@ class Visualizer:
             is_scalar = False
 
         self._shader.clear_items()
-        self._shader.add_item(self.SOLID_NAME)
+        if not is_scalar:
+            self._shader.add_item(self.COLOR_NAME)
         if has_lut:
             self._shader.add_item(self.LABELS_NAME)
             self._label_edit.set_labels(self._attrname2lut[current_attr])
-        
         self._shader.add_item(self.RAINBOW_NAME)
         self._shader.add_item(self.GREYSCALE_NAME)
-
-        if not is_scalar:
-            self._shader.add_item(self.COLOR_NAME)
+        self._shader.add_item(self.SOLID_NAME)
 
         if current_shader == self.LABELS_NAME and has_lut:
             self._set_shader(self.LABELS_NAME)
