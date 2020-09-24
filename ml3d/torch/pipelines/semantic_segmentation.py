@@ -9,6 +9,7 @@ from datetime import datetime
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
+from pathlib import Path
 
 from os.path import exists, join, isfile, dirname, abspath
 
@@ -16,7 +17,7 @@ from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
-from ...utils import make_dir, LogRecord, Config, PIPELINE
+from ...utils import make_dir, LogRecord, Config, PIPELINE, get_runid
 from ...datasets.utils import DataProcessing
 
 logging.setLogRecordFactory(LogRecord)
@@ -191,6 +192,14 @@ class SemanticSegmentation(BasePipeline):
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
+
+        dataset_name = dataset.name if dataset is not None else ''
+        tensorboard_dir = join(
+            self.cfg.train_sum_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_torch')
+        runid = get_runid(tensorboard_dir)
+        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+                                    runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
         self.save_config(writer)

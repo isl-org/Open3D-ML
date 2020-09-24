@@ -110,12 +110,9 @@ def main():
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
     pipeline.cfg_tb = {
-        'dataset':
-            pprint.pformat(cfg_dict_dataset, indent=2, sort_dicts=False),
-        'model':
-            pprint.pformat(cfg_dict_model, indent=2, sort_dicts=False),
-        'pipeline':
-            pprint.pformat(cfg_dict_pipeline, indent=2, sort_dicts=False)
+        'dataset': pprint.pformat(cfg_dict_dataset, indent=2),
+        'model': pprint.pformat(cfg_dict_model, indent=2),
+        'pipeline': pprint.pformat(cfg_dict_pipeline, indent=2)
     }
 
     if args.split == 'test':

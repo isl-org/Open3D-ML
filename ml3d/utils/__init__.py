@@ -1,5 +1,5 @@
 from .config import Config
-from .log import LogRecord, get_tb_hash
+from .log import LogRecord, get_runid
 from .builder import (MODEL, PIPELINE, DATASET, get_module,
                       convert_framework_name)
 from .dataset_helper import get_hash, make_dir, Cache

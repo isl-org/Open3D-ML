@@ -5,6 +5,7 @@ import sys
 from tqdm import tqdm
 from datetime import datetime
 from os.path import exists, join, isfile, dirname, abspath
+from pathlib import Path
 
 import tensorflow as tf
 
@@ -12,7 +13,7 @@ from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
-from ...utils import make_dir, LogRecord, PIPELINE
+from ...utils import make_dir, LogRecord, PIPELINE, get_runid
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -152,6 +153,14 @@ class SemanticSegmentation(BasePipeline):
                                    steps_per_epoch=dataset.cfg.get(
                                        'steps_per_epoch_valid', None))
         valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
+
+        dataset_name = dataset.name if dataset is not None else ''
+        tensorboard_dir = join(
+            self.cfg.train_sum_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_tf')
+        runid = get_runid(tensorboard_dir)
+        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+                                    runid + '_' + Path(tensorboard_dir).name)
 
         writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)

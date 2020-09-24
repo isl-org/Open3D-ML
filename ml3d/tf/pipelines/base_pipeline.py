@@ -3,9 +3,8 @@ import yaml
 import tensorflow as tf
 
 from os.path import join, exists, dirname, abspath
-from pathlib import Path
 
-from ...utils import Config, make_dir, get_tb_hash
+from ...utils import Config, make_dir
 
 
 class BasePipeline(object):
@@ -39,13 +38,6 @@ class BasePipeline(object):
             self.cfg.main_log_dir,
             model.__class__.__name__ + '_' + dataset_name + '_tf')
         make_dir(self.cfg.logs_dir)
-
-        tensorboard_dir = join(
-            self.cfg.train_sum_dir,
-            model.__class__.__name__ + '_' + dataset_name + '_tf')
-        hsh = get_tb_hash(tensorboard_dir)
-        self.tensorboard_dir = join(self.cfg.train_sum_dir,
-                                    hsh + '_' + Path(tensorboard_dir).name)
 
     def get_loss(self):
         raise NotImplementedError()

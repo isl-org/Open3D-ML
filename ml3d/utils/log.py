@@ -15,17 +15,19 @@ class LogRecord(logging.LogRecord):
         return msg
 
 
-def get_tb_hash(path):
+def get_runid(path):
     name = Path(path).name
     if not os.path.exists(Path(path).parent):
         return '00001'
     files = os.listdir(Path(path).parent)
-    hsh = 0
+    runid = 0
     for f in files:
-        id, val = f.split('_', 1)
-        hsh = max(hsh, int(id))
+        try:
+            id, val = f.split('_', 1)
+            runid = max(runid, int(id))
+        except:
+            pass
+    runid = str(runid + 1)
+    runid = '0' * (5 - len(runid)) + runid
 
-    hsh = str(hsh + 1)
-    hsh = '0' * (5 - len(hsh)) + hsh
-
-    return hsh
+    return runid
