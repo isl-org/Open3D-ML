@@ -574,7 +574,7 @@ class Visualizer:
             self._progress.value = value
 
     SOLID_NAME = "Solid Color"
-    LABELS_NAME = "Labels"
+    LABELS_NAME = "Label Colormap"
     RAINBOW_NAME = "Colormap (Rainbow)"
     GREYSCALE_NAME = "Colormap (Greyscale)"
     COLOR_NAME = "RGB"
