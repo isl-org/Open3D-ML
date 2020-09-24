@@ -18,6 +18,9 @@ class Model:
         self._known_attrs = {}  # name -> set(attrs)
         self._attr2minmax = {}  # only access in _get_attr_minmax()
 
+        self._attr_rename = { "label": "labels",
+                              "feat" : "feature" }
+
     def _init_data(self, name):
         tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
                                           o3d.core.Device("CPU:0"))
@@ -63,10 +66,9 @@ class Model:
             if attr_name == "point" or attr_name == "points":
                 continue
             
-            if attr_name == "label":
-                attr_name = "labels"
-            elif attr_name == "feat":
-                attr_name = "feature"
+            new_name = self._attr_rename.get(attr_name)
+            if new_name is not None:
+                attr_name = new_name
 
             if len(attr.shape) == 1 or len(attr.shape) == 2:
                 tcloud.point[attr_name] = Visualizer._make_tcloud_array(attr)
@@ -197,6 +199,10 @@ class DatasetModel(Model):
 
                 self._init_data(name)
                 self._name2datasetidx[name] = i
+
+            if dataset.__class__.__name__ in ["Toronto3D", "Semantic3D", "S3DIS"]:
+                self._attr_rename["feat"] = "colors"
+                self._attr_rename["feature"] = "colors"
         else:
             print("[ERROR] Dataset split has no data")
 
