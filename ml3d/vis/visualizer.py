@@ -15,9 +15,14 @@ import time
 class Model:
 
     def __init__(self):
-        self.data = {}  # name -> tpointcloud
+        # Note: the tpointcloud cannot store the actual data arrays, because
+        # the tpointcloud requires specific names for some arrays (e.g. "points",
+        # "colors"). So the tpointcloud exists for rendering and initially only
+        # contains the "points" array.
+        self.tclouds = {}  # name -> tpointcloud
         self.data_names = []  # the order data will be displayed / animated
 
+        self._data = {}  # name -> {attr_name -> numpyarray}
         self._known_attrs = {}  # name -> set(attrs)
         self._attr2minmax = {}  # only access in _get_attr_minmax()
 
@@ -26,11 +31,12 @@ class Model:
     def _init_data(self, name):
         tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
                                           o3d.core.Device("CPU:0"))
-        self.data[name] = tcloud
+        self.tclouds[name] = tcloud
+        self._data[name] = {}
         self.data_names.append(name)
 
     def is_loaded(self, name):
-        return not self.data[name].is_empty()
+        return len(self._data[name]) > 0
 
     def load(self, name, fail_if_no_space=False):
         assert (False)  # pure virtual
@@ -54,19 +60,18 @@ class Model:
             xyz = pts[:, [0, 1, 2]]
             tcloud.point["points"] = Visualizer._make_tcloud_array(xyz,
                                                                    copy=True)
-            tcloud.point["points_raw"] = Visualizer._make_tcloud_array(pts)
-            known_attrs.add("points_raw")
         else:
             tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
-        known_attrs.add("points")
+        self.tclouds[name] = tcloud
 
         # Add scalar attributes and vector3 attributes
+        attrs = {}
         for k, v in data.items():
             attr = self._convert_to_numpy(v)
             if attr is None:
                 continue
             attr_name = k
-            if attr_name == "point" or attr_name == "points":
+            if attr_name == "point":
                 continue
 
             new_name = self._attr_rename.get(attr_name)
@@ -74,10 +79,10 @@ class Model:
                 attr_name = new_name
 
             if len(attr.shape) == 1 or len(attr.shape) == 2:
-                tcloud.point[attr_name] = Visualizer._make_tcloud_array(attr)
+                attrs[attr_name] = attr
                 known_attrs.add(attr_name)
 
-        self.data[name] = tcloud
+        self._data[name] = attrs
         self._known_attrs[name] = known_attrs
 
     def _convert_to_numpy(self, ary):
@@ -98,10 +103,10 @@ class Model:
             return None
 
     def get_attr(self, name, attr_name):
-        if name in self.data:
-            tcloud = self.data[name]
-            if attr_name in tcloud.point:
-                return tcloud.point[attr_name].as_tensor().numpy()
+        if name in self._data:
+            attrs = self._data[name]
+            if attr_name in attrs:
+                return attrs[attr_name]
         return None
 
     def get_attr_shape(self, name, attr_name):
@@ -115,7 +120,7 @@ class Model:
         if attr_key not in self._attr2minmax:
             attr_min = 1e30
             attr_max = -1e30
-            for name, tcloud in self.data.items():
+            for name in self._data.keys():
                 attr = self.get_attr(name, attr_name)
                 if attr is None:  # clouds may not have all the same attributes
                     continue
@@ -143,8 +148,8 @@ class Model:
         return sorted(attr_names)
 
     def calc_bounds_for(self, name):
-        if name in self.data:
-            tcloud = self.data[name]
+        if name in self.tclouds:
+            tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
             pts = tcloud.point["points"].as_tensor().numpy()
@@ -164,7 +169,7 @@ class DataModel(Model):
         self._name2srcdata = {}
         for d in userdata:
             name = d["name"]
-            while name in self.data:  # ensure each name is unique
+            while name in self._data:  # ensure each name is unique
                 name = name + "_"
             self._init_data(name)
             self._name2srcdata[name] = d
@@ -204,7 +209,7 @@ class DatasetModel(Model):
             for i in indices:
                 info = self._dataset.get_attr(i)
                 name = info["name"]
-                while name in self.data:  # ensure each name is unique
+                while name in self._data:  # ensure each name is unique
                     name = name + "_"
 
                 self._init_data(name)
@@ -238,7 +243,7 @@ class DatasetModel(Model):
         data["points"] = data["point"]
 
         self.create_point_cloud(data)
-        size = self._calculate_pointcloud_size(self.data[name])
+        size = self._calculate_pointcloud_size(self._data[name])
         if size + self._current_memory_usage > self._memory_limit:
             if fail_if_no_space:
                 self.unload(name)
@@ -247,7 +252,7 @@ class DatasetModel(Model):
                 # Remove oldest from cache
                 remove_name = self._cached_data.popleft()
                 remove_size = self._calculate_pointcloud_size(
-                    self.data[remove_name])
+                    self._data[remove_name])
                 self._current_memory_usage -= remove_size
                 self.unload(remove_name)
                 # Add new point cloud to cache
@@ -268,7 +273,8 @@ class DatasetModel(Model):
         if name in self._name2datasetidx:
             tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
                                               o3d.core.Device("CPU:0"))
-            self.data[name] = tcloud
+            self.tclouds[name] = tcloud
+            self._data[name] = {}
 
 
 class Visualizer:
@@ -900,7 +906,7 @@ class Visualizer:
 
     def _update_geometry(self):
         material = self._get_material()
-        for n, tcloud in self._objects.data.items():
+        for n, tcloud in self._objects.tclouds.items():
             self._update_point_cloud(n, tcloud, material)
             if not tcloud.is_empty():
                 self._name2treenode[n].label.text_color = gui.Color(
