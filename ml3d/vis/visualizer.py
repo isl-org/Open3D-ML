@@ -11,7 +11,9 @@ from .labellut import *
 
 import time
 
+
 class Model:
+
     def __init__(self):
         self.data = {}  # name -> tpointcloud
         self.data_names = []  # the order data will be displayed / animated
@@ -19,27 +21,26 @@ class Model:
         self._known_attrs = {}  # name -> set(attrs)
         self._attr2minmax = {}  # only access in _get_attr_minmax()
 
-        self._attr_rename = { "label": "labels",
-                              "feat" : "feature" }
+        self._attr_rename = {"label": "labels", "feat": "feature"}
 
     def _init_data(self, name):
         tcloud = o3d.tgeometry.PointCloud(o3d.core.Dtype.Float32,
                                           o3d.core.Device("CPU:0"))
         self.data[name] = tcloud
         self.data_names.append(name)
-        
+
     def is_loaded(self, name):
         return not self.data[name].is_empty()
 
     def load(self, name):
-        assert(False) # pure virtual
+        assert (False)  # pure virtual
 
     def unload(self, name):
-        assert(False) # pure virtual
+        assert (False)  # pure virtual
 
     def create_point_cloud(self, data):
-        assert("name" in data)    # name is a required field
-        assert("points" in data)  # 'points' is a required field
+        assert ("name" in data)  # name is a required field
+        assert ("points" in data)  # 'points' is a required field
 
         name = data["name"]
         pts = self._convert_to_numpy(data["points"])
@@ -50,8 +51,9 @@ class Model:
             # We can't use inplace Tensor creation (e.g. from_numpy())
             # because the resulting arrays won't be contiguous. However,
             # TensorList can be inplace.
-            xyz = pts[:,[0,1,2]]
-            tcloud.point["points"] = Visualizer._make_tcloud_array(xyz, copy=True)
+            xyz = pts[:, [0, 1, 2]]
+            tcloud.point["points"] = Visualizer._make_tcloud_array(xyz,
+                                                                   copy=True)
             tcloud.point["points_raw"] = Visualizer._make_tcloud_array(pts)
             known_attrs.add("points_raw")
         else:
@@ -59,14 +61,14 @@ class Model:
         known_attrs.add("points")
 
         # Add scalar attributes and vector3 attributes
-        for k,v in data.items():
+        for k, v in data.items():
             attr = self._convert_to_numpy(v)
             if attr is None:
                 continue
             attr_name = k
             if attr_name == "point" or attr_name == "points":
                 continue
-            
+
             new_name = self._attr_rename.get(attr_name)
             if new_name is not None:
                 attr_name = new_name
@@ -101,7 +103,7 @@ class Model:
             if attr_name in tcloud.point:
                 return tcloud.point[attr_name].as_tensor().numpy()
         return None
-        
+
     def get_attr_shape(self, name, attr_name):
         attr = self.get_attr(name, attr_name)
         if attr is not None:
@@ -113,12 +115,12 @@ class Model:
         if attr_key not in self._attr2minmax:
             attr_min = 1e30
             attr_max = -1e30
-            for name,tcloud in self.data.items():
+            for name, tcloud in self.data.items():
                 attr = self.get_attr(name, attr_name)
                 if attr is None:  # clouds may not have all the same attributes
                     continue
                 if len(attr.shape) > 1:
-                    attr = attr[:,channel]
+                    attr = attr[:, channel]
                 attr_min = min(attr_min, attr.min())
                 attr_max = max(attr_max, attr.max())
             if attr_min <= attr_max:
@@ -146,13 +148,15 @@ class Model:
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
             pts = tcloud.point["points"].as_tensor().numpy()
-            min_val = (pts[:,0].min(), pts[:,1].min(), pts[:,2].min())
-            max_val = (pts[:,0].max(), pts[:,1].max(), pts[:,2].max())
+            min_val = (pts[:, 0].min(), pts[:, 1].min(), pts[:, 2].min())
+            max_val = (pts[:, 0].max(), pts[:, 1].max(), pts[:, 2].max())
             return [min_val, max_val]
         else:
             return [(0.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
 
+
 class DataModel(Model):
+
     def __init__(self, userdata):
         super().__init__()
         # We could just create the TPointCloud here, but that would cause the UI
@@ -174,15 +178,17 @@ class DataModel(Model):
     def unload(self, name):
         pass
 
+
 class DatasetModel(Model):
+
     def __init__(self, dataset, split, indices):
         super().__init__()
         self._dataset = None
         self._name2datasetidx = {}
-        self._memory_limit = 8192 # memory limit in megabytes
+        self._memory_limit = 8192  # memory limit in megabytes
         self._current_memory_usage = 0
         self._cached_data = deque()
-        
+
         self._dataset = dataset.get_split(split)
         if len(self._dataset) > 0:
             if indices is None:
@@ -204,7 +210,9 @@ class DatasetModel(Model):
                 self._init_data(name)
                 self._name2datasetidx[name] = i
 
-            if dataset.__class__.__name__ in ["Toronto3D", "Semantic3D", "S3DIS"]:
+            if dataset.__class__.__name__ in [
+                    "Toronto3D", "Semantic3D", "S3DIS"
+            ]:
                 self._attr_rename["feat"] = "colors"
                 self._attr_rename["feature"] = "colors"
         else:
@@ -218,8 +226,8 @@ class DatasetModel(Model):
             self._cached_data.append(name)
         return loaded
 
-    def load(self, name, fail_if_no_space = False):
-        assert(name in self._name2datasetidx)
+    def load(self, name, fail_if_no_space=False):
+        assert (name in self._name2datasetidx)
 
         if self.is_loaded(name):
             return True
@@ -238,7 +246,8 @@ class DatasetModel(Model):
             else:
                 # Remove oldest from cache
                 remove_name = self._cached_data.popleft()
-                remove_size = self._calculate_pointcloud_size(self.data[remove_name])
+                remove_size = self._calculate_pointcloud_size(
+                    self.data[remove_name])
                 self._current_memory_usage -= remove_size
                 self.unload(remove_name)
                 # Add new point cloud to cache
@@ -252,7 +261,7 @@ class DatasetModel(Model):
 
     def _calculate_pointcloud_size(self, pcloud):
         return 2000
-        
+
     def unload(self, name):
         # Only unload if this was loadable; we might have an in-memory,
         # user-specified data created directly through create_point_cloud().
@@ -261,8 +270,11 @@ class DatasetModel(Model):
                                               o3d.core.Device("CPU:0"))
             self.data[name] = tcloud
 
+
 class Visualizer:
+
     class LabelLUTEdit:
+
         def __init__(self):
             self.widget = gui.TreeView()
             self._on_changed = None  # takes no args, returns no value
@@ -276,8 +288,10 @@ class Visualizer:
             return len(self._label2color) == 0
 
         def get_colors(self):
-            return [self._label2color[label]
-                    for label in sorted(self._label2color.keys())]
+            return [
+                self._label2color[label]
+                for label in sorted(self._label2color.keys())
+            ]
 
         def set_on_changed(self, callback):  # takes no args, no return value
             self._on_changed = callback
@@ -292,30 +306,37 @@ class Visualizer:
                     color += [1.0]
                 self._label2color[key] = color
                 color = gui.Color(lbl.color[0], lbl.color[1], lbl.color[2])
-                cell = gui.LUTTreeCell(str(key) + ": " + lbl.name, True,
-                                       color, None, None)
-                cell.checkbox.set_on_checked(self._make_on_checked(key, self._on_label_checked))
-                cell.color_edit.set_on_value_changed(self._make_on_color_changed(key, self._on_label_color_changed))
+                cell = gui.LUTTreeCell(
+                    str(key) + ": " + lbl.name, True, color, None, None)
+                cell.checkbox.set_on_checked(
+                    self._make_on_checked(key, self._on_label_checked))
+                cell.color_edit.set_on_value_changed(
+                    self._make_on_color_changed(key,
+                                                self._on_label_color_changed))
                 self.widget.add_item(root, cell)
 
         def _make_on_color_changed(self, label, member_func):
+
             def on_changed(color):
                 member_func(label, color)
+
             return on_changed
-            
+
         def _on_label_color_changed(self, label, gui_color):
-            self._label2color[label] = [gui_color.red,
-                                        gui_color.green,
-                                        gui_color.blue,
-                                        self._label2color[label][3]]
+            self._label2color[label] = [
+                gui_color.red, gui_color.green, gui_color.blue,
+                self._label2color[label][3]
+            ]
             if self._on_changed is not None:
                 self._on_changed()
 
         def _make_on_checked(self, label, member_func):
+
             def on_checked(checked):
                 member_func(label, checked)
+
             return on_checked
-            
+
         def _on_label_checked(self, label, checked):
             if checked:
                 alpha = 1.0
@@ -327,6 +348,7 @@ class Visualizer:
                 self._on_changed()
 
     class ColormapEdit:
+
         def __init__(self, window, em):
             self.colormap = None
             self.widget = gui.Vert()
@@ -390,35 +412,44 @@ class Visualizer:
                 color = gui.Color(p.color[0], p.color[1], p.color[2])
                 val = min_val + p.value * (max_val - min_val)
                 cell = gui.ColormapTreeCell(val, color, None, None)
-                cell.color_edit.set_on_value_changed(self._make_on_color_changed(i, self._on_color_changed))
-                cell.number_edit.set_on_value_changed(self._make_on_value_changed(i, self._on_value_changed))
+                cell.color_edit.set_on_value_changed(
+                    self._make_on_color_changed(i, self._on_color_changed))
+                cell.number_edit.set_on_value_changed(
+                    self._make_on_value_changed(i, self._on_value_changed))
                 item_id = self._edit.add_item(root_id, cell)
                 self._itemid2idx[item_id] = i
             self._update_buttons_enabled()
 
         def _make_on_color_changed(self, idx, member_func):
+
             def on_changed(color):
                 member_func(idx, color)
+
             return on_changed
-            
+
         def _on_color_changed(self, idx, gui_color):
-            self.colormap.points[idx].color = [gui_color.red, gui_color.green,
-                                               gui_color.blue]
+            self.colormap.points[idx].color = [
+                gui_color.red, gui_color.green, gui_color.blue
+            ]
             if self._on_changed is not None:
                 self._on_changed()
 
         def _make_on_value_changed(self, idx, member_func):
+
             def on_changed(value):
                 member_func(idx, value)
+
             return on_changed
 
         def _on_value_changed(self, idx, value):
-            value = (value - self._min_value) / (self._max_value - self._min_value)
+            value = (value - self._min_value) / (self._max_value -
+                                                 self._min_value)
             needs_update = False
             value = min(1.0, max(0.0, value))
 
-            if ((idx > 0 and value < self.colormap.points[idx-1].value) or
-                (idx < len(self.colormap.points) - 1 and value > self.colormap.points[idx+1].value)):
+            if ((idx > 0 and value < self.colormap.points[idx - 1].value) or
+                (idx < len(self.colormap.points) - 1 and
+                 value > self.colormap.points[idx + 1].value)):
                 self.colormap.points[idx].value = value
                 o = self.colormap.points[idx]
                 self.colormap.points.sort(key=lambda cmap_pt: cmap_pt.value)
@@ -427,18 +458,19 @@ class Visualizer:
                         idx = i
                         break
                 needs_update = True
-            if idx > 0 and value == self.colormap.points[idx-1].value:
+            if idx > 0 and value == self.colormap.points[idx - 1].value:
                 if idx < len(self.colormap.points):
                     upper = self.colormap.points[idx + 1].value
                 else:
                     upper = 1.0
                 value = value + 0.5 * (upper - value)
                 needs_update = True
-            if idx < len(self.colormap.points) - 1 and value == self.colormap.points[idx+1].value:
+            if idx < len(self.colormap.points
+                        ) - 1 and value == self.colormap.points[idx + 1].value:
                 if idx > 0:
                     lower = self.colormap.points[idx - 1].value
                 else:
-                    lower  = 0.0
+                    lower = 0.0
                 value = lower + 0.5 * (value - lower)
                 needs_update = True
 
@@ -456,14 +488,16 @@ class Visualizer:
         def _on_delete(self):
             if len(self.colormap.points) > 2:
                 idx = self._itemid2idx[self._edit.selected_item]
-                self.colormap.points = self.colormap.points[:idx] + self.colormap.points[idx+1:]
+                self.colormap.points = self.colormap.points[:
+                                                            idx] + self.colormap.points[
+                                                                idx + 1:]
                 del self._itemid2idx[self._edit.selected_item]
                 self._update_later()
                 if self._on_changed is not None:
                     self._on_changed()
 
         def _on_add(self):
-            if self._edit.selected_item in self._itemid2idx: # maybe no selection
+            if self._edit.selected_item in self._itemid2idx:  # maybe no selection
                 idx = self._itemid2idx[self._edit.selected_item]
                 if idx < len(self.colormap.points) - 1:
                     lower = self.colormap.points[idx]
@@ -473,11 +507,15 @@ class Visualizer:
                     upper = self.colormap.points[len(self.colormap.points) - 1]
                 add_idx = min(idx + 1, len(self.colormap.points) - 1)
                 new_value = lower.value + 0.5 * (upper.value - lower.value)
-                new_color = [0.5 * lower.color[0] + 0.5 * upper.color[0],
-                             0.5 * lower.color[1] + 0.5 * upper.color[1],
-                             0.5 * lower.color[2] + 0.5 * upper.color[2]]
+                new_color = [
+                    0.5 * lower.color[0] + 0.5 * upper.color[0],
+                    0.5 * lower.color[1] + 0.5 * upper.color[1],
+                    0.5 * lower.color[2] + 0.5 * upper.color[2]
+                ]
                 new_point = Colormap.Point(new_value, new_color)
-                self.colormap.points = self.colormap.points[:add_idx] + [new_point] + self.colormap.points[add_idx:]
+                self.colormap.points = self.colormap.points[:add_idx] + [
+                    new_point
+                ] + self.colormap.points[add_idx:]
                 self._update_later()
                 if self._on_changed is not None:
                     self._on_changed()
@@ -491,13 +529,15 @@ class Visualizer:
                 self._add.enabled = False
 
         def _update_later(self):
+
             def update():
                 self.update(self.colormap, self._min_value, self._max_value)
-                self._window.post_redraw() # need to manually request redraw
+                self._window.post_redraw()  # need to manually request redraw
 
             gui.Application.instance.post_to_main_thread(self._window, update)
 
     class ProgressDialog:
+
         def __init__(self, title, window, n_items):
             self._window = window
             self._n_items = n_items
@@ -518,15 +558,16 @@ class Visualizer:
 
         def post_update(self, text=None):
             if text is None:
-                gui.Application.instance.post_to_main_thread(self._window,
-                                                             self.update)
+                gui.Application.instance.post_to_main_thread(
+                    self._window, self.update)
             else:
+
                 def update_with_text():
                     self.update()
                     self._label.text = text
 
-                gui.Application.instance.post_to_main_thread(self._window,
-                                                             update_with_text)
+                gui.Application.instance.post_to_main_thread(
+                    self._window, update_with_text)
 
         def update(self):
             value = min(1.0, self._progress.value + 1.0 / self._n_items)
@@ -626,7 +667,8 @@ class Visualizer:
 
         # ... model list
         self._dataset = gui.TreeView()
-        self._dataset.set_on_selection_changed(self._on_dataset_selection_changed)
+        self._dataset.set_on_selection_changed(
+            self._on_dataset_selection_changed)
         view_tab.add_tab("List", self._dataset)
 
         # ... animation slider
@@ -664,13 +706,15 @@ class Visualizer:
         properties = gui.CollapsableVert("Properties", 0, indented_margins)
 
         grid = gui.VGrid(2, 0.25 * em)
-        
+
         # ... data source
         self._datasource_combobox = gui.Combobox()
-        self._datasource_combobox.set_on_selection_changed(self._on_datasource_changed)
+        self._datasource_combobox.set_on_selection_changed(
+            self._on_datasource_changed)
         self._colormap_channel = gui.Combobox()
         self._colormap_channel.add_item("0")
-        self._colormap_channel.set_on_selection_changed(self._on_channel_changed)
+        self._colormap_channel.set_on_selection_changed(
+            self._on_channel_changed)
         h = gui.Horiz()
         h.add_child(self._datasource_combobox)
         h.add_fixed(em)
@@ -761,8 +805,9 @@ class Visualizer:
 
     def setup_camera(self):
         selected_names = self._get_selected_names()
-        selected_bounds = [self._objects.calc_bounds_for(n)
-                           for n in selected_names]
+        selected_bounds = [
+            self._objects.calc_bounds_for(n) for n in selected_names
+        ]
         min_val = [1e30, 1e30, 1e30]
         max_val = [-1e30, -1e30, -1e30]
         for b in selected_bounds:
@@ -774,7 +819,7 @@ class Visualizer:
 
     def show_geometries_under(self, name, show):
         prefix = name
-        for (n,node) in self._name2treenode.items():
+        for (n, node) in self._name2treenode.items():
             if n.startswith(prefix):
                 self._3d.scene.show_geometry(n, show)
                 node.checkbox.checked = show
@@ -787,8 +832,10 @@ class Visualizer:
             if n in self._name2treeid:
                 parent = self._name2treeid[n]
             else:
+
                 def on_parent_checked(checked):
                     self.show_geometries_under(n, checked)
+
                 cell = gui.CheckableTextTreeCell(n, True, on_parent_checked)
                 parent = self._dataset.add_item(parent, cell)
                 self._name2treenode[n] = cell
@@ -804,7 +851,7 @@ class Visualizer:
         node = self._dataset.add_item(parent, cell)
         self._name2treenode[name] = cell
         self._treeid2name[node] = name
-        
+
         self._slider.set_limits(0, len(self._objects.data_names) - 1)
         if len(self._objects.data_names) == 1:
             self._slider_current.text = name
@@ -816,15 +863,15 @@ class Visualizer:
         def load_thread():
             result = self._objects.load(name)
             progress_dlg.post_update("Loading " + name + "...")
-                
-            gui.Application.instance.post_to_main_thread(self.window,
-                                                         ui_done_callback)
-            gui.Application.instance.post_to_main_thread(self.window,
-                                                        self.window.close_dialog)
+
+            gui.Application.instance.post_to_main_thread(
+                self.window, ui_done_callback)
+            gui.Application.instance.post_to_main_thread(
+                self.window, self.window.close_dialog)
 
         self.window.show_dialog(progress_dlg.dialog)
         threading.Thread(target=load_thread).start()
-        
+
     def _load_geometries(self, names, ui_done_callback):
         # Progress has: len(names) items + ui_done_callback
         progress_dlg = Visualizer.ProgressDialog("Loading...", self.window,
@@ -840,24 +887,27 @@ class Visualizer:
                     text = "Creating GPU objects..."
                 progress_dlg.post_update(text)
                 if result:
-                    self._name2treenode[names[i]].label.text_color = gui.Color(0.0, 1.0, 0.0, 1.0)
-                    
-            gui.Application.instance.post_to_main_thread(self.window,
-                                                         ui_done_callback)
-            gui.Application.instance.post_to_main_thread(self.window,
-                                                        self.window.close_dialog)
+                    self._name2treenode[names[i]].label.text_color = gui.Color(
+                        0.0, 1.0, 0.0, 1.0)
+
+            gui.Application.instance.post_to_main_thread(
+                self.window, ui_done_callback)
+            gui.Application.instance.post_to_main_thread(
+                self.window, self.window.close_dialog)
 
         self.window.show_dialog(progress_dlg.dialog)
         threading.Thread(target=load_thread).start()
 
     def _update_geometry(self):
         material = self._get_material()
-        for n,tcloud in self._objects.data.items():
+        for n, tcloud in self._objects.data.items():
             self._update_point_cloud(n, tcloud, material)
             if not tcloud.is_empty():
-                self._name2treenode[n].label.text_color = gui.Color(0.0, 1.0, 0.0, 1.0)
+                self._name2treenode[n].label.text_color = gui.Color(
+                    0.0, 1.0, 0.0, 1.0)
             else:
-                self._name2treenode[n].label.text_color = gui.Color(1.0, 0.0, 0.0, 1.0)
+                self._name2treenode[n].label.text_color = gui.Color(
+                    1.0, 0.0, 0.0, 1.0)
 
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
@@ -866,7 +916,7 @@ class Visualizer:
         self._3d.scene.remove_geometry(name)
         if tcloud.is_empty():
             return
-        
+
         attr_name = self._datasource_combobox.selected_text
         attr = None
         flag = 0
@@ -878,11 +928,12 @@ class Visualizer:
                 scalar = attr
             else:
                 channel = max(0, self._colormap_channel.selected_index)
-                scalar = attr[:,channel]
+                scalar = attr[:, channel]
         else:
             shape = [len(tcloud.point["points"].as_tensor().numpy())]
             scalar = np.zeros(shape, dtype='float32')
-        tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(scalar)
+        tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(
+            scalar)
 
         flag |= rendering.Scene.UPDATE_UV0_FLAG
 
@@ -891,7 +942,7 @@ class Visualizer:
             max_val = float(self._rgb_combo.selected_text)
             if max_val <= 0:
                 max_val = 255.0
-            colors = attr[:,[0,1,2]] * (1.0 / max_val)
+            colors = attr[:, [0, 1, 2]] * (1.0 / max_val)
             tcloud.point["colors"] = Visualizer._make_tcloud_array(colors)
             flag |= rendering.Scene.UPDATE_COLORS_FLAG
 
@@ -928,23 +979,26 @@ class Visualizer:
             colors = self._label_edit.get_colors()
             n = float(len(colors) - 1)
             if n >= 1:
-                self._gradient.points = [rendering.Gradient.Point(
-                                         float(i) / n,
-                                         [colors[i][0], colors[i][1],
-                                          colors[i][2], colors[i][3]])
-                                     for i in range(0, len(colors))]
+                self._gradient.points = [
+                    rendering.Gradient.Point(
+                        float(i) / n, [
+                            colors[i][0], colors[i][1], colors[i][2],
+                            colors[i][3]
+                        ]) for i in range(0, len(colors))
+                ]
             else:
-                self._gradient.points = [rendering.Gradient.Point(0.0, [1.0, 0.0, 1.0, 1.0])]
+                self._gradient.points = [
+                    rendering.Gradient.Point(0.0, [1.0, 0.0, 1.0, 1.0])
+                ]
             self._gradient.mode = rendering.Gradient.LUT
         else:
             cmap = self._colormaps.get(self._shader.selected_text)
             if cmap is not None:
-                self._gradient.points = [rendering.Gradient.Point(p.value,
-                                                          [p.color[0],
-                                                           p.color[1],
-                                                           p.color[2],
-                                                           1.0])
-                                         for p in cmap.points]
+                self._gradient.points = [
+                    rendering.Gradient.Point(
+                        p.value, [p.color[0], p.color[1], p.color[2], 1.0])
+                    for p in cmap.points
+                ]
                 self._gradient.mode = rendering.Gradient.GRADIENT
 
     def _update_geometry_colors(self):
@@ -966,7 +1020,7 @@ class Visualizer:
             # 1) no geometries are selected: don't change anything
             # 2) geometries are selected: color solid
             has_checked = False
-            for n,node in self._name2treenode.items():
+            for n, node in self._name2treenode.items():
                 if node.checkbox.checked:
                     has_checked = True
                     break
@@ -979,7 +1033,9 @@ class Visualizer:
         has_lut = (current_attr in self._attrname2lut)
         is_scalar = True
         selected_names = self._get_selected_names()
-        if len(selected_names) > 0 and len(self._objects.get_attr_shape(selected_names[0], current_attr)) > 1:
+        if len(selected_names) > 0 and len(
+                self._objects.get_attr_shape(selected_names[0],
+                                             current_attr)) > 1:
             is_scalar = False
 
         self._shader.clear_items()
@@ -1000,12 +1056,13 @@ class Visualizer:
     def _update_attr_range(self):
         attr_name = self._datasource_combobox.selected_text
         current_channel = self._colormap_channel.selected_index
-        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(attr_name, current_channel)
+        self._scalar_min, self._scalar_max = self._objects.get_attr_minmax(
+            attr_name, current_channel)
 
         if self._shader.selected_text in self._colormaps:
             cmap = self._colormaps[self._shader.selected_text]
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
-        
+
     def _set_shader(self, shader_name, force_update=False):
         if shader_name == self._shader.selected_text and not force_update:
             return
@@ -1027,8 +1084,8 @@ class Visualizer:
         panel_rect = gui.Rect(frame.get_right() - panel_width, frame.y,
                               panel_width, frame.height - frame.y)
         self._panel.frame = panel_rect
-        self._3d.frame = gui.Rect(frame.x, frame.y,
-                                  panel_rect.x - frame.x, frame.height - frame.y)
+        self._3d.frame = gui.Rect(frame.x, frame.y, panel_rect.x - frame.x,
+                                  frame.height - frame.y)
 
     def _on_arcball_mode(self):
         self._3d.set_view_controls(gui.SceneWidget.ROTATE_CAMERA)
@@ -1044,21 +1101,22 @@ class Visualizer:
 
         def ui_callback():
             self._update_geometry()
-            
+
         if not self._objects.is_loaded(name):
             self._load_geometry(name, ui_callback)
-    
+
     def _on_display_tab_changed(self, index):
         if index == 1:
             self._on_animation_slider_changed(self._slider.int_value)
         else:
-            for name,node in self._name2treenode.items():
+            for name, node in self._name2treenode.items():
                 self._3d.scene.show_geometry(name, node.checkbox.checked)
 
     def _on_animation_slider_changed(self, new_value):
         idx = int(new_value)
         for i in range(0, len(self._objects.data_names)):
-            self._3d.scene.show_geometry(self._objects.data_names[i], (i == idx))
+            self._3d.scene.show_geometry(self._objects.data_names[i],
+                                         (i == idx))
         self._slider_current.text = self._objects.data_names[idx]
         r = self._slider_current.frame
         self._slider_current.frame = gui.Rect(r.x, r.y,
@@ -1066,6 +1124,7 @@ class Visualizer:
                                               r.height)
 
     def _on_start_animation(self):
+
         def on_tick():
             return self._on_animate()
 
@@ -1077,7 +1136,8 @@ class Visualizer:
     def _on_animate(self):
         now = time.time()
         if now >= self._last_animation_time + self._animation_delay_secs:
-            idx = (self._slider.int_value + 1) % (len(self._objects.data_names) - 1)
+            idx = (self._slider.int_value +
+                   1) % (len(self._objects.data_names) - 1)
             self._slider.int_value = idx
             self._on_animation_slider_changed(idx)
             self._last_animation_time = now
@@ -1091,8 +1151,7 @@ class Visualizer:
 
     def _on_bgcolor_changed(self, new_color):
         bg_color = [
-            new_color.red, new_color.green,
-            new_color.blue, new_color.alpha
+            new_color.red, new_color.green, new_color.blue, new_color.alpha
         ]
         self.window.renderer.set_clear_color(bg_color)
 
@@ -1132,12 +1191,13 @@ class Visualizer:
 
     def _on_shader_color_changed(self, color):
         self._update_geometry_colors()
-            
+
     def _on_labels_changed(self):
         self._update_geometry_colors()
 
     def _on_colormap_changed(self):
-        self._colormaps[self._shader.selected_text] = self._colormap_edit.colormap
+        self._colormaps[
+            self._shader.selected_text] = self._colormap_edit.colormap
         self._update_geometry_colors()
 
     def _on_rgb_multiplier(self, text, idx):
@@ -1145,7 +1205,7 @@ class Visualizer:
 
     def _get_selected_names(self):
         selected_names = []
-        for n,node in self._name2treenode.items():
+        for n, node in self._name2treenode.items():
             if node.checkbox.checked:
                 selected_names.append(n)
         return selected_names
@@ -1162,8 +1222,12 @@ class Visualizer:
             t = o3d.core.Tensor.from_numpy(np_array)
         return o3d.core.TensorList.from_tensor(t, inplace=True)
 
-    def visualize_dataset(self, dataset, split, indices=None,
-                          width=1024, height=768):
+    def visualize_dataset(self,
+                          dataset,
+                          split,
+                          indices=None,
+                          width=1024,
+                          height=768):
         # Setup the labels
         lut = LabelLUT()
         for val in sorted(dataset.label_to_names.keys()):
@@ -1184,7 +1248,7 @@ class Visualizer:
         self._3d.scene.downsample_threshold = 400000
 
         # Turn all the objects off except the first one
-        for name,node in self._name2treenode.items():
+        for name, node in self._name2treenode.items():
             node.checkbox.checked = False
             self._3d.scene.show_geometry(name, False)
         for name in [self._objects.data_names[0]]:
@@ -1214,8 +1278,9 @@ class Visualizer:
             self.setup_camera()
 
             self._dont_update_geometry = True
-            self._on_datasource_changed(self._datasource_combobox.selected_text,
-                                        self._datasource_combobox.selected_index)
+            self._on_datasource_changed(
+                self._datasource_combobox.selected_text,
+                self._datasource_combobox.selected_index)
             self._update_geometry_colors()
             self._dont_update_geometry = False
             # _datasource_combobox was empty, now isn't, re-layout.
