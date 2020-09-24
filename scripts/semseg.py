@@ -118,10 +118,10 @@ def main():
             pprint.pformat(cfg_dict_pipeline, indent=2, sort_dicts=False)
     }
 
-    if args.split == 'train':
-        pipeline.run_train()
-    else:
+    if args.split == 'test':
         pipeline.run_test()
+    else:
+        pipeline.run_train()
 
 
 if __name__ == '__main__':

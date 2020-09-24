@@ -90,17 +90,15 @@ class SemanticSegmentation(BasePipeline):
         return model.inference_result
 
     def run_test(self):
-        #self.device = device
         model = self.model
         dataset = self.dataset
         device = self.device
         cfg = self.cfg
         model.device = device
-        print(device)
         model.to(device)
-        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        metric = SemSegMetric(self, model, dataset, device)
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
@@ -121,14 +119,29 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
+        self.test_accs = []
+        self.test_ious = []
+
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
                 attr = datset_split.get_attr(idx)
-                if dataset.is_tested(attr):
+                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
                     continue
                 data = datset_split.get_data(idx)
                 results = self.run_inference(data)
+
+                predict_label = results['predict_labels']
+                if cfg.get('test_compute_metric', False):
+                    acc = metric.acc_np_label(predict_label, data['label'])
+                    iou = metric.iou_np_label(predict_label, data['label'])
+                    self.test_accs.append(acc)
+                    self.test_ious.append(iou)
+
                 dataset.save_test_result(results, attr)
+
+        if cfg.get('test_compute_metric', False):
+            log.info("test acc: {}".format(self.test_accs))
+            log.info("test iou: {}".format(self.test_ious))
 
     def run_train(self):
         model = self.model
@@ -147,7 +160,7 @@ class SemanticSegmentation(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLoss(self, model, dataset, device)
-        Metric = SemSegMetric(self, model, dataset, device)
+        metric = SemSegMetric(self, model, dataset, device)
 
         batcher = self.get_batcher(device)
 
@@ -187,7 +200,7 @@ class SemanticSegmentation(BasePipeline):
 
         for epoch in range(0, cfg.max_epoch + 1):
 
-            print(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
             self.losses = []
             self.accs = []
@@ -202,9 +215,8 @@ class SemanticSegmentation(BasePipeline):
                 loss.backward()
                 self.optimizer.step()
 
-                acc = Metric.acc(predict_scores, gt_labels)
-                iou = Metric.iou(predict_scores, gt_labels)
-                print(results.size(), acc[-1], iou[-1])
+                acc = metric.acc(predict_scores, gt_labels)
+                iou = metric.iou(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
@@ -217,16 +229,15 @@ class SemanticSegmentation(BasePipeline):
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
-            step = 0
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
+
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
-                    acc = Metric.acc(predict_scores, gt_labels)
-
-                    iou = Metric.iou(predict_scores, gt_labels)
+                    acc = metric.acc(predict_scores, gt_labels)
+                    iou = metric.iou(predict_scores, gt_labels)
 
                     self.valid_losses.append(loss.cpu().item())
                     self.valid_accs.append(acc)

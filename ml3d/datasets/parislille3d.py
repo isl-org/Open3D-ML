@@ -105,21 +105,28 @@ class ParisLille3D(BaseDataset):
 
         return files
 
+    def is_tested(self, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        store_path = join(path, self.name, name + '.txt')
+        if exists(store_path):
+            print("{} already exists.".format(store_path))
+            return True
+        else:
+            return False
+
     def save_test_result(self, results, attr):
         cfg = self.cfg
         name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
-        pred = results['predict_labels']
-        pred = np.array(pred)
-
-        for ign in cfg.ignored_label_inds:
-            pred[pred >= ign] += 1
-
-        store_path = join(path, self.name, name + '.npy')
+        pred = results['predict_labels'] + 1
+        store_path = join(path, self.name, name + '.txt')
         make_dir(Path(store_path).parent)
-        np.save(store_path, pred)
+        np.savetxt(store_path, pred.astype(np.int32), fmt='%d')
+
         log.info("Saved {} in {}.".format(name, store_path))
 
 
