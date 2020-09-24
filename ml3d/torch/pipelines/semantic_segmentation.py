@@ -192,7 +192,9 @@ class SemanticSegmentation(BasePipeline):
 
         first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
 
-        writer = SummaryWriter(join(cfg.logs_dir, cfg.train_sum_dir))
+        writer = SummaryWriter(self.tensorboard_dir)
+        self.save_config(writer)
+        log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
 
@@ -281,15 +283,13 @@ class SemanticSegmentation(BasePipeline):
         } for iou, val_iou in zip(ious, valid_ious)]
 
         # send results to tensorboard
-        writer.add_scalars('Loss', loss_dict, epoch)
-
-        for i in range(self.model.cfg.num_classes):
-            writer.add_scalars(f'Per-class accuracy/{i+1:02d}', acc_dicts[i],
-                               epoch)
-            writer.add_scalars(f'Per-class IoU/{i+1:02d}', iou_dicts[i], epoch)
-
-        writer.add_scalars('Overall accuracy', acc_dicts[-1], epoch)
-        writer.add_scalars('Mean IoU', iou_dicts[-1], epoch)
+        # add_scalars creates clutter: https://github.com/pytorch/pytorch/issues/32651
+        for key, val in loss_dict.items():
+            writer.add_scalar(key, val, epoch)
+        for key, val in acc_dicts[-1].items():
+            writer.add_scalar("{}/ Overall".format(key), val, epoch)
+        for key, val in iou_dicts[-1].items():
+            writer.add_scalar("{}/ Overall".format(key), val, epoch)
 
         log.info(f"loss train: {loss_dict['Training loss']:.3f} "
                  f" eval: {loss_dict['Validation loss']:.3f}")
@@ -330,6 +330,50 @@ class SemanticSegmentation(BasePipeline):
                  scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
+
+    def filter_valid(self, scores, labels, device):
+        valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
+        valid_labels = labels.reshape(-1).to(device)
+
+        ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
+        for ign_label in self.dataset.cfg.ignored_label_inds:
+            ignored_bool = torch.logical_or(ignored_bool,
+                                            torch.eq(valid_labels, ign_label))
+
+        valid_idx = torch.where(torch.logical_not(ignored_bool))[0].to(device)
+
+        valid_scores = torch.gather(
+            valid_scores, 0,
+            valid_idx.unsqueeze(-1).expand(-1, self.model.cfg.num_classes))
+        valid_labels = torch.gather(valid_labels, 0, valid_idx)
+
+        # Reduce label values in the range of logit shape
+        reducing_list = torch.arange(0,
+                                     self.model.cfg.num_classes,
+                                     dtype=torch.int64)
+        inserted_value = torch.zeros([1], dtype=torch.int64)
+
+        for ign_label in self.dataset.cfg.ignored_label_inds:
+            reducing_list = torch.cat([
+                reducing_list[:ign_label], inserted_value,
+                reducing_list[ign_label:]
+            ], 0)
+        valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels)
+
+        valid_labels = valid_labels.unsqueeze(0)
+        valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
+
+        return valid_scores, valid_labels
+
+    def save_config(self, writer):
+        '''
+        Save experiment configuration with tensorboard summary
+        '''
+        desc = "#TODO: How did we do this? \nRead in a documentation md here"
+        writer.add_text("Description/Experiment procedure", desc, 0)
+        writer.add_text('Configuration/Dataset', self.cfg_tb['dataset'], 0)
+        writer.add_text('Configuration/Model', self.cfg_tb['model'], 0)
+        writer.add_text('Configuration/Pipeline', self.cfg_tb['pipeline'], 0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "torch")
