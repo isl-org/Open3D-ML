@@ -29,5 +29,14 @@ def get_runid(path):
             pass
     runid = str(runid + 1)
     runid = '0' * (5 - len(runid)) + runid
-
     return runid
+
+
+def code2md(code_text, language=None):
+    """
+    Format code as markdown for display (eg in tensorboard)
+    """
+    four_spaces = '    '
+    code_md = four_spaces + code_text.replace(os.linesep,
+                                              os.linesep + four_spaces)
+    return code_md[:-4]

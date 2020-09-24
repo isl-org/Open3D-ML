@@ -1,7 +1,9 @@
 import argparse
 import copy
 import os
+import sys
 import os.path as osp
+from pathlib import Path
 import yaml
 import time
 import pprint
@@ -53,6 +55,7 @@ from ml3d.utils import Config, get_module, convert_framework_name
 
 
 def main():
+    cmd_line = ' '.join(sys.argv[:])
     args, extra_dict = parse_args()
 
     framework = convert_framework_name(args.framework)
@@ -109,7 +112,11 @@ def main():
         model = Model(**cfg_dict_model)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
+    with open(Path(__file__).parent / 'readme.md', 'r') as f:
+        readme = f.read()
     pipeline.cfg_tb = {
+        'readme': readme,
+        'cmd_line': cmd_line,
         'dataset': pprint.pformat(cfg_dict_dataset, indent=2),
         'model': pprint.pformat(cfg_dict_model, indent=2),
         'pipeline': pprint.pformat(cfg_dict_pipeline, indent=2)

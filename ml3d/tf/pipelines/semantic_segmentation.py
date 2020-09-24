@@ -13,7 +13,7 @@ from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
-from ...utils import make_dir, LogRecord, PIPELINE, get_runid
+from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -292,12 +292,20 @@ class SemanticSegmentation(BasePipeline):
         '''
         with writer.as_default():
             with tf.name_scope("Description"):
-                desc = "#TODO: How did we do this? \nRead in a documentation md here"
-                tf.summary.text("Experiment procedure", desc, step=0)
+                tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)
+                tf.summary.text("Command line", self.cfg_tb['cmd_line'], step=0)
             with tf.name_scope("Configuration"):
-                tf.summary.text('Dataset', self.cfg_tb['dataset'], step=0)
-                tf.summary.text('Model', self.cfg_tb['model'], step=0)
-                tf.summary.text('Pipeline', self.cfg_tb['pipeline'], step=0)
+                tf.summary.text('Dataset',
+                                code2md(self.cfg_tb['dataset'],
+                                        language='json'),
+                                step=0)
+                tf.summary.text('Model',
+                                code2md(self.cfg_tb['model'], language='json'),
+                                step=0)
+                tf.summary.text('Pipeline',
+                                code2md(self.cfg_tb['pipeline'],
+                                        language='json'),
+                                step=0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "tf")
