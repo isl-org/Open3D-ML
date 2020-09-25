@@ -1194,7 +1194,7 @@ class Visualizer:
         current_shader = self._shader.selected_text
         if current_shader == Visualizer.SOLID_NAME:
             pass
-        elif attr_name == "labels":
+        elif attr_name in self._attrname2lut:
             self._set_shader(Visualizer.LABELS_NAME)
         elif attr_name == "colors":
             self._set_shader(Visualizer.COLOR_NAME)
