@@ -401,6 +401,9 @@ class KPFCNN(BaseModel):
             n = in_pts.shape[0]
             # Safe check
             if n < 2:
+                print("not enough points")
+                if attr['split'] in ['test']:
+                    self.possibility[wanted_ind] += 0.01
                 continue
 
             # Randomly drop some points (augmentation process and safety for GPU memory consumption)
@@ -440,6 +443,7 @@ class KPFCNN(BaseModel):
 
             # Data augmentation
             in_pts, scale, R = self.augmentation_transform(in_pts)
+
 
             # Color augmentation
             if np.random.rand() > self.cfg.augment_color:
@@ -516,7 +520,6 @@ class KPFCNN(BaseModel):
             self.test_probs[proj_mask, :] = frame_probs
 
             i0 += length
-        print(np.min(self.possibility))
         if np.min(self.possibility) > 0.5:
             inference_result = {
                 'predict_labels': np.argmax(self.test_probs, 1),

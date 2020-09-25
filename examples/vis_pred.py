@@ -5,6 +5,9 @@ from ml3d.datasets import Semantic3D
 from ml3d.datasets import SemanticKITTI
 from ml3d.datasets import Toronto3D
 from ml3d.vis import Visualizer, LabelLUT
+from ml3d.utils import get_module
+
+import argparse
 import math
 import numpy as np
 import os
@@ -12,6 +15,7 @@ import random
 import sys
 import tensorflow as tf
 import torch
+from os.path import exists, join, isfile, dirname, abspath, split
 
 
 def print_usage_and_exit():
@@ -46,50 +50,77 @@ kitti_labels = {
 }
 
 
-def create_custom_dataset(path):
-    pts = np.load(path + "/kitti_01_points_000000.npy")
-    d1 = {
-        "name": "kitti01 000000 + dist + random",
-        "points": pts,
-        "labels": np.load(path + "/kitti_01_labels_000000.npy"),
-        "distance": create_distance(pts),
-        "random": create_random_feature(len(pts)),
-    }
-    pts = np.load(path + "/kitti_01_points_000001.npy")
-    d2 = {
-        "name": "kitti01 000001 + dist",
-        "points": pts,
-        "labels": np.load(path + "/kitti_01_labels_000001.npy"),
-        "distance": create_distance(pts)
-    }
-    d3 = {
-        "name": "kitti01 000002",
-        "points": np.load(path + "/kitti_01_points_000002.npy"),
-        "labels": np.load(path + "/kitti_01_labels_000002.npy")
-    }
-    return [d1, d2, d3]
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Visualize Datasets')
+    parser.add_argument('dataset_name')
+    parser.add_argument('dataset_path')
+    parser.add_argument('--model', default='RandLANet')
+
+    args = parser.parse_args()
 
 
-def create_distance(pts):
-    d = [math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) for p in pts]
-    return tf.convert_to_tensor(d, dtype='float32')
+    return args
 
 
-def create_random_feature(n_points):
-    return torch.randn(1, n_points)
+
+def get_custom_data(path):
+    pc_names = [
+        "kitti_01_points_000000.npy", 
+        "kitti_01_points_000001.npy"
+    ]
+    pc_labels = [
+        "kitti_01_labels_000000.npy", 
+        "kitti_01_labels_000001.npy"
+    ]
+
+    pc_data = []
+    for i, name in enumerate(pc_names):
+        pc_path = join(path, name)
+        label_path = join(path, pc_labels[i])
+        point = np.load(pc_path)
+        np.load(path + "/kitti_01_labels_000000.npy")
+        data = {
+            'point': point[:, 0:3],
+            'feat': None,
+            'label': np.squeeze(np.load(label_path)) ,
+        }
+        pc_data.append(data)
+
+    return pc_data
+
+def pred_custom_data(pcs, pipeline):
+    vis_points = []
+    for i, data in enumerate(pcs):
+        results = pipeline.run_inference(data)
+        pred_label = np.expand_dims(results['predict_labels'], 0) 
+
+        pts = data['point']
+        vis_d = {
+            "name": "{:05d}".format(i),
+            "points": pts,
+            "labels": data['label'],
+            "preds": pred_label.astype(np.int32)
+        }
+
+        vis_points.append(vis_d)
+
+    return vis_points
 
 
 # ------------------------------
 
-from ml3d.tf.pipelines import SemanticSegmentation
-from ml3d.tf.models import RandLANet
+from ml3d.torch.pipelines import SemanticSegmentation
+from ml3d.torch.models import RandLANet, KPFCNN
 
 def main():
-    if len(sys.argv) != 3:
-        print_usage_and_exit()
+    # if len(sys.argv) != 3:
+    #     print_usage_and_exit()
 
-    which = sys.argv[1]
-    path = sys.argv[2]
+    args = parse_args()
+
+    which = args.dataset_name
+    path = args.dataset_path
 
     if which == "kitti":
         dataset = SemanticKITTI(path)
@@ -107,6 +138,9 @@ def main():
         print("[ERROR] '" + which + "' is not a valid dataset")
         print_usage_and_exit()
 
+
+
+
     v = Visualizer()
     if dataset is None:  # custom
         lut = LabelLUT()
@@ -115,14 +149,28 @@ def main():
         v.set_lut("labels", lut)
         path = os.path.dirname(os.path.realpath(__file__)) + "/data"
 
-        ckpt_path = "../dataset/checkpoints/randlanet_semantickitti.pth"
-        model = RandLANet(ckpt_path=args.path_ckpt_randlanet)
-        pipeline = SemanticSegmentation()
+        kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
+        randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+        ckpt_path = "../dataset/checkpoints/vis_weights_{}.pth".format(args.model)
 
+        if args.model == 'RandLANet':
+            if not exists(ckpt_path):
+                cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
+                os.system(cmd)
+            model = RandLANet(ckpt_path=ckpt_path)
+        elif args.model == 'KPFCNN':
+            if not exists(ckpt_path):
+                cmd = "wget {} -O {}".format(kpconv_url, ckpt_path)
+                os.system(cmd)
+            model = KPFCNN(ckpt_path=ckpt_path, in_radius=10)
 
+        pipeline = SemanticSegmentation(model)
+        pipeline.load_ckpt(model.cfg.ckpt_path, is_train=False)
 
+        pcs = get_custom_data(path)
+        pcs_with_pred = pred_custom_data(pcs, pipeline)
 
-        v.visualize(create_custom_dataset(path))
+        v.visualize(pcs_with_pred)
     else:
         v.visualize_dataset(dataset, "training")  # everything
         #v.visualize_dataset(dataset, "training", [0])
