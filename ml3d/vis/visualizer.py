@@ -190,7 +190,7 @@ class DatasetModel(Model):
         super().__init__()
         self._dataset = None
         self._name2datasetidx = {}
-        self._memory_limit = 4001  # memory limit in megabytes
+        self._memory_limit = 8192  # memory limit in megabytes
         self._current_memory_usage = 0
         self._cached_data = deque()
 
