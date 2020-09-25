@@ -43,8 +43,8 @@ def preprocess(args):
     size_limit = args.size_limit  #Size in mega bytes.
 
     if out_path is None:
-        print("out_path not give, Saving output in {}".format(dataset_path))
-        out_path = dataset_path
+        out_path = Path(dataset_path) / 'processed'
+        print("out_path not give, Saving output in {}".format(out_path))
 
     all_files = glob.glob(str(Path(dataset_path) / '*.txt'))
 
@@ -102,8 +102,8 @@ def preprocess(args):
             shuf = np.arange(pcs[i].shape[0])
             np.random.shuffle(shuf)
 
-            np.savetxt(name, pcs[i][shuf])
-            np.savetxt(name_lbl, lbls[i][shuf])
+            np.savetxt(name, pcs[i][shuf], fmt='%.3f %.3f %.3f %i %i %i %i')
+            np.savetxt(name_lbl, lbls[i][shuf], fmt='%i')
 
 
 if __name__ == '__main__':
