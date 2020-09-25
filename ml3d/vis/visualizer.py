@@ -895,6 +895,8 @@ class Visualizer:
                 if result:
                     self._name2treenode[names[i]].label.text_color = gui.Color(
                         0.0, 1.0, 0.0, 1.0)
+                else:
+                    break
 
             gui.Application.instance.post_to_main_thread(
                 self.window, ui_done_callback)
