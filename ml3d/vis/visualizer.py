@@ -1073,6 +1073,13 @@ class Visualizer:
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
 
     def _set_shader(self, shader_name, force_update=False):
+        # Disable channel if we are using a vector shader. Always do this to
+        # ensure that the UI is consistent.
+        if shader_name == Visualizer.COLOR_NAME:
+            self._colormap_channel.enabled = False
+        else:
+            self._colormap_channel.enabled = True
+
         if shader_name == self._shader.selected_text and not force_update:
             return
 
@@ -1083,12 +1090,6 @@ class Visualizer:
         if shader_name in self._colormaps:
             cmap = self._colormaps[shader_name]
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
-
-        # Disable channel if we are using a vector shader
-        if shader_name == Visualizer.COLOR_NAME:
-            self._colormap_channel.enabled = False
-        else:
-            self._colormap_channel.enabled = True
 
         self._update_geometry_colors()
 
@@ -1189,7 +1190,7 @@ class Visualizer:
         self._update_attr_range()
         self._update_shaders_combobox()
 
-        # Try to intelligently pick a shader
+        # Try to intelligently pick a shader.
         current_shader = self._shader.selected_text
         if current_shader == Visualizer.SOLID_NAME:
             pass
@@ -1286,13 +1287,11 @@ class Visualizer:
 
             # Display "colors" by default if available, "points" if not
             available_attrs = self._get_available_attrs()
+            self._set_shader(self.SOLID_NAME, force_update=True)
             if "colors" in available_attrs:
                 self._datasource_combobox.selected_text = "colors"
             elif "points" in available_attrs:
                 self._datasource_combobox.selected_text = "points"
-            else:  # shouldn't happen, should always have "points"
-                shader_name = self.SOLID_NAME
-                self._set_shader(self.SOLID_NAME, force_update=True)
 
             self._dont_update_geometry = True
             self._on_datasource_changed(
