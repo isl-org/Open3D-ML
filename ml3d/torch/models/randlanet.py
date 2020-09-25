@@ -223,7 +223,7 @@ class RandLANet(BaseModel):
 
         pred_l = np.argmax(probs, 1)
 
-        inds = inputs['data']['point_inds'][0, :]
+        inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
