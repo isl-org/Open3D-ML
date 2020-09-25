@@ -1057,7 +1057,7 @@ class Visualizer:
 
         if current_shader == self.LABELS_NAME and has_lut:
             self._set_shader(self.LABELS_NAME)
-        else:
+        elif is_scalar:
             self._set_shader(self.RAINBOW_NAME)
 
     def _update_attr_range(self):
@@ -1081,6 +1081,12 @@ class Visualizer:
         if shader_name in self._colormaps:
             cmap = self._colormaps[shader_name]
             self._colormap_edit.update(cmap, self._scalar_min, self._scalar_max)
+
+        # Disable channel if we are using a vector shader
+        if shader_name == Visualizer.COLOR_NAME:
+            self._colormap_channel.enabled = False
+        else:
+            self._colormap_channel.enabled = True
 
         self._update_geometry_colors()
 
@@ -1180,6 +1186,22 @@ class Visualizer:
 
         self._update_attr_range()
         self._update_shaders_combobox()
+
+        # Try to intelligently pick a shader
+        current_shader = self._shader.selected_text
+        if current_shader == Visualizer.SOLID_NAME:
+            pass
+        elif attr_name == "labels":
+            self._set_shader(Visualizer.LABELS_NAME)
+        elif attr_name == "colors":
+            self._set_shader(Visualizer.COLOR_NAME)
+        elif n_channels >= 3:
+            self._set_shader(Visualizer.RAINBOW_NAME)
+        elif current_shader == Visualizer.COLOR_NAME: # vector -> scalar
+            self._set_shader(Visualizer.RAINBOW_NAME)
+        else: # changing from one scalar to another, don't change
+            pass
+
         self._update_geometry()
 
     def _on_channel_changed(self, name, idx):
@@ -1189,12 +1211,6 @@ class Visualizer:
     def _on_shader_changed(self, name, idx):
         # _shader.current_text is already name, so we need to force an update
         self._set_shader(name, force_update=True)
-
-        # Disable channel if we are using a vector shader
-        if name == Visualizer.COLOR_NAME:
-            self._colormap_channel.enabled = False
-        else:
-            self._colormap_channel.enabled = True
 
     def _on_shader_color_changed(self, color):
         self._update_geometry_colors()
@@ -1266,23 +1282,15 @@ class Visualizer:
             self._update_datasource_combobox()
             self._update_shaders_combobox()
 
-            # Display labels by default, if available
-            shader_name = None
-            for attr_name in ["label", "labels"]:
-                if attr_name in self._get_available_attrs():
-                    self._datasource_combobox.selected_text = attr_name
-                    if attr_name in self._attrname2lut:
-                        shader_name = self.LABELS_NAME
-                    break
-            if shader_name is None:
-                if self._datasource_combobox.selected_text == "":
-                    shader_name = self.SOLID_NAME
-                else:
-                    shader_name = self.RAINBOW_NAME
-            self._set_shader(shader_name)
-
-            self._update_geometry()
-            self.setup_camera()
+            # Display "colors" by default if available, "points" if not
+            available_attrs = self._get_available_attrs()
+            if "colors" in available_attrs:
+                self._datasource_combobox.selected_text = "colors"
+            elif "points" in available_attrs:
+                self._datasource_combobox.selected_text = "points"
+            else:  # shouldn't happen, should always have "points"
+                shader_name = self.SOLID_NAME
+                self._set_shader(self.SOLID_NAME, force_update=True)
 
             self._dont_update_geometry = True
             self._on_datasource_changed(
@@ -1292,6 +1300,9 @@ class Visualizer:
             self._dont_update_geometry = False
             # _datasource_combobox was empty, now isn't, re-layout.
             self.window.set_needs_layout()
+
+            self._update_geometry()
+            self.setup_camera()
 
         self._load_geometries(self._objects.data_names, on_done_ui)
         gui.Application.instance.add_window(self.window)
