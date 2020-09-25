@@ -148,7 +148,7 @@ class Model:
         return sorted(attr_names)
 
     def calc_bounds_for(self, name):
-        if name in self.tclouds:
+        if name in self.tclouds and not self.tclouds[name].is_empty():
             tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
