@@ -116,23 +116,26 @@ class Model:
         return []
 
     def get_attr_minmax(self, attr_name, channel):
-        attr_key = attr_name + ":" + str(channel)
-        if attr_key not in self._attr2minmax:
-            attr_min = 1e30
-            attr_max = -1e30
-            for name in self._data.keys():
+        attr_key_base = attr_name + ":" + str(channel)
+
+        attr_min = 1e30
+        attr_max = -1e30
+        for name in self._data.keys():
+            key = name + ":" + attr_key_base
+            if key not in self._attr2minmax:
                 attr = self.get_attr(name, attr_name)
                 if attr is None:  # clouds may not have all the same attributes
                     continue
                 if len(attr.shape) > 1:
                     attr = attr[:, channel]
-                attr_min = min(attr_min, attr.min())
-                attr_max = max(attr_max, attr.max())
-            if attr_min <= attr_max:
-                self._attr2minmax[attr_key] = (attr_min, attr_max)
-            else:
-                return (0.0, 0.0)
-        return self._attr2minmax[attr_key]
+                self._attr2minmax[key] = (attr.min(), attr.max())
+            amin, amax = self._attr2minmax[key]
+            attr_min = min(attr_min, amin)
+            attr_max = max(attr_max, amax)
+
+        if attr_min > attr_max:
+            return (0.0, 0.0)
+        return (attr_min, attr_max)
 
     def get_available_attrs(self, names):
         attr_names = None
@@ -906,7 +909,12 @@ class Visualizer:
         self.window.show_dialog(progress_dlg.dialog)
         threading.Thread(target=load_thread).start()
 
-    def _update_geometry(self):
+    def _update_geometry(self, check_unloaded=False):
+        if check_unloaded:
+            for name in self._objects.data_names:
+                if not self._objects.is_loaded(name):
+                    self._3d.scene.remove_geometry(name)
+
         material = self._get_material()
         for n, tcloud in self._objects.tclouds.items():
             self._update_point_cloud(n, tcloud, material)
@@ -917,12 +925,12 @@ class Visualizer:
                 self._name2treenode[n].label.text_color = gui.Color(
                     1.0, 0.0, 0.0, 1.0)
                 self._name2treenode[n].checkbox.checked = False
+        self._3d.scene.update_material(material)
 
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
             return
 
-        self._3d.scene.remove_geometry(name)
         if tcloud.is_empty():
             return
 
@@ -1116,7 +1124,8 @@ class Visualizer:
         name = self._treeid2name[item]
 
         def ui_callback():
-            self._update_geometry()
+            self._update_attr_range()
+            self._update_geometry(check_unloaded=True)
 
         if not self._objects.is_loaded(name):
             self._load_geometry(name, ui_callback)
