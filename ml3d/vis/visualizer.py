@@ -914,6 +914,7 @@ class Visualizer:
             else:
                 self._name2treenode[n].label.text_color = gui.Color(
                     1.0, 0.0, 0.0, 1.0)
+                self._name2treenode[n].checkbox.checked = False
 
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
