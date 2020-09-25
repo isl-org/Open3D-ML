@@ -1197,9 +1197,9 @@ class Visualizer:
             self._set_shader(Visualizer.COLOR_NAME)
         elif n_channels >= 3:
             self._set_shader(Visualizer.RAINBOW_NAME)
-        elif current_shader == Visualizer.COLOR_NAME: # vector -> scalar
+        elif current_shader == Visualizer.COLOR_NAME:  # vector -> scalar
             self._set_shader(Visualizer.RAINBOW_NAME)
-        else: # changing from one scalar to another, don't change
+        else:  # changing from one scalar to another, don't change
             pass
 
         self._update_geometry()
