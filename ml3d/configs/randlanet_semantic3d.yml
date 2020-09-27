@@ -10,6 +10,7 @@ dataset:
   test_result_folder: ./test
   use_cache: true
   val_files:
+  - bildstein_station1_xyz_intensity_rgb
   - domfountain_station1_xyz_intensity_rgb
   steps_per_epoch_train: 500
   steps_per_epoch_valid: 100

@@ -68,7 +68,15 @@ def preprocess(args):
 
     sub_grid_size = 0.01
 
+    ii = 0
     for key, parts in tqdm(files.items()):
+        ii = ii + 1
+        print(key)
+        if ii < 11:
+            continue
+        if parts > 4:
+            continue
+
         if parts == 1:
             if dataset_path != out_path:
                 pc = pd.read_csv(key,

@@ -1,5 +1,6 @@
 #!/bin/bash
-#SBATCH -p gpu 
+#SBATCH -p gpu
+#SBATCH -c 4 
 #SBATCH --gres=gpu:1 
 
 
