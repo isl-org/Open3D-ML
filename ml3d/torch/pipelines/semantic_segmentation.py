@@ -219,11 +219,12 @@ class SemanticSegmentation(BasePipeline):
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
-                if results.size()[-1]==0 or len(results.size())<3:
-                    print(results.size())
-                    continue
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
+
+                print(predict_scores.size())
+                if predict_scores.size()[-1] == 0:
+                    continue
 
                 self.optimizer.zero_grad()
                 loss.backward()
