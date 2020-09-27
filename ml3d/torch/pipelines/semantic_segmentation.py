@@ -222,7 +222,6 @@ class SemanticSegmentation(BasePipeline):
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
 
-                print(predict_scores.size())
                 if predict_scores.size()[-1] == 0:
                     continue
 
@@ -250,11 +249,11 @@ class SemanticSegmentation(BasePipeline):
                         tqdm(valid_loader, desc='validation')):
 
                     results = model(inputs['data'])
-                    if results.size()[-1]==0 or len(results.size())<3:
-                        print(results.size())
-                        continue
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
+
+                    if predict_scores.size()[-1] == 0:
+                        continue
                     acc = metric.acc(predict_scores, gt_labels)
                     iou = metric.iou(predict_scores, gt_labels)
 
