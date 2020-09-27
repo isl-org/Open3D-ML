@@ -42,12 +42,12 @@ model:
   - unary
   - nearest_upsample
   - unary
-  augment_color: 0.8
+  augment_color: 1.0
   augment_noise: 0.001
   augment_rotation: vertical
   augment_scale_anisotropic: true
-  augment_scale_max: 1.2
-  augment_scale_min: 0.8
+  augment_scale_max: 1.1
+  augment_scale_min: 0.9
   augment_symmetries:
   - true
   - false
@@ -67,7 +67,7 @@ model:
   ignored_label_inds: [0]
   in_features_dim: 5
   in_points_dim: 3
-  in_radius: 1.5
+  in_radius: 3.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   min_in_points: 20000
   max_in_points: 40000
@@ -92,7 +92,7 @@ pipeline:
   lr_decays: 0.98477
   deform_lr_factor: 0.1
   main_log_dir: ./logs
-  max_epoch: 100
+  max_epoch: 500
   save_ckpt_freq: 3
   scheduler_gamma: 0.95
   test_batch_size: 3
