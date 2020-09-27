@@ -10,10 +10,10 @@ def trans_normalize(pc, feat, t_normalize):
     method = t_normalize['method']
     if method == 'linear':
         points_bias = t_normalize.get('points_bias', 0)
-        pc -= pc.mean()
+        pc -= points_bias
 
         points_scale = t_normalize.get('points_scale', 1)
-        pc /= (pc.max(0) - pc.min(0)).max()
+        pc /= points_scale
 
         if feat is not None:
             feat_bias = t_normalize.get('feat_bias', 0)

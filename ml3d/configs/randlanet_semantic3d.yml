@@ -1,7 +1,7 @@
 dataset:
   name: Semantic3D
   dataset_path: # path/to/your/dataset
-  cache_dir: ./logs/cache/
+  cache_dir: ./logs/cache_small3d/
   class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353]
   ignored_label_inds:
   - 0
@@ -10,8 +10,9 @@ dataset:
   test_result_folder: ./test
   use_cache: true
   val_files:
-  - bildstein_station3_xyz_intensity_rgb
-  - sg27_station2_intensity_rgb
+  - domfountain_station1_xyz_intensity_rgb
+  steps_per_epoch_train: 500
+  steps_per_epoch_valid: 100
 model:
   name: RandLANet
   batcher: DefaultBatcher
@@ -37,6 +38,12 @@ model:
   - 4
   - 4
   - 2
+  t_normalize:
+    method: linear
+    points_bias: 0
+    points_scale: 1
+    feat_bias: 0
+    feat_scale: 255
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
@@ -44,7 +51,7 @@ pipeline:
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 100
-  save_ckpt_freq: 20
+  save_ckpt_freq: 5
   scheduler_gamma: 0.95
   test_batch_size: 3
   train_sum_dir: train_log
