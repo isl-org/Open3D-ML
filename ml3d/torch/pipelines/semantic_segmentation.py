@@ -219,6 +219,9 @@ class SemanticSegmentation(BasePipeline):
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
+                if results.size()[-1]==0 or len(results.size())<3:
+                    print(results.size())
+                    continue
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
 
@@ -228,7 +231,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = metric.acc(predict_scores, gt_labels)
                 iou = metric.iou(predict_scores, gt_labels)
-             
+
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
@@ -246,6 +249,9 @@ class SemanticSegmentation(BasePipeline):
                         tqdm(valid_loader, desc='validation')):
 
                     results = model(inputs['data'])
+                    if results.size()[-1]==0 or len(results.size())<3:
+                        print(results.size())
+                        continue
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
                     acc = metric.acc(predict_scores, gt_labels)
