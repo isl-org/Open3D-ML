@@ -80,25 +80,26 @@ def preprocess(args):
         if parts == 1:
             if dataset_path != out_path:
                 pc = pd.read_csv(key,
-                    header=None,
-                    delim_whitespace=True,
-                    dtype=np.float32).values
+                                 header=None,
+                                 delim_whitespace=True,
+                                 dtype=np.float32).values
 
                 labels = pd.read_csv(key.replace(".txt", ".labels"),
-                    header=None,
-                    delim_whitespace=True,
-                    dtype=np.int32).values
+                                     header=None,
+                                     delim_whitespace=True,
+                                     dtype=np.int32).values
                 labels = np.array(labels, dtype=np.int32).reshape((-1,))
 
                 print(pc.shape, labels.shape)
                 points, feat, labels = DataProcessing.grid_subsampling(
-                    pc[:,:3], features=pc[:,3:], labels=labels, grid_size=sub_grid_size)
+                    pc[:, :3],
+                    features=pc[:, 3:],
+                    labels=labels,
+                    grid_size=sub_grid_size)
                 pc = np.concatenate([points, feat], 1)
                 print(pc.shape, labels.shape)
 
-                name = join(
-                    out_path,
-                    Path(key).name.replace('.txt', '.txt'))
+                name = join(out_path, Path(key).name.replace('.txt', '.txt'))
                 name_lbl = name.replace('.txt', '.labels')
 
                 np.savetxt(name, pc, fmt='%.3f %.3f %.3f %i %i %i %i')
@@ -129,11 +130,14 @@ def preprocess(args):
             lbl = lbls[i]
             print(pc.shape, lbl.shape)
             pc, feat, lbl = DataProcessing.grid_subsampling(
-                pc[:,:3], features=pc[:,3:], labels=lbl, grid_size=sub_grid_size)
+                pc[:, :3],
+                features=pc[:, 3:],
+                labels=lbl,
+                grid_size=sub_grid_size)
             pcs[i] = np.concatenate([pc, feat], 1)
             lbls[i] = lbl
             print(pc.shape, lbl.shape)
-        
+
         for i in range(parts):
             name = join(
                 out_path,

@@ -19,6 +19,7 @@ from ...utils import MODEL
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
                                trans_crop_pc, create_3D_rotations)
 
+
 class KPFCNN(BaseModel):
     """
     Class defining KPFCNN
@@ -312,7 +313,6 @@ class KPFCNN(BaseModel):
 
         return loss, labels, scores
 
-
     def preprocess(self, data, attr):
         cfg = self.cfg
 
@@ -332,7 +332,6 @@ class KPFCNN(BaseModel):
 
         data = dict()
 
-
         if (feat is None):
             sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.grid_size)
@@ -341,7 +340,10 @@ class KPFCNN(BaseModel):
             points, feat, labels = DataProcessing.grid_subsampling(
                 points, features=feat, labels=labels, grid_size=0.01)
             sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-                points, features=feat, labels=labels, grid_size=cfg.first_subsampling_dl)
+                points,
+                features=feat,
+                labels=labels,
+                grid_size=cfg.first_subsampling_dl)
 
         search_tree = KDTree(sub_points)
 
@@ -431,9 +433,9 @@ class KPFCNN(BaseModel):
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
-
             t_normalize = self.cfg.get('t_normalize', None)
-            curr_new_points, feat = trans_normalize(curr_new_points, feat, t_normalize)
+            curr_new_points, feat = trans_normalize(curr_new_points, feat,
+                                                    t_normalize)
 
             if feat is None:
                 curr_new_coords = curr_new_points

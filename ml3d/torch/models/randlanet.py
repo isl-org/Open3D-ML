@@ -263,7 +263,6 @@ class RandLANet(BaseModel):
 
         data = dict()
 
-
         if (feat is None):
             sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.grid_size)
