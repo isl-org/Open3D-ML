@@ -12,8 +12,8 @@ dataset:
   # - domfountain_station1_xyz_intensity_rgb
   - bildstein_station1_xyz_intensity_rgb
   - domfountain_station1_xyz_intensity_rgb
-  steps_per_epoch_train: 100
-  steps_per_epoch_valid: 10
+  steps_per_epoch_train: 500
+  steps_per_epoch_valid: 50
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
