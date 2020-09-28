@@ -268,8 +268,8 @@ class KPFCNN(BaseModel):
                 x = tf.concat([x, skip_conn.pop()], axis=1)
             x = block_op(x, inputs, training=training)
 
-        x = self.head_mlp(x, inputs)
-        x = self.head_softmax(x, inputs)
+        x = self.head_mlp(x, inputs, training)
+        x = self.head_softmax(x, inputs, training)
 
         return x
 
