@@ -15,7 +15,9 @@ from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
 from ...utils.ply import write_ply, read_ply
 from ...utils import MODEL
-from ...datasets.utils import DataProcessing, create_3D_rotations
+
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
+                               trans_crop_pc, create_3D_rotations)
 
 
 class KPFCNN(BaseModel):
@@ -124,7 +126,7 @@ class KPFCNN(BaseModel):
         self.K = cfg.num_kernel_points
         self.C = len(lbl_values) - len(ign_lbls)
 
-        self.preprocess = None
+        # self.preprocess = None
         #####################
         # List Encoder blocks
         #####################
@@ -311,6 +313,53 @@ class KPFCNN(BaseModel):
 
         return loss, labels, scores
 
+    def preprocess(self, data, attr):
+        cfg = self.cfg
+
+        points = np.array(data['point'][:, 0:3], dtype=np.float32)
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
+
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = None
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+
+        split = attr['split']
+
+        data = dict()
+
+        if (feat is None):
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
+                points, labels=labels, grid_size=cfg.grid_size)
+            sub_feat = None
+        else:
+            points, feat, labels = DataProcessing.grid_subsampling(
+                points, features=feat, labels=labels, grid_size=0.01)
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+                points,
+                features=feat,
+                labels=labels,
+                grid_size=cfg.first_subsampling_dl)
+
+        search_tree = KDTree(sub_points)
+
+        data['point'] = sub_points
+        data['feat'] = sub_feat
+        data['label'] = sub_labels
+        data['search_tree'] = search_tree
+
+        if split in ["test", "testing"]:
+            proj_inds = np.squeeze(
+                search_tree.query(points, return_distance=False))
+            proj_inds = proj_inds.astype(np.int32)
+            data['proj_inds'] = proj_inds
+
+        return data
+
     def transform(self, data, attr):
         # Read points
         points = data['point']
@@ -384,17 +433,24 @@ class KPFCNN(BaseModel):
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
+            t_normalize = self.cfg.get('t_normalize', None)
+            curr_new_points, feat = trans_normalize(curr_new_points, feat,
+                                                    t_normalize)
+
             if feat is None:
                 curr_new_coords = curr_new_points
             else:
                 curr_new_coords = np.hstack(
                     (curr_new_points, feat[rand_order, :]))
 
-            in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
-                curr_new_points,
-                features=curr_new_coords,
-                labels=curr_sem_labels,
-                grid_size=self.cfg.first_subsampling_dl)
+            in_pts = curr_new_points
+            in_fts = curr_new_coords
+            in_lbls = curr_sem_labels
+            # in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
+            #     curr_new_points,
+            #     features=curr_new_coords,
+            #     labels=curr_sem_labels,
+            #     grid_size=self.cfg.first_subsampling_dl)
             # print(in_pts.shape)
 
             # Number collected

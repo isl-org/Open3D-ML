@@ -141,10 +141,10 @@ class SemanticSegmentation(BasePipeline):
                 dataset.save_test_result(results, attr)
 
         if cfg.get('test_compute_metric', True):
-            log.info("test acc: {}".format(self.test_accs))
-            log.info("test iou: {}".format(self.test_ious))
-            log.info("acc : {}".format(np.array(self.test_accs)[:, -1].mean()))
-            log.info("iou : {}".format(np.array(self.test_ious)[:, -1].mean()))
+            log.info("test acc: {}".format(
+                np.array(self.test_accs)[:, -1].mean()))
+            log.info("test iou: {}".format(
+                np.array(self.test_ious)[:, -1].mean()))
 
     def run_train(self):
         model = self.model
@@ -222,6 +222,9 @@ class SemanticSegmentation(BasePipeline):
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
 
+                if predict_scores.size()[-1] == 0:
+                    continue
+
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
@@ -247,6 +250,9 @@ class SemanticSegmentation(BasePipeline):
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
+
+                    if predict_scores.size()[-1] == 0:
+                        continue
                     acc = metric.acc(predict_scores, gt_labels)
                     iou = metric.iou(predict_scores, gt_labels)
 

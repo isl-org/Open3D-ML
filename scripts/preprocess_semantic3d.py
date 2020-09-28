@@ -8,6 +8,7 @@ import random
 import shutil
 from tqdm import tqdm
 import argparse
+from ml3d.datasets.utils import DataProcessing
 
 
 def parse_args():
@@ -24,7 +25,7 @@ def parse_args():
         default=2000,
         type=int)
 
-    args, _ = parser.parse_known_args()
+    args = parser.parse_args()
 
     dict_args = vars(args)
     for k in dict_args:
@@ -43,8 +44,8 @@ def preprocess(args):
     size_limit = args.size_limit  #Size in mega bytes.
 
     if out_path is None:
-        print("out_path not give, Saving output in {}".format(dataset_path))
-        out_path = dataset_path
+        out_path = Path(dataset_path) / 'processed'
+        print("out_path not give, Saving output in {}".format(out_path))
 
     all_files = glob.glob(str(Path(dataset_path) / '*.txt'))
 
@@ -65,14 +66,38 @@ def preprocess(args):
 
     os.makedirs(out_path, exist_ok=True)
 
+    sub_grid_size = 0.01
+
     for key, parts in tqdm(files.items()):
+
         if parts == 1:
             if dataset_path != out_path:
-                shutil.copyfile(key, join(out_path, Path(key).name))
-                shutil.copyfile(
-                    key.replace('.txt', '.labels'),
-                    join(out_path,
-                         Path(key).name.replace('.txt', '.labels')))
+                pc = pd.read_csv(key,
+                                 header=None,
+                                 delim_whitespace=True,
+                                 dtype=np.float32).values
+
+                labels = pd.read_csv(key.replace(".txt", ".labels"),
+                                     header=None,
+                                     delim_whitespace=True,
+                                     dtype=np.int32).values
+                labels = np.array(labels, dtype=np.int32).reshape((-1,))
+
+                print(pc.shape, labels.shape)
+                points, feat, labels = DataProcessing.grid_subsampling(
+                    pc[:, :3],
+                    features=pc[:, 3:],
+                    labels=labels,
+                    grid_size=sub_grid_size)
+                pc = np.concatenate([points, feat], 1)
+                print(pc.shape, labels.shape)
+
+                name = join(out_path, Path(key).name.replace('.txt', '.txt'))
+                name_lbl = name.replace('.txt', '.labels')
+
+                np.savetxt(name, pc, fmt='%.3f %.3f %.3f %i %i %i %i')
+                np.savetxt(name_lbl, labels, fmt='%i')
+
             continue
         print("Splitting {} into {} parts".format(Path(key).name, parts))
         pc = pd.read_csv(key,
@@ -93,6 +118,19 @@ def preprocess(args):
         labels = labels[inds]
         pcs = np.array_split(pc, parts)
         lbls = np.array_split(labels, parts)
+
+        for i, pc in enumerate(pcs):
+            lbl = lbls[i]
+            print(pc.shape, lbl.shape)
+            pc, feat, lbl = DataProcessing.grid_subsampling(
+                pc[:, :3],
+                features=pc[:, 3:],
+                labels=lbl,
+                grid_size=sub_grid_size)
+            pcs[i] = np.concatenate([pc, feat], 1)
+            lbls[i] = lbl
+            print(pc.shape, lbl.shape)
+
         for i in range(parts):
             name = join(
                 out_path,
@@ -102,8 +140,8 @@ def preprocess(args):
             shuf = np.arange(pcs[i].shape[0])
             np.random.shuffle(shuf)
 
-            np.savetxt(name, pcs[i][shuf])
-            np.savetxt(name_lbl, lbls[i][shuf])
+            np.savetxt(name, pcs[i][shuf], fmt='%.3f %.3f %.3f %i %i %i %i')
+            np.savetxt(name_lbl, lbls[i][shuf], fmt='%i')
 
 
 if __name__ == '__main__':
