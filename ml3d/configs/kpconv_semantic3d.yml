@@ -16,7 +16,7 @@ dataset:
   steps_per_epoch_valid: 50
 model:
   name: KPFCNN
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: KPFCNN_Semantic3D_torch153.pth # path/to/your/checkpoint
   KP_extent: 1.2
   KP_influence: linear
   aggregation_mode: sum
