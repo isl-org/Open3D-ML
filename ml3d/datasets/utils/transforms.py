@@ -83,7 +83,7 @@ def trans_augment(points, t_augment):
     #         symmetries.append(tf.round(tf.random_uniform((1, 1))) * 2 - 1)
     #     else:
     #         symmetries.append(tf.ones([1, 1], dtype=tf.float32))
-            
+
     # symmetries = np.array(symmetries).astype(np.int32)
     # symmetries = symmetries * np.random.randint(2, size=points.shape[1])
     # scale = (scale * (1 - symmetries * 2)).astype(np.float32)
@@ -95,7 +95,7 @@ def trans_augment(points, t_augment):
     augmented_points = np.sum(np.expand_dims(points, 2) * R,
                               axis=1) * scale + noise
 
-    return augmented_points
+    return augmented_points.astype(np.float32)
 
 
 def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
