@@ -52,7 +52,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 50000
+  batch_limit: 80000
   batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher
@@ -65,12 +65,12 @@ model:
   first_subsampling_dl: 0.04
   fixed_kernel_points: center
   ignored_label_inds: [0]
-  in_features_dim: 5
+  in_features_dim: 4
   in_points_dim: 3
   in_radius: 3.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  min_in_points: 20000
-  max_in_points: 40000
+  min_in_points: 10000
+  max_in_points: 20000
   modulated: false
   num_classes: 8
   num_kernel_points: 15
@@ -87,7 +87,7 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 1
+  batch_size: 4
   learning_rate: 0.01
   lr_decays: 0.98477
   deform_lr_factor: 0.1
@@ -95,7 +95,7 @@ pipeline:
   max_epoch: 500
   save_ckpt_freq: 3
   scheduler_gamma: 0.95
-  test_batch_size: 3
+  test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1
   weight_decay: 0.001
