@@ -293,7 +293,7 @@ class SemanticSegmentation(BasePipeline):
                                         net=self.model)
         self.manager = tf.train.CheckpointManager(self.ckpt,
                                                   train_ckpt_dir,
-                                                  max_to_keep=3)
+                                                  max_to_keep=100)
 
         if ckpt_path:
             self.ckpt.restore(ckpt_path).expect_partial()
