@@ -193,7 +193,7 @@ class DatasetModel(Model):
         super().__init__()
         self._dataset = None
         self._name2datasetidx = {}
-        self._memory_limit = 8192  # memory limit in megabytes
+        self._memory_limit = 8192 * 1024 * 1024  # memory limit in bytes
         self._current_memory_usage = 0
         self._cached_data = deque()
 
@@ -246,7 +246,7 @@ class DatasetModel(Model):
         data["points"] = data["point"]
 
         self.create_point_cloud(data)
-        size = self._calculate_pointcloud_size(self._data[name])
+        size = self._calc_pointcloud_size(self._data[name], self.tclouds[name])
         if size + self._current_memory_usage > self._memory_limit:
             if fail_if_no_space:
                 self.unload(name)
@@ -254,8 +254,8 @@ class DatasetModel(Model):
             else:
                 # Remove oldest from cache
                 remove_name = self._cached_data.popleft()
-                remove_size = self._calculate_pointcloud_size(
-                    self._data[remove_name])
+                remove_size = self._calc_pointcloud_size(
+                    self._data[remove_name], self.tclouds[remove_name])
                 self._current_memory_usage -= remove_size
                 self.unload(remove_name)
                 # Add new point cloud to cache
@@ -267,8 +267,14 @@ class DatasetModel(Model):
             self._cached_data.append(name)
             return True
 
-    def _calculate_pointcloud_size(self, pcloud):
-        return 2000
+    def _calc_pointcloud_size(self, raw_data, pcloud):
+        pcloud_size = 0
+        for (attr, arr) in raw_data.items():
+            pcloud_size += arr.size * 4
+        for (attr, tlist) in pcloud.point.items():
+            pcloud_size += tlist.size * 4
+
+        return pcloud_size
 
     def unload(self, name):
         # Only unload if this was loadable; we might have an in-memory,
