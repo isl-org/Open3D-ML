@@ -25,3 +25,4 @@ test/
 test_kpconv/
 kernels/
 **/.fuse*
+train_log/
