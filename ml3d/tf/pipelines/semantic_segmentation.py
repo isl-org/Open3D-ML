@@ -183,6 +183,8 @@ class SemanticSegmentation(BasePipeline):
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
 
+                if predict_scores.shape[0] == 0:
+                    continue
                 # params for deformable convolutions.
                 scaled_params = []
                 params = []
@@ -227,6 +229,9 @@ class SemanticSegmentation(BasePipeline):
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
+
+                if predict_scores.shape[0] == 0:
+                    continue
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
