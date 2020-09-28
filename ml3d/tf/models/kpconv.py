@@ -14,7 +14,7 @@ from open3d.ml.tf.ops import *
 from .network_blocks import *
 from .base_model import BaseModel
 from ...utils import MODEL
-from ...datasets.utils.dataprocessing import DataProcessing
+from ...datasets.utils import DataProcessing, trans_normalize
 from .network_blocks import *
 from open3d.ml.tf.ops import batch_grid_subsampling as tf_batch_subsampling
 from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
@@ -811,7 +811,6 @@ class KPFCNN(BaseModel):
             feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat /= 255.0
 
         data = dict()
 
@@ -820,6 +819,10 @@ class KPFCNN(BaseModel):
             features=feat,
             labels=labels,
             grid_size=cfg.first_subsampling_dl)
+
+        t_normalize = cfg.get('t_normalize', None)
+        sub_points, sub_feat = trans_normalize(sub_points, sub_feat,
+                                               t_normalize)
 
         search_tree = KDTree(sub_points)
 
