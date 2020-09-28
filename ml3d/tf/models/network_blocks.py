@@ -146,6 +146,7 @@ class KPConv(tf.keras.layers.Layer):
                  modulated=False,
                  repulse_extent=1.2,
                  deform_fitting_power=1.0,
+                 offset_param=False,
                  **kwargs):
 
         super(KPConv, self).__init__(**kwargs)
@@ -166,8 +167,18 @@ class KPConv(tf.keras.layers.Layer):
         self.deformed_KP = None
         self.offset_features = None
 
-        self.wts = get_weight((self.K, self.in_channels, self.out_channels))
-
+        if (offset_param):
+            self.wts = self.add_weight(name="{}_W_deform".format(self.name),
+                                       shape=(self.K, self.in_channels,
+                                              self.out_channels),
+                                       initializer='random_normal',
+                                       trainable=True)
+        else:
+            self.wts = self.add_weight(name="{}_W".format(self.name),
+                                       shape=(self.K, self.in_channels,
+                                              self.out_channels),
+                                       initializer='random_normal',
+                                       trainable=True)
         self.repulse_extent = repulse_extent
         self.deform_fitting_power = deform_fitting_power
 
@@ -184,8 +195,12 @@ class KPConv(tf.keras.layers.Layer):
                                       radius,
                                       fixed_kernel_points=fixed_kernel_points,
                                       KP_influence=KP_influence,
-                                      aggregation_mode=aggregation_mode)
-            self.offset_bias = get_bias(self.offset_dim)
+                                      aggregation_mode=aggregation_mode,
+                                      offset_param=True)
+            self.offset_bias = self.add_weight(name="{}_b".format(self.name),
+                                               shape=(self.offset_dim,),
+                                               initializer='zeros',
+                                               trainable=True)
 
         else:
             self.offset_dim = None
@@ -198,11 +213,6 @@ class KPConv(tf.keras.layers.Layer):
         return
 
     def reset_parameters(self):
-        init = tf.keras.initializers.HeUniform()  # TODO : kaining initializer
-        self.wts = tf.Variable(init(shape=self.wts.shape))
-
-        if self.deformable:
-            self.offset_bias = get_bias(self.offset_bias.shape)
         return
 
     def init_KP(self):
@@ -414,7 +424,10 @@ class BatchNormBlock(tf.keras.layers.Layer):
             self.batch_norm = tf.keras.layers.BatchNormalization(
                 momentum=bn_momentum)
         else:
-            self.bias = get_bias(shape=in_dim)
+            self.bias = self.add_weight(name="{}_b".format(self.name),
+                                        shape=(self.in_dim,),
+                                        initializer='zeros',
+                                        trainable=True)
 
     def call(self, x, training=False):
         if (self.use_bn):
@@ -510,7 +523,7 @@ class IdentityBlock(tf.keras.layers.Layer):
     def __init__(self):
         super(IdentityBlock, self).__init__()
 
-    def call(self, x):
+    def call(self, x, training=False):
         return tf.identity(x)
 
 
@@ -590,21 +603,21 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
             neighb_inds = batch['neighbors'][self.layer_ind]
 
         # First downscaling mlp
-        x = self.unary1(features)
+        x = self.unary1(features, training)
 
         # Convolution
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
         x = self.leaky_relu(self.batch_norm_conv(x, training))
 
         # Second upscaling mlp
-        x = self.unary2(x)
+        x = self.unary2(x, training)
 
         # Shortcut
         if 'strided' in self.block_name:
             shortcut = max_pool(features, neighb_inds)  # TODO : test max_pool
         else:
             shortcut = features
-        shortcut = self.unary_shortcut(shortcut)
+        shortcut = self.unary_shortcut(shortcut, training)
 
         return self.leaky_relu(x + shortcut)
 

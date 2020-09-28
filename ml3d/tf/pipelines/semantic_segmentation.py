@@ -178,14 +178,36 @@ class SemanticSegmentation(BasePipeline):
 
             for idx, inputs in enumerate(
                     tqdm(train_loader, total=len_train, desc='training')):
-                with tf.GradientTape() as tape:
+                with tf.GradientTape(persistent=True) as tape:
                     results = model(inputs, training=True)
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
 
-                grads = tape.gradient(loss, model.trainable_weights)
-                self.optimizer.apply_gradients(
-                    zip(grads, model.trainable_weights))
+                if predict_scores.shape[0] == 0:
+                    continue
+                # params for deformable convolutions.
+                scaled_params = []
+                params = []
+                for val in model.trainable_weights:
+                    if 'deform' in val.name:
+                        scaled_params.append(val)
+                    else:
+                        params.append(val)
+
+                grads = tape.gradient(loss, params)
+                scaled_grads = tape.gradient(loss, scaled_params)
+                for i in range(len(scaled_grads)):
+                    scaled_grads[i] *= 0.1
+
+                norm = cfg.get('grad_clip_norm', 100.0)
+                grads = [tf.clip_by_norm(g, norm) for g in grads]
+                scaled_grads = [tf.clip_by_norm(g, norm) for g in scaled_grads]
+
+                self.optimizer.apply_gradients(zip(grads, params))
+
+                if len(scaled_grads) > 0:
+                    self.optimizer.apply_gradients(
+                        zip(scaled_grads, scaled_params))
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
@@ -207,6 +229,9 @@ class SemanticSegmentation(BasePipeline):
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
+
+                if predict_scores.shape[0] == 0:
+                    continue
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
@@ -268,7 +293,7 @@ class SemanticSegmentation(BasePipeline):
                                         net=self.model)
         self.manager = tf.train.CheckpointManager(self.ckpt,
                                                   train_ckpt_dir,
-                                                  max_to_keep=3)
+                                                  max_to_keep=100)
 
         if ckpt_path:
             self.ckpt.restore(ckpt_path).expect_partial()
