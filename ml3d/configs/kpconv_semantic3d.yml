@@ -52,7 +52,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 80000
+  batch_limit: 20000
   batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher
@@ -87,7 +87,7 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 4
+  batch_size: 1
   learning_rate: 0.01
   lr_decays: 0.98477
   deform_lr_factor: 0.1

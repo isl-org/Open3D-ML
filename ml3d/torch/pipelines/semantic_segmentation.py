@@ -141,10 +141,12 @@ class SemanticSegmentation(BasePipeline):
                 dataset.save_test_result(results, attr)
 
         if cfg.get('test_compute_metric', False):
+            print(self.test_accs)
+            print(self.test_ious)
             log.info("test acc: {}".format(
-                np.array(self.test_accs)[:, -1].mean()))
+                np.nanmean(np.array(self.test_accs)[:, -1])))
             log.info("test iou: {}".format(
-                np.array(self.test_ious)[:, -1].mean()))
+                np.nanmean(np.array(self.test_ious)[:, -1])))
 
     def run_train(self):
         model = self.model

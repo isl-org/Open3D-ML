@@ -91,6 +91,9 @@ class Semantic3D(BaseDataset):
         self.test_files = [
             f for f in self.all_files if f not in self.train_files
         ]
+        self.test_files = [
+            f for f in self.all_files if f not in self.train_files
+        ]
 
         self.train_files = np.sort(self.train_files)
         self.test_files = np.sort(self.test_files)
@@ -102,8 +105,8 @@ class Semantic3D(BaseDataset):
                     self.val_files.append(file_path)
                     break
 
-        self.train_files = np.sort(
-            [f for f in self.train_files if f not in self.val_files])
+        # self.train_files = np.sort(
+        #     [f for f in self.train_files if f not in self.val_files])
 
     def get_split(self, split):
         return Semantic3DSplit(self, split=split)
@@ -122,23 +125,29 @@ class Semantic3D(BaseDataset):
 
         return files
 
+    def is_tested(self, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        store_path = join(path, self.name, name + '.txt')
+        if exists(store_path):
+            print("{} already exists.".format(store_path))
+            return True
+        else:
+            return False
+
     def save_test_result(self, results, attr):
         cfg = self.cfg
         name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
-        pred = results['predict_labels']
-        pred = np.array(pred)
-
-        for ign in cfg.ignored_label_inds:
-            pred[pred >= ign] += 1
-
-        store_path = join(path, self.name, name + '.npy')
+        pred = results['predict_labels'] + 1
+        store_path = join(path, self.name, name + '.txt')
         make_dir(Path(store_path).parent)
-        np.save(store_path, pred)
-        log.info("Saved {} in {}.".format(name, store_path))
+        np.savetxt(store_path, pred.astype(np.int32), fmt='%d')
 
+        log.info("Saved {} in {}.".format(name, store_path))
 
 class Semantic3DSplit():
 

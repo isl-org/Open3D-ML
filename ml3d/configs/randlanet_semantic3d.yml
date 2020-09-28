@@ -18,7 +18,7 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: #../dataset/checkpoints/RandLANet_Semantic3D_torch60.pth # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 6
   dim_output:
@@ -46,6 +46,14 @@ model:
     points_scale: 1
     feat_bias: 0
     feat_scale: 255
+  t_augment:
+    turn_on: true
+    rotation_method: vertical
+    scale_anisotropic: true
+    symmetries: [true, false, false]
+    noise_level: 0.001
+    min_s: 0.8
+    max_s: 1.2
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
@@ -55,6 +63,7 @@ pipeline:
   max_epoch: 100
   save_ckpt_freq: 5
   scheduler_gamma: 0.95
-  test_batch_size: 3
+  test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1
+  test_compute_metric: false

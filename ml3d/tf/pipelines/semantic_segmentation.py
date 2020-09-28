@@ -182,6 +182,8 @@ class SemanticSegmentation(BasePipeline):
                     results = model(inputs, training=True)
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
+                print(predict_scores)
+                print(loss)
 
                 if len(predict_scores.shape) < 2:
                     continue

@@ -255,6 +255,7 @@ class KPFCNN(BaseModel):
         cfg = self.cfg
         inputs = self.organise_inputs(flat_inputs)
 
+
         x = tf.stop_gradient(tf.identity(inputs['features']))
 
         skip_conn = []
@@ -642,6 +643,7 @@ class KPFCNN(BaseModel):
         stacked_features = tf.ones((tf.shape(stacked_points)[0], 1),
                                    dtype=tf.float32)
 
+        
         # Get coordinates and colors
         stacked_original_coordinates = stacked_colors[:, 3:]
         stacked_colors = stacked_colors[:, :3]

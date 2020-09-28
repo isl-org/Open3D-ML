@@ -226,6 +226,7 @@ class RandLANet(BaseModel):
         inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
+        print(np.min(self.possibility))
 
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)
