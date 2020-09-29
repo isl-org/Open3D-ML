@@ -192,7 +192,7 @@ class RandLANet(BaseModel):
         return inputs
 
     def inference_begin(self, data):
-        self.test_smooth = 0.98
+        self.test_smooth = 0.95
         attr = {'split': 'test'}
         self.inference_ori_data = data
         self.inference_data = self.preprocess(data, attr)

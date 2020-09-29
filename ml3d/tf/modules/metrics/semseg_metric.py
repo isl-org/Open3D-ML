@@ -45,8 +45,6 @@ class SemSegMetric(object):
             label_mask = labels == label
             num_correct = (accuracy_mask & label_mask).numpy().sum()
             num_label = label_mask.numpy().sum()
-            if num_label == 0:
-                num_label = 1
             per_class_accuracy = num_correct / num_label
             total_corret += num_correct
             total_label += num_label
@@ -85,8 +83,6 @@ class SemSegMetric(object):
             labels_mask = labels == label
             num_i = (pred_mask & labels_mask).sum()
             num_u = (pred_mask | labels_mask).sum()
-            if num_u == 0:
-                num_u = 1
             iou = num_i / num_u
             total_i += num_i
             total_u += num_u

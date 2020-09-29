@@ -105,7 +105,7 @@ class RandLANet(BaseModel):
     def init_building_block(self, dim_input, dim_output, name):
         f_pc = helper_tf.conv2d(True, dim_input)
 
-        setattr(self, name + 'bdmlp1', f_pc)
+        setattr(self, name + 'mlp1', f_pc)
 
         self.init_att_pooling(dim_input * 2, dim_output // 2,
                               name + 'att_pooling_1')
@@ -179,7 +179,7 @@ class RandLANet(BaseModel):
 
     def forward_building_block(self, xyz, feature, neigh_idx, name):
         f_xyz = self.forward_relative_pos_encoding(xyz, neigh_idx)
-        m_conv2d = getattr(self, name + 'bdmlp1')
+        m_conv2d = getattr(self, name + 'mlp1')
 
         f_xyz = m_conv2d(f_xyz, training=self.training)
 
@@ -223,6 +223,7 @@ class RandLANet(BaseModel):
         sub_idx = inputs[2 * num_layers:3 * num_layers]
         interp_idx = inputs[3 * num_layers:4 * num_layers]
         feature = inputs[4 * num_layers]
+
 
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature, training=self.training)
@@ -496,7 +497,7 @@ class RandLANet(BaseModel):
         return input_list
 
     def inference_begin(self, data):
-        self.test_smooth = 0.98
+        self.test_smooth = 0.95
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
         num_points = self.inference_data['search_tree'].data.shape[0]
@@ -534,6 +535,7 @@ class RandLANet(BaseModel):
         # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0],
         #                      self.possibility.shape[0]))
 
+        print(np.min(self.possibility))
         if np.min(self.possibility) > 0.5:
             reproj_inds = self.inference_data['proj_inds']
             self.test_probs = self.test_probs[reproj_inds]
