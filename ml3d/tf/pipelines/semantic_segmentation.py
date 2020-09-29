@@ -182,9 +182,7 @@ class SemanticSegmentation(BasePipeline):
                     results = model(inputs, training=True)
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
-                print(predict_scores)
-                print(loss)
-
+              
                 if len(predict_scores.shape) < 2:
                     continue
 
@@ -194,6 +192,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+
 
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)
@@ -218,6 +217,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+              
 
                 self.valid_losses.append(loss.numpy())
                 self.valid_accs.append(acc)

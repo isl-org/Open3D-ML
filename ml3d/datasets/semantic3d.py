@@ -32,7 +32,6 @@ class Semantic3D(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  num_points=65536,
-                 prepro_grid_size=0.06,
                  class_weights=[
                      5181602, 5012952, 6830086, 1311528, 10476365, 946982,
                      334860, 269353
@@ -58,7 +57,6 @@ class Semantic3D(BaseDataset):
                          use_cache=use_cache,
                          class_weights=class_weights,
                          num_points=num_points,
-                         prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
                          val_files=val_files,
                          test_result_folder=test_result_folder,

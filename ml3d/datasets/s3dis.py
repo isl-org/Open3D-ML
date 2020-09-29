@@ -31,7 +31,6 @@ class S3DIS(BaseDataset):
                  name='S3DIS',
                  cache_dir='./logs/cache',
                  use_cache=False,
-                 prepro_grid_size=0.04,
                  class_weights=[
                      3370714, 2856755, 4919229, 318158, 375640, 478001, 974733,
                      650464, 791496, 88727, 1284130, 229758, 2272837
@@ -55,7 +54,6 @@ class S3DIS(BaseDataset):
                          use_cache=use_cache,
                          class_weights=class_weights,
                          test_result_folder=test_result_folder,
-                         prepro_grid_size=prepro_grid_size,
                          num_points=num_points,
                          test_area_idx=test_area_idx,
                          ignored_label_inds=ignored_label_inds,

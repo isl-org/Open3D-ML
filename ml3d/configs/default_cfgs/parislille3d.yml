@@ -5,7 +5,6 @@ class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,42122
 ignored_label_inds:
 - 0
 num_points: 65536
-prepro_grid_size: 0.06
 test_result_folder: ./test
 val_files:
 - Lille2.ply

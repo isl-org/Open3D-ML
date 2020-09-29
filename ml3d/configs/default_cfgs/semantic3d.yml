@@ -5,7 +5,6 @@ class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 26
 ignored_label_inds:
 - 0
 num_points: 65536
-prepro_grid_size: 0.06
 test_result_folder: ./test
 use_cache: true
 val_files:
