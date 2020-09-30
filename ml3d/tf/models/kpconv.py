@@ -771,8 +771,17 @@ class KPFCNN(BaseModel):
             tuckeys[dists > np.square(cfg.in_radius)] = 0
             self.possibility[input_inds] += tuckeys
 
-            input_points = (points[input_inds] - pick_point).astype(np.float32)
-            input_colors = data['feat'][input_inds].astype(np.float32)
+            input_points = points[input_inds]
+            feat = data['feat']
+
+            t_normalize = self.cfg.get('t_normalize', None)
+            input_points, feat = trans_normalize(input_points, feat,
+                                                 t_normalize)
+
+            if feat is None:
+                coords = input_points
+            else:
+                coords = np.hstack((input_points, feat[input_inds]))
 
             if len(data['label'][input_inds].shape) == 2:
                 input_labels = data['label'][input_inds][:, 0]
@@ -781,7 +790,7 @@ class KPFCNN(BaseModel):
 
             if n > 0:
                 p_list += [input_points]
-                c_list += [np.hstack((input_colors, input_points + pick_point))]
+                c_list += [coords]
                 pl_list += [input_labels]
                 pi_list += [input_inds]
                 ci_list += [cloud_ind]
