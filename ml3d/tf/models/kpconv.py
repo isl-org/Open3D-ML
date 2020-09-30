@@ -117,9 +117,10 @@ class KPFCNN(BaseModel):
         hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1)**3))
 
         # Initiate neighbors limit with higher bound
-        self.neighborhood_limits = np.full(cfg.num_layers,
-                                           hist_n,
-                                           dtype=np.int32)
+        self.neighborhood_limits = []
+        # self.neighborhood_limits = np.full(cfg.num_layers,
+        #                                    hist_n,
+        #                                    dtype=np.int32)
 
         # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
         self.dropout_prob = tf.constant(0.2, name='dropout_prob')
@@ -304,7 +305,10 @@ class KPFCNN(BaseModel):
         Limit is computed at initialization
         """
         # crop neighbors matrix
-        return neighbors[:, :self.neighborhood_limits[layer]]
+        if len(self.neighborhood_limits) > 0:
+            return neighbors[:, :self.neighborhood_limits[layer]]
+        else:
+            return neighbors
 
     def get_batch_inds(self, stacks_len):
         """
@@ -499,7 +503,7 @@ class KPFCNN(BaseModel):
         stacked_weights = tf.gather(batch_weights, batch_inds)
 
         # Starting radius of convolutions
-        r_normal = cfg.first_subsampling_dl * cfg.KP_extent * 2.5
+        r_normal = cfg.first_subsampling_dl * cfg.conv_radius
 
         # Starting layer
         layer_blocks = []
@@ -513,23 +517,19 @@ class KPFCNN(BaseModel):
 
         # Loop over the blocks
         for block_i, block in enumerate(cfg.architecture):
-
-            # Stop when meeting a global pooling or upsampling
-            if 'global' in block or 'upsample' in block:
-                break
-
             # Get all blocks of the layer
-            if not ('pool' in block or 'strided' in block):
+            if not ('pool' in block or 'strided' in block or
+                    'global' in block or 'upsample' in block):
                 layer_blocks += [block]
-                if block_i < len(cfg.architecture) - 1 and not (
-                        'upsample' in cfg.architecture[block_i + 1]):
-                    continue
+                continue
 
             # Convolution neighbors indices
+            deform_layer = False
             if layer_blocks:
                 # Convolutions are done in this layer, compute the neighbors with the good radius
-                if np.any(['deformable' in blck for blck in layer_blocks[:-1]]):
-                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
+                if np.any(['deformable' in blck for blck in layer_blocks]):
+                    r = r_normal * cfg.deform_radius / cfg.conv_radius
+                    deform_layer = True
                 else:
                     r = r_normal
                 conv_i = tf_batch_neighbors(stacked_points, stacked_points,
@@ -543,7 +543,7 @@ class KPFCNN(BaseModel):
             if 'pool' in block or 'strided' in block:
 
                 # New subsampling length
-                dl = 2 * r_normal / (cfg.KP_extent * 2.5)
+                dl = 2 * r_normal / cfg.conv_radius
 
                 # Subsampled points
                 pool_p, pool_b = tf_batch_subsampling(stacked_points,
@@ -551,7 +551,8 @@ class KPFCNN(BaseModel):
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
-                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
+                    r = r_normal * cfg.deform_radius / cfg.conv_radius
+                    deform_layer = True
                 else:
                     r = r_normal
 
@@ -574,7 +575,7 @@ class KPFCNN(BaseModel):
             # TODO :
             conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
             pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
-            up_i = self.big_neighborhood_filter(up_i, len(input_points))
+            up_i = self.big_neighborhood_filter(up_i, len(input_points) + 1)
 
             # Updating input lists
             input_points += [stacked_points]
@@ -590,6 +591,10 @@ class KPFCNN(BaseModel):
             # Update radius and reset blocks
             r_normal *= 2
             layer_blocks = []
+
+            # Stop when meeting a global pooling or upsampling
+            if 'global' in block or 'upsample' in block:
+                break
 
         # Return inputs
         # Batch unstacking (with last layer indices for optionnal classif loss)
@@ -836,8 +841,6 @@ class KPFCNN(BaseModel):
                 points, labels=labels, grid_size=cfg.first_subsampling_dl)
             sub_feat = None
         else:
-            points, feat, labels = DataProcessing.grid_subsampling(
-                points, features=feat, labels=labels, grid_size=0.01)
             sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points,
                 features=feat,
