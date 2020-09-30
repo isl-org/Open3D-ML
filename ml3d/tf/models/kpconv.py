@@ -643,8 +643,8 @@ class KPFCNN(BaseModel):
                                    dtype=tf.float32)
 
         # Get coordinates and colors
-        stacked_original_coordinates = stacked_colors[:, 3:]
-        stacked_colors = stacked_colors[:, :3]
+        stacked_original_coordinates = stacked_colors[:, :3]
+        stacked_colors = stacked_colors[:, 3:]
 
         # Augmentation : randomly drop colors
         if cfg.in_features_dim in [4, 5]:
@@ -667,12 +667,15 @@ class KPFCNN(BaseModel):
             stacked_features = tf.concat((stacked_features, stacked_colors),
                                          axis=1)
         elif cfg.in_features_dim == 5:
-            stacked_features = tf.concat((stacked_features, stacked_colors,
-                                          stacked_original_coordinates[:, 2:]),
-                                         axis=1)
+            stacked_features = tf.concat(
+                (stacked_features, stacked_original_coordinates[:, 2:],
+                 stacked_colors),
+                axis=1)
         elif cfg.in_features_dim == 7:
             stacked_features = tf.concat(
-                (stacked_features, stacked_colors, stacked_points), axis=1)
+                (stacked_features, stacked_original_coordinates,
+                 stacked_colors),
+                axis=1)
         else:
             raise ValueError(
                 'Only accepted input dimensions are 1, 3, 4 and 7 (without and with rgb/xyz)'
@@ -804,31 +807,39 @@ class KPFCNN(BaseModel):
         cfg = self.cfg
 
         points = data['point'][:, 0:3]
-        labels = data['label']
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
+
         split = attr['split']
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points.copy()
+            feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
         data = dict()
 
-        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-            points,
-            features=feat,
-            labels=labels,
-            grid_size=cfg.first_subsampling_dl)
-
-        t_normalize = cfg.get('t_normalize', None)
-        sub_points, sub_feat = trans_normalize(sub_points, sub_feat,
-                                               t_normalize)
+        if (feat is None):
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
+                points, labels=labels, grid_size=cfg.first_subsampling_dl)
+            sub_feat = None
+        else:
+            points, feat, labels = DataProcessing.grid_subsampling(
+                points, features=feat, labels=labels, grid_size=0.01)
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+                points,
+                features=feat,
+                labels=labels,
+                grid_size=cfg.first_subsampling_dl)
 
         search_tree = KDTree(sub_points)
 
-        data['point'] = np.array(sub_points)
-        data['feat'] = np.array(sub_feat)
-        data['label'] = np.array(sub_labels)
+        data['point'] = sub_points
+        data['feat'] = sub_feat
+        data['label'] = sub_labels
         data['search_tree'] = search_tree
 
         if split in ["test", "testing"]:
@@ -865,6 +876,10 @@ class KPFCNN(BaseModel):
     def get_batch_gen(self, dataset, steps_per_epoch=None):
 
         cfg = self.cfg
+        if dataset.read_data(0)[0]['feat'] is None:
+            dim_features = 3
+        else:
+            dim_features = 6
 
         def spatially_regular_gen():
 
@@ -881,14 +896,6 @@ class KPFCNN(BaseModel):
 
             batch_limit = cfg.batch_limit
 
-            # Initiate potentials for regular generation
-            if not hasattr(self, 'potentials'):
-                self.potentials = {}
-                self.min_potentials = {}
-
-            # Reset potentials
-            self.potentials[split] = []
-            self.min_potentials[split] = []
             data_split = split
 
             # Initiate concatanation lists
@@ -909,8 +916,7 @@ class KPFCNN(BaseModel):
 
                 point_ind = np.random.choice(len(data['point']), 1)
 
-                # Get points from tree structure
-                points = np.array(data['search_tree'].data, copy=False)
+                points = data['point']
 
                 # Center point of input region
                 center_point = points[point_ind, :].reshape(1, -1)
@@ -935,9 +941,17 @@ class KPFCNN(BaseModel):
                     n = input_inds.shape[0]
 
                 # Collect points and colors
-                input_points = (points[input_inds] - pick_point).astype(
-                    np.float32)
-                input_colors = data['feat'][input_inds]
+                input_points = points[input_inds]
+                feat = data['feat']
+
+                t_normalize = self.cfg.get('t_normalize', None)
+                input_points, feat = trans_normalize(input_points, feat,
+                                                     t_normalize)
+
+                if feat is None:
+                    coords = input_points
+                else:
+                    coords = np.hstack((input_points, feat[input_inds]))
 
                 if split in ['test', 'testing']:
                     input_labels = np.zeros(input_points.shape[0])
@@ -969,9 +983,7 @@ class KPFCNN(BaseModel):
                 # Add data to current batch
                 if n > 0:
                     p_list += [input_points]
-                    c_list += [
-                        np.hstack((input_colors, input_points + pick_point))
-                    ]
+                    c_list += [coords]
                     pl_list += [input_labels]
                     pi_list += [input_inds]
                     ci_list += [cloud_ind]
@@ -991,7 +1003,8 @@ class KPFCNN(BaseModel):
         gen_func = spatially_regular_gen
         gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32,
                      tf.int32)
-        gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
+        gen_shapes = ([None, 3], [None,
+                                  dim_features], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 
