@@ -598,7 +598,7 @@ class Visualizer:
     Y_ATTR_NAME = "y position"
     Z_ATTR_NAME = "z position"
 
-    def __init__(self, dataset=None, split=None, indices=None, data=None):
+    def __init__(self):
         self._objects = None
 
         self._name2treenode = {}
