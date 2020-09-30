@@ -434,14 +434,16 @@ class KPFCNN(BaseModel):
                 o_labels = sem_labels.astype(np.int32)
 
             t_normalize = self.cfg.get('t_normalize', None)
-            curr_new_points, feat = trans_normalize(curr_new_points, feat,
+            curr_new_points, curr_feat = trans_normalize(curr_new_points, feat,
                                                     t_normalize)
 
-            if feat is None:
+            if curr_feat is None:
                 curr_new_coords = curr_new_points
             else:
                 curr_new_coords = np.hstack(
-                    (curr_new_points, feat[rand_order, :]))
+                    (curr_new_points, curr_feat[rand_order, :]))
+
+            # print(curr_feat)
 
             in_pts = curr_new_points
             in_fts = curr_new_coords

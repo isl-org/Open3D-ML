@@ -32,8 +32,8 @@ class Toronto3D(BaseDataset):
                  use_cache=False,
                  num_points=65536,
                  class_weights=[
-                     41697357, 1745448, 6572572, 19136493, 674897, 897825,
-                     4634634, 374721
+                    35391894., 1449308., 4650919., 18252779., 
+                    589856., 743579., 4311631., 356463.
                  ],
                  ignored_label_inds=[0],
                  train_files=['L001.ply', 'L003.ply', 'L004.ply'],

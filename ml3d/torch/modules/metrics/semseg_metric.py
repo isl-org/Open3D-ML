@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+from sklearn.metrics import confusion_matrix
 
 class SemSegMetric(object):
     """docstring for SemSegLoss"""
@@ -46,6 +46,10 @@ class SemSegMetric(object):
             n_total += label_mask.float().sum()
             accuracies.append(per_class_accuracy.cpu().item())
 
+        pred = np.squeeze(predictions.cpu().data.numpy())
+        l = np.squeeze(labels.cpu().data.numpy())
+        m = confusion_matrix(l, pred, labels=[0, 1, 2, 3, 4, 5, 6, 7])
+        print(m)
         # overall accuracy
         accuracies.append(np.nanmean(accuracies))
         return accuracies

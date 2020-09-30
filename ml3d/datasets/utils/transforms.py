@@ -7,6 +7,9 @@ def trans_normalize(pc, feat, t_normalize):
     if t_normalize is None or t_normalize.get('method', None) is None:
         return pc, feat
 
+    pc = pc.copy()
+    feat = feat.copy()
+
     method = t_normalize['method']
     if method == 'linear':
         points_bias = t_normalize.get('points_bias', 0)
