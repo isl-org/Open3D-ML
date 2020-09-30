@@ -446,17 +446,13 @@ class KPFCNN(BaseModel):
             in_pts = curr_new_points
             in_fts = curr_new_coords
             in_lbls = curr_sem_labels
-            # in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
-            #     curr_new_points,
-            #     features=curr_new_coords,
-            #     labels=curr_sem_labels,
-            #     grid_size=self.cfg.first_subsampling_dl)
-            # print(in_pts.shape)
 
             # Number collected
             n = in_pts.shape[0]
             # Safe check
             if n < 2:
+                if attr['split'] in ['test']:
+                    self.possibility[wanted_ind] += 0.001
                 continue
 
             # Randomly drop some points (augmentation process and safety for GPU memory consumption)
