@@ -404,7 +404,6 @@ class KPFCNN(BaseModel):
         min_in_points = self.cfg.get('min_in_points', 3)
         min_in_points = min(min_in_points, self.cfg.max_in_points)
 
-
         while curr_num_points < min_in_points:
 
             new_points = points.copy()
@@ -424,8 +423,8 @@ class KPFCNN(BaseModel):
             # mask_inds = np.where(mask)[0].astype(np.int32)
 
             # Indices of points in input region
-            mask_inds = search_tree.query_radius(
-                p0.reshape(1, -1), r=self.cfg.in_radius)[0]
+            mask_inds = search_tree.query_radius(p0.reshape(1, -1),
+                                                 r=self.cfg.in_radius)[0]
 
             # Shuffle points
             rand_order = np.random.permutation(mask_inds)
@@ -438,9 +437,9 @@ class KPFCNN(BaseModel):
                 o_labels = sem_labels.astype(np.int32)
 
             t_normalize = self.cfg.get('t_normalize', None)
-            curr_new_points, curr_feat = trans_normalize(curr_new_points, feat,
-                                                    t_normalize)
 
+            curr_new_points, curr_feat = trans_normalize(
+                curr_new_points, feat, t_normalize)
 
             curr_new_points = curr_new_points - p0
 
@@ -450,17 +449,9 @@ class KPFCNN(BaseModel):
                 curr_new_coords = np.hstack(
                     (curr_new_points, curr_feat[rand_order, :]))
 
-            # print(curr_feat)
-
             in_pts = curr_new_points
             in_fts = curr_new_coords
             in_lbls = curr_sem_labels
-            # in_pts, in_fts, in_lbls = DataProcessing.grid_subsampling(
-            #     curr_new_points,
-            #     features=curr_new_coords,
-            #     labels=curr_sem_labels,
-            #     grid_size=self.cfg.first_subsampling_dl)
-            # print(in_pts.shape)
 
             # Number collected
             n = in_pts.shape[0]
@@ -492,14 +483,13 @@ class KPFCNN(BaseModel):
                 # Project predictions on the frame points
                 search_tree_2 = KDTree(in_pts, leaf_size=50)
                 proj_inds = search_tree_2.query(o_pts[reproj_mask, :],
-                                              return_distance=False)
+                                                return_distance=False)
                 proj_inds = np.squeeze(proj_inds).astype(np.int32)
 
                 dists = np.sum(np.square(
                     (o_pts[reproj_mask] - p0).astype(np.float32)),
                                axis=1)
                 delta = np.square(1 - dists / (np.max(dists) + 0.001))
-                print(np.max(dists), dists.shape)
 
                 self.possibility[reproj_mask] += delta
 
@@ -533,7 +523,6 @@ class KPFCNN(BaseModel):
         self.inference_data = self.preprocess(data, attr)
         self.inference_proj_inds = self.inference_data['proj_inds']
         num_points = self.inference_data['search_tree'].data.shape[0]
-
 
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],

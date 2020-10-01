@@ -55,8 +55,7 @@ model:
     max_s: 1.1
   t_normalize:
     method: linear
-    points_bias: 0
-    points_scale: 1
+    normalize_points: False
     feat_bias: 0
     feat_scale: 1
 pipeline:

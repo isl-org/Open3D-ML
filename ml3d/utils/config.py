@@ -180,6 +180,8 @@ class Config(object):
                     continue
                 if v.isnumeric():
                     v = int(v)
+                elif v.replace('.', '').isnumeric():
+                    v = float(v)
                 elif v == 'True' or v == 'true':
                     v = True
                 elif v == 'False' or v == 'false':

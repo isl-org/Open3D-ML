@@ -187,11 +187,7 @@ def main():
 
         v.visualize(pcs_with_pred)
     else:
-        v.visualize_dataset(dataset, "training")  # everything
-        #v.visualize_dataset(dataset, "training", [0])
-        #v.visualize_dataset(dataset, "training", [0, 2, 4, 6])
-        #v.visualize_dataset(dataset, "training", range(0, 4))
-        #v.visualize_dataset(dataset, "training", range(0, 20))
+        v.visualize_dataset(dataset, "training")
 
 
 if __name__ == "__main__":

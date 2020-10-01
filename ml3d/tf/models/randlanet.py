@@ -230,18 +230,14 @@ class RandLANet(BaseModel):
         # interp_idx = inputs['interp_idx']
         # feature = inputs['features']
 
-
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature, training=self.training)
 
         m_bn = getattr(self, 'batch_normalization')
         feature = m_bn(feature, training=self.training)
 
-
-
         feature = tf.nn.leaky_relu(feature)
         feature = tf.expand_dims(feature, axis=2)
-
 
         # B N 1 d
         # Encoder
@@ -281,7 +277,7 @@ class RandLANet(BaseModel):
         f_layer_fc2 = m_conv2d(f_layer_fc1, training=self.training)
 
         self.test_hidden = f_layer_fc2
-        
+
         m_dropout = getattr(self, 'dropout1')
         f_layer_drop = m_dropout(f_layer_fc2, training=self.training)
 

@@ -147,6 +147,7 @@ class Semantic3D(BaseDataset):
 
         log.info("Saved {} in {}.".format(name, store_path))
 
+
 class Semantic3DSplit():
 
     def __init__(self, dataset, split='training'):

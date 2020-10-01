@@ -132,7 +132,7 @@ class SemanticSegmentation(BasePipeline):
                 results = self.run_inference(data)
 
                 predict_label = results['predict_labels']
-                if cfg.get('test_compute_metric', False):
+                if cfg.get('test_compute_metric', True):
                     acc = metric.acc_np_label(predict_label, data['label'])
                     iou = metric.iou_np_label(predict_label, data['label'])
                     self.test_accs.append(acc)
@@ -140,9 +140,7 @@ class SemanticSegmentation(BasePipeline):
 
                 dataset.save_test_result(results, attr)
 
-        if cfg.get('test_compute_metric', False):
-            print(self.test_accs)
-            print(self.test_ious)
+        if cfg.get('test_compute_metric', True):
             log.info("test acc: {}".format(
                 np.nanmean(np.array(self.test_accs)[:, -1])))
             log.info("test iou: {}".format(

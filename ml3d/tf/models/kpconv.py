@@ -14,7 +14,7 @@ from open3d.ml.tf.ops import *
 from .network_blocks import *
 from .base_model import BaseModel
 from ...utils import MODEL
-from ...datasets.utils.dataprocessing import DataProcessing
+from ...datasets.utils import DataProcessing, trans_normalize
 from .network_blocks import *
 from open3d.ml.tf.ops import batch_grid_subsampling as tf_batch_subsampling
 from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
@@ -255,7 +255,6 @@ class KPFCNN(BaseModel):
         cfg = self.cfg
         inputs = self.organise_inputs(flat_inputs)
 
-
         x = tf.stop_gradient(tf.identity(inputs['features']))
 
         skip_conn = []
@@ -269,8 +268,8 @@ class KPFCNN(BaseModel):
                 x = tf.concat([x, skip_conn.pop()], axis=1)
             x = block_op(x, inputs, training=training)
 
-        x = self.head_mlp(x, inputs)
-        x = self.head_softmax(x, inputs)
+        x = self.head_mlp(x, inputs, training)
+        x = self.head_softmax(x, inputs, training)
 
         return x
 
@@ -643,7 +642,6 @@ class KPFCNN(BaseModel):
         stacked_features = tf.ones((tf.shape(stacked_points)[0], 1),
                                    dtype=tf.float32)
 
-        
         # Get coordinates and colors
         stacked_original_coordinates = stacked_colors[:, 3:]
         stacked_colors = stacked_colors[:, :3]
@@ -813,7 +811,6 @@ class KPFCNN(BaseModel):
             feat = points.copy()
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-            feat /= 255.0
 
         data = dict()
 
@@ -822,6 +819,10 @@ class KPFCNN(BaseModel):
             features=feat,
             labels=labels,
             grid_size=cfg.first_subsampling_dl)
+
+        t_normalize = cfg.get('t_normalize', None)
+        sub_points, sub_feat = trans_normalize(sub_points, sub_feat,
+                                               t_normalize)
 
         search_tree = KDTree(sub_points)
 
