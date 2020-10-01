@@ -55,7 +55,7 @@ class RandLANet(BaseModel):
         dim_feature = cfg.dim_feature
         self.fc0 = tf.keras.layers.Dense(dim_feature, activation=None)
         self.batch_normalization = tf.keras.layers.BatchNormalization(
-            -1, 0.99, 1e-6)
+            -1, momentum=0.99, epsilon=1e-6)
         self.leaky_relu0 = tf.keras.layers.LeakyReLU()
 
         # ###########################Encoder############################
@@ -224,6 +224,12 @@ class RandLANet(BaseModel):
         interp_idx = inputs[3 * num_layers:4 * num_layers]
         feature = inputs[4 * num_layers]
 
+        # xyz = inputs['xyz']
+        # neigh_idx = inputs['neigh_idx']
+        # sub_idx = inputs['sub_idx']
+        # interp_idx = inputs['interp_idx']
+        # feature = inputs['features']
+
 
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature, training=self.training)
@@ -231,8 +237,11 @@ class RandLANet(BaseModel):
         m_bn = getattr(self, 'batch_normalization')
         feature = m_bn(feature, training=self.training)
 
+
+
         feature = tf.nn.leaky_relu(feature)
         feature = tf.expand_dims(feature, axis=2)
+
 
         # B N 1 d
         # Encoder
@@ -271,11 +280,13 @@ class RandLANet(BaseModel):
         m_conv2d = getattr(self, 'fc2')
         f_layer_fc2 = m_conv2d(f_layer_fc1, training=self.training)
 
+        self.test_hidden = f_layer_fc2
+        
         m_dropout = getattr(self, 'dropout1')
         f_layer_drop = m_dropout(f_layer_fc2, training=self.training)
 
         m_conv2d = getattr(self, 'fc')
-        f_layer_fc3 = m_conv2d(f_layer_drop, training=self.training)
+        f_layer_fc3 = m_conv2d(f_layer_fc2, training=self.training)
 
         f_out = tf.squeeze(f_layer_fc3, [2])
         # f_out = tf.nn.softmax(f_out)
@@ -299,6 +310,7 @@ class RandLANet(BaseModel):
         :return: loss
         """
         cfg = self.cfg
+        # labels = inputs['labels']
         labels = inputs[-1]
 
         scores, labels = Loss.filter_valid_label(results, labels)

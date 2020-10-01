@@ -179,6 +179,9 @@ class SemanticSegmentation(BasePipeline):
             for idx, inputs in enumerate(
                     tqdm(train_loader, total=len_train, desc='training')):
 
+                # inputs = np.load("test_input2.npy", allow_pickle=True)
+                # inputs = inputs.item()
+
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=True)
                 
@@ -200,6 +203,15 @@ class SemanticSegmentation(BasePipeline):
                 self.accs.append(acc)
                 self.ious.append(iou)
                 step = step + 1
+
+                # import sys
+                # np.set_printoptions(threshold=sys.maxsize)
+                # pred = np.argmax(probs, -1)
+                # print(model.test_hidden)
+                # print(results)
+                # print(results.shape)
+                print(acc[-1], iou[-1])
+                # exit()
 
             # --------------------- validation
             self.valid_accs = []

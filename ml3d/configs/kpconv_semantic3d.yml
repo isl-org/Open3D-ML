@@ -6,7 +6,7 @@ dataset:
   ignored_label_inds:
   - 0
   test_result_folder: ./test
-  use_cache: true
+  use_cache: false
   val_files:
   # - domfountain_station1_xyz_intensity_rgb
   - bildstein_station1_xyz_intensity_rgb
@@ -15,7 +15,7 @@ dataset:
   steps_per_epoch_valid: 50
 model:
   name: KPFCNN
-  ckpt_path: KPFCNN_Semantic3D_torch153.pth # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/KPFCNN_Semantic3D_torch153.pth # path/to/your/checkpoint
   KP_extent: 1.2
   KP_influence: linear
   aggregation_mode: sum
@@ -51,7 +51,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 20000
+  batch_limit: 10000
   batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher
@@ -64,12 +64,12 @@ model:
   first_subsampling_dl: 0.04
   fixed_kernel_points: center
   ignored_label_inds: [0]
-  in_features_dim: 4
+  in_features_dim: 5
   in_points_dim: 3
-  in_radius: 3.0
+  in_radius: 6.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  min_in_points: 10000
-  max_in_points: 20000
+  min_in_points: 5000
+  max_in_points: 10000
   modulated: false
   num_classes: 8
   num_kernel_points: 15

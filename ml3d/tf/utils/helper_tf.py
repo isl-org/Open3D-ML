@@ -35,7 +35,7 @@ class conv2d(tf.keras.layers.Layer):
 
         self.batchNorm = batchNorm
         if self.batchNorm:
-            self.batch_normalization = tf.keras.layers.BatchNormalization()
+            self.batch_normalization = tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-6)
 
         if activation:
             self.activation_fn = tf.keras.layers.LeakyReLU(alpha=0.2)
@@ -74,7 +74,7 @@ class conv2d_transpose(tf.keras.layers.Layer):
 
         self.batchNorm = batchNorm
         if self.batchNorm:
-            self.batch_normalization = tf.keras.layers.BatchNormalization()
+            self.batch_normalization = tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-6)
 
         if activation:
             self.activation_fn = tf.keras.layers.LeakyReLU(alpha=0.2)
