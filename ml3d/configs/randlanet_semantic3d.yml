@@ -44,7 +44,7 @@ model:
     feat_bias: 0
     feat_scale: 255
   t_augment:
-    turn_on: true
+    turn_on: false
     rotation_method: vertical
     scale_anisotropic: true
     symmetries: [true, false, false]

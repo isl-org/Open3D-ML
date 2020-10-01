@@ -50,9 +50,9 @@ model:
   - true
   - false
   - false
-  batch_limit: 10000
+  batch_limit: 20000
   batch_norm_momentum: 0.02
-  batch_num: 50
+  batch_num: 100
   batcher: ConcatBatcher
   conv_radius: 2.5
   deform_fitting_mode: point2point
@@ -78,6 +78,7 @@ model:
   val_batch_num: 30
   t_normalize:
     method: linear
+    normalize_points: False
     feat_bias: 0
     feat_scale: 255
 pipeline:
