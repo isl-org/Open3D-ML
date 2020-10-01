@@ -59,7 +59,9 @@ class RandLANet(BaseModel):
 
         dim_feature = cfg.dim_feature
         self.fc0 = nn.Linear(cfg.dim_input, dim_feature)
-        self.batch_normalization = nn.BatchNorm2d(dim_feature, eps=1e-6)
+        self.batch_normalization = nn.BatchNorm2d(dim_feature,
+                                                  eps=1e-6,
+                                                  momentum=0.01)
 
         d_encoder_list = []
 
@@ -192,7 +194,7 @@ class RandLANet(BaseModel):
         return inputs
 
     def inference_begin(self, data):
-        self.test_smooth = 0.98
+        self.test_smooth = 0.95
         attr = {'split': 'test'}
         self.inference_ori_data = data
         self.inference_data = self.preprocess(data, attr)
@@ -226,6 +228,7 @@ class RandLANet(BaseModel):
         inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
+        print(np.min(self.possibility))
 
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)

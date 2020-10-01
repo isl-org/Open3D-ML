@@ -82,6 +82,7 @@ class SemSegMetric(object):
                 iou = np.nan
             else:
                 iou = num_i / num_u
+
             ious.append(iou)
         ious.append(np.nanmean(ious))
         return ious

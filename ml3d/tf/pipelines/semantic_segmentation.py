@@ -165,8 +165,8 @@ class SemanticSegmentation(BasePipeline):
         writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
-
         self.optimizer = model.get_optimizer(cfg)
+
         self.load_ckpt(ckpt_path=model.cfg.ckpt_path)
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
@@ -180,8 +180,12 @@ class SemanticSegmentation(BasePipeline):
                     tqdm(train_loader, total=len_train, desc='training')):
                 with tf.GradientTape(persistent=True) as tape:
                     results = model(inputs, training=True)
+
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
+
+                if len(predict_scores.shape) < 2:
+                    continue
 
                 if predict_scores.shape[0] == 0:
                     continue
@@ -230,7 +234,7 @@ class SemanticSegmentation(BasePipeline):
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
 
-                if predict_scores.shape[0] == 0:
+                if len(predict_scores.shape) < 2:
                     continue
 
                 acc = Metric.acc(predict_scores, gt_labels)

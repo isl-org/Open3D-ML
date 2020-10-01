@@ -5,11 +5,9 @@ dataset:
   class_weights: [5181602, 5012952, 6830086, 1311528, 10476365, 946982, 334860, 269353]
   ignored_label_inds:
   - 0
-  prepro_grid_size: 0.06
   test_result_folder: ./test
   use_cache: true
   val_files:
-  # - domfountain_station1_xyz_intensity_rgb
   - bildstein_station1_xyz_intensity_rgb
   - domfountain_station1_xyz_intensity_rgb
   steps_per_epoch_train: 500
@@ -67,10 +65,10 @@ model:
   ignored_label_inds: [0]
   in_features_dim: 5
   in_points_dim: 3
-  in_radius: 3.0
+  in_radius: 6.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  min_in_points: 20000
-  max_in_points: 40000
+  min_in_points: 5000
+  max_in_points: 10000
   modulated: false
   num_classes: 8
   num_kernel_points: 15
@@ -94,7 +92,7 @@ pipeline:
   max_epoch: 500
   save_ckpt_freq: 3
   scheduler_gamma: 0.95
-  test_batch_size: 3
+  test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1
   weight_decay: 0.001

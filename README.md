@@ -15,6 +15,8 @@ TODO List:
 - [ ] storage solution for network weights and other large binary data (Git LFS, Google, AWS)
 - [ ] check code origins for all files 
   - [ ] ml3d/torch/utils/dataset_helper.py is a copy from Kaolin
+- [ ] semantic kitti velodyne download does not work; requires browser and email.
+- [ ] consider curl instead of wget (not installed on mac) or even a python function for downloading
 
 ## Directories
 
