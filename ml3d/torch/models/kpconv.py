@@ -426,7 +426,7 @@ class KPFCNN(BaseModel):
 
             # In case of validation, keep the original points in memory
             if attr['split'] in ['test']:
-                selected_points = curr_new_points
+                selected_points = curr_new_points.copy()
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
