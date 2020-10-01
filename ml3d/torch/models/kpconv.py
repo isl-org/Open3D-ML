@@ -426,6 +426,7 @@ class KPFCNN(BaseModel):
 
             # In case of validation, keep the original points in memory
             if attr['split'] in ['test']:
+                selected_points = curr_new_points
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
@@ -441,6 +442,8 @@ class KPFCNN(BaseModel):
             else:
                 curr_new_coords = np.hstack(
                     (curr_new_points, curr_feat[rand_order, :]))
+
+            curr_new_coords[:, 2] += p0[2]
 
             in_pts = curr_new_points
             in_fts = curr_new_coords
@@ -474,7 +477,7 @@ class KPFCNN(BaseModel):
                 reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
 
                 # Project predictions on the frame points
-                kdtree = KDTree(in_pts, leaf_size=50)
+                kdtree = KDTree(selected_points, leaf_size=50)
                 proj_inds = kdtree.query(o_pts[reproj_mask, :],
                                          return_distance=False)
                 proj_inds = np.squeeze(proj_inds).astype(np.int32)
