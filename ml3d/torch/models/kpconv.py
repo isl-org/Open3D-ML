@@ -432,10 +432,10 @@ class KPFCNN(BaseModel):
 
             t_normalize = self.cfg.get('t_normalize', None)
 
+            curr_new_points = curr_new_points - p0
+
             curr_new_points, curr_feat = trans_normalize(
                 curr_new_points, feat, t_normalize)
-
-            curr_new_points = curr_new_points - p0
 
             if curr_feat is None:
                 curr_new_coords = curr_new_points.copy()
