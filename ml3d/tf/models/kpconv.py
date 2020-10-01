@@ -761,7 +761,7 @@ class KPFCNN(BaseModel):
             point_ind = int(np.argmin(self.possibility))
 
             center_point = points[point_ind, :].reshape(1, -1)
-            pick_point = center_point
+            pick_point = center_point.copy()
 
             input_inds = data['search_tree'].query_radius(pick_point,
                                                           r=cfg.in_radius)[0]
@@ -776,7 +776,7 @@ class KPFCNN(BaseModel):
             tuckeys[dists > np.square(cfg.in_radius)] = 0
             self.possibility[input_inds] += tuckeys
 
-            input_points = points[input_inds]
+            input_points = points[input_inds].copy() - pick_point
             feat = data['feat']
 
             t_normalize = self.cfg.get('t_normalize', None)
@@ -787,6 +787,8 @@ class KPFCNN(BaseModel):
                 coords = input_points
             else:
                 coords = np.hstack((input_points, feat[input_inds]))
+
+            coords[:, 2] += pick_point[:, 2]
 
             if len(data['label'][input_inds].shape) == 2:
                 input_labels = data['label'][input_inds][:, 0]
@@ -953,7 +955,7 @@ class KPFCNN(BaseModel):
                     n = input_inds.shape[0]
 
                 # Collect points and colors
-                input_points = points[input_inds]
+                input_points = points[input_inds].copy() - pick_point
                 feat = data['feat']
 
                 t_normalize = self.cfg.get('t_normalize', None)
@@ -961,9 +963,11 @@ class KPFCNN(BaseModel):
                                                      t_normalize)
 
                 if feat is None:
-                    coords = input_points
+                    coords = input_points.copy()
                 else:
                     coords = np.hstack((input_points, feat[input_inds]))
+
+                coords[:, 2] += pick_point[:, 2]
 
                 if split in ['test', 'testing']:
                     input_labels = np.zeros(input_points.shape[0])

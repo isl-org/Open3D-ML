@@ -422,7 +422,7 @@ class BatchNormBlock(tf.keras.layers.Layer):
 
         if (self.use_bn):
             self.batch_norm = tf.keras.layers.BatchNormalization(
-                momentum=bn_momentum)
+                epsilon=1e-5, momentum=bn_momentum)
         else:
             self.bias = self.add_weight(name="{}_b".format(self.name),
                                         shape=(self.in_dim,),
