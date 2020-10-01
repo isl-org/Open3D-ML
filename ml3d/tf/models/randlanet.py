@@ -55,7 +55,7 @@ class RandLANet(BaseModel):
         dim_feature = cfg.dim_feature
         self.fc0 = tf.keras.layers.Dense(dim_feature, activation=None)
         self.batch_normalization = tf.keras.layers.BatchNormalization(
-            -1, 0.99, 1e-6)
+            -1, momentum=0.99, epsilon=1e-6)
         self.leaky_relu0 = tf.keras.layers.LeakyReLU()
 
         # ###########################Encoder############################
@@ -105,7 +105,7 @@ class RandLANet(BaseModel):
     def init_building_block(self, dim_input, dim_output, name):
         f_pc = helper_tf.conv2d(True, dim_input)
 
-        setattr(self, name + 'bdmlp1', f_pc)
+        setattr(self, name + 'mlp1', f_pc)
 
         self.init_att_pooling(dim_input * 2, dim_output // 2,
                               name + 'att_pooling_1')
@@ -179,7 +179,7 @@ class RandLANet(BaseModel):
 
     def forward_building_block(self, xyz, feature, neigh_idx, name):
         f_xyz = self.forward_relative_pos_encoding(xyz, neigh_idx)
-        m_conv2d = getattr(self, name + 'bdmlp1')
+        m_conv2d = getattr(self, name + 'mlp1')
 
         f_xyz = m_conv2d(f_xyz, training=self.training)
 
@@ -269,6 +269,8 @@ class RandLANet(BaseModel):
 
         m_conv2d = getattr(self, 'fc2')
         f_layer_fc2 = m_conv2d(f_layer_fc1, training=self.training)
+
+        self.test_hidden = f_layer_fc2
 
         m_dropout = getattr(self, 'dropout1')
         f_layer_drop = m_dropout(f_layer_fc2, training=self.training)
@@ -496,7 +498,7 @@ class RandLANet(BaseModel):
         return input_list
 
     def inference_begin(self, data):
-        self.test_smooth = 0.98
+        self.test_smooth = 0.95
         attr = {'split': 'test'}
         self.inference_data = self.preprocess(data, attr)
         num_points = self.inference_data['search_tree'].data.shape[0]
@@ -530,9 +532,6 @@ class RandLANet(BaseModel):
         inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
-
-        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0],
-        #                      self.possibility.shape[0]))
 
         if np.min(self.possibility) > 0.5:
             reproj_inds = self.inference_data['proj_inds']

@@ -136,7 +136,6 @@ class SemSegMetric(object):
 
     def acc_np_label(self, pred, gt):
         valid_pred, valid_gt = self.filter_valid_label_np(pred, gt)
-
         num_classes = self.dataset.num_classes
 
         accuracies = []

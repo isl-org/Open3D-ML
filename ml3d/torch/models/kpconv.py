@@ -334,11 +334,9 @@ class KPFCNN(BaseModel):
 
         if (feat is None):
             sub_points, sub_labels = DataProcessing.grid_subsampling(
-                points, labels=labels, grid_size=cfg.grid_size)
+                points, labels=labels, grid_size=cfg.first_subsampling_dl)
             sub_feat = None
         else:
-            points, feat, labels = DataProcessing.grid_subsampling(
-                points, features=feat, labels=labels, grid_size=0.01)
             sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
                 points,
                 features=feat,
@@ -365,6 +363,7 @@ class KPFCNN(BaseModel):
         points = data['point']
         sem_labels = data['label']
         feat = data['feat']
+        search_tree = data['search_tree']
 
         dim_points = points.shape[1]
         if feat is None:
@@ -406,22 +405,19 @@ class KPFCNN(BaseModel):
         min_in_points = min(min_in_points, self.cfg.max_in_points)
 
         while curr_num_points < min_in_points:
-            new_points = points.copy()
 
-            # In case radius smaller than 50m, chose new center on a point of the wanted class or not
-            # TODO balance
+            new_points = points.copy()
 
             if attr['split'] in ['test']:
                 wanted_ind = np.argmin(self.possibility)
             else:
                 wanted_ind = np.random.choice(new_points.shape[0])
 
+            # print(new_points.shape, wanted_ind, p0)
             p0 = new_points[wanted_ind]
 
-            # Eliminate points further than config.in_radius
-            mask = np.sum(np.square(new_points - p0),
-                          axis=1) < self.cfg.in_radius**2
-            mask_inds = np.where(mask)[0].astype(np.int32)
+            mask_inds = search_tree.query_radius(p0.reshape(1, -1),
+                                                 r=self.cfg.in_radius)[0]
 
             # Shuffle points
             rand_order = np.random.permutation(mask_inds)
@@ -430,18 +426,24 @@ class KPFCNN(BaseModel):
 
             # In case of validation, keep the original points in memory
             if attr['split'] in ['test']:
+                selected_points = curr_new_points.copy()
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
             t_normalize = self.cfg.get('t_normalize', None)
-            curr_new_points, feat = trans_normalize(curr_new_points, feat,
-                                                    t_normalize)
 
-            if feat is None:
-                curr_new_coords = curr_new_points
+            curr_new_points, curr_feat = trans_normalize(
+                curr_new_points, feat, t_normalize)
+
+            curr_new_points = curr_new_points - p0
+
+            if curr_feat is None:
+                curr_new_coords = curr_new_points.copy()
             else:
                 curr_new_coords = np.hstack(
-                    (curr_new_points, feat[rand_order, :]))
+                    (curr_new_points, curr_feat[rand_order, :]))
+
+            curr_new_coords[:, 2] += p0[2]
 
             in_pts = curr_new_points
             in_fts = curr_new_coords
@@ -475,15 +477,16 @@ class KPFCNN(BaseModel):
                 reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
 
                 # Project predictions on the frame points
-                search_tree = KDTree(in_pts, leaf_size=50)
-                proj_inds = search_tree.query(o_pts[reproj_mask, :],
-                                              return_distance=False)
+                kdtree = KDTree(selected_points, leaf_size=50)
+                proj_inds = kdtree.query(o_pts[reproj_mask, :],
+                                         return_distance=False)
                 proj_inds = np.squeeze(proj_inds).astype(np.int32)
 
                 dists = np.sum(np.square(
                     (o_pts[reproj_mask] - p0).astype(np.float32)),
                                axis=1)
-                delta = np.square(1 - dists / np.max(dists))
+                delta = np.square(1 - dists / (np.max(dists) + 0.001))
+
                 self.possibility[reproj_mask] += delta
 
             else:
@@ -511,17 +514,20 @@ class KPFCNN(BaseModel):
 
     def inference_begin(self, data):
         self.test_smooth = 0.98
-        num_points = data['point'].shape[0]
+        attr = {'split': 'test'}
+        self.inference_ori_data = data
+        self.inference_data = self.preprocess(data, attr)
+        self.inference_proj_inds = self.inference_data['proj_inds']
+        num_points = self.inference_data['search_tree'].data.shape[0]
+
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
-        self.inference_data = data
 
         from ..dataloaders import ConcatBatcher
         self.batcher = ConcatBatcher(self.device)
 
     def inference_preprocess(self):
-
         attr = {'split': 'test'}
         data = self.transform(self.inference_data, attr)
         inputs = {'data': data, 'attr': attr}
@@ -570,10 +576,17 @@ class KPFCNN(BaseModel):
             i0 += length
         print(np.min(self.possibility))
         if np.min(self.possibility) > 0.5:
+            pred_labels = np.argmax(self.test_probs, 1)
+
+            pred_labels = pred_labels[self.inference_proj_inds]
+            test_probs = self.test_probs[self.inference_proj_inds]
             inference_result = {
-                'predict_labels': np.argmax(self.test_probs, 1),
-                'predict_scores': self.test_probs
+                'predict_labels': pred_labels,
+                'predict_scores': test_probs
             }
+            data = self.inference_ori_data
+            acc = (pred_labels == data['label'] - 1).mean()
+
             self.inference_result = inference_result
             return True
         else:

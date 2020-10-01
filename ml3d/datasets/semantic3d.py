@@ -32,7 +32,6 @@ class Semantic3D(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  num_points=65536,
-                 prepro_grid_size=0.06,
                  class_weights=[
                      5181602, 5012952, 6830086, 1311528, 10476365, 946982,
                      334860, 269353
@@ -58,7 +57,6 @@ class Semantic3D(BaseDataset):
                          use_cache=use_cache,
                          class_weights=class_weights,
                          num_points=num_points,
-                         prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
                          val_files=val_files,
                          test_result_folder=test_result_folder,
@@ -119,8 +117,18 @@ class Semantic3D(BaseDataset):
             files = self.val_files + self.train_files + self.test_files
         else:
             raise ValueError("Invalid split {}".format(split))
-
         return files
+
+    def is_tested(self, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        store_path = join(path, self.name, name + '.labels')
+        if exists(store_path):
+            print("{} already exists.".format(store_path))
+            return True
+        else:
+            return False
 
     def save_test_result(self, results, attr):
         cfg = self.cfg
@@ -128,15 +136,11 @@ class Semantic3D(BaseDataset):
         path = cfg.test_result_folder
         make_dir(path)
 
-        pred = results['predict_labels']
-        pred = np.array(pred)
-
-        for ign in cfg.ignored_label_inds:
-            pred[pred >= ign] += 1
-
-        store_path = join(path, self.name, name + '.npy')
+        pred = results['predict_labels'] + 1
+        store_path = join(path, self.name, name + '.labels')
         make_dir(Path(store_path).parent)
-        np.save(store_path, pred)
+        np.savetxt(store_path, pred.astype(np.int32), fmt='%d')
+
         log.info("Saved {} in {}.".format(name, store_path))
 
 

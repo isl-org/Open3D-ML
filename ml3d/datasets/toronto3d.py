@@ -31,10 +31,9 @@ class Toronto3D(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  num_points=65536,
-                 prepro_grid_size=0.06,
                  class_weights=[
-                     41697357, 1745448, 6572572, 19136493, 674897, 897825,
-                     4634634, 374721
+                     35391894., 1449308., 4650919., 18252779., 589856., 743579.,
+                     4311631., 356463.
                  ],
                  ignored_label_inds=[0],
                  train_files=['L001.ply', 'L003.ply', 'L004.ply'],
@@ -56,7 +55,6 @@ class Toronto3D(BaseDataset):
                          use_cache=use_cache,
                          class_weights=class_weights,
                          num_points=num_points,
-                         prepro_grid_size=prepro_grid_size,
                          ignored_label_inds=ignored_label_inds,
                          train_files=train_files,
                          test_files=test_files,

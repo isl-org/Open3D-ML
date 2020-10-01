@@ -2,7 +2,8 @@ dataset:
   name: Toronto3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [41697357, 1745448, 6572572, 19136493, 674897, 897825, 4634634, 374721]
+  class_weights: [35391894., 1449308., 14650919., 18252779., 
+              589856., 743579., 4311631., 356463.]
   ignored_label_inds:
   - 0
   test_files:
@@ -42,17 +43,17 @@ model:
   - unary
   - nearest_upsample
   - unary
-  augment_color: 0.8
-  augment_noise: 0.001
+  augment_color: 1
+  augment_noise: 0.0001
   augment_rotation: vertical
-  augment_scale_anisotropic: true
-  augment_scale_max: 1.2
-  augment_scale_min: 0.8
+  augment_scale_anisotropic: false
+  augment_scale_max: 1.1
+  augment_scale_min: 0.9
   augment_symmetries:
   - true
   - false
   - false
-  batch_limit: 50000
+  batch_limit: 10000
   batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher
@@ -66,12 +67,12 @@ model:
   fixed_kernel_points: center
   ignored_label_inds:
   - 0
-  in_features_dim: 5
+  in_features_dim: 7
   in_points_dim: 3
-  in_radius: 2.0
+  in_radius: 6.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  min_in_points: 20000
-  max_in_points: 100000
+  min_in_points: 5000
+  max_in_points: 10000
   modulated: false
   num_classes: 8
   num_kernel_points: 15
@@ -79,6 +80,10 @@ model:
   repulse_extent: 1.2
   use_batch_norm: true
   val_batch_num: 30
+  t_normalize:
+    method: linear
+    feat_bias: 0
+    feat_scale: 255
 pipeline:
   name: SemanticSegmentation
   momentum: 0.98
