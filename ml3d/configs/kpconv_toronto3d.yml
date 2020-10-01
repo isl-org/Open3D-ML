@@ -82,8 +82,6 @@ model:
   val_batch_num: 30
   t_normalize:
     method: linear
-    points_bias: 0
-    points_scale: [1, 1, 100]
     feat_bias: 0
     feat_scale: 255
 pipeline:

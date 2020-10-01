@@ -7,9 +7,6 @@ def trans_normalize(pc, feat, t_normalize):
     if t_normalize is None or t_normalize.get('method', None) is None:
         return pc, feat
 
-    pc = pc.copy()
-    feat = feat.copy()
-
     method = t_normalize['method']
     if method == 'linear':
         if t_normalize.get('normalize_points', False):
@@ -76,6 +73,7 @@ def trans_augment(points, t_augment):
     else:
         scale = np.random.rand() * (max_s - min_s) - min_s
 
+    # TODO: add symmetric augmentation
     # # Add random symmetries to the scale factor
     # symmetries = []
     # sym = t_augment.get('symmetries', [False, False, False])

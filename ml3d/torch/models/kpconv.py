@@ -407,7 +407,6 @@ class KPFCNN(BaseModel):
         while curr_num_points < min_in_points:
 
             new_points = points.copy()
-            # new_points = np.array(search_tree.data)
 
             if attr['split'] in ['test']:
                 wanted_ind = np.argmin(self.possibility)
@@ -417,12 +416,6 @@ class KPFCNN(BaseModel):
             # print(new_points.shape, wanted_ind, p0)
             p0 = new_points[wanted_ind]
 
-            # Eliminate points further than config.in_radius
-            # mask = np.sum(np.square(new_points - p0),
-            #               axis=1) < self.cfg.in_radius**2
-            # mask_inds = np.where(mask)[0].astype(np.int32)
-
-            # Indices of points in input region
             mask_inds = search_tree.query_radius(p0.reshape(1, -1),
                                                  r=self.cfg.in_radius)[0]
 
@@ -481,9 +474,9 @@ class KPFCNN(BaseModel):
                 reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
 
                 # Project predictions on the frame points
-                search_tree_2 = KDTree(in_pts, leaf_size=50)
-                proj_inds = search_tree_2.query(o_pts[reproj_mask, :],
-                                                return_distance=False)
+                kdtree = KDTree(in_pts, leaf_size=50)
+                proj_inds = kdtree.query(o_pts[reproj_mask, :],
+                                         return_distance=False)
                 proj_inds = np.squeeze(proj_inds).astype(np.int32)
 
                 dists = np.sum(np.square(

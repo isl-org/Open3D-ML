@@ -89,9 +89,6 @@ class Semantic3D(BaseDataset):
         self.test_files = [
             f for f in self.all_files if f not in self.train_files
         ]
-        self.test_files = [
-            f for f in self.all_files if f not in self.train_files
-        ]
 
         self.train_files = np.sort(self.train_files)
         self.test_files = np.sort(self.test_files)
@@ -103,8 +100,8 @@ class Semantic3D(BaseDataset):
                     self.val_files.append(file_path)
                     break
 
-        # self.train_files = np.sort(
-        #     [f for f in self.train_files if f not in self.val_files])
+        self.train_files = np.sort(
+            [f for f in self.train_files if f not in self.val_files])
 
     def get_split(self, split):
         return Semantic3DSplit(self, split=split)

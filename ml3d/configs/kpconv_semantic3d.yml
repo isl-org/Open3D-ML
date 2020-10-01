@@ -6,16 +6,15 @@ dataset:
   ignored_label_inds:
   - 0
   test_result_folder: ./test
-  use_cache: false
+  use_cache: true
   val_files:
-  # - domfountain_station1_xyz_intensity_rgb
   - bildstein_station1_xyz_intensity_rgb
   - domfountain_station1_xyz_intensity_rgb
   steps_per_epoch_train: 500
   steps_per_epoch_valid: 50
 model:
   name: KPFCNN
-  ckpt_path: ../dataset/checkpoints/KPFCNN_Semantic3D_torch153.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   KP_extent: 1.2
   KP_influence: linear
   aggregation_mode: sum
@@ -79,8 +78,6 @@ model:
   val_batch_num: 30
   t_normalize:
     method: linear
-    points_bias: 0
-    points_scale: 1
     feat_bias: 0
     feat_scale: 255
 pipeline:

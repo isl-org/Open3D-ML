@@ -224,12 +224,6 @@ class RandLANet(BaseModel):
         interp_idx = inputs[3 * num_layers:4 * num_layers]
         feature = inputs[4 * num_layers]
 
-        # xyz = inputs['xyz']
-        # neigh_idx = inputs['neigh_idx']
-        # sub_idx = inputs['sub_idx']
-        # interp_idx = inputs['interp_idx']
-        # feature = inputs['features']
-
         m_dense = getattr(self, 'fc0')
         feature = m_dense(feature, training=self.training)
 
@@ -282,7 +276,7 @@ class RandLANet(BaseModel):
         f_layer_drop = m_dropout(f_layer_fc2, training=self.training)
 
         m_conv2d = getattr(self, 'fc')
-        f_layer_fc3 = m_conv2d(f_layer_fc2, training=self.training)
+        f_layer_fc3 = m_conv2d(f_layer_drop, training=self.training)
 
         f_out = tf.squeeze(f_layer_fc3, [2])
         # f_out = tf.nn.softmax(f_out)
@@ -306,7 +300,6 @@ class RandLANet(BaseModel):
         :return: loss
         """
         cfg = self.cfg
-        # labels = inputs['labels']
         labels = inputs[-1]
 
         scores, labels = Loss.filter_valid_label(results, labels)
@@ -540,10 +533,6 @@ class RandLANet(BaseModel):
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
-        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0],
-        #                      self.possibility.shape[0]))
-
-        print(np.min(self.possibility))
         if np.min(self.possibility) > 0.5:
             reproj_inds = self.inference_data['proj_inds']
             self.test_probs = self.test_probs[reproj_inds]
