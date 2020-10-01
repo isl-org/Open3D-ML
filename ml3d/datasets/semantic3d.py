@@ -117,7 +117,6 @@ class Semantic3D(BaseDataset):
             files = self.val_files + self.train_files + self.test_files
         else:
             raise ValueError("Invalid split {}".format(split))
-
         return files
 
     def is_tested(self, attr):
