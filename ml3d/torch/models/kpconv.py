@@ -438,7 +438,7 @@ class KPFCNN(BaseModel):
             curr_new_points = curr_new_points - p0
 
             if curr_feat is None:
-                curr_new_coords = curr_new_points
+                curr_new_coords = curr_new_points.copy()
             else:
                 curr_new_coords = np.hstack(
                     (curr_new_points, curr_feat[rand_order, :]))
