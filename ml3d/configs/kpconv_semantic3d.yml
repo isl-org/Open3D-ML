@@ -23,11 +23,11 @@ model:
                     'resnetb_strided',
                     'resnetb',
                     'resnetb_strided',
-                    'resnetb_deformable',
-                    'resnetb_deformable_strided',
-                    'resnetb_deformable',
-                    'resnetb_deformable_strided',
-                    'resnetb_deformable',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
                     'nearest_upsample',
                     'unary',
                     'nearest_upsample',
@@ -56,12 +56,12 @@ model:
   deform_radius: 6.0
   density_parameter: 5.0
   first_features_dim: 128
-  first_subsampling_dl: 0.04
+  first_subsampling_dl: 0.06
   fixed_kernel_points: center
   ignored_label_inds: [0]
   in_features_dim: 4
   in_points_dim: 3
-  in_radius: 2.0
+  in_radius: 3.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   min_in_points: 5000
   max_in_points: 10000
