@@ -215,6 +215,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+                print(acc[-1], iou[-1])
 
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)

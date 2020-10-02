@@ -269,9 +269,9 @@ class KPFCNN(BaseModel):
             'params': deform_params,
             'lr': deform_lr
         }],
-                                    lr=cfg_pipeline.learning_rate,
-                                    momentum=cfg_pipeline.momentum,
-                                    weight_decay=cfg_pipeline.weight_decay)
+            lr=cfg_pipeline.learning_rate,
+            momentum=cfg_pipeline.momentum,
+            weight_decay=cfg_pipeline.weight_decay)
 
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)

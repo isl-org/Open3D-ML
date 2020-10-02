@@ -418,7 +418,9 @@ class RandLANet(BaseModel):
         selected_pc, feat, label, selected_idx = trans_crop_pc(
             pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
-        dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+        center_point = pc[pick_idx, :].reshape(1, -1)
+
+        dists = np.sum(np.square((selected_pc-center_point).astype(np.float32)), axis=1)
         delta = np.square(1 - dists / np.max(dists))
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx

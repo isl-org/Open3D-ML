@@ -76,6 +76,8 @@ class Toronto3D(BaseDataset):
             8: 'Fence'
         }
 
+
+
         self.dataset_path = cfg.dataset_path
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
@@ -147,6 +149,8 @@ class Toronto3DSplit():
         self.split = split
         self.dataset = dataset
 
+        self.UTM_OFFSET = [627285, 4841948, 0]
+
         self.cache_in_memory = self.cfg.get('cache_in_memory', False)
         if self.cache_in_memory:
             self.data_list = [None] * len(self.path_list)
@@ -167,16 +171,18 @@ class Toronto3DSplit():
         else:
             data = PlyData.read(pc_path)['vertex']
 
-        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
-        points[:, 0] = data['x']
-        points[:, 1] = data['y']
-        points[:, 2] = data['z']
+
+        points = np.vstack(
+            (data['x'], data['y'], data['z'])).astype(np.float64).T
+        points = points - self.UTM_OFFSET
+        points = np.float32(points)
+       
 
         feat = np.zeros(points.shape, dtype=np.float32)
         feat[:, 0] = data['red']
         feat[:, 1] = data['green']
         feat[:, 2] = data['blue']
-
+      
         labels = np.array(data['scalar_Label'], dtype=np.int32)
 
         data = {'point': points, 'feat': feat, 'label': labels}

@@ -117,6 +117,6 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     else:
         select_feat = feat[select_idx]
 
-    select_points = select_points - center_point
+    select_points = select_points #- center_point
 
     return select_points, select_feat, select_labels, select_idx
