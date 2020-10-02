@@ -627,6 +627,7 @@ class Visualizer:
         em = self.window.theme.font_size
 
         self._3d = gui.SceneWidget()
+        self._3d.enable_scene_caching(True)  # makes UI _much_ more responsive
         self._3d.scene = rendering.Open3DScene(self.window.renderer)
         self.window.add_child(self._3d)
 
