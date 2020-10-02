@@ -18,28 +18,24 @@ model:
   KP_extent: 1.2
   KP_influence: linear
   aggregation_mode: sum
-  architecture:
-  - simple
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - nearest_upsample
-  - unary
-  - nearest_upsample
-  - unary
-  - nearest_upsample
-  - unary
-  - nearest_upsample
-  - unary
+  architecture: ['simple',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb',
+                    'resnetb_strided',
+                    'resnetb_deformable',
+                    'resnetb_deformable_strided',
+                    'resnetb_deformable',
+                    'resnetb_deformable_strided',
+                    'resnetb_deformable',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary',
+                    'nearest_upsample',
+                    'unary']
   augment_color: 1.0
   augment_noise: 0.001
   augment_rotation: vertical
@@ -63,9 +59,9 @@ model:
   first_subsampling_dl: 0.04
   fixed_kernel_points: center
   ignored_label_inds: [0]
-  in_features_dim: 5
+  in_features_dim: 4
   in_points_dim: 3
-  in_radius: 6.0
+  in_radius: 2.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   min_in_points: 5000
   max_in_points: 10000
@@ -89,7 +85,7 @@ pipeline:
   deform_lr_factor: 0.1
   main_log_dir: ./logs
   max_epoch: 500
-  save_ckpt_freq: 3
+  save_ckpt_freq: 5
   scheduler_gamma: 0.95
   test_batch_size: 1
   train_sum_dir: train_log
