@@ -98,7 +98,7 @@ class Model:
         elif isinstance(ary, tf.Tensor):
             return self._convert_to_numpy(ary.numpy())
         elif isinstance(ary, torch.Tensor):
-            return self._convert_to_numpy(ary.numpy())
+            return self._convert_to_numpy(ary.detach().cpu().numpy())
         else:
             return None
 
