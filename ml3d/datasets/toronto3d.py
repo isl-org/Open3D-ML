@@ -113,7 +113,7 @@ class Toronto3D(BaseDataset):
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
-        store_path = join(path, name + '.npy')
+        store_path = join(path, self.name, name + '.npy')
         if exists(store_path):
             print("{} already exists.".format(store_path))
             return True

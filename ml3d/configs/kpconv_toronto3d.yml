@@ -20,7 +20,7 @@ dataset:
   steps_per_epoch_valid: 10
 model:
   name: KPFCNN
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/KPFCNN_Toronto3D_torch375.pth # path/to/your/checkpoint
   KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
