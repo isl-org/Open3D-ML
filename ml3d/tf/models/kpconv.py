@@ -182,6 +182,7 @@ class KPFCNN(BaseModel):
         self.decoder_blocks = []
         self.decoder_concats = []
 
+        out_dim /= 2
         start_i = 0
         for block_i, block in enumerate(cfg.architecture):
             if 'upsample' in block:
@@ -211,8 +212,13 @@ class KPFCNN(BaseModel):
                 r *= 0.5
                 out_dim = out_dim // 2
 
-        self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
+        self.head_mlp = UnaryBlock(out_dim, int(cfg.first_features_dim / 2),
+                                   True, cfg.batch_norm_momentum)
+        self.head_softmax = UnaryBlock(int(cfg.first_features_dim / 2),
+                                       self.C,
+                                       False,
+                                       0,
+                                       no_relu=True)
 
         self.valid_labels = np.sort(
             [c for c in lbl_values if c not in ign_lbls])

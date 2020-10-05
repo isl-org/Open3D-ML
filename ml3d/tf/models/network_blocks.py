@@ -422,7 +422,7 @@ class BatchNormBlock(tf.keras.layers.Layer):
 
         if (self.use_bn):
             self.batch_norm = tf.keras.layers.BatchNormalization(
-                epsilon=1e-5, momentum=bn_momentum)
+                epsilon=1e-6, momentum=bn_momentum)
         else:
             self.bias = self.add_weight(name="{}_b".format(self.name),
                                         shape=(self.in_dim,),
@@ -459,7 +459,7 @@ class UnaryBlock(tf.keras.layers.Layer):
         self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
 
         if not no_relu:
-            self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+            self.leaky_relu = tf.keras.layers.LeakyReLU(0.2)
 
     def call(self, x, batch=None, training=False):
         x = self.mlp(x)
@@ -499,7 +499,7 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
-        self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+        self.leaky_relu = tf.keras.layers.LeakyReLU(0.2)
 
     def call(self, x, batch, training=False):
 
@@ -587,7 +587,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
             self.unary_shortcut = IdentityBlock()
 
         # Other operations
-        self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+        self.leaky_relu = tf.keras.layers.LeakyReLU(0.2)
 
         return
 
