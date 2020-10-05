@@ -7,13 +7,15 @@ extended over time.
 ## Visualize custom data
 
 The visualizer can be used to visualize point clouds with custom attributes.
-This can be useful to for example for comparing predictions and the ground truth.
+This can be useful to for example for comparing predictions and the ground
+truth.
 
-Point clouds are defined as a dictionaries with mandatory entries **name** and 
-**points** defining the name of the object and the point positions.
-In the following example we create a single point cloud with an attribute 
+Point clouds are defined as a dictionaries with mandatory entries **name** and
+**points** defining the name of the object and the point positions.  In the
+following example we create a single point cloud with an attribute
 **random_colors** and an integer attribute **int_attr** in the range [0,4].
-The data can be passed as PyTorch tensor, TensorFlow tensors or as numpy arrays.
+The data can be passed as PyTorch tensor, TensorFlow tensors or as numpy
+arrays.
 
 ```python
 import open3d.ml.torch as ml3d
@@ -60,7 +62,8 @@ lut.add_label('two', 2)
 lut.add_label('three', 3, [0,0,1]) # use blue for label 'three'
 lut.add_label('four', 4, [0,1,0])  # use green for label 'four'
 ```
-If nor color is provided when adding a label a color will be assigned from a default LUT.
+If no color is provided when adding a label a color will be assigned from a
+default LUT.
 
 To pass the LUT to the visualizer we associate it with the **int_attr**.
 ```python
@@ -73,29 +76,51 @@ Selecting the **int_attr** in the visualizer will then switch to our LUT.
 
 ## Adding a new model
 
-TODO
+For adding a new model to Open3D-ML you need to clone the repository and add
+the model code to `ml3d/{tf,torch}/models`.
 
+All models should be derived from `BaseModel` defined in
+`ml3d/{tf,torch}/models/base_model.py` and must implement a set of functions
+that allow a pipeline to interact with the model. A minimal model for torch 
+looks like this.
 
-### pipeline
+```python
+# use relative import for all imports within ml3d.
+from .base_model import BaseModel
+
+class MyModel(BaseModel):
+    def __init__(self, name="MyModel"):
+        super().__init__(name=name)
+        # network definition ...
+
+    def forward(self, inputs):
+        # inference code ...
+
+    def get_optimizer(self, cfg_pipeline):
+        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, cfg_pipeline.scheduler_gamma)
+        return optimizer, scheduler
+    
+    def get_loss(self, Loss, results, inputs):
+        labels = inputs['data'].labels # is 'data' standardized?
+        loss = Loss.weighted_CrossEntropyLoss(results, labels) # how does the model now about weighted_CrossEntropyLoss?
+        return loss # randlanet and kpconv return here "loss, labels, scores"
+
+    def preprocess(self, data, attr):
+        return data
 ```
-pipeline
-	__init__(model, dataset, cfg)
-	run_train
-	run_test
-	run_inference
+
+To test code with an already installed Open3D package you can set the
+environment variable `OPEN3D_ML_ROOT` to the root dir of the repo. This can be
+done with
+```bash 
+source /path/to/Open3D-ML/set_open3d_ml_root.sh
 ```
-### dataloader
-```
-dataloader
-	__init__(cfg)
-	save_test_result
-	get_sampler(split="training/test/validation")
-	get_data(file_path)
-```
-### model
-```
-model
-	__init__(cfg)
-	forward
-	preprocess         
+which will make the _ml_ namespace point to `ml3d` in the repo.
+Our example model can then be instantiated with
+```python
+import open3d.ml.torch as ml3d
+# prints "Using external Open3D-ML in /path/to/Open3D-ML"
+
+model = ml3d.models.MyModel()
 ```
