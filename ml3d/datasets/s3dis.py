@@ -142,7 +142,7 @@ class S3DIS(BaseDataset):
             labels = pc_feat_labels[:, 6]
 
         return points, feat, search_tree, labels
-        
+
     def is_tested(self, attr):
         cfg = self.cfg
         name = attr['name']

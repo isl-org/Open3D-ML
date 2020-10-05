@@ -27,7 +27,6 @@ class BaseModel(tf.keras.Model):
 
         self.cfg = Config(kwargs)
 
-
     def get_loss(self, Loss, results, inputs, device):
         raise NotImplementedError()
 

@@ -301,7 +301,6 @@ class SemanticSegmentation(BasePipeline):
             'Validation IoU': val_iou
         } for iou, val_iou in zip(ious, valid_ious)]
 
-  
         for key, val in loss_dict.items():
             writer.add_scalar(key, val, epoch)
         for key, val in acc_dicts[-1].items():
@@ -316,7 +315,6 @@ class SemanticSegmentation(BasePipeline):
         log.info(f"iou train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
 
-
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
@@ -325,7 +323,7 @@ class SemanticSegmentation(BasePipeline):
             ckpt_path = latest_torch_ckpt(train_ckpt_dir)
             if ckpt_path is not None and is_resume:
                 log.info('ckpt_path not given. Restore from the latest ckpt')
-            else: 
+            else:
                 log.info('Initializing from scratch.')
                 return
 
@@ -341,8 +339,6 @@ class SemanticSegmentation(BasePipeline):
         if 'scheduler_state_dict' in ckpt:
             log.info(f'Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
-
-        
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')

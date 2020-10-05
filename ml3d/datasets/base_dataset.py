@@ -33,6 +33,6 @@ class BaseDataset(object):
 
     def is_tested(self, attr):
         raise NotImplementedError()
-        
+
     def save_test_result(self, results, attr):
         raise NotImplementedError()

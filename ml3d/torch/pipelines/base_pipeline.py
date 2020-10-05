@@ -47,7 +47,6 @@ class BasePipeline(object):
             self.device = torch.device('cuda' if len(device.split(':')) ==
                                        1 else 'cuda:' + device.split(':')[1])
 
-
     def run_inference(self, data):
         raise NotImplementedError()
 

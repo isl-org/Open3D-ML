@@ -47,4 +47,3 @@ class BasePipeline(object):
 
     def run_train(self):
         raise NotImplementedError()
-

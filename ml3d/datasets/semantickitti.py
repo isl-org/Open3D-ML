@@ -230,7 +230,7 @@ class SemanticKITTISplit():
             labels = np.zeros(np.shape(points)[0], dtype=np.int32)
             if self.split not in ['test', 'all']:
                 raise FileNotFoundError(f' Label file {label_path} not found')
-        
+
         else:
             labels = DataProcessing.load_label_kitti(
                 label_path, self.remap_lut_val).astype(np.int32)
