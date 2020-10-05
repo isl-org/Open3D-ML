@@ -39,5 +39,12 @@ class BasePipeline(object):
             model.__class__.__name__ + '_' + dataset_name + '_tf')
         make_dir(self.cfg.logs_dir)
 
-    def get_loss(self):
+    def run_inference(self, data):
         raise NotImplementedError()
+
+    def run_test(self):
+        raise NotImplementedError()
+
+    def run_train(self):
+        raise NotImplementedError()
+

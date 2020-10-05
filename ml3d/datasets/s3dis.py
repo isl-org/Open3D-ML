@@ -142,6 +142,17 @@ class S3DIS(BaseDataset):
             labels = pc_feat_labels[:, 6]
 
         return points, feat, search_tree, labels
+        
+    def is_tested(self, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        store_path = join(path, self.name, name + '.npy')
+        if exists(store_path):
+            print("{} already exists.".format(store_path))
+            return True
+        else:
+            return False
 
     def save_test_result(self, results, attr):
         cfg = self.cfg
