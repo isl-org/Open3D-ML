@@ -188,6 +188,7 @@ the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D
 
 * [Visualize custom data](docs/howtos.md#visualize-custom-data) 
 * [Adding a new model](docs/howtos.md#adding-a-new-model) 
+* [Adding a new dataset](docs/howtos.md#adding-a-new-dataset) 
 
 ## Contribute 
 There are many ways to contribute to this project. You can 
