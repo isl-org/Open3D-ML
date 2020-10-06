@@ -17,6 +17,7 @@ TODO List:
   - [ ] ml3d/torch/utils/dataset_helper.py is a copy from Kaolin
 - [ ] semantic kitti velodyne download does not work; requires browser and email.
 - [ ] consider curl instead of wget (not installed on mac) or even a python function for downloading
+- [ ] rename `import ml3d.*` to `import open3d.{tf,torch}.ml as ml3d`
 
 ## Directories
 

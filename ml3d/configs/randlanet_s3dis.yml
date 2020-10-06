@@ -33,6 +33,11 @@ model:
   - 4
   - 4
   - 2
+  t_normalize:
+    method: linear
+    normalize_points: False
+    feat_bias: 0
+    feat_scale: 1
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

@@ -117,9 +117,10 @@ class KPFCNN(BaseModel):
         hist_n = int(np.ceil(4 / 3 * np.pi * (cfg.density_parameter + 1)**3))
 
         # Initiate neighbors limit with higher bound
-        self.neighborhood_limits = np.full(cfg.num_layers,
-                                           hist_n,
-                                           dtype=np.int32)
+        self.neighborhood_limits = []
+        # self.neighborhood_limits = np.full(cfg.num_layers,
+        #                                    hist_n,
+        #                                    dtype=np.int32)
 
         # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
         self.dropout_prob = tf.constant(0.2, name='dropout_prob')
@@ -304,7 +305,10 @@ class KPFCNN(BaseModel):
         Limit is computed at initialization
         """
         # crop neighbors matrix
-        return neighbors[:, :self.neighborhood_limits[layer]]
+        if len(self.neighborhood_limits) > 0:
+            return neighbors[:, :self.neighborhood_limits[layer]]
+        else:
+            return neighbors
 
     def get_batch_inds(self, stacks_len):
         """
@@ -499,7 +503,7 @@ class KPFCNN(BaseModel):
         stacked_weights = tf.gather(batch_weights, batch_inds)
 
         # Starting radius of convolutions
-        r_normal = cfg.first_subsampling_dl * cfg.KP_extent * 2.5
+        r_normal = cfg.first_subsampling_dl * cfg.conv_radius
 
         # Starting layer
         layer_blocks = []
@@ -513,23 +517,19 @@ class KPFCNN(BaseModel):
 
         # Loop over the blocks
         for block_i, block in enumerate(cfg.architecture):
-
-            # Stop when meeting a global pooling or upsampling
-            if 'global' in block or 'upsample' in block:
-                break
-
             # Get all blocks of the layer
-            if not ('pool' in block or 'strided' in block):
+            if not ('pool' in block or 'strided' in block or
+                    'global' in block or 'upsample' in block):
                 layer_blocks += [block]
-                if block_i < len(cfg.architecture) - 1 and not (
-                        'upsample' in cfg.architecture[block_i + 1]):
-                    continue
+                continue
 
             # Convolution neighbors indices
+            deform_layer = False
             if layer_blocks:
                 # Convolutions are done in this layer, compute the neighbors with the good radius
-                if np.any(['deformable' in blck for blck in layer_blocks[:-1]]):
-                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
+                if np.any(['deformable' in blck for blck in layer_blocks]):
+                    r = r_normal * cfg.deform_radius / cfg.conv_radius
+                    deform_layer = True
                 else:
                     r = r_normal
                 conv_i = tf_batch_neighbors(stacked_points, stacked_points,
@@ -543,7 +543,7 @@ class KPFCNN(BaseModel):
             if 'pool' in block or 'strided' in block:
 
                 # New subsampling length
-                dl = 2 * r_normal / (cfg.KP_extent * 2.5)
+                dl = 2 * r_normal / cfg.conv_radius
 
                 # Subsampled points
                 pool_p, pool_b = tf_batch_subsampling(stacked_points,
@@ -551,7 +551,8 @@ class KPFCNN(BaseModel):
 
                 # Radius of pooled neighbors
                 if 'deformable' in block:
-                    r = r_normal * cfg.density_parameter / (cfg.KP_extent * 2.5)
+                    r = r_normal * cfg.deform_radius / cfg.conv_radius
+                    deform_layer = True
                 else:
                     r = r_normal
 
@@ -574,7 +575,7 @@ class KPFCNN(BaseModel):
             # TODO :
             conv_i = self.big_neighborhood_filter(conv_i, len(input_points))
             pool_i = self.big_neighborhood_filter(pool_i, len(input_points))
-            up_i = self.big_neighborhood_filter(up_i, len(input_points))
+            up_i = self.big_neighborhood_filter(up_i, len(input_points) + 1)
 
             # Updating input lists
             input_points += [stacked_points]
@@ -590,6 +591,10 @@ class KPFCNN(BaseModel):
             # Update radius and reset blocks
             r_normal *= 2
             layer_blocks = []
+
+            # Stop when meeting a global pooling or upsampling
+            if 'global' in block or 'upsample' in block:
+                break
 
         # Return inputs
         # Batch unstacking (with last layer indices for optionnal classif loss)
@@ -643,8 +648,8 @@ class KPFCNN(BaseModel):
                                    dtype=tf.float32)
 
         # Get coordinates and colors
-        stacked_original_coordinates = stacked_colors[:, 3:]
-        stacked_colors = stacked_colors[:, :3]
+        stacked_original_coordinates = stacked_colors[:, :3]
+        stacked_colors = stacked_colors[:, 3:]
 
         # Augmentation : randomly drop colors
         if cfg.in_features_dim in [4, 5]:
@@ -667,12 +672,15 @@ class KPFCNN(BaseModel):
             stacked_features = tf.concat((stacked_features, stacked_colors),
                                          axis=1)
         elif cfg.in_features_dim == 5:
-            stacked_features = tf.concat((stacked_features, stacked_colors,
-                                          stacked_original_coordinates[:, 2:]),
-                                         axis=1)
+            stacked_features = tf.concat(
+                (stacked_features, stacked_original_coordinates[:, 2:],
+                 stacked_colors),
+                axis=1)
         elif cfg.in_features_dim == 7:
             stacked_features = tf.concat(
-                (stacked_features, stacked_colors, stacked_points), axis=1)
+                (stacked_features, stacked_original_coordinates,
+                 stacked_colors),
+                axis=1)
         else:
             raise ValueError(
                 'Only accepted input dimensions are 1, 3, 4 and 7 (without and with rgb/xyz)'
@@ -753,7 +761,7 @@ class KPFCNN(BaseModel):
             point_ind = int(np.argmin(self.possibility))
 
             center_point = points[point_ind, :].reshape(1, -1)
-            pick_point = center_point
+            pick_point = center_point.copy()
 
             input_inds = data['search_tree'].query_radius(pick_point,
                                                           r=cfg.in_radius)[0]
@@ -768,8 +776,19 @@ class KPFCNN(BaseModel):
             tuckeys[dists > np.square(cfg.in_radius)] = 0
             self.possibility[input_inds] += tuckeys
 
-            input_points = (points[input_inds] - pick_point).astype(np.float32)
-            input_colors = data['feat'][input_inds].astype(np.float32)
+            input_points = points[input_inds].copy() - pick_point
+            feat = data['feat']
+
+            t_normalize = self.cfg.get('t_normalize', None)
+            input_points, feat = trans_normalize(input_points, feat,
+                                                 t_normalize)
+
+            if feat is None:
+                coords = input_points
+            else:
+                coords = np.hstack((input_points, feat[input_inds]))
+
+            coords[:, 2] += pick_point[:, 2]
 
             if len(data['label'][input_inds].shape) == 2:
                 input_labels = data['label'][input_inds][:, 0]
@@ -778,7 +797,7 @@ class KPFCNN(BaseModel):
 
             if n > 0:
                 p_list += [input_points]
-                c_list += [np.hstack((input_colors, input_points + pick_point))]
+                c_list += [coords]
                 pl_list += [input_labels]
                 pi_list += [input_inds]
                 ci_list += [cloud_ind]
@@ -804,31 +823,37 @@ class KPFCNN(BaseModel):
         cfg = self.cfg
 
         points = data['point'][:, 0:3]
-        labels = data['label']
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
+
         split = attr['split']
 
         if 'feat' not in data.keys() or data['feat'] is None:
-            feat = points.copy()
+            feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
         data = dict()
 
-        sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
-            points,
-            features=feat,
-            labels=labels,
-            grid_size=cfg.first_subsampling_dl)
-
-        t_normalize = cfg.get('t_normalize', None)
-        sub_points, sub_feat = trans_normalize(sub_points, sub_feat,
-                                               t_normalize)
+        if (feat is None):
+            sub_points, sub_labels = DataProcessing.grid_subsampling(
+                points, labels=labels, grid_size=cfg.first_subsampling_dl)
+            sub_feat = None
+        else:
+            sub_points, sub_feat, sub_labels = DataProcessing.grid_subsampling(
+                points,
+                features=feat,
+                labels=labels,
+                grid_size=cfg.first_subsampling_dl)
 
         search_tree = KDTree(sub_points)
 
-        data['point'] = np.array(sub_points)
-        data['feat'] = np.array(sub_feat)
-        data['label'] = np.array(sub_labels)
+        data['point'] = sub_points
+        data['feat'] = sub_feat
+        data['label'] = sub_labels
         data['search_tree'] = search_tree
 
         if split in ["test", "testing"]:
@@ -865,6 +890,10 @@ class KPFCNN(BaseModel):
     def get_batch_gen(self, dataset, steps_per_epoch=None):
 
         cfg = self.cfg
+        if dataset.read_data(0)[0]['feat'] is None:
+            dim_features = 3
+        else:
+            dim_features = 6
 
         def spatially_regular_gen():
 
@@ -881,14 +910,6 @@ class KPFCNN(BaseModel):
 
             batch_limit = cfg.batch_limit
 
-            # Initiate potentials for regular generation
-            if not hasattr(self, 'potentials'):
-                self.potentials = {}
-                self.min_potentials = {}
-
-            # Reset potentials
-            self.potentials[split] = []
-            self.min_potentials[split] = []
             data_split = split
 
             # Initiate concatanation lists
@@ -909,8 +930,7 @@ class KPFCNN(BaseModel):
 
                 point_ind = np.random.choice(len(data['point']), 1)
 
-                # Get points from tree structure
-                points = np.array(data['search_tree'].data, copy=False)
+                points = data['point']
 
                 # Center point of input region
                 center_point = points[point_ind, :].reshape(1, -1)
@@ -935,9 +955,19 @@ class KPFCNN(BaseModel):
                     n = input_inds.shape[0]
 
                 # Collect points and colors
-                input_points = (points[input_inds] - pick_point).astype(
-                    np.float32)
-                input_colors = data['feat'][input_inds]
+                input_points = points[input_inds].copy() - pick_point
+                feat = data['feat']
+
+                t_normalize = self.cfg.get('t_normalize', None)
+                input_points, feat = trans_normalize(input_points, feat,
+                                                     t_normalize)
+
+                if feat is None:
+                    coords = input_points.copy()
+                else:
+                    coords = np.hstack((input_points, feat[input_inds]))
+
+                coords[:, 2] += pick_point[:, 2]
 
                 if split in ['test', 'testing']:
                     input_labels = np.zeros(input_points.shape[0])
@@ -969,9 +999,7 @@ class KPFCNN(BaseModel):
                 # Add data to current batch
                 if n > 0:
                     p_list += [input_points]
-                    c_list += [
-                        np.hstack((input_colors, input_points + pick_point))
-                    ]
+                    c_list += [coords]
                     pl_list += [input_labels]
                     pi_list += [input_inds]
                     ci_list += [cloud_ind]
@@ -991,7 +1019,8 @@ class KPFCNN(BaseModel):
         gen_func = spatially_regular_gen
         gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32,
                      tf.int32)
-        gen_shapes = ([None, 3], [None, 6], [None], [None], [None], [None])
+        gen_shapes = ([None, 3], [None,
+                                  dim_features], [None], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 

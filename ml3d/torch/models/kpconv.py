@@ -473,16 +473,8 @@ class KPFCNN(BaseModel):
 
             # Before augmenting, compute reprojection inds (only for validation and test)
             if attr['split'] in ['test']:
-                # get val_points that are in range
-                # radiuses = np.sum(np.square(o_pts - p0), axis=1)
-                # reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
-
-                # # Project predictions on the frame points
-                # kdtree = KDTree(selected_points, leaf_size=50)
-                # proj_inds = kdtree.query(o_pts[reproj_mask, :],
-                #                          return_distance=False)
-                # proj_inds = np.squeeze(proj_inds).astype(np.int32)
                 proj_inds = np.zeros((0,))
+
 
                 reproj_mask = rand_order
                 dists = np.sum(np.square(
