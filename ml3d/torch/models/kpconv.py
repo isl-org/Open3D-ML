@@ -562,20 +562,6 @@ class KPFCNN(BaseModel):
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
             # frame_labels = labels_list[b_i]
-
-            # # Project predictions on the frame points
-            # proj_probs = probs[proj_inds]
-
-            # # Safe check if only one point:
-            # if proj_probs.ndim < 2:
-            #     proj_probs = np.expand_dims(proj_probs, 0)
-            # # Save probs in a binary file (uint8 format for lighter weight)
-
-            # frame_probs = self.test_probs[proj_mask, :]
-            # frame_probs = self.test_smooth * frame_probs + \
-            #     (1 - self.test_smooth) * proj_probs
-            # self.test_probs[proj_mask, :] = frame_probs
-
            
             self.test_probs[proj_mask] = self.test_smooth * self.test_probs[proj_mask] + (
                 1 - self.test_smooth) * probs
