@@ -269,9 +269,9 @@ class KPFCNN(BaseModel):
             'params': deform_params,
             'lr': deform_lr
         }],
-            lr=cfg_pipeline.learning_rate,
-            momentum=cfg_pipeline.momentum,
-            weight_decay=cfg_pipeline.weight_decay)
+                                    lr=cfg_pipeline.learning_rate,
+                                    momentum=cfg_pipeline.momentum,
+                                    weight_decay=cfg_pipeline.weight_decay)
 
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
@@ -430,12 +430,10 @@ class KPFCNN(BaseModel):
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
+            curr_new_points = curr_new_points - p0
             t_normalize = self.cfg.get('t_normalize', None)
-
             curr_new_points, curr_feat = trans_normalize(
                 curr_new_points, feat, t_normalize)
-
-            curr_new_points = curr_new_points - p0
 
             if curr_feat is None:
                 curr_new_coords = curr_new_points.copy()
@@ -474,7 +472,6 @@ class KPFCNN(BaseModel):
             # Before augmenting, compute reprojection inds (only for validation and test)
             if attr['split'] in ['test']:
                 proj_inds = np.zeros((0,))
-
 
                 reproj_mask = rand_order
                 dists = np.sum(np.square(
@@ -548,18 +545,14 @@ class KPFCNN(BaseModel):
 
         i0 = 0
         for b_i, length in enumerate(lengths):
-
             # Get prediction
             probs = stk_probs[i0:i0 + length]
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
-            # frame_labels = labels_list[b_i]
-           
-            self.test_probs[proj_mask] = self.test_smooth * self.test_probs[proj_mask] + (
-                1 - self.test_smooth) * probs
-
+            self.test_probs[proj_mask] = self.test_smooth * self.test_probs[
+                proj_mask] + (1 - self.test_smooth) * probs
             i0 += length
-        print(np.min(self.possibility))
+
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)
 
