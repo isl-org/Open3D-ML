@@ -102,12 +102,63 @@ class MyModel(BaseModel):
         return optimizer, scheduler
     
     def get_loss(self, Loss, results, inputs):
-        labels = inputs['data'].labels # is 'data' standardized?
-        loss = Loss.weighted_CrossEntropyLoss(results, labels) # how does the model now about weighted_CrossEntropyLoss?
-        return loss # randlanet and kpconv return here "loss, labels, scores"
+        labels = inputs['data'].labels # processed data from model.preprocess and/or model.transform.
+
+        # Loss is an object of type SemSegLoss. Any new loss can be added to `ml3d/{tf, torch}/modules/semseg_loss.py`
+        loss = Loss.weighted_CrossEntropyLoss(results, labels)
+        results, labels = Loss.filter_valid_label(results, labels) # remove ignored indices if present.
+        return loss, labels, results
 
     def preprocess(self, data, attr):
         return data
+```
+
+
+## Adding a new dataset
+
+For adding a new dataset, you can the dataset code to `ml3d/datasets`.
+Dataset class is independent of framework and it has to be derived from 
+`BaseDataset` defined in `ml3d/datasets/base_dataset.py`. You must implement 
+another class `MyDatasetSplit` which is used to return data and attributes 
+for files corresponding to a particular split.
+
+```python
+from .base_dataset import BaseDataset
+
+class MyDataset(BaseDataset):
+    def __init__(self, name="MyDataset"):
+        super().__init__(name=name)
+        # read file lists.
+     
+    def get_split(self, split):
+        return MyDatasetSplit(self, split=split)
+    
+    def is_tested(self, attr):
+        # checks whether attr['name'] is already tested.
+    
+    def save_test_result(self, results, attr):
+        # save results['predict_labels'] to file.
+    
+
+class MyDatasetSplit():
+    def __init__(self, dataset, split='train'):
+        self.split = split
+        self.path_list = []
+        # collect list of files relevant to split.
+    
+    def __len__(self):
+        return len(self.path_list)
+    
+    def get_data(self, idx):
+        path = self.path_list[idx]
+        points, features, labels = read_pc(path)
+        return {'point': points, 'feat': features, 'label': labels}
+    
+    def get_attr(self, idx):
+        path = self.path_list[idx]
+        name = path.split('/')[-1]
+        return {'name': name, 'path': path, 'split': self.split}
+    
 ```
 
 To test code with an already installed Open3D package you can set the
@@ -123,4 +174,5 @@ import open3d.ml.torch as ml3d
 # prints "Using external Open3D-ML in /path/to/Open3D-ML"
 
 model = ml3d.models.MyModel()
+dataset = ml3d.datasets.MyDataset()
 ```
