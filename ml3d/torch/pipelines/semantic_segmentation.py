@@ -15,6 +15,7 @@ from os.path import exists, join, isfile, dirname, abspath
 
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
+from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord, Config, PIPELINE, get_runid, code2md
@@ -114,7 +115,7 @@ class SemanticSegmentation(BasePipeline):
                                      use_cache=dataset.cfg.use_cache,
                                      shuffle=False)
 
-        self.load_ckpt(model.cfg.ckpt_path, False)
+        self.load_ckpt(model.cfg.ckpt_path)
 
         datset_split = self.dataset.get_split('test')
 
@@ -193,7 +194,8 @@ class SemanticSegmentation(BasePipeline):
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
-        first_epoch = self.load_ckpt(model.cfg.ckpt_path, True)
+        is_resume = model.cfg.get('is_resume', True)
+        self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
 
         dataset_name = dataset.name if dataset is not None else ''
         tensorboard_dir = join(
@@ -231,7 +233,6 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = metric.acc(predict_scores, gt_labels)
                 iou = metric.iou(predict_scores, gt_labels)
-                print(predict_scores.shape, acc[-1], iou[-1])
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
@@ -300,8 +301,6 @@ class SemanticSegmentation(BasePipeline):
             'Validation IoU': val_iou
         } for iou, val_iou in zip(ious, valid_ious)]
 
-        # send results to tensorboard
-        # add_scalars creates clutter: https://github.com/pytorch/pytorch/issues/32651
         for key, val in loss_dict.items():
             writer.add_scalar(key, val, epoch)
         for key, val in acc_dicts[-1].items():
@@ -316,27 +315,30 @@ class SemanticSegmentation(BasePipeline):
         log.info(f"iou train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
 
-        # print(acc_dicts[-1])
+    def load_ckpt(self, ckpt_path=None, is_resume=True):
+        train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
+        make_dir(train_ckpt_dir)
 
-    def load_ckpt(self, ckpt_path, is_train=True):
-        if ckpt_path is None or not exists(ckpt_path):
-            first_epoch = 0
-            log.info('No checkpoint')
-        else:
-            #path = max(list((cfg.ckpt_path).glob('*.pth')))
-            log.info(f'Loading checkpoint {ckpt_path}')
-            ckpt = torch.load(ckpt_path)
-            first_epoch = ckpt['epoch'] + 1
-            self.model.load_state_dict(ckpt['model_state_dict'])
-            if is_train:
-                if 'optimizer_state_dict' in ckpt:
-                    log.info(f'Loading checkpoint optimizer_state_dict')
-                    self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-                if 'scheduler_state_dict' in ckpt:
-                    log.info(f'Loading checkpoint scheduler_state_dict')
-                    self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+        if ckpt_path is None:
+            ckpt_path = latest_torch_ckpt(train_ckpt_dir)
+            if ckpt_path is not None and is_resume:
+                log.info('ckpt_path not given. Restore from the latest ckpt')
+            else:
+                log.info('Initializing from scratch.')
+                return
 
-        return first_epoch
+        if not exists(ckpt_path):
+            raise FileNotFoundError(f' ckpt {ckpt_path} not found')
+
+        log.info(f'Loading checkpoint {ckpt_path}')
+        ckpt = torch.load(ckpt_path)
+        self.model.load_state_dict(ckpt['model_state_dict'])
+        if 'optimizer_state_dict' in ckpt:
+            log.info(f'Loading checkpoint optimizer_state_dict')
+            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if 'scheduler_state_dict' in ckpt:
+            log.info(f'Loading checkpoint scheduler_state_dict')
+            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
@@ -346,7 +348,7 @@ class SemanticSegmentation(BasePipeline):
                  model_state_dict=self.model.state_dict(),
                  optimizer_state_dict=self.optimizer.state_dict(),
                  scheduler_state_dict=self.scheduler.state_dict()),
-            join(path_ckpt, f'ckpt_{epoch:02d}.pth'))
+            join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
     def filter_valid(self, scores, labels, device):
