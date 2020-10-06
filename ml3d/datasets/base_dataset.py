@@ -30,3 +30,9 @@ class BaseDataset(object):
 
     def get_split(self, split):
         raise NotImplementedError()
+
+    def is_tested(self, attr):
+        raise NotImplementedError()
+
+    def save_test_result(self, results, attr):
+        raise NotImplementedError()

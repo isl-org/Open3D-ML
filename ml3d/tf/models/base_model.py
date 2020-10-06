@@ -27,5 +27,23 @@ class BaseModel(tf.keras.Model):
 
         self.cfg = Config(kwargs)
 
-    def get_loss(self):
+    def get_loss(self, Loss, results, inputs, device):
+        raise NotImplementedError()
+
+    def get_optimizer(self, cfg_pipeline):
+        raise NotImplementedError()
+
+    def preprocess(self, cfg_pipeline):
+        raise NotImplementedError()
+
+    def transform(self, cfg_pipeline):
+        raise NotImplementedError()
+
+    def inference_begin(self, data):
+        raise NotImplementedError()
+
+    def inference_preprocess(self):
+        raise NotImplementedError()
+
+    def inference_end(self, results):
         raise NotImplementedError()
