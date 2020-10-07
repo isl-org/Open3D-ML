@@ -1,5 +1,5 @@
 import yaml
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from os.path import join, exists, dirname, abspath
 from ..utils import Config
