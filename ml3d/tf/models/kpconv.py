@@ -450,9 +450,9 @@ class KPFCNN(BaseModel):
             stacked_rots = tf.gather(R, batch_inds)
 
             # Apply rotations
-            stacked_points = tf.reshape(
-                tf.matmul(tf.expand_dims(stacked_points, axis=1), stacked_rots),
-                [-1, 3])
+            # stacked_points = tf.reshape(
+            #     tf.matmul(tf.expand_dims(stacked_points, axis=1), stacked_rots),
+            #     [-1, 3])
 
         elif cfg.augment_rotation == 'none':
             R = tf.eye(3, batch_shape=(num_batches,))
@@ -484,12 +484,12 @@ class KPFCNN(BaseModel):
         stacked_scales = tf.gather(s, batch_inds)
 
         # Apply scales
-        stacked_points = stacked_points * stacked_scales
+        # stacked_points = stacked_points * stacked_scales
 
         # Noise
         noise = tf.random.normal(tf.shape(stacked_points),
                                  stddev=cfg.augment_noise)
-        stacked_points = stacked_points + noise
+        # stacked_points = stacked_points + noise
 
         return stacked_points, s, R
 

@@ -338,10 +338,10 @@ class SemanticSegmentation(BasePipeline):
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt:
             log.info(f'Loading checkpoint optimizer_state_dict')
-            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+            # self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt:
             log.info(f'Loading checkpoint scheduler_state_dict')
-            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+            # self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')

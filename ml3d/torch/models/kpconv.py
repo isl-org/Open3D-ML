@@ -658,7 +658,7 @@ class KPFCNN(BaseModel):
                                   axis=1) * scale + noise
 
         if normals is None:
-            return augmented_points, scale, R
+            return points, scale, R
         else:
             # Anisotropic scale of the normals thanks to cross product formula
             normal_scale = scale[[1, 2, 0]] * scale[[2, 0, 1]]
@@ -770,9 +770,7 @@ def max_pool(x, inds):
     """
 
     # Add a last row with minimum features for shadow pools
-    # x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
-    val, _ = torch.min(x, axis=0, keepdim=True)
-    x = torch.cat((x, val), 0)
+    x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
 
     # Get all features for each pooling location [n2, max_num, d]
     pool_features = gather(x, inds)

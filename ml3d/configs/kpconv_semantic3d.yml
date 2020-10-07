@@ -46,8 +46,8 @@ model:
   - false
   - false
   batch_limit: 10000
-  batch_norm_momentum: 0.02
-  batch_num: 100
+  batch_norm_momentum: 0.98
+  batch_num: 1
   batcher: ConcatBatcher
   conv_radius: 2.5
   deform_fitting_mode: point2point
