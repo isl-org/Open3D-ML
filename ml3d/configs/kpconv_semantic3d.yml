@@ -8,14 +8,13 @@ dataset:
   test_result_folder: ./test
   use_cache: true
   val_files:
-  - bildstein_station1_xyz_intensity_rgb
   - domfountain_station1_xyz_intensity_rgb
-  steps_per_epoch_train: 500
-  steps_per_epoch_valid: 50
+  # steps_per_epoch_train: 500
+  # steps_per_epoch_valid: 50
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
-  KP_extent: 1.2
+  KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
   architecture: ['simple',
@@ -46,9 +45,9 @@ model:
   - true
   - false
   - false
-  batch_limit: 10000
-  batch_norm_momentum: 0.02
-  batch_num: 50
+  batch_limit: 20000
+  batch_norm_momentum: 0.98
+  batch_num: 1
   batcher: ConcatBatcher
   conv_radius: 2.5
   deform_fitting_mode: point2point
@@ -71,7 +70,7 @@ model:
   num_layers: 5
   repulse_extent: 1.2
   use_batch_norm: true
-  val_batch_num: 30
+  val_batch_num: 1
   t_normalize:
     method: linear
     feat_bias: 0

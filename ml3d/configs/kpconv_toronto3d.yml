@@ -16,6 +16,8 @@ dataset:
   val_files:
   - L002.ply
   use_cache: True
+  steps_per_epoch_train: 1
+  steps_per_epoch_valid: 1
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
@@ -45,7 +47,7 @@ model:
   - false
   - false
   batch_limit: 20000
-  batch_norm_momentum: 0.98
+  batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher
   conv_radius: 2.5
@@ -62,8 +64,8 @@ model:
   in_points_dim: 3
   in_radius: 4.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8]
-  min_in_points: 5000
-  max_in_points: 10000
+  min_in_points: 15000
+  max_in_points: 20000
   modulated: false
   num_classes: 8
   num_kernel_points: 15
