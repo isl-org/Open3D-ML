@@ -205,6 +205,8 @@ class KPFCNN(BaseModel):
 
             # Update dimension of input from output
             in_dim = out_dim
+            if block_i == 0:
+                out_dim = int(out_dim/2)
 
             # Detect change to a subsampled layer
             if 'upsample' in block:
@@ -213,8 +215,8 @@ class KPFCNN(BaseModel):
                 r *= 0.5
                 out_dim = out_dim // 2
 
-        self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
+        self.head_mlp = UnaryBlock(out_dim, int(cfg.first_features_dim/2), True, cfg.batch_norm_momentum)
+        self.head_softmax = UnaryBlock(int(cfg.first_features_dim/2), self.C, False, 1, no_relu=True)
 
         ################
         # Network Losses
@@ -574,7 +576,8 @@ class KPFCNN(BaseModel):
             self.test_probs[proj_mask, :] = frame_probs
 
             i0 += length
-        print(np.min(self.possibility))
+        print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
+        # print(np.min(self.possibility))
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)
 
@@ -791,7 +794,9 @@ def max_pool(x, inds):
     """
 
     # Add a last row with minimum features for shadow pools
-    x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
+    # x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
+    val, _ = torch.min(x, axis=0, keepdim=True)
+    x = torch.cat((x, val), 0)
 
     # Get all features for each pooling location [n2, max_num, d]
     pool_features = gather(x, inds)
@@ -1156,7 +1161,7 @@ class BatchNormBlock(nn.Module):
         self.use_bn = use_bn
         self.in_dim = in_dim
         if self.use_bn:
-            self.batch_norm = nn.BatchNorm1d(in_dim, momentum=bn_momentum)
+            self.batch_norm = nn.BatchNorm1d(in_dim, momentum=bn_momentum, eps=1e-6)
             #self.batch_norm = nn.InstanceNorm1d(in_dim, momentum=bn_momentum)
         else:
             self.bias = Parameter(torch.zeros(in_dim, dtype=torch.float32),
@@ -1202,7 +1207,7 @@ class UnaryBlock(nn.Module):
         self.mlp = nn.Linear(in_dim, out_dim, bias=False)
         self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
         if not no_relu:
-            self.leaky_relu = nn.LeakyReLU(0.1)
+            self.leaky_relu = nn.LeakyReLU(0.2)
         return
 
     def forward(self, x, batch=None):
@@ -1256,7 +1261,7 @@ class SimpleBlock(nn.Module):
         # Other opperations
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
-        self.leaky_relu = nn.LeakyReLU(0.1)
+        self.leaky_relu = nn.LeakyReLU(0.2)
 
         return
 
@@ -1339,7 +1344,7 @@ class ResnetBottleneckBlock(nn.Module):
             self.unary_shortcut = nn.Identity()
 
         # Other operations
-        self.leaky_relu = nn.LeakyReLU(0.1)
+        self.leaky_relu = nn.LeakyReLU(0.2)
 
         return
 
