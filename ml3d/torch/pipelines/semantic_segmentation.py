@@ -229,6 +229,9 @@ class SemanticSegmentation(BasePipeline):
 
                 self.optimizer.zero_grad()
                 loss.backward()
+                if model.cfg.grad_clip_norm > 0:
+                    torch.nn.utils.clip_grad_value_(model.parameters(),
+                                                    model.cfg.grad_clip_norm)
                 self.optimizer.step()
 
                 acc = metric.acc(predict_scores, gt_labels)

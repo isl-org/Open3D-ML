@@ -430,10 +430,8 @@ class KPFCNN(BaseModel):
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
-            t_normalize = self.cfg.get('t_normalize', None)
-
             curr_new_points = curr_new_points - p0
-
+            t_normalize = self.cfg.get('t_normalize', None)
             curr_new_points, curr_feat = trans_normalize(
                 curr_new_points, feat, t_normalize)
 
@@ -466,22 +464,16 @@ class KPFCNN(BaseModel):
                 in_pts = in_pts[input_inds, :]
                 in_fts = in_fts[input_inds, :]
                 in_lbls = in_lbls[input_inds]
+                rand_order = rand_order[input_inds]
                 n = input_inds.shape[0]
 
             curr_num_points += n
 
             # Before augmenting, compute reprojection inds (only for validation and test)
             if attr['split'] in ['test']:
-                # get val_points that are in range
-                radiuses = np.sum(np.square(o_pts - p0), axis=1)
-                reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
+                proj_inds = np.zeros((0,))
 
-                # Project predictions on the frame points
-                kdtree = KDTree(selected_points, leaf_size=50)
-                proj_inds = kdtree.query(o_pts[reproj_mask, :],
-                                         return_distance=False)
-                proj_inds = np.squeeze(proj_inds).astype(np.int32)
-
+                reproj_mask = rand_order
                 dists = np.sum(np.square(
                     (o_pts[reproj_mask] - p0).astype(np.float32)),
                                axis=1)
@@ -553,28 +545,14 @@ class KPFCNN(BaseModel):
 
         i0 = 0
         for b_i, length in enumerate(lengths):
-
             # Get prediction
             probs = stk_probs[i0:i0 + length]
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
-            frame_labels = labels_list[b_i]
-
-            # Project predictions on the frame points
-            proj_probs = probs[proj_inds]
-
-            # Safe check if only one point:
-            if proj_probs.ndim < 2:
-                proj_probs = np.expand_dims(proj_probs, 0)
-            # Save probs in a binary file (uint8 format for lighter weight)
-
-            frame_probs = self.test_probs[proj_mask, :]
-            frame_probs = self.test_smooth * frame_probs + \
-                (1 - self.test_smooth) * proj_probs
-            self.test_probs[proj_mask, :] = frame_probs
-
+            self.test_probs[proj_mask] = self.test_smooth * self.test_probs[
+                proj_mask] + (1 - self.test_smooth) * probs
             i0 += length
-        print(np.min(self.possibility))
+
         if np.min(self.possibility) > 0.5:
             pred_labels = np.argmax(self.test_probs, 1)
 
