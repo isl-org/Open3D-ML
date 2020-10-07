@@ -62,13 +62,11 @@ class BaseModel(tf.keras.Model):
         """
         raise NotImplementedError()
 
-    def transform(self, points, feat, label):
+    def transform(self, *args):
         """Transform function for the point cloud and features.
 
         Args:
-            points: The point cloud.
-            feat: Features.
-            label: Label.
+            args: A list of tf Tensors.
         """
         raise NotImplementedError()
 
@@ -76,7 +74,7 @@ class BaseModel(tf.keras.Model):
         """Function called right before running inference.
 
         Args:
-            data: A datum from the dataset.
+            data: A data from the dataset.
         """
         raise NotImplementedError()
 
