@@ -33,7 +33,6 @@ class BaseModel(tf.keras.Model):
 
         Returns:
             Returns the loss value.
-
         """
         raise NotImplementedError()
 
@@ -99,6 +98,8 @@ class BaseModel(tf.keras.Model):
             results: The model outputs as returned by the call() function.
                 Post-processing is applied on this object.
         Returns:
-            ?
+            Returns True if the inference is complete and otherwise False.
+            Returning False can be used to implement inference for large point
+            clouds which require multiple passes.
         """
         raise NotImplementedError()
