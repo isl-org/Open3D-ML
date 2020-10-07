@@ -18,23 +18,23 @@ model:
   KP_influence: linear
   aggregation_mode: sum
   architecture: ['simple',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'resnetb_strided',
-                    'resnetb',
-                    'nearest_upsample',
-                    'unary',
-                    'nearest_upsample',
-                    'unary',
-                    'nearest_upsample',
-                    'unary',
-                    'nearest_upsample',
-                    'unary']
+                'resnetb',
+                'resnetb_strided',
+                'resnetb',
+                'resnetb_strided',
+                'resnetb',
+                'resnetb_strided',
+                'resnetb',
+                'resnetb_strided',
+                'resnetb',
+                'nearest_upsample',
+                'unary',
+                'nearest_upsample',
+                'unary',
+                'nearest_upsample',
+                'unary',
+                'nearest_upsample',
+                'unary']
   augment_color: 1.0
   augment_noise: 0.001
   augment_rotation: vertical
@@ -45,9 +45,9 @@ model:
   - true
   - false
   - false
-  batch_limit: 20000
-  batch_norm_momentum: 0.98
-  batch_num: 1
+  batch_limit: 10000
+  batch_norm_momentum: 0.02
+  batch_num: 100
   batcher: ConcatBatcher
   conv_radius: 2.5
   deform_fitting_mode: point2point

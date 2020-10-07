@@ -14,6 +14,7 @@ dataset:
   use_cache: true
   validation_split:
   - '08'
+  recentering: false
 model:
   name: RandLANet
   batcher: DefaultBatcher

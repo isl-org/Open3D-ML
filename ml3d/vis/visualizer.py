@@ -287,6 +287,7 @@ class DatasetModel(Model):
 
 
 class Visualizer:
+    """Visualizer for Dataset objects and custom point clouds"""
 
     class LabelLUTEdit:
 
@@ -817,6 +818,12 @@ class Visualizer:
         self._update_datasource_combobox()
 
     def set_lut(self, attr_name, lut):
+        """Sets the LUT for a specific attribute
+        
+        Args:
+            attr_name: Attribute name as string.
+            lut: A LabelLUT object.
+        """
         self._attrname2lut[attr_name] = lut
 
     def setup_camera(self):
@@ -1270,6 +1277,24 @@ class Visualizer:
                           indices=None,
                           width=1024,
                           height=768):
+        """Visualizes a dataset
+
+        Example:
+            Minimal example for visualizing a dataset::
+                import open3d.ml.torch as ml3d  # or open3d.ml.tf as ml3d
+
+                dataset = ml3d.datasets.SemanticKITTI(dataset_path='/path/to/SemanticKITTI/')
+                vis = ml3d.vis.Visualizer()
+                vis.visualize_dataset(dataset, 'all', indices=range(100))
+
+        Args:
+            dataset: A dataset object.
+            split: A string that identifies the split, e.g., 'test'.
+            indices: An iterable with a subset of the data points to visualize.
+                E.g., [0,2,3,4].
+            width: window width.
+            height: window height.
+        """
         # Setup the labels
         lut = LabelLUT()
         for val in sorted(dataset.label_to_names.keys()):
@@ -1280,6 +1305,32 @@ class Visualizer:
         self._visualize("Open3D - " + dataset.name, width, height)
 
     def visualize(self, data, width=1024, height=768):
+        """Visualizes custom point cloud data
+
+        Example:
+            Minimal example for visualizing a single point cloud with an
+            attribute::
+                import numpy as np
+                import open3d.ml.torch as ml3d
+                # or import open3d.ml.tf as ml3d
+
+                data = [ {
+                    'name': 'my_point_cloud',
+                    'points': np.random.rand(100,3).astype(np.float32),
+                    'point_attr1': np.random.rand(100).astype(np.float32),
+                    } ]
+
+                vis = ml3d.vis.Visualizer()
+                vis.visualize(data) 
+
+        Args:
+            data: A list of dictionaries. Each dictionary is a point cloud with
+                attributes. Each dictionary must have the entries 'name' and
+                'points'. Points and point attributes can be passed as numpy 
+                arrays, PyTorch tensors or TensorFlow tensors.
+            width: window width.
+            height: window height.
+        """
         self._init_data(data)
         self._visualize("Open3D", width, height)
 

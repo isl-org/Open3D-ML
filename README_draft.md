@@ -6,7 +6,7 @@
 ![Ubuntu CI](https://github.com/intel-isl/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
 ![Style check](https://github.com/intel-isl/Open3D-ML/workflows/Style%20check/badge.svg)
 
-[**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Datasets**](#datasets) | [**Model Zoo**](model_zoo.md) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
+[**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Model Zoo**](model_zoo.md) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
 
 Open3D-ML is an extension of Open3D for 3D machine learning tasks.
 It builds on top of the Open3D core library and extends it with machine learning
@@ -63,13 +63,9 @@ all_split = dataset.get_split('all')
 
 # print the attributes of the first datum
 print(all_split.get_attr(0))
-# returns  {'name': '00_000000', 
-#           'path': '/path/to/SemanticKITTI/dataset/sequences/00/velodyne/000000.bin', 
-#           'split': 'all'}
 
 # print the shape of the first point cloud
 print(all_split.get_data(0)['point'].shape)
-# returns (124668, 3)
 
 # show the first 100 frames using the visualizer
 vis = ml3d.vis.Visualizer()
@@ -85,11 +81,11 @@ pretrained model for semantic segmentation and run it on a point cloud of our
 dataset. See the [model zoo](#model-zoo) for obtaining the weights of the
 pretrained model.
 ```python
-model = ml3d.models.RandLANet(ckpt_path='randlanet_semantickitti_202009090354utc.pth')
+model = ml3d.models.RandLANet()
 pipeline = ml3d.pipelines.SemanticSegmentation(model=model, dataset=dataset, device="gpu")
 
 # load the parameters.
-pipeline.load_ckpt(ckpt_path='randlanet_semantickitti_202009090354utc.pth', is_train=False) # model.cfg.ckpt_path
+pipeline.load_ckpt(ckpt_path='randlanet_semantickitti_202009090354utc.pth', is_train=False)
 
 data = test_split.get_data(0)
 
@@ -97,7 +93,7 @@ data = test_split.get_data(0)
 # returns dict with 'predict_labels' and 'predict_scores'.
 result = pipeline.run_inference(data)
 
-# evaluate performance on the test set; this will write logs to '.logs/'.
+# evaluate performance on the test set; this will write logs to './logs'.
 pipeline.run_test()
 ```
 
@@ -160,10 +156,16 @@ the respective scores.
 
 | Model / Dataset    | SemanticKITTI | Toronto 3D | Semantic 3D | S3DIS |
 |--------------------|---------------|------------|-------------|-------|
-| RandLA-Net (tf)    |      scores   |            |             |       |
+| RandLA-Net (tf)    | scores [:floppy_disk:](link) |            |             |       |
 | RandLA-Net (torch) |               |            |             |       |
 | KPConv     (tf)    |               |            |             |       |
 | KPConv     (torch) |               |            |             |       |
+
+
+## Model Zoo
+
+For a full list of all weight files see [model_weights.txt](model_weights.txt)
+and the MD5 checksum file [model_weights.md5](model_weights.md5).
 
 
 ## Datasets
@@ -175,20 +177,18 @@ The following is a list of datasets for which we provide dataset reader classes.
 * Semantic 3D ([project-page](http://www.semantic3d.net/))
 * S3DIS ([project-page](http://3dsemantics.stanford.edu/))
 * Paris-Lille 3D ([project-page](https://npm3d.fr/paris-lille-3d))
+images
 
 For downloading these datasets visit the respective webpages and have a look at
 the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
 
-
-## Model Zoo
-
-We provide a collection of pretrained models under this [link](model_zoo.md).
 
 
 ## How-tos
 
 * [Visualize custom data](docs/howtos.md#visualize-custom-data) 
 * [Adding a new model](docs/howtos.md#adding-a-new-model) 
+* [Adding a new dataset](docs/howtos.md#adding-a-new-dataset) 
 
 ## Contribute 
 There are many ways to contribute to this project. You can 
@@ -200,7 +200,8 @@ There are many ways to contribute to this project. You can
 Open3D is a community effort. We welcome and celebrate contributions from the
 community!
 
-For adding new features, please create pull requests.
+If you want to share weights for a model you trained please attach or link the
+weights file in the pull request.
 For bugs and problems, [open an issue](https://github.com/intel-isl/Open3D-ML/issues). 
 Please also check out our communication channels to get in contact with the community.
 

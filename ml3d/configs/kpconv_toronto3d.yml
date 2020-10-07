@@ -15,9 +15,9 @@ dataset:
   - L004.ply
   val_files:
   - L002.ply
-  use_cache: True
-  steps_per_epoch_train: 1
-  steps_per_epoch_valid: 1
+  use_cache: true
+  steps_per_epoch_train: 100
+  steps_per_epoch_valid: 10
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
@@ -46,7 +46,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 20000
+  batch_limit: 10000
   batch_norm_momentum: 0.02
   batch_num: 50
   batcher: ConcatBatcher

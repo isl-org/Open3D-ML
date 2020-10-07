@@ -377,9 +377,13 @@ class RandLANet(BaseModel):
                 tree = data['search_tree']
 
                 pick_idx = np.random.choice(len(pc), 1)
+                center_point = pc[pick_idx, :].reshape(1, -1)
                 pc, feat, label, _ = trans_crop_pc(pc, feat, label, tree,
                                                    pick_idx,
                                                    self.cfg.num_points)
+
+                if not cfg.get('recentering', True):
+                    pc = pc + center_point
 
                 t_normalize = cfg.get('t_normalize', None)
                 pc, feat = trans_normalize(pc, feat, t_normalize)
@@ -414,16 +418,19 @@ class RandLANet(BaseModel):
         tree = data['search_tree']
 
         pick_idx = min_posbility_idx
+        center_point = pc[pick_idx, :].reshape(1, -1)
 
-        selected_pc, feat, label, selected_idx = trans_crop_pc(
-            pc, feat, label, tree, pick_idx, self.cfg.num_points)
+        pc, feat, label, selected_idx = trans_crop_pc(pc, feat, label, tree,
+                                                      pick_idx,
+                                                      self.cfg.num_points)
 
-        dists = np.sum(np.square((selected_pc).astype(np.float32)), axis=1)
+        dists = np.sum(np.square(pc.astype(np.float32)), axis=1)
         delta = np.square(1 - dists / np.max(dists))
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx
 
-        pc = selected_pc
+        if not cfg.get('recentering', True):
+            pc = pc + center_point
 
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)
