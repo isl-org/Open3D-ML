@@ -1,13 +1,14 @@
-from os import makedirs
 import time
+import sys
 import tensorflow as tf
 import numpy as np
 import random
+
 from os.path import exists, join, isfile, dirname, abspath, split
-import sys
+from os import makedirs
 from pathlib import Path
 from sklearn.neighbors import KDTree
-import pudb
+from tqdm import tqdm
 
 # use relative import for being compatible with Open3d main repo
 from open3d.ml.tf.ops import *
@@ -419,7 +420,7 @@ class KPFCNN(BaseModel):
 
         return batch_inds
 
-    def augment_input(self, stacked_points, batch_inds):
+    def augment_input(self, stacked_points, batch_inds, is_test):
 
         cfg = self.cfg
         # Parameter
@@ -444,9 +445,10 @@ class KPFCNN(BaseModel):
             stacked_rots = tf.gather(R, batch_inds)
 
             # Apply rotations
-            stacked_points = tf.reshape(
-                tf.matmul(tf.expand_dims(stacked_points, axis=1), stacked_rots),
-                [-1, 3])
+            if not is_test:
+                stacked_points = tf.reshape(
+                    tf.matmul(tf.expand_dims(stacked_points, axis=1),
+                              stacked_rots), [-1, 3])
 
         elif cfg.augment_rotation == 'none':
             R = tf.eye(3, batch_shape=(num_batches,))
@@ -477,13 +479,13 @@ class KPFCNN(BaseModel):
         # Create N x 3 vector of scales to multiply with stacked_points
         stacked_scales = tf.gather(s, batch_inds)
 
-        # Apply scales
-        stacked_points = stacked_points * stacked_scales
+        # Apply scales and Noise
+        if not is_test:
+            stacked_points = stacked_points * stacked_scales
 
-        # Noise
-        noise = tf.random.normal(tf.shape(stacked_points),
-                                 stddev=cfg.augment_noise)
-        stacked_points = stacked_points + noise
+            noise = tf.random.normal(tf.shape(stacked_points),
+                                     stddev=cfg.augment_noise)
+            stacked_points = stacked_points + noise
 
         return stacked_points, s, R
 
@@ -630,8 +632,14 @@ class KPFCNN(BaseModel):
 
             return li
 
-    def transform(self, stacked_points, stacked_colors, point_labels,
-                  stacks_lengths, point_inds, cloud_inds):
+    def transform(self,
+                  stacked_points,
+                  stacked_colors,
+                  point_labels,
+                  stacks_lengths,
+                  point_inds,
+                  cloud_inds,
+                  is_test=False):
         """
         [None, 3], [None, 3], [None], [None]
         """
@@ -641,7 +649,7 @@ class KPFCNN(BaseModel):
 
         # Augment input points
         stacked_points, scales, rots = self.augment_input(
-            stacked_points, batch_inds)
+            stacked_points, batch_inds, is_test)
 
         # First add a column of 1 as feature for the network to be able to learn 3D shapes
         stacked_features = tf.ones((tf.shape(stacked_points)[0], 1),
@@ -704,6 +712,8 @@ class KPFCNN(BaseModel):
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
 
     def inference_preprocess(self):
         flat_inputs, point_inds, stacks_lengths = self.transform_inference(
@@ -729,9 +739,12 @@ class KPFCNN(BaseModel):
                 inds[l:r]] * test_smooth + (1 - test_smooth) * results[l:r]
             l += len
 
-        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] -
+                         self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
 
         if np.min(self.possibility) > 0.5:
+            self.pbar.close()
             reproj_inds = self.inference_data['proj_inds']
             predict_scores = self.test_probs[reproj_inds]
             inference_result = {
@@ -816,7 +829,8 @@ class KPFCNN(BaseModel):
             tf.convert_to_tensor(np.array(point_labels[0], dtype=np.int32)),
             tf.convert_to_tensor(np.array(stacks_lengths[0], dtype=np.int32)),
             tf.convert_to_tensor(np.array(point_inds[0], dtype=np.int32)),
-            tf.convert_to_tensor(np.array(cloud_inds, dtype=np.int32)))
+            tf.convert_to_tensor(np.array(cloud_inds, dtype=np.int32)),
+            is_test=True)
         return input_list, np.array(point_inds[0]), np.array(stacks_lengths[0])
 
     def preprocess(self, data, attr):
