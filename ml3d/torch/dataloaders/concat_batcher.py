@@ -161,59 +161,7 @@ class SemanticKittiCustomBatch:
         self.reproj_masks = input_list[ind]
         ind += 1
         self.val_labels = input_list[ind]
-
         return
-
-    # def __init__(self, input_list):
-    #     print("batcher")
-    #     print(len(input_list))
-    #     # Get rid of batch dimension
-    #     input_list = input_list[0]['data']
-
-    #     # Number of layers
-    #     L = int(input_list[0])
-
-    #     # Extract input tensors from the list of numpy array
-    #     ind = 1
-    #     self.points = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.neighbors = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.pools = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.upsamples = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.lengths = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.features = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.labels = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.scales = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.rots = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.frame_inds = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.frame_centers = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.reproj_inds = input_list[ind]
-    #     ind += 1
-    #     self.reproj_masks = input_list[ind]
-    #     ind += 1
-    #     self.val_labels = input_list[ind]
-
-    #     return
 
     def big_neighborhood_filter(self, neighbors, layer):
         """

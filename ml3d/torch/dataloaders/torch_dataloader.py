@@ -9,15 +9,31 @@ from ...utils import Cache, get_hash
 
 
 class TorchDataloader(Dataset):
+    """
+    Data loader for torch framework.
+    """
 
     def __init__(self,
-                 *args,
                  dataset=None,
                  preprocess=None,
                  transform=None,
                  use_cache=True,
                  steps_per_epoch=None,
                  **kwargs):
+        """
+        Initialize
+
+        Args:
+            dataset: ml3d dataset class.
+            dataset: model's preprocess method.
+            devce: model's transform mthod.
+            use_cache: whether to use cached preprocessed data.
+            steps_per_epch: steps per epoch. The step number will be the 
+                number of samples in the data if steps_per_epoch=None
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
         self.dataset = dataset
         self.preprocess = preprocess
         self.steps_per_epoch = steps_per_epoch
@@ -41,7 +57,7 @@ class TorchDataloader(Dataset):
                     if name in self.cache_convert.cached_ids:
                         continue
                     data = dataset.get_data(idx)
-
+                    # cache the data
                     self.cache_convert(name, data, attr)
 
         else:
@@ -70,6 +86,7 @@ class TorchDataloader(Dataset):
         return inputs
 
     def __len__(self):
+        """Returns the number of steps for one epoch"""
         if self.steps_per_epoch is not None:
             steps_per_epoch = self.steps_per_epoch
         else:
