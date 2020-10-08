@@ -156,10 +156,10 @@ the respective scores.
 
 | Model / Dataset    | SemanticKITTI | Toronto 3D | Semantic 3D | S3DIS |
 |--------------------|---------------|------------|-------------|-------|
-| RandLA-Net (tf)    | scores [:floppy_disk:](link) |            |             |       |
-| RandLA-Net (torch) |               |            |             |       |
-| KPConv     (tf)    |               |            |             |       |
-| KPConv     (torch) |               |            |             |       |
+| RandLA-Net (tf)    | 53.7 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth) |  64.0         |  76.0         |  67.0     |
+| RandLA-Net (torch) | 52.0            |     61.0     |  76.0         |  67.0   |
+| KPConv     (tf)    | 58.7 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     65.6   |  59.0         |  65.0   |
+| KPConv     (torch) | 58.0  [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     65.6   |  59.0         |  60.0   |
 
 
 ## Model Zoo
