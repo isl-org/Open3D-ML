@@ -1,6 +1,7 @@
 import numpy as np
 import yaml
 import torch
+from abc import ABC, abstractmethod
 
 from os.path import join, exists, dirname, abspath
 
@@ -8,7 +9,7 @@ from os.path import join, exists, dirname, abspath
 from ...utils import Config, make_dir
 
 
-class BasePipeline(object):
+class BasePipeline(ABC):
     """
     Base pipeline class
     """
@@ -47,11 +48,14 @@ class BasePipeline(object):
             self.device = torch.device('cuda' if len(device.split(':')) ==
                                        1 else 'cuda:' + device.split(':')[1])
 
+    @abstractmethod
     def run_inference(self, data):
-        raise NotImplementedError()
+        return
 
+    @abstractmethod
     def run_test(self):
-        raise NotImplementedError()
+        return
 
+    @abstractmethod
     def run_train(self):
-        raise NotImplementedError()
+        return
