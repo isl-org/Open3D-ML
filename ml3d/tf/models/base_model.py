@@ -2,12 +2,13 @@ import numpy as np
 import yaml
 import tensorflow as tf
 from os.path import join, exists, dirname, abspath
+from abc import ABC, abstractmethod
 
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config
 
 
-class BaseModel(tf.keras.Model):
+class BaseModel(ABC, tf.keras.Model):
     """
     Base dataset class
     """
@@ -24,7 +25,6 @@ class BaseModel(tf.keras.Model):
             class: The corresponding class.
         """
         super().__init__()
-
         self.cfg = Config(kwargs)
 
     def get_loss(self, Loss, results, inputs, device):

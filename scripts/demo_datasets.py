@@ -57,7 +57,7 @@ def demo_dataset(args):
                 num_labels[l] += (labels == l).sum()
 
         print(num_labels)
-    exit()
+    
 
     for dataset in datasets:
         print(dataset.label_to_names)

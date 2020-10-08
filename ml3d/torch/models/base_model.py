@@ -24,7 +24,6 @@ class BaseModel(torch.nn.Module):
             class: The corresponding class.
         """
         super().__init__()
-
         self.cfg = Config(kwargs)
 
     def get_loss(self, Loss, results, inputs, device):
