@@ -57,7 +57,7 @@ class BasePipeline(ABC):
         Args:
             data: A raw data.
         Returns:
-            class: Inference results.
+            Returns the inference results.
         """
         return
 

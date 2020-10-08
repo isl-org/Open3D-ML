@@ -16,7 +16,7 @@ class BasePipeline(ABC):
     def __init__(self, model, dataset=None, **kwargs):
         """
         Initialize
-        
+
         Args:
             model: network
             dataset: dataset, or None for inference model
@@ -49,7 +49,7 @@ class BasePipeline(ABC):
         Args:
             data: A raw data.
         Returns:
-            class: Inference results.
+            Returns the inference results.
         """
         return
 
