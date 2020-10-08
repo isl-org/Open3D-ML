@@ -40,7 +40,7 @@ class BaseModel(ABC, torch.nn.Module):
         Returns:
             Returns the loss value.
         """
-        return 
+        return
 
     @abstractmethod
     def get_optimizer(self, cfg_pipeline):
@@ -52,7 +52,7 @@ class BaseModel(ABC, torch.nn.Module):
         Returns:
             Returns a new optimizer object.
         """
-        return 
+        return
 
     @abstractmethod
     def preprocess(self, cfg_pipeline):
@@ -68,7 +68,7 @@ class BaseModel(ABC, torch.nn.Module):
         Returns:
             Returns the preprocessed data
         """
-        return 
+        return
 
     @abstractmethod
     def transform(self, cfg_pipeline):
@@ -77,7 +77,7 @@ class BaseModel(ABC, torch.nn.Module):
         Args:
             args: A list of tf Tensors.
         """
-        return 
+        return
 
     @abstractmethod
     def inference_begin(self, data):
@@ -86,7 +86,7 @@ class BaseModel(ABC, torch.nn.Module):
         Args:
             data: A data from the dataset.
         """
-        return 
+        return
 
     @abstractmethod
     def inference_preprocess(self):
@@ -95,7 +95,7 @@ class BaseModel(ABC, torch.nn.Module):
         Returns:
             The inputs to be consumed by the call() function of the model.
         """
-        return 
+        return
 
     @abstractmethod
     def inference_end(self, inputs, results):
