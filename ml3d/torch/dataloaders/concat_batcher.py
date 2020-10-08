@@ -12,11 +12,19 @@ from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 from torch.utils.data import Sampler, get_worker_info
 
 
-class SemanticKittiCustomBatch:
-    """Custom batch definition with memory pinning for SemanticKitti"""
+class CustomBatch:
+    """Batched results for KPConv"""
 
     def __init__(self, batches):
-        # print(batches)
+        """
+        Initialize
+
+        Args:
+            batches: A batch of data
+
+        Returns:
+            class: The corresponding class.
+        """
 
         self.neighborhood_limits = []
         p_list = []
@@ -399,13 +407,31 @@ class SemanticKittiCustomBatch:
 
 
 class ConcatBatcher(object):
-    """docstring for BaseBatcher"""
+    """ConcatBatcher for KPConv"""
 
     def __init__(self, device):
+        """
+        Initialize
+
+        Args:
+            device: torch device 'gpu' or 'cpu'
+
+        Returns:
+            class: The corresponding class.
+        """
         super(ConcatBatcher, self).__init__()
         self.device = device
 
     def collate_fn(self, batches):
-        batching_result = SemanticKittiCustomBatch(batches)
+        """
+        collate_fn called by original PyTorch dataloader
+
+        Args:
+            batches: a batch of data
+
+        Returns:
+            class: the batched result
+        """
+        batching_result = CustomBatch(batches)
         batching_result.to(self.device)
         return {'data': batching_result, 'attr': []}
