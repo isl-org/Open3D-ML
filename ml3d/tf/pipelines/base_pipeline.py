@@ -16,6 +16,7 @@ class BasePipeline(ABC):
     def __init__(self, model, dataset=None, **kwargs):
         """
         Initialize
+        
         Args:
             model: network
             dataset: dataset, or None for inference model
@@ -42,12 +43,27 @@ class BasePipeline(ABC):
 
     @abstractmethod
     def run_inference(self, data):
+        """
+        Run inference on a given data.
+
+        Args:
+            data: A raw data.
+        Returns:
+            class: Inference results.
+        """
         return
 
     @abstractmethod
     def run_test(self):
+        """
+        Run testing on test sets.
+            
+        """
         return
 
     @abstractmethod
     def run_train(self):
+        """
+        Run training on train sets
+        """
         return
