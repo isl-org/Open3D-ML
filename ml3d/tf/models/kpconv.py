@@ -1,13 +1,14 @@
-from os import makedirs
 import time
+import sys
 import tensorflow as tf
 import numpy as np
 import random
+
 from os.path import exists, join, isfile, dirname, abspath, split
-import sys
+from os import makedirs
 from pathlib import Path
 from sklearn.neighbors import KDTree
-import pudb
+from tqdm import tqdm
 
 # use relative import for being compatible with Open3d main repo
 from open3d.ml.tf.ops import *
@@ -705,6 +706,8 @@ class KPFCNN(BaseModel):
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
 
     def inference_preprocess(self):
         flat_inputs, point_inds, stacks_lengths = self.transform_inference(
@@ -730,9 +733,11 @@ class KPFCNN(BaseModel):
                 inds[l:r]] * test_smooth + (1 - test_smooth) * results[l:r]
             l += len
 
-        # print("{}/{}".format(self.possibility[self.possibility < 0.5].shape[0], self.possibility.shape[0]))
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] - self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
 
         if np.min(self.possibility) > 0.5:
+            self.pbar.close()
             reproj_inds = self.inference_data['proj_inds']
             predict_scores = self.test_probs[reproj_inds]
             inference_result = {
