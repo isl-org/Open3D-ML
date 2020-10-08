@@ -488,7 +488,8 @@ class KPFCNN(BaseModel):
                 reproj_mask = np.zeros((0,))
 
             # Data augmentation
-            in_pts, scale, R = self.augmentation_transform(in_pts, is_test=is_test)
+            in_pts, scale, R = self.augmentation_transform(in_pts,
+                                                           is_test=is_test)
 
             # Color augmentation
             if np.random.rand() > self.cfg.augment_color:
@@ -556,7 +557,8 @@ class KPFCNN(BaseModel):
                 proj_mask] + (1 - self.test_smooth) * probs
             i0 += length
 
-        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] - self.pbar_update)
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] -
+                         self.pbar_update)
         self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
         if np.min(self.possibility) > 0.5:
             self.pbar.close()
@@ -588,7 +590,11 @@ class KPFCNN(BaseModel):
         else:
             return neighbors
 
-    def augmentation_transform(self, points, normals=None, verbose=False, is_test=False):
+    def augmentation_transform(self,
+                               points,
+                               normals=None,
+                               verbose=False,
+                               is_test=False):
         """Implementation of an augmentation transform for point clouds."""
 
         ##########
