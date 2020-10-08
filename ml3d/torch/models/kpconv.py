@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 import open3d.core as o3c
+from tqdm import tqdm
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
@@ -358,7 +359,7 @@ class KPFCNN(BaseModel):
 
         return data
 
-    def transform(self, data, attr):
+    def transform(self, data, attr, is_test=False):
         # Read points
         points = data['point']
         sem_labels = data['label']
@@ -486,7 +487,7 @@ class KPFCNN(BaseModel):
                 reproj_mask = np.zeros((0,))
 
             # Data augmentation
-            in_pts, scale, R = self.augmentation_transform(in_pts)
+            in_pts, scale, R = self.augmentation_transform(in_pts, is_test=is_test)
 
             # Color augmentation
             if np.random.rand() > self.cfg.augment_color:
@@ -515,13 +516,14 @@ class KPFCNN(BaseModel):
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
-
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
         from ..dataloaders import ConcatBatcher
         self.batcher = ConcatBatcher(self.device)
 
     def inference_preprocess(self):
         attr = {'split': 'test'}
-        data = self.transform(self.inference_data, attr)
+        data = self.transform(self.inference_data, attr, is_test=True)
         inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
@@ -553,7 +555,10 @@ class KPFCNN(BaseModel):
                 proj_mask] + (1 - self.test_smooth) * probs
             i0 += length
 
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] - self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
         if np.min(self.possibility) > 0.5:
+            self.pbar.close()
             pred_labels = np.argmax(self.test_probs, 1)
 
             pred_labels = pred_labels[self.inference_proj_inds]
@@ -582,7 +587,7 @@ class KPFCNN(BaseModel):
         else:
             return neighbors
 
-    def augmentation_transform(self, points, normals=None, verbose=False):
+    def augmentation_transform(self, points, normals=None, verbose=False, is_test=False):
         """Implementation of an augmentation transform for point clouds."""
 
         ##########
@@ -655,6 +660,9 @@ class KPFCNN(BaseModel):
         #augmented_points = np.dot(points, R) * scale + noise
         augmented_points = np.sum(np.expand_dims(points, 2) * R,
                                   axis=1) * scale + noise
+
+        if is_test:
+            return points, scale, R
 
         if normals is None:
             return augmented_points, scale, R
