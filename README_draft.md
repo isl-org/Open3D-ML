@@ -156,16 +156,16 @@ the respective scores.
 
 | Model / Dataset    | SemanticKITTI | Toronto 3D | Semantic 3D | S3DIS |
 |--------------------|---------------|------------|-------------|-------|
-| RandLA-Net (tf)    | 53.7 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth) |  64.0         |  76.0         |  67.0     |
-| RandLA-Net (torch) | 52.0            |     61.0     |  76.0         |  67.0   |
-| KPConv     (tf)    | 58.7 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     65.6   |  59.0         |  65.0   |
-| KPConv     (torch) | 58.0  [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     65.6   |  59.0         |  60.0   |
+| RandLA-Net (tf)    | 53.7  |  64.0         |  76.0         |  67.0 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.zip)    |
+| RandLA-Net (torch) | 52.0 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth)        |     61.0     |  76.0         |  67.0 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.pth)  |
+| KPConv     (tf)    | 58.7 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     65.6 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.zip)  |  59.0     |  65.0  [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.zip) |
+| KPConv     (torch) | 58.0  [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     65.6 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.pth) |  59.0         |  60.0 [:floppy_disk:](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  |
 
 
 ## Model Zoo
 
 For a full list of all weight files see [model_weights.txt](model_weights.txt)
-and the MD5 checksum file [model_weights.md5](model_weights.md5).
+and the MD5 checksum file [model_weights.md5](https://storage.googleapis.com/open3d-releases/model-zoo/integrity.txt).
 
 
 ## Datasets
