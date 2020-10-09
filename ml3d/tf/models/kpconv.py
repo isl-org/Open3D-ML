@@ -70,6 +70,8 @@ class KPFCNN(BaseModel):
             in_points_dim=3,
             fixed_kernel_points='center',
             num_layers=5,
+            l_relu=0.1,
+            reduce_fc = False,
             **kwargs):
 
         super().__init__(name=name,
@@ -109,6 +111,8 @@ class KPFCNN(BaseModel):
                          in_points_dim=in_points_dim,
                          fixed_kernel_points=fixed_kernel_points,
                          num_layers=num_layers,
+                         l_relu=l_relu,
+                         reduce_fc = reduce_fc,
                          **kwargs)
 
         cfg = self.cfg
@@ -182,6 +186,8 @@ class KPFCNN(BaseModel):
         self.decoder_blocks = []
         self.decoder_concats = []
 
+        if cfg.reduce_fc:
+            out_dim = out_dim // 2
         start_i = 0
         for block_i, block in enumerate(cfg.architecture):
             if 'upsample' in block:
@@ -211,8 +217,12 @@ class KPFCNN(BaseModel):
                 r *= 0.5
                 out_dim = out_dim // 2
 
-        self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
+        if reduce_fc:
+            self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim // 2, True, cfg.batch_norm_momentum, l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim // 2, self.C, False, 0, no_relu=True, l_relu=cfg.get('l_relu', 0.1))
+        else:
+            self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0, l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0, l_relu=cfg.get('l_relu', 0.1))
 
         self.valid_labels = np.sort(
             [c for c in lbl_values if c not in ign_lbls])

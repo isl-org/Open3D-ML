@@ -98,7 +98,7 @@ def block_decider(block_name, radius, in_dim, out_dim, layer_ind, cfg):
 
     if block_name == 'unary':
         return UnaryBlock(in_dim, out_dim, cfg.use_batch_norm,
-                          cfg.batch_norm_momentum)
+                          cfg.batch_norm_momentum, l_relu=cfg.get('l_relu', 0.1))
 
     elif block_name in [
             'simple', 'simple_deformable', 'simple_invariant',
@@ -443,7 +443,7 @@ class BatchNormBlock(tf.keras.layers.Layer):
 
 class UnaryBlock(tf.keras.layers.Layer):
 
-    def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False):
+    def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False, l_relu=0.1):
 
         super(UnaryBlock, self).__init__()
         self.bn_momentum = bn_momentum
@@ -459,7 +459,7 @@ class UnaryBlock(tf.keras.layers.Layer):
         self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
 
         if not no_relu:
-            self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+            self.leaky_relu = tf.keras.layers.LeakyReLU(l_relu)
 
     def call(self, x, batch=None, training=False):
         x = self.mlp(x)
@@ -499,7 +499,7 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
-        self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+        self.leaky_relu = tf.keras.layers.LeakyReLU(cfg.get('leaky_relu', 0.1))
 
     def call(self, x, batch, training=False):
 
@@ -543,11 +543,12 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
         self.layer_ind = layer_ind
         self.in_dim = in_dim
         self.out_dim = out_dim
+        l_relu = cfg.get('l_relu', 0.1)
 
         # First downscaling mlp
         if in_dim != out_dim // 4:
             self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn,
-                                     self.bn_momentum)
+                                     self.bn_momentum, l_relu=l_relu)
         else:
             self.unary1 = tf.identity()
 
@@ -574,7 +575,8 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
                                  out_dim,
                                  self.use_bn,
                                  self.bn_momentum,
-                                 no_relu=True)
+                                 no_relu=True,
+                                 l_relu=l_relu)
 
         # Shortcut optional mpl
         if in_dim != out_dim:
@@ -582,12 +584,13 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
                                              out_dim,
                                              self.use_bn,
                                              self.bn_momentum,
-                                             no_relu=True)
+                                             no_relu=True,
+                                             l_relu=l_relu)
         else:
             self.unary_shortcut = IdentityBlock()
 
         # Other operations
-        self.leaky_relu = tf.keras.layers.LeakyReLU(0.1)
+        self.leaky_relu = tf.keras.layers.LeakyReLU(l_relu)
 
         return
 
