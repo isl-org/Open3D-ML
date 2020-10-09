@@ -14,7 +14,6 @@ dataset:
   use_cache: true
   validation_split:
   - '08'
-  recentering: false
 model:
   name: RandLANet
   batcher: DefaultBatcher
@@ -38,6 +37,7 @@ model:
   - 4
   - 4
   - 4
+  recentering: False
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
