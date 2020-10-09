@@ -136,7 +136,6 @@ class SemanticSegmentation(BasePipeline):
                 if cfg.get('test_compute_metric', True):
                     acc = metric.acc_np_label(predict_label, data['label'])
                     iou = metric.iou_np_label(predict_label, data['label'])
-                    print(acc[-1], iou[-1])
                     self.test_accs.append(acc)
                     self.test_ious.append(iou)
 
