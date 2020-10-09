@@ -34,7 +34,7 @@ class BaseDataset(ABC):
     @abstractmethod
     def get_split(self, split):
         """Returns a dataset split.
-
+        
         Args:
             split: A string identifying the dataset split. Usually one of
             'training', 'test', 'validation', 'all'.
@@ -43,7 +43,7 @@ class BaseDataset(ABC):
             A dataset split object providing the requested subset of the data.
         """
         return
-
+      
     @abstractmethod
     def is_tested(self, attr):
         """Checks whether a datum has been tested.

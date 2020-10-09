@@ -3,6 +3,8 @@ import math
 import torch
 import torch.nn as nn
 import open3d.core as o3c
+
+from tqdm import tqdm
 from torch.nn.parameter import Parameter
 from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
@@ -73,6 +75,8 @@ class KPFCNN(BaseModel):
             in_points_dim=3,
             fixed_kernel_points='center',
             num_layers=5,
+            l_relu=0.1,
+            reduce_fc=False,
             **kwargs):
 
         super().__init__(name=name,
@@ -112,6 +116,8 @@ class KPFCNN(BaseModel):
                          in_points_dim=in_points_dim,
                          fixed_kernel_points=fixed_kernel_points,
                          num_layers=num_layers,
+                         l_relu=l_relu,
+                         reduce_fc=reduce_fc,
                          **kwargs)
 
         cfg = self.cfg
@@ -205,6 +211,8 @@ class KPFCNN(BaseModel):
 
             # Update dimension of input from output
             in_dim = out_dim
+            if block_i == 0 and cfg.reduce_fc:
+                out_dim = out_dim // 2
 
             # Detect change to a subsampled layer
             if 'upsample' in block:
@@ -213,8 +221,29 @@ class KPFCNN(BaseModel):
                 r *= 0.5
                 out_dim = out_dim // 2
 
-        self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0)
-        self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0)
+        if reduce_fc:
+            self.head_mlp = UnaryBlock(out_dim,
+                                       cfg.first_features_dim // 2,
+                                       True,
+                                       cfg.batch_norm_momentum,
+                                       l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim // 2,
+                                           self.C,
+                                           False,
+                                           1,
+                                           no_relu=True,
+                                           l_relu=cfg.get('l_relu', 0.1))
+        else:
+            self.head_mlp = UnaryBlock(out_dim,
+                                       cfg.first_features_dim,
+                                       False,
+                                       0,
+                                       l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim,
+                                           self.C,
+                                           False,
+                                           0,
+                                           l_relu=cfg.get('l_relu', 0.1))
 
         ################
         # Network Losses
@@ -358,7 +387,7 @@ class KPFCNN(BaseModel):
 
         return data
 
-    def transform(self, data, attr):
+    def transform(self, data, attr, is_test=False):
         # Read points
         points = data['point']
         sem_labels = data['label']
@@ -430,10 +459,8 @@ class KPFCNN(BaseModel):
                 o_pts = new_points
                 o_labels = sem_labels.astype(np.int32)
 
-            t_normalize = self.cfg.get('t_normalize', None)
-
             curr_new_points = curr_new_points - p0
-
+            t_normalize = self.cfg.get('t_normalize', None)
             curr_new_points, curr_feat = trans_normalize(
                 curr_new_points, feat, t_normalize)
 
@@ -466,22 +493,16 @@ class KPFCNN(BaseModel):
                 in_pts = in_pts[input_inds, :]
                 in_fts = in_fts[input_inds, :]
                 in_lbls = in_lbls[input_inds]
+                rand_order = rand_order[input_inds]
                 n = input_inds.shape[0]
 
             curr_num_points += n
 
             # Before augmenting, compute reprojection inds (only for validation and test)
             if attr['split'] in ['test']:
-                # get val_points that are in range
-                radiuses = np.sum(np.square(o_pts - p0), axis=1)
-                reproj_mask = radiuses < (0.99 * self.cfg.in_radius)**2
+                proj_inds = np.zeros((0,))
 
-                # Project predictions on the frame points
-                kdtree = KDTree(selected_points, leaf_size=50)
-                proj_inds = kdtree.query(o_pts[reproj_mask, :],
-                                         return_distance=False)
-                proj_inds = np.squeeze(proj_inds).astype(np.int32)
-
+                reproj_mask = rand_order
                 dists = np.sum(np.square(
                     (o_pts[reproj_mask] - p0).astype(np.float32)),
                                axis=1)
@@ -494,7 +515,8 @@ class KPFCNN(BaseModel):
                 reproj_mask = np.zeros((0,))
 
             # Data augmentation
-            in_pts, scale, R = self.augmentation_transform(in_pts)
+            in_pts, scale, R = self.augmentation_transform(in_pts,
+                                                           is_test=is_test)
 
             # Color augmentation
             if np.random.rand() > self.cfg.augment_color:
@@ -523,13 +545,14 @@ class KPFCNN(BaseModel):
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
-
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
         from ..dataloaders import ConcatBatcher
         self.batcher = ConcatBatcher(self.device)
 
     def inference_preprocess(self):
         attr = {'split': 'test'}
-        data = self.transform(self.inference_data, attr)
+        data = self.transform(self.inference_data, attr, is_test=True)
         inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
@@ -553,29 +576,19 @@ class KPFCNN(BaseModel):
 
         i0 = 0
         for b_i, length in enumerate(lengths):
-
             # Get prediction
             probs = stk_probs[i0:i0 + length]
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
-            frame_labels = labels_list[b_i]
-
-            # Project predictions on the frame points
-            proj_probs = probs[proj_inds]
-
-            # Safe check if only one point:
-            if proj_probs.ndim < 2:
-                proj_probs = np.expand_dims(proj_probs, 0)
-            # Save probs in a binary file (uint8 format for lighter weight)
-
-            frame_probs = self.test_probs[proj_mask, :]
-            frame_probs = self.test_smooth * frame_probs + \
-                (1 - self.test_smooth) * proj_probs
-            self.test_probs[proj_mask, :] = frame_probs
-
+            self.test_probs[proj_mask] = self.test_smooth * self.test_probs[
+                proj_mask] + (1 - self.test_smooth) * probs
             i0 += length
-        print(np.min(self.possibility))
+
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] -
+                         self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
         if np.min(self.possibility) > 0.5:
+            self.pbar.close()
             pred_labels = np.argmax(self.test_probs, 1)
 
             pred_labels = pred_labels[self.inference_proj_inds]
@@ -604,7 +617,11 @@ class KPFCNN(BaseModel):
         else:
             return neighbors
 
-    def augmentation_transform(self, points, normals=None, verbose=False):
+    def augmentation_transform(self,
+                               points,
+                               normals=None,
+                               verbose=False,
+                               is_test=False):
         """Implementation of an augmentation transform for point clouds."""
 
         ##########
@@ -677,6 +694,9 @@ class KPFCNN(BaseModel):
         #augmented_points = np.dot(points, R) * scale + noise
         augmented_points = np.sum(np.expand_dims(points, 2) * R,
                                   axis=1) * scale + noise
+
+        if is_test:
+            return points, scale, R
 
         if normals is None:
             return augmented_points, scale, R
@@ -1108,8 +1128,11 @@ class KPConv(nn.Module):
 def block_decider(block_name, radius, in_dim, out_dim, layer_ind, config):
 
     if block_name == 'unary':
-        return UnaryBlock(in_dim, out_dim, config.use_batch_norm,
-                          config.batch_norm_momentum)
+        return UnaryBlock(in_dim,
+                          out_dim,
+                          config.use_batch_norm,
+                          config.batch_norm_momentum,
+                          l_relu=config.get('l_relu', 0.1))
 
     elif block_name in [
             'simple', 'simple_deformable', 'simple_invariant',
@@ -1152,12 +1175,11 @@ class BatchNormBlock(nn.Module):
         :param bn_momentum: Batch norm momentum
         """
         super(BatchNormBlock, self).__init__()
-        self.bn_momentum = bn_momentum
+        self.bn_momentum = 1 - bn_momentum
         self.use_bn = use_bn
         self.in_dim = in_dim
         if self.use_bn:
-            self.batch_norm = nn.BatchNorm1d(in_dim, momentum=bn_momentum)
-            #self.batch_norm = nn.InstanceNorm1d(in_dim, momentum=bn_momentum)
+            self.batch_norm = nn.BatchNorm1d(in_dim, momentum=1 - bn_momentum)
         else:
             self.bias = Parameter(torch.zeros(in_dim, dtype=torch.float32),
                                   requires_grad=True)
@@ -1184,7 +1206,13 @@ class BatchNormBlock(nn.Module):
 
 class UnaryBlock(nn.Module):
 
-    def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 use_bn,
+                 bn_momentum,
+                 no_relu=False,
+                 l_relu=0.1):
         """
         Initialize a standard unary block with its ReLU and BatchNorm.
         :param in_dim: dimension input features
@@ -1202,7 +1230,7 @@ class UnaryBlock(nn.Module):
         self.mlp = nn.Linear(in_dim, out_dim, bias=False)
         self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
         if not no_relu:
-            self.leaky_relu = nn.LeakyReLU(0.1)
+            self.leaky_relu = nn.LeakyReLU(l_relu)
         return
 
     def forward(self, x, batch=None):
@@ -1256,7 +1284,7 @@ class SimpleBlock(nn.Module):
         # Other opperations
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
-        self.leaky_relu = nn.LeakyReLU(0.1)
+        self.leaky_relu = nn.LeakyReLU(config.get('l_relu', 0.1))
 
         return
 
@@ -1298,11 +1326,15 @@ class ResnetBottleneckBlock(nn.Module):
         self.layer_ind = layer_ind
         self.in_dim = in_dim
         self.out_dim = out_dim
+        l_relu = config.get('l_relu', 0.1)
 
         # First downscaling mlp
         if in_dim != out_dim // 4:
-            self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn,
-                                     self.bn_momentum)
+            self.unary1 = UnaryBlock(in_dim,
+                                     out_dim // 4,
+                                     self.use_bn,
+                                     self.bn_momentum,
+                                     l_relu=l_relu)
         else:
             self.unary1 = nn.Identity()
 
@@ -1326,7 +1358,8 @@ class ResnetBottleneckBlock(nn.Module):
                                  out_dim,
                                  self.use_bn,
                                  self.bn_momentum,
-                                 no_relu=True)
+                                 no_relu=True,
+                                 l_relu=l_relu)
 
         # Shortcut optional mpl
         if in_dim != out_dim:
@@ -1334,12 +1367,13 @@ class ResnetBottleneckBlock(nn.Module):
                                              out_dim,
                                              self.use_bn,
                                              self.bn_momentum,
-                                             no_relu=True)
+                                             no_relu=True,
+                                             l_relu=l_relu)
         else:
             self.unary_shortcut = nn.Identity()
 
         # Other operations
-        self.leaky_relu = nn.LeakyReLU(0.1)
+        self.leaky_relu = nn.LeakyReLU(l_relu)
 
         return
 

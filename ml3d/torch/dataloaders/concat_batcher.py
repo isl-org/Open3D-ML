@@ -12,11 +12,19 @@ from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 from torch.utils.data import Sampler, get_worker_info
 
 
-class SemanticKittiCustomBatch:
-    """Custom batch definition with memory pinning for SemanticKitti"""
+class CustomBatch:
+    """Batched results for KPConv"""
 
     def __init__(self, batches):
-        # print(batches)
+        """
+        Initialize
+
+        Args:
+            batches: A batch of data
+
+        Returns:
+            class: The corresponding class.
+        """
 
         self.neighborhood_limits = []
         p_list = []
@@ -161,59 +169,7 @@ class SemanticKittiCustomBatch:
         self.reproj_masks = input_list[ind]
         ind += 1
         self.val_labels = input_list[ind]
-
         return
-
-    # def __init__(self, input_list):
-    #     print("batcher")
-    #     print(len(input_list))
-    #     # Get rid of batch dimension
-    #     input_list = input_list[0]['data']
-
-    #     # Number of layers
-    #     L = int(input_list[0])
-
-    #     # Extract input tensors from the list of numpy array
-    #     ind = 1
-    #     self.points = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.neighbors = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.pools = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.upsamples = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.lengths = [
-    #         torch.from_numpy(nparray) for nparray in input_list[ind:ind + L]
-    #     ]
-    #     ind += L
-    #     self.features = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.labels = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.scales = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.rots = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.frame_inds = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.frame_centers = torch.from_numpy(input_list[ind])
-    #     ind += 1
-    #     self.reproj_inds = input_list[ind]
-    #     ind += 1
-    #     self.reproj_masks = input_list[ind]
-    #     ind += 1
-    #     self.val_labels = input_list[ind]
-
-    #     return
 
     def big_neighborhood_filter(self, neighbors, layer):
         """
@@ -451,13 +407,31 @@ class SemanticKittiCustomBatch:
 
 
 class ConcatBatcher(object):
-    """docstring for BaseBatcher"""
+    """ConcatBatcher for KPConv"""
 
     def __init__(self, device):
+        """
+        Initialize
+
+        Args:
+            device: torch device 'gpu' or 'cpu'
+
+        Returns:
+            class: The corresponding class.
+        """
         super(ConcatBatcher, self).__init__()
         self.device = device
 
     def collate_fn(self, batches):
-        batching_result = SemanticKittiCustomBatch(batches)
+        """
+        collate_fn called by original PyTorch dataloader
+
+        Args:
+            batches: a batch of data
+
+        Returns:
+            class: the batched result
+        """
+        batching_result = CustomBatch(batches)
         batching_result.to(self.device)
         return {'data': batching_result, 'attr': []}

@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config
 
-
 class BaseModel(ABC, tf.keras.Model):
     """Base class for models.
 
@@ -19,20 +18,10 @@ class BaseModel(ABC, tf.keras.Model):
     """
 
     def __init__(self, **kwargs):
-        """
-        Initialize
-        Args:
-            cfg (cfg object or str): cfg object or path to cfg file
-            dataset_path (str): path to the dataset
-            args (dict): dict of args 
-            kwargs:
-        Returns:
-            class: The corresponding class.
-        """
         super().__init__()
         self.cfg = Config(kwargs)
 
-    @abstractmethod
+
     def get_loss(self, Loss, results, inputs):
         """Computes the loss given the network input and outputs.
 
@@ -46,6 +35,7 @@ class BaseModel(ABC, tf.keras.Model):
         """
         return
 
+
     @abstractmethod
     def get_optimizer(self, cfg_pipeline):
         """Returns an optimizer object for the model.
@@ -56,6 +46,7 @@ class BaseModel(ABC, tf.keras.Model):
         Returns:
             Returns a new optimizer object.
         """
+
         return
 
     @abstractmethod

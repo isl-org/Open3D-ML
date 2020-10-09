@@ -37,6 +37,7 @@ model:
   - 4
   - 4
   - 4
+  recentering: False
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

@@ -229,6 +229,9 @@ class SemanticSegmentation(BasePipeline):
 
                 self.optimizer.zero_grad()
                 loss.backward()
+                if model.cfg.get('grad_clip_norm', -1) > 0:
+                    torch.nn.utils.clip_grad_value_(model.parameters(),
+                                                    model.cfg.grad_clip_norm)
                 self.optimizer.step()
 
                 acc = metric.acc(predict_scores, gt_labels)
@@ -333,10 +336,10 @@ class SemanticSegmentation(BasePipeline):
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path)
         self.model.load_state_dict(ckpt['model_state_dict'])
-        if 'optimizer_state_dict' in ckpt:
+        if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
             log.info(f'Loading checkpoint optimizer_state_dict')
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
-        if 'scheduler_state_dict' in ckpt:
+        if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
             log.info(f'Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 

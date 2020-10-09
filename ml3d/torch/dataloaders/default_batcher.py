@@ -82,7 +82,7 @@ def default_collate(batch):
 
 
 class DefaultBatcher(object):
-    """docstring for BaseBatcher"""
+    """DefaultBatcher of PyTorch dataloader"""
 
     def __init__(self):
         super(DefaultBatcher, self).__init__()

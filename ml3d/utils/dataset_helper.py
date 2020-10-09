@@ -21,14 +21,37 @@ def get_hash(x: str):
 
 
 class Cache(object):
+    """
+    Cache converter for preprocessed data.
+    """
 
     def __init__(self, func: Callable, cache_dir: str, cache_key: str):
+        """
+        Initialize
+
+        Args:
+            func: preprocess function of a model.
+            cache_dir: directory to store the cache.
+            cache_key: key of this cache
+        Returns:
+            class: The corresponding class.
+        """
         self.func = func
         self.cache_dir = join(cache_dir, cache_key)
         make_dir(self.cache_dir)
         self.cached_ids = [splitext(p)[0] for p in listdir(self.cache_dir)]
 
     def __call__(self, unique_id: str, *data):
+        """
+        Call the converter. If the cache exists, load and return the cache,
+        otherwise run the preprocess function and store the cache
+
+        Args:
+            unique_id: A unique key of this data.
+            data: Input to the preprocess function.
+        Returns:
+            class: Preprocessed (cache) data.
+        """
         fpath = join(self.cache_dir, str('{}.npy'.format(unique_id)))
 
         if not exists(fpath):
