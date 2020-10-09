@@ -18,11 +18,11 @@ dataset:
   val_files:
   - L002.ply
   steps_per_epoch_train: 100
-  steps_per_epoch_valid: 10
+  steps_per_epoch_valid: 20
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/RandLANet_Toronto3D_torch140.pth # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 6
   dim_output:

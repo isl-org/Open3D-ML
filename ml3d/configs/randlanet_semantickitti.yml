@@ -6,7 +6,8 @@ dataset:
     78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
     476491114, 9833174, 129609852, 4506626, 1168181]
   test_result_folder: ./test
-  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  #test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  test_split: ['08']
   training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
   all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
@@ -14,11 +15,11 @@ dataset:
   use_cache: true
   validation_split:
   - '08'
-  recentering: false
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/ready_weights/randlanet_semantickitti_tf/randlanet_semantickitti_tf # path/to/your/checkpoint
+  ckpt_paht: 
   dim_feature: 8
   dim_input: 3
   dim_output:
@@ -38,6 +39,7 @@ model:
   - 4
   - 4
   - 4
+  recentering: False
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
