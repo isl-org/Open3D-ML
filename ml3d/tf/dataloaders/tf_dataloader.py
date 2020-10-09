@@ -13,6 +13,9 @@ from sklearn.neighbors import KDTree
 
 
 class TFDataloader():
+    """
+    Data loader for tf framework.
+    """
 
     def __init__(self,
                  *args,
@@ -21,6 +24,20 @@ class TFDataloader():
                  use_cache=True,
                  steps_per_epoch=None,
                  **kwargs):
+        """
+        Initialize
+
+        Args:
+            dataset: ml3d dataset class.
+            dataset: model's preprocess method.
+            devce: model's transform mthod.
+            use_cache: whether to use cached preprocessed data.
+            steps_per_epch: steps per epoch. The step number will be the 
+                number of samples in the data if steps_per_epoch=None
+            kwargs:
+        Returns:
+            class: The corresponding class.
+        """
         self.dataset = dataset
         self.model = model
         self.preprocess = model.preprocess
@@ -59,6 +76,7 @@ class TFDataloader():
         self.num_pc = len(self.pc_list)
 
     def read_data(self, index):
+        """Returns the data at index idx. """
         attr = self.dataset.get_attr(index)
         if self.cache_convert:
             data = self.cache_convert(attr['name'])
@@ -70,6 +88,16 @@ class TFDataloader():
         return data, attr
 
     def get_loader(self, batch_size=1, num_threads=3):
+        """
+        Construct the origianl tensorflow dataloader.
+
+        Args:
+            batch_size: batch size.
+            num_threads: number of threads for data loading.
+            kwargs:
+        Returns:
+            the tensorflow dataloader and the number of steps in one epoch
+        """
         steps_per_epoch = self.steps_per_epoch * batch_size if self.steps_per_epoch is not None else None
         gen_func, gen_types, gen_shapes = self.get_batch_gen(
             self, steps_per_epoch)
