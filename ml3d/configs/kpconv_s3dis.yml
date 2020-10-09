@@ -48,7 +48,7 @@ model:
   - false
   - false
   batch_limit: 20000
-  batch_norm_momentum: 0.02
+  batch_norm_momentum: 0.98
   batch_num: 500
   batcher: ConcatBatcher
   conv_radius: 2.5
