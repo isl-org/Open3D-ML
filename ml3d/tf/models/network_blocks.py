@@ -97,8 +97,11 @@ def global_average(x, batch_lengths):
 def block_decider(block_name, radius, in_dim, out_dim, layer_ind, cfg):
 
     if block_name == 'unary':
-        return UnaryBlock(in_dim, out_dim, cfg.use_batch_norm,
-                          cfg.batch_norm_momentum, l_relu=cfg.get('l_relu', 0.1))
+        return UnaryBlock(in_dim,
+                          out_dim,
+                          cfg.use_batch_norm,
+                          cfg.batch_norm_momentum,
+                          l_relu=cfg.get('l_relu', 0.1))
 
     elif block_name in [
             'simple', 'simple_deformable', 'simple_invariant',
@@ -443,7 +446,13 @@ class BatchNormBlock(tf.keras.layers.Layer):
 
 class UnaryBlock(tf.keras.layers.Layer):
 
-    def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False, l_relu=0.1):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 use_bn,
+                 bn_momentum,
+                 no_relu=False,
+                 l_relu=0.1):
 
         super(UnaryBlock, self).__init__()
         self.bn_momentum = bn_momentum
@@ -547,8 +556,11 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         # First downscaling mlp
         if in_dim != out_dim // 4:
-            self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn,
-                                     self.bn_momentum, l_relu=l_relu)
+            self.unary1 = UnaryBlock(in_dim,
+                                     out_dim // 4,
+                                     self.use_bn,
+                                     self.bn_momentum,
+                                     l_relu=l_relu)
         else:
             self.unary1 = tf.identity()
 

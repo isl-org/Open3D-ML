@@ -74,7 +74,7 @@ class KPFCNN(BaseModel):
             fixed_kernel_points='center',
             num_layers=5,
             l_relu=0.1,
-            reduce_fc = False,
+            reduce_fc=False,
             **kwargs):
 
         super().__init__(name=name,
@@ -115,7 +115,7 @@ class KPFCNN(BaseModel):
                          fixed_kernel_points=fixed_kernel_points,
                          num_layers=num_layers,
                          l_relu=l_relu,
-                         reduce_fc = reduce_fc,
+                         reduce_fc=reduce_fc,
                          **kwargs)
 
         cfg = self.cfg
@@ -220,12 +220,28 @@ class KPFCNN(BaseModel):
                 out_dim = out_dim // 2
 
         if reduce_fc:
-            self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim // 2, True, cfg.batch_norm_momentum, l_relu=cfg.get('l_relu', 0.1))
-            self.head_softmax = UnaryBlock(cfg.first_features_dim // 2, self.C, False, 1, no_relu=True, l_relu=cfg.get('l_relu', 0.1))
+            self.head_mlp = UnaryBlock(out_dim,
+                                       cfg.first_features_dim // 2,
+                                       True,
+                                       cfg.batch_norm_momentum,
+                                       l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim // 2,
+                                           self.C,
+                                           False,
+                                           1,
+                                           no_relu=True,
+                                           l_relu=cfg.get('l_relu', 0.1))
         else:
-            self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0, l_relu=cfg.get('l_relu', 0.1))
-            self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0, l_relu=cfg.get('l_relu', 0.1))
-
+            self.head_mlp = UnaryBlock(out_dim,
+                                       cfg.first_features_dim,
+                                       False,
+                                       0,
+                                       l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim,
+                                           self.C,
+                                           False,
+                                           0,
+                                           l_relu=cfg.get('l_relu', 0.1))
 
         ################
         # Network Losses
@@ -1097,8 +1113,11 @@ class KPConv(nn.Module):
 def block_decider(block_name, radius, in_dim, out_dim, layer_ind, config):
 
     if block_name == 'unary':
-        return UnaryBlock(in_dim, out_dim, config.use_batch_norm,
-                          config.batch_norm_momentum, l_relu=config.get('l_relu', 0.1))
+        return UnaryBlock(in_dim,
+                          out_dim,
+                          config.use_batch_norm,
+                          config.batch_norm_momentum,
+                          l_relu=config.get('l_relu', 0.1))
 
     elif block_name in [
             'simple', 'simple_deformable', 'simple_invariant',
@@ -1172,7 +1191,13 @@ class BatchNormBlock(nn.Module):
 
 class UnaryBlock(nn.Module):
 
-    def __init__(self, in_dim, out_dim, use_bn, bn_momentum, no_relu=False, l_relu=0.1):
+    def __init__(self,
+                 in_dim,
+                 out_dim,
+                 use_bn,
+                 bn_momentum,
+                 no_relu=False,
+                 l_relu=0.1):
         """
         Initialize a standard unary block with its ReLU and BatchNorm.
         :param in_dim: dimension input features
@@ -1290,8 +1315,11 @@ class ResnetBottleneckBlock(nn.Module):
 
         # First downscaling mlp
         if in_dim != out_dim // 4:
-            self.unary1 = UnaryBlock(in_dim, out_dim // 4, self.use_bn,
-                                     self.bn_momentum, l_relu=l_relu)
+            self.unary1 = UnaryBlock(in_dim,
+                                     out_dim // 4,
+                                     self.use_bn,
+                                     self.bn_momentum,
+                                     l_relu=l_relu)
         else:
             self.unary1 = nn.Identity()
 

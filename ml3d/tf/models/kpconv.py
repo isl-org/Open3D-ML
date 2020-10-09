@@ -71,7 +71,7 @@ class KPFCNN(BaseModel):
             fixed_kernel_points='center',
             num_layers=5,
             l_relu=0.1,
-            reduce_fc = False,
+            reduce_fc=False,
             **kwargs):
 
         super().__init__(name=name,
@@ -112,7 +112,7 @@ class KPFCNN(BaseModel):
                          fixed_kernel_points=fixed_kernel_points,
                          num_layers=num_layers,
                          l_relu=l_relu,
-                         reduce_fc = reduce_fc,
+                         reduce_fc=reduce_fc,
                          **kwargs)
 
         cfg = self.cfg
@@ -218,11 +218,28 @@ class KPFCNN(BaseModel):
                 out_dim = out_dim // 2
 
         if reduce_fc:
-            self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim // 2, True, cfg.batch_norm_momentum, l_relu=cfg.get('l_relu', 0.1))
-            self.head_softmax = UnaryBlock(cfg.first_features_dim // 2, self.C, False, 0, no_relu=True, l_relu=cfg.get('l_relu', 0.1))
+            self.head_mlp = UnaryBlock(out_dim,
+                                       cfg.first_features_dim // 2,
+                                       True,
+                                       cfg.batch_norm_momentum,
+                                       l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim // 2,
+                                           self.C,
+                                           False,
+                                           0,
+                                           no_relu=True,
+                                           l_relu=cfg.get('l_relu', 0.1))
         else:
-            self.head_mlp = UnaryBlock(out_dim, cfg.first_features_dim, False, 0, l_relu=cfg.get('l_relu', 0.1))
-            self.head_softmax = UnaryBlock(cfg.first_features_dim, self.C, False, 0, l_relu=cfg.get('l_relu', 0.1))
+            self.head_mlp = UnaryBlock(out_dim,
+                                       cfg.first_features_dim,
+                                       False,
+                                       0,
+                                       l_relu=cfg.get('l_relu', 0.1))
+            self.head_softmax = UnaryBlock(cfg.first_features_dim,
+                                           self.C,
+                                           False,
+                                           0,
+                                           l_relu=cfg.get('l_relu', 0.1))
 
         self.valid_labels = np.sort(
             [c for c in lbl_values if c not in ign_lbls])
