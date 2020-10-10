@@ -20,7 +20,7 @@ from os.path import exists, join, isfile, dirname, abspath, split
 
 def print_usage_and_exit():
     print(
-        "Usage: ml-test.py [kitti|paris|toronto|sematic3d|s3dis|custom] path/to/dataset"
+        "Usage: ml-test.py [kitti|paris|toronto|semantic3d|s3dis|custom] path/to/dataset"
     )
     exit(0)
 
