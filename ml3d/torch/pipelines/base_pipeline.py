@@ -1,6 +1,7 @@
 import numpy as np
 import yaml
 import torch
+from abc import ABC, abstractmethod
 
 from os.path import join, exists, dirname, abspath
 
@@ -8,18 +9,19 @@ from os.path import join, exists, dirname, abspath
 from ...utils import Config, make_dir
 
 
-class BasePipeline(object):
+class BasePipeline(ABC):
     """
     Base pipeline class
     """
 
     def __init__(self, model, dataset=None, device='gpu', **kwargs):
         """
-        Initialize
+        Initialize.
+
         Args:
-            model: network
-            dataset: dataset, or None for inference model
-            devce: 'gpu' or 'cpu'
+            model: A network model.
+            dataset: A dataset, or None for inference model.
+            devce: 'gpu' or 'cpu'.
             kwargs:
         Returns:
             class: The corresponding class.
@@ -47,11 +49,29 @@ class BasePipeline(object):
             self.device = torch.device('cuda' if len(device.split(':')) ==
                                        1 else 'cuda:' + device.split(':')[1])
 
+    @abstractmethod
     def run_inference(self, data):
-        raise NotImplementedError()
+        """
+        Run inference on a given data.
 
+        Args:
+            data: A raw data.
+        Returns:
+            Returns the inference results.
+        """
+        return
+
+    @abstractmethod
     def run_test(self):
-        raise NotImplementedError()
+        """
+        Run testing on test sets.
+            
+        """
+        return
 
+    @abstractmethod
     def run_train(self):
-        raise NotImplementedError()
+        """
+        Run training on train sets
+        """
+        return

@@ -2,12 +2,12 @@ import numpy as np
 import yaml
 import tensorflow as tf
 from os.path import join, exists, dirname, abspath
+from abc import ABC, abstractmethod
 
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config
 
-
-class BaseModel(tf.keras.Model):
+class BaseModel(ABC, tf.keras.Model):
     """Base class for models.
 
     All models must inherit from this class and implement all functions to be
@@ -19,23 +19,24 @@ class BaseModel(tf.keras.Model):
 
     def __init__(self, **kwargs):
         super().__init__()
-
         self.cfg = Config(kwargs)
 
-    def get_loss(self, Loss, results, inputs, device):
+
+    def get_loss(self, Loss, results, inputs):
         """Computes the loss given the network input and outputs.
 
         Args:
             Loss: A loss object.
             results: This is the output of the model.
             inputs: This is the input to the model.
-            device: The torch device to be used.
 
         Returns:
             Returns the loss value.
         """
-        raise NotImplementedError()
+        return
 
+
+    @abstractmethod
     def get_optimizer(self, cfg_pipeline):
         """Returns an optimizer object for the model.
 
@@ -45,8 +46,10 @@ class BaseModel(tf.keras.Model):
         Returns:
             Returns a new optimizer object.
         """
-        raise NotImplementedError()
 
+        return
+
+    @abstractmethod
     def preprocess(self, data, attr):
         """Data preprocessing function.
 
@@ -58,34 +61,38 @@ class BaseModel(tf.keras.Model):
             attr: The corresponding attributes.
 
         Returns:
-            Returns the preprocessed datum
+            Returns the preprocessed data
         """
-        raise NotImplementedError()
+        return
 
+    @abstractmethod
     def transform(self, *args):
         """Transform function for the point cloud and features.
 
         Args:
             args: A list of tf Tensors.
         """
-        raise NotImplementedError()
+        return []
 
+    @abstractmethod
     def inference_begin(self, data):
         """Function called right before running inference.
 
         Args:
             data: A data from the dataset.
         """
-        raise NotImplementedError()
+        return
 
+    @abstractmethod
     def inference_preprocess(self):
         """This function prepares the inputs for the model
 
         Returns:
             The inputs to be consumed by the call() function of the model.
         """
-        raise NotImplementedError()
+        return
 
+    @abstractmethod
     def inference_end(self, results):
         """This function is called after the inference.
 
@@ -100,4 +107,4 @@ class BaseModel(tf.keras.Model):
             Returning False can be used to implement inference for large point
             clouds which require multiple passes.
         """
-        raise NotImplementedError()
+        return
