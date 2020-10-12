@@ -154,6 +154,7 @@ The table shows the available models and datasets for the segmentation task and
 the respective scores.
 
 
+
 | Model / Dataset    | SemanticKITTI | Toronto 3D | S3DIS |
 |--------------------|---------------|----------- |-------|
 | RandLA-Net (tf)    | [53.7](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |  [69.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.zip)    |
