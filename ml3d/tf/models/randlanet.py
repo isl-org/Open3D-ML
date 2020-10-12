@@ -363,11 +363,11 @@ class RandLANet(BaseModel):
                        tf.shape(neighbor_idx)[-1], d])
         return features
 
-    def get_batch_gen(self, dataset, steps_per_epoch=None):
+    def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
         cfg = self.cfg
 
         def gen():
-            n_iters = dataset.num_pc if steps_per_epoch is None else steps_per_epoch
+            n_iters = dataset.num_pc if steps_per_epoch is None else steps_per_epoch * batch_size
             for i in range(n_iters):
                 data, attr = dataset.read_data(i % dataset.num_pc)
 
