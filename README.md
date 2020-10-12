@@ -164,7 +164,7 @@ the respective scores.
 
 ## Model Zoo
 
-For a full list of all weight files see [model_weights.txt](model_weights.txt)
+For a full list of all weight files see [model_weights.txt](https://storage.googleapis.com/open3d-releases/model-zoo/model_weights.txt)
 and the MD5 checksum file [model_weights.md5](https://storage.googleapis.com/open3d-releases/model-zoo/integrity.txt).
 
 
