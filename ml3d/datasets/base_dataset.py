@@ -43,7 +43,7 @@ class BaseDataset(ABC):
             A dataset split object providing the requested subset of the data.
         """
         return
-      
+
     @abstractmethod
     def is_tested(self, attr):
         """Checks whether a datum has been tested.
