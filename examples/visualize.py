@@ -172,7 +172,7 @@ def main():
             os.system(cmd)
         model = RandLANet(ckpt_path=ckpt_path)
         pipeline_r = SemanticSegmentation(model)
-        pipeline_r.load_ckpt(model.cfg.ckpt_path, is_train=False)
+        pipeline_r.load_ckpt(model.cfg.ckpt_path)
 
         ckpt_path = "../dataset/checkpoints/vis_weights_{}.pth".format('KPFCNN')
         if not exists(ckpt_path):
@@ -180,7 +180,7 @@ def main():
             os.system(cmd)
         model = KPFCNN(ckpt_path=ckpt_path, in_radius=10)
         pipeline_k = SemanticSegmentation(model)
-        pipeline_k.load_ckpt(model.cfg.ckpt_path, is_train=False)
+        pipeline_k.load_ckpt(model.cfg.ckpt_path)
 
         pcs = get_custom_data(pc_names, path)
         pcs_with_pred = pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k)
