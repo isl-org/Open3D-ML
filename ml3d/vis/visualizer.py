@@ -271,9 +271,8 @@ class DatasetModel(Model):
         pcloud_size = 0
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
-        for (attr, tlist) in pcloud.point.items():
-            pcloud_size += tlist.size * 4
-
+        # Point cloud consumes 64 bytes of per point of GPU memory
+        pcloud_size += pcloud.point["points"].size * 64
         return pcloud_size
 
     def unload(self, name):
@@ -846,6 +845,7 @@ class Visualizer:
             if n.startswith(prefix):
                 self._3d.scene.show_geometry(n, show)
                 node.checkbox.checked = show
+        self._3d.force_redraw()
 
     def _add_tree_name(self, name):
         names = name.split("/")
@@ -868,6 +868,7 @@ class Visualizer:
         def on_checked(checked):
             self._3d.scene.show_geometry(name, checked)
             self._update_datasource_combobox()  # available attrs could change
+            self._3d.force_redraw()
 
         cell = gui.CheckableTextTreeCell(names[-1], True, on_checked)
         cell.label.text_color = gui.Color(1.0, 0.0, 0.0, 1.0)
@@ -940,6 +941,7 @@ class Visualizer:
                     1.0, 0.0, 0.0, 1.0)
                 self._name2treenode[n].checkbox.checked = False
         self._3d.scene.update_material(material)
+        self._3d.force_redraw()
 
     def _update_point_cloud(self, name, tcloud, material):
         if self._dont_update_geometry:
@@ -1035,6 +1037,7 @@ class Visualizer:
     def _update_geometry_colors(self):
         material = self._get_material()
         self._3d.scene.update_material(material)
+        self._3d.force_redraw()
 
     def _update_datasource_combobox(self):
         current = self._datasource_combobox.selected_text
@@ -1192,7 +1195,8 @@ class Visualizer:
         bg_color = [
             new_color.red, new_color.green, new_color.blue, new_color.alpha
         ]
-        self.window.renderer.set_clear_color(bg_color)
+        self._3d.scene.set_background_color(bg_color)
+        self._3d.force_redraw()
 
     def _on_datasource_changed(self, attr_name, idx):
         selected_names = self._get_selected_names()

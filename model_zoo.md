@@ -1,3 +1,4 @@
+
 # Model Zoo
 
 ## Pretrained weights
@@ -9,8 +10,8 @@
 | KPConv     (tf)    |  [58.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |      [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.zip)  |    [65.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.zip) |
 | KPConv     (torch) |   [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |      [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.pth) |   [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  |
 
-[md5 checksum file](https://storage.googleapis.com/open3d-releases/model-zoo/integrity.txt)
 
+[md5 checksum file](https://storage.googleapis.com/open3d-releases/model-zoo/integrity.txt)
 
 ## Models
 The followings are the models we implemented in this model zoo.

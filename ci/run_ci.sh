@@ -59,4 +59,5 @@ mkdir test_workdir
 pushd test_workdir
 mv $PATH_TO_OPEN3D_ML/tests .
 pytest tests/test_integration.py
+pytest tests/test_models.py
 popd
