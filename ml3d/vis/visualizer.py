@@ -1160,8 +1160,7 @@ class Visualizer:
     def _on_animation_slider_changed(self, new_value):
         idx = int(new_value)
         for i in range(0, len(self._animation_frames)):
-            self._3d.scene.show_geometry(self._animation_frames[i],
-                                         (i == idx))
+            self._3d.scene.show_geometry(self._animation_frames[i], (i == idx))
             self._3d.force_redraw()
         self._slider_current.text = self._animation_frames[idx]
         r = self._slider_current.frame
@@ -1182,8 +1181,7 @@ class Visualizer:
     def _on_animate(self):
         now = time.time()
         if now >= self._last_animation_time + self._animation_delay_secs:
-            idx = (self._slider.int_value +
-                   1) % len(self._animation_frames)
+            idx = (self._slider.int_value + 1) % len(self._animation_frames)
             self._slider.int_value = idx
             self._on_animation_slider_changed(idx)
             self._last_animation_time = now
