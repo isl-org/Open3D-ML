@@ -3,6 +3,57 @@
 This page is an effort to give short examples for common tasks and will be
 extended over time.
 
+## Visualize network predictions
+Users can inspect the prediction results using the visualizer. Run `python examples/vis_pred.py` to see an example.
+
+First, initialize a `Visualizer` and set up `LabelLUT` as label names to visualize. Here we would like to visualize points from `SemanticKITTI`. The labels can be obtained by `get_label_to_names()`
+```python
+    kitti_labels = SemanticKITTI.get_label_to_names()
+    v = Visualizer()
+    lut = LabelLUT()
+    for val in sorted(kitti_labels.keys()):
+        lut.add_label(kitti_labels[val], val)
+    v.set_lut("labels", lut)
+    v.set_lut("pred", lut)
+```
+
+Second, we will construct the networks and pipelines, load the pretrained weights, and prepare the data to be visualized.
+```python
+    kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
+    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+    
+    ckpt_path = "./logs/vis_weights_{}.pth".format('RandLANet')
+    if not exists(ckpt_path):
+        cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
+        os.system(cmd)
+    model = RandLANet(ckpt_path=ckpt_path)
+    pipeline_r = SemanticSegmentation(model)
+    pipeline_r.load_ckpt(model.cfg.ckpt_path)
+
+    ckpt_path = "./logs/vis_weights_{}.pth".format('KPFCNN')
+    if not exists(ckpt_path):
+        cmd = "wget {} -O {}".format(kpconv_url, ckpt_path)
+        print(cmd)
+        os.system(cmd)
+    model = KPFCNN(ckpt_path=ckpt_path, in_radius=10)
+    pipeline_k = SemanticSegmentation(model)
+    pipeline_k.load_ckpt(model.cfg.ckpt_path)
+
+    data_path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
+    pc_names = ["000700", "000750"]
+    pcs = get_custom_data(pc_names, data_path)
+```
+
+Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` visualize is a list of point clouds and their predictions. Each point cloud is a dictionary like, 
+```python
+    vis_d = {
+        "name": name,
+        "points": pts, # n x 3
+        "labels": label, # n
+        "pred": pred_label, # n
+    }
+```
+You will give its `name` and `points`. Other entries can be customized. For example, we can visualize its ground truth `label` and our prediction `pred` on one single point cloud.
 
 ## Visualize custom data
 
