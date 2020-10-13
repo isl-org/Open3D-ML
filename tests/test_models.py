@@ -44,7 +44,6 @@ def test_randlanet_torch():
 def test_randlanet_tf():
     import tensorflow as tf
     import open3d.ml.tf as ml3d
-    from ml3d.datasets.utils import trans_crop_pc
 
     net = ml3d.models.RandLANet(num_points=5000,
                                 num_classes=10,
@@ -63,9 +62,9 @@ def test_randlanet_tf():
     attr = {'split': 'train'}
 
     data = net.preprocess(data, attr)
-    pc, feat, label, _ = trans_crop_pc(data['point'], data['feat'],
-                                       data['label'], data['search_tree'], 0,
-                                       5000)
+    pc, feat, label, _ = ml3d.datasets.utils.trans_crop_pc(
+        data['point'], data['feat'], data['label'], data['search_tree'], 0,
+        5000)
 
     inputs = net.transform(tf.convert_to_tensor(pc), tf.convert_to_tensor(feat),
                            tf.convert_to_tensor(label))
