@@ -53,7 +53,7 @@ Third, we can run the inference and collect the results and send the results to 
         "pred": pred_label, # n
     }
 ```
-You will give its `name` and `points`. Other entries can be customized. For example, we can visualize its ground truth `label` and our prediction `pred` on one single point cloud.
+You will give its `name` and `points`. Other entries can be customized. For example, we can visualize its ground truth `label` and our prediction `pred` on a point cloud.
 
 ## Visualize custom data
 
