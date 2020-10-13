@@ -72,7 +72,31 @@ class SemanticKITTI(BaseDataset):
 
         cfg = self.cfg
 
-        self.label_to_names = {
+        self.label_to_names = self.get_label_to_names()
+        self.num_classes = len(self.label_to_names)
+
+        data_config = join(dirname(abspath(__file__)), '_resources/',
+                           'semantic-kitti.yaml')
+        DATA = yaml.safe_load(open(data_config, 'r'))
+        remap_dict = DATA["learning_map_inv"]
+
+        # make lookup table for mapping
+        max_key = max(remap_dict.keys())
+        remap_lut = np.zeros((max_key + 100), dtype=np.int32)
+        remap_lut[list(remap_dict.keys())] = list(remap_dict.values())
+
+        remap_dict_val = DATA["learning_map"]
+        max_key = max(remap_dict_val.keys())
+        remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
+        remap_lut_val[list(remap_dict_val.keys())] = list(
+            remap_dict_val.values())
+
+        self.remap_lut_val = remap_lut_val
+        self.remap_lut = remap_lut
+
+    @staticmethod
+    def get_label_to_names():
+        label_to_names = {
             0: 'unlabeled',
             1: 'car',
             2: 'bicycle',
@@ -94,26 +118,7 @@ class SemanticKITTI(BaseDataset):
             18: 'pole',
             19: 'traffic-sign'
         }
-        self.num_classes = len(self.label_to_names)
-
-        data_config = join(dirname(abspath(__file__)), '_resources/',
-                           'semantic-kitti.yaml')
-        DATA = yaml.safe_load(open(data_config, 'r'))
-        remap_dict = DATA["learning_map_inv"]
-
-        # make lookup table for mapping
-        max_key = max(remap_dict.keys())
-        remap_lut = np.zeros((max_key + 100), dtype=np.int32)
-        remap_lut[list(remap_dict.keys())] = list(remap_dict.values())
-
-        remap_dict_val = DATA["learning_map"]
-        max_key = max(remap_dict_val.keys())
-        remap_lut_val = np.zeros((max_key + 100), dtype=np.int32)
-        remap_lut_val[list(remap_dict_val.keys())] = list(
-            remap_dict_val.values())
-
-        self.remap_lut_val = remap_lut_val
-        self.remap_lut = remap_lut
+        return label_to_names
 
     def get_split(self, split):
         return SemanticKITTISplit(self, split=split)

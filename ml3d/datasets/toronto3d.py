@@ -64,17 +64,7 @@ class Toronto3D(BaseDataset):
 
         cfg = self.cfg
 
-        self.label_to_names = {
-            0: 'Unclassified',
-            1: 'Ground',
-            2: 'Road_markings',
-            3: 'Natural',
-            4: 'Building',
-            5: 'Utility_line',
-            6: 'Pole',
-            7: 'Car',
-            8: 'Fence'
-        }
+        self.label_to_names = self.get_label_to_names()
 
         self.dataset_path = cfg.dataset_path
         self.num_classes = len(self.label_to_names)
@@ -89,6 +79,21 @@ class Toronto3D(BaseDataset):
         self.test_files = [
             join(self.cfg.dataset_path, f) for f in cfg.test_files
         ]
+
+    @staticmethod
+    def get_label_to_names():
+        label_to_names = {
+            0: 'Unclassified',
+            1: 'Ground',
+            2: 'Road_markings',
+            3: 'Natural',
+            4: 'Building',
+            5: 'Utility_line',
+            6: 'Pole',
+            7: 'Car',
+            8: 'Fence'
+        }
+        return label_to_names
 
     def get_split(self, split):
         return Toronto3DSplit(self, split=split)

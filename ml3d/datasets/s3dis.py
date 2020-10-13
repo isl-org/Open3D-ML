@@ -61,21 +61,7 @@ class S3DIS(BaseDataset):
 
         cfg = self.cfg
 
-        self.label_to_names = {
-            0: 'ceiling',
-            1: 'floor',
-            2: 'wall',
-            3: 'beam',
-            4: 'column',
-            5: 'window',
-            6: 'door',
-            7: 'table',
-            8: 'chair',
-            9: 'sofa',
-            10: 'bookcase',
-            11: 'board',
-            12: 'clutter'
-        }
+        self.label_to_names = self.get_label_to_names()
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
@@ -93,6 +79,25 @@ class S3DIS(BaseDataset):
 
         self.all_files = glob.glob(
             str(Path(self.cfg.dataset_path) / 'original_ply' / '*.ply'))
+
+    @staticmethod
+    def get_label_to_names():
+        label_to_names = {
+            0: 'ceiling',
+            1: 'floor',
+            2: 'wall',
+            3: 'beam',
+            4: 'column',
+            5: 'window',
+            6: 'door',
+            7: 'table',
+            8: 'chair',
+            9: 'sofa',
+            10: 'bookcase',
+            11: 'board',
+            12: 'clutter'
+        }
+        return label_to_names
 
     def get_split(self, split):
         return S3DISSplit(self, split=split)
