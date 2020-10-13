@@ -32,7 +32,7 @@ class TFDataloader():
             dataset: model's preprocess method.
             devce: model's transform mthod.
             use_cache: whether to use cached preprocessed data.
-            steps_per_epch: steps per epoch. The step number will be the 
+            steps_per_epoch: steps per epoch. The step number will be the
                 number of samples in the data if steps_per_epoch=None
             kwargs:
         Returns:
@@ -98,9 +98,9 @@ class TFDataloader():
         Returns:
             the tensorflow dataloader and the number of steps in one epoch
         """
-        steps_per_epoch = self.steps_per_epoch * batch_size if self.steps_per_epoch is not None else None
+
         gen_func, gen_types, gen_shapes = self.get_batch_gen(
-            self, steps_per_epoch)
+            self, self.steps_per_epoch, batch_size)
 
         loader = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
 
@@ -110,14 +110,9 @@ class TFDataloader():
         if ('batcher' not in self.model_cfg.keys() or
                 self.model_cfg.batcher == 'DefaultBatcher'):
             loader = loader.batch(batch_size)
-            length = len(self.dataset) / batch_size + 1 if len(
-                self.dataset) % batch_size else len(self.dataset) / batch_size
-            length = length if self.steps_per_epoch is None else self.steps_per_epoch
 
-        else:
-            if self.dataset.split not in ['train', 'training']:
-                length = self.model_cfg.get('val_batch_num', 20)
-            else:
-                length = self.model_cfg.get('batch_num', 20)
+        length = len(self.dataset) / batch_size + 1 if len(
+            self.dataset) % batch_size else len(self.dataset) / batch_size
+        length = length if self.steps_per_epoch is None else self.steps_per_epoch
 
         return loader, int(length)
