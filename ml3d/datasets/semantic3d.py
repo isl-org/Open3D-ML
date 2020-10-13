@@ -64,17 +64,7 @@ class Semantic3D(BaseDataset):
 
         cfg = self.cfg
 
-        self.label_to_names = {
-            0: 'unlabeled',
-            1: 'man-made terrain',
-            2: 'natural terrain',
-            3: 'high vegetation',
-            4: 'low vegetation',
-            5: 'buildings',
-            6: 'hard scape',
-            7: 'scanning artefacts',
-            8: 'cars'
-        }
+        self.label_to_names = self.get_label_to_names()
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
         self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
@@ -102,6 +92,21 @@ class Semantic3D(BaseDataset):
 
         self.train_files = np.sort(
             [f for f in self.train_files if f not in self.val_files])
+
+    @staticmethod
+    def get_label_to_names():
+        label_to_names = {
+            0: 'unlabeled',
+            1: 'man-made terrain',
+            2: 'natural terrain',
+            3: 'high vegetation',
+            4: 'low vegetation',
+            5: 'buildings',
+            6: 'hard scape',
+            7: 'scanning artefacts',
+            8: 'cars'
+        }
+        return label_to_names
 
     def get_split(self, split):
         return Semantic3DSplit(self, split=split)

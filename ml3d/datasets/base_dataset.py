@@ -31,6 +31,16 @@ class BaseDataset(ABC):
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
 
+    @staticmethod
+    @abstractmethod
+    def get_label_to_names():
+        """Returns a label to names dict.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            vals are the corresponding names.
+        """
+
     @abstractmethod
     def get_split(self, split):
         """Returns a dataset split.
@@ -43,7 +53,7 @@ class BaseDataset(ABC):
             A dataset split object providing the requested subset of the data.
         """
         return
-      
+
     @abstractmethod
     def is_tested(self, attr):
         """Checks whether a datum has been tested.
