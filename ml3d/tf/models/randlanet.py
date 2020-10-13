@@ -470,8 +470,6 @@ class RandLANet(BaseModel):
         inputs['labels'] = label.astype(np.int64)
 
         return inputs
-        # input_list = input_points + input_neighbors + input_pools + input_up_samples
-        # input_list += [feat, label]
 
     def transform(self, pc, feat, label):
         cfg = self.cfg

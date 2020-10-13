@@ -60,5 +60,59 @@ def test_randlanet_tf():
     assert out.shape == (1, 5000, 10)
 
 
-# test_randlanet_torch()
-# test_randlanet_tf()
+def test_kpconv_torch():
+    import torch
+    import open3d.ml.torch as ml3d
+    
+    net = ml3d.models.KPFCNN(lbl_values=[0, 1, 2, 3, 4, 5], num_classes=4, ignored_label_inds=[0], in_features_dim=5)
+    net.device = 'cpu'
+
+    data = {
+        'point': np.array(np.random.random((1000, 3)), dtype=np.float32),
+        'feat': np.array(np.random.random((1000, 3)), dtype=np.float32),
+        'label': np.array([np.random.randint(5) for i in range(1000)], dtype=np.int32)
+        }
+    attr = {
+        'split': 'train'
+    }
+    batcher = ml3d.dataloaders.ConcatBatcher('cpu')
+
+    data = net.preprocess(data, attr)
+    inputs = {
+        'data': net.transform(data, attr),
+        'attr': attr
+    }
+    inputs = batcher.collate_fn([inputs])
+    out = net(inputs['data']).detach().numpy()
+
+    assert out.shape[1] == 5
+
+def test_kpconv_tf():
+    import tensorflow as tf
+    import open3d.ml.tf as ml3d
+    
+    net = ml3d.models.KPFCNN(lbl_values=[0, 1, 2, 3, 4, 5], num_classes=4, ignored_label_inds=[0], in_features_dim=5)
+
+    data = {
+        'point': np.array(np.random.random((10000, 3)), dtype=np.float32),
+        'feat': np.array(np.random.random((10000, 3)), dtype=np.float32),
+        'label': np.array([np.random.randint(5) for i in range(10000)], dtype=np.int32)
+        }
+    attr = {
+        'split': 'train'
+    }
+
+    data = net.preprocess(data, attr)
+    p_list = tf.convert_to_tensor(data['point'][:1000])
+    c_list = tf.convert_to_tensor(np.concatenate([data['point'][:1000], data['feat'][:1000]], axis=1))
+    pl_list = tf.convert_to_tensor(data['label'][:1000])
+
+    pi_list = tf.convert_to_tensor(np.array([i for i in range(1000)], dtype=np.int32))
+    ci_list = tf.convert_to_tensor(np.array([0], dtype=np.int32))
+
+    inputs = net.transform(p_list, c_list, pl_list, tf.convert_to_tensor(np.array([500, 500], dtype=np.int32)), pi_list, ci_list)
+
+    out = net(inputs)
+
+    assert out.shape == (1000, 5)
+
