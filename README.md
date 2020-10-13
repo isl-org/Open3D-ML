@@ -5,6 +5,8 @@
 
 ![Ubuntu CI](https://github.com/intel-isl/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
 ![Style check](https://github.com/intel-isl/Open3D-ML/workflows/Style%20check/badge.svg)
+![PyTorch badge](https://img.shields.io/badge/PyTorch-supported-brightgreen?style=flat&logo=pytorch)
+![TensorFlow badge](https://img.shields.io/badge/TensorFlow-supported-brightgreen?style=flat&logo=tensorflow)
 
 [**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Model Zoo**](model_zoo.md) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
 
@@ -13,6 +15,10 @@ It builds on top of the Open3D core library and extends it with machine learning
 tools for 3D data processing. This repo focuses on applications such as semantic
 point cloud segmentation and provides pretrained models that can be applied to 
 common tasks as well as pipelines for training.
+
+Open3D-ML works with **TensorFlow** and **PyTorch** to integrate easily into
+existing projects and also provides general functionality independent of
+ML frameworks such as data visualization.
 
 ## Installation
 
