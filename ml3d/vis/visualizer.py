@@ -271,9 +271,8 @@ class DatasetModel(Model):
         pcloud_size = 0
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
-        for (attr, tlist) in pcloud.point.items():
-            pcloud_size += tlist.size * 4
-
+        # Point cloud consumes 64 bytes of per point of GPU memory
+        pcloud_size += pcloud.point["points"].size * 64
         return pcloud_size
 
     def unload(self, name):
