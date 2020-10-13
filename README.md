@@ -6,7 +6,7 @@
 ![Ubuntu CI](https://github.com/intel-isl/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
 ![Style check](https://github.com/intel-isl/Open3D-ML/workflows/Style%20check/badge.svg)
 
-[**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Model Zoo**](model_zoo.md) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
+[**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
 
 Open3D-ML is an extension of Open3D for 3D machine learning tasks.
 It builds on top of the Open3D core library and extends it with machine learning
@@ -78,7 +78,7 @@ vis.visualize_dataset(dataset, 'all', indices=range(100))
 
 Building on the previous example we can instantiate a pipeline with a
 pretrained model for semantic segmentation and run it on a point cloud of our 
-dataset. See the [model zoo](#model-zoo) for obtaining the weights of the
+dataset. See the [model zoo](model_zoo.md) for obtaining the weights of the
 pretrained model.
 ```python
 model = ml3d.models.RandLANet()
@@ -163,10 +163,8 @@ the respective scores.
 | KPConv     (torch) |   [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |      [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.pth) |   [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  |
 
 
-## Model Zoo
-
 For a full list of all weight files see [model_weights.txt](model_weights.txt)
-and the MD5 checksum file [model_weights.md5](https://storage.googleapis.com/open3d-releases/model-zoo/integrity.txt).
+and the MD5 checksum file [model_weights.md5](https://storage.googleapis.com/open3d-releases/model-zoo/integrity.txt). Detailed information about the models can be found in [model_zoo.md](model_zoo.md)
 
 
 ## Datasets

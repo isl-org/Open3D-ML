@@ -77,6 +77,7 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
     return vis_points
 
+
 # ------------------------------
 
 from ml3d.torch.pipelines import SemanticSegmentation
@@ -94,7 +95,7 @@ def main():
 
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
-    
+
     ckpt_path = "./logs/vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)

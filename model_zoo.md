@@ -1,4 +1,3 @@
-
 # Model Zoo
 
 ## Pretrained weights
