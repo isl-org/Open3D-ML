@@ -1159,6 +1159,7 @@ class Visualizer:
         for i in range(0, len(self._objects.data_names)):
             self._3d.scene.show_geometry(self._objects.data_names[i],
                                          (i == idx))
+            self._3d.force_redraw()
         self._slider_current.text = self._objects.data_names[idx]
         r = self._slider_current.frame
         self._slider_current.frame = gui.Rect(r.x, r.y,
