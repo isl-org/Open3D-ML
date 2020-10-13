@@ -55,8 +55,8 @@ Third, we can run the inference and collect the results and send the results to 
 ```
 You will give its `name` and `points`. Other entries can be customized. For example, we can visualize its ground truth `label` and our prediction `pred` on a point cloud.
 
-Here is the result by running `python examples/vis_pred.py`
-![Visualize prediction GIF](docs/images/visualizer_predictions.gif)
+Here is the result by running `python examples/vis_pred.py`,
+![Visualize prediction GIF](images/visualizer_predictions.gif)
 
 ## Visualize custom data
 
