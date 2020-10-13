@@ -610,6 +610,7 @@ class Visualizer:
         self._gradient = rendering.Gradient()
         self._scalar_min = 0.0
         self._scalar_max = 1.0
+        self._animation_frames = []
         self._last_animation_time = time.time()
         self._animation_delay_secs = 0.100
         self._dont_update_geometry = False
@@ -1149,6 +1150,8 @@ class Visualizer:
 
     def _on_display_tab_changed(self, index):
         if index == 1:
+            self._animation_frames = self._get_selected_names()
+            self._slider.set_limits(0, len(self._animation_frames) - 1)
             self._on_animation_slider_changed(self._slider.int_value)
         else:
             for name, node in self._name2treenode.items():
@@ -1156,10 +1159,10 @@ class Visualizer:
 
     def _on_animation_slider_changed(self, new_value):
         idx = int(new_value)
-        for i in range(0, len(self._objects.data_names)):
-            self._3d.scene.show_geometry(self._objects.data_names[i],
-                                         (i == idx))
-        self._slider_current.text = self._objects.data_names[idx]
+        for i in range(0, len(self._animation_frames)):
+            self._3d.scene.show_geometry(self._animation_frames[i], (i == idx))
+            self._3d.force_redraw()
+        self._slider_current.text = self._animation_frames[idx]
         r = self._slider_current.frame
         self._slider_current.frame = gui.Rect(r.x, r.y,
                                               self._slider.frame.get_right(),
@@ -1178,8 +1181,7 @@ class Visualizer:
     def _on_animate(self):
         now = time.time()
         if now >= self._last_animation_time + self._animation_delay_secs:
-            idx = (self._slider.int_value +
-                   1) % (len(self._objects.data_names) - 1)
+            idx = (self._slider.int_value + 1) % len(self._animation_frames)
             self._slider.int_value = idx
             self._on_animation_slider_changed(idx)
             self._last_animation_time = now
