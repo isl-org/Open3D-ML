@@ -14,6 +14,7 @@ def build_network(cfg):
 
 
 def convert_framework_name(framework):
+    """Convert framework to either tf or torch"""
     tf_names = ["tf", "tensorflow", "TF"]
     torch_names = ["torch", "pytorch", "PyTorch"]
     if framework not in tf_names + torch_names:
@@ -26,6 +27,7 @@ def convert_framework_name(framework):
 
 
 def get_module(module_type, module_name, framework=None, **kwargs):
+    """Fetch modules (pipeline, model, or) from registry."""
     if module_type is 'pipeline':
         framework = convert_framework_name(framework)
         return get_from_name(module_name, PIPELINE, framework)

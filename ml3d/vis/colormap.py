@@ -1,5 +1,5 @@
 class Colormap:
-
+    """Color map for visulization of points."""
     class Point:
 
         def __init__(self, value, color):

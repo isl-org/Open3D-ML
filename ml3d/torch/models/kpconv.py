@@ -24,7 +24,7 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
 
 class KPFCNN(BaseModel):
     """
-    Class defining KPFCNN
+    Class defining KPFCNN. A model for Semantic Segmentation.
     """
 
     def __init__(

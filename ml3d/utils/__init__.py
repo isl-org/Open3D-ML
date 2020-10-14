@@ -1,3 +1,5 @@
+"""Utils for 3D ML."""
+
 from .config import Config
 from .log import LogRecord, get_runid, code2md
 from .builder import (MODEL, PIPELINE, DATASET, get_module,

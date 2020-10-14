@@ -8,13 +8,13 @@ from os.path import exists, join, isfile, dirname, abspath, splitext
 
 
 def make_dir(folder_name):
+    """Create a directory. If already exists, do nothing"""
     if not exists(folder_name):
         makedirs(folder_name)
 
 
 def get_hash(x: str):
-    """Generate a hash from a string.
-    """
+    """Generate a hash from a string."""
     h = hashlib.md5(x.encode())
     return h.hexdigest()
 

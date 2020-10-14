@@ -4,6 +4,9 @@ from pathlib import Path
 
 
 class LogRecord(logging.LogRecord):
+    """
+    Class for logging information.
+    """
 
     def getMessage(self):
         msg = self.msg
@@ -16,6 +19,7 @@ class LogRecord(logging.LogRecord):
 
 
 def get_runid(path):
+    """Get runid or an experiment"""
     name = Path(path).name
     if not os.path.exists(Path(path).parent):
         return '00001'

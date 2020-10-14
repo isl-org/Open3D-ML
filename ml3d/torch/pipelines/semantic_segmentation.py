@@ -29,6 +29,9 @@ log = logging.getLogger(__name__)
 
 
 class SemanticSegmentation(BasePipeline):
+    """
+    Pipeline for semantic segmentation. 
+    """
 
     def __init__(
             self,
@@ -352,40 +355,6 @@ class SemanticSegmentation(BasePipeline):
                  scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
-
-    def filter_valid(self, scores, labels, device):
-        valid_scores = scores.reshape(-1, self.model.cfg.num_classes)
-        valid_labels = labels.reshape(-1).to(device)
-
-        ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            ignored_bool = torch.logical_or(ignored_bool,
-                                            torch.eq(valid_labels, ign_label))
-
-        valid_idx = torch.where(torch.logical_not(ignored_bool))[0].to(device)
-
-        valid_scores = torch.gather(
-            valid_scores, 0,
-            valid_idx.unsqueeze(-1).expand(-1, self.model.cfg.num_classes))
-        valid_labels = torch.gather(valid_labels, 0, valid_idx)
-
-        # Reduce label values in the range of logit shape
-        reducing_list = torch.arange(0,
-                                     self.model.cfg.num_classes,
-                                     dtype=torch.int64)
-        inserted_value = torch.zeros([1], dtype=torch.int64)
-
-        for ign_label in self.dataset.cfg.ignored_label_inds:
-            reducing_list = torch.cat([
-                reducing_list[:ign_label], inserted_value,
-                reducing_list[ign_label:]
-            ], 0)
-        valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels)
-
-        valid_labels = valid_labels.unsqueeze(0)
-        valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
-
-        return valid_scores, valid_labels
 
     def save_config(self, writer):
         '''

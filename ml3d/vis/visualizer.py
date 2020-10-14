@@ -11,6 +11,7 @@ import time
 
 
 class Model:
+    """Attributes, data, and methods of visulization models."""
 
     def __init__(self):
         # Note: the tpointcloud cannot store the actual data arrays, because
@@ -172,6 +173,7 @@ class Model:
 
 
 class DataModel(Model):
+    """Class for data i/o and storage."""
 
     def __init__(self, userdata):
         super().__init__()
