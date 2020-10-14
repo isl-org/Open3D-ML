@@ -126,6 +126,28 @@ For more examples see [`examples/`](https://github.com/intel-isl/Open3D-ML/tree/
 and the [`scripts/`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts) directories.
 
 
+### Using predefined scripts
+
+[`scripts/semseg.py`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/semseg.py)
+provides an easy interface for training and evaluating a model on a dataset. It saves
+the trouble of defining specific model and passing exact configuration.
+
+`python scripts/semseg.py {tf/torch} -c <path-to-config> --<extra args>`
+
+Note that `extra args` will be prioritized over the same parameter present in the configuration file.
+So instead of changing param in config file, you may pass the same as a command line argument while launching the script.
+
+For eg.
+```
+# Launch training for RandLANet on SemanticKITTI with torch.
+python scripts/semseg.py torch -c ml3d/configs/randlanet_semantickitti.yml --dataset.dataset_path <path-to-dataset> --dataset.use_cache True
+
+# Launch testing for KPConv on Toronto3D with tensorflow.
+python scripts/semseg.py tf -c ml3d/configs/kpconv_toronto3d.yml --dataset.dataset_path <path-to-dataset> --model.ckpt_path <path-to-checkpoint>
+```
+For further help, run `python scripts/semseg.py --help`.
+
+
 ## Repository structure
 The core part of Open3D-ML lives in the `ml3d` subfolder, which is integrated 
 into Open3D in the `ml` namespace. In addition to the core part, the directories

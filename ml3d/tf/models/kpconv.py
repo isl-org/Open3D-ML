@@ -22,6 +22,9 @@ from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
 
 
 class KPFCNN(BaseModel):
+    """
+    Class defining KPFCNN
+    """
 
     def __init__(
             self,

@@ -151,7 +151,20 @@ class KPConv(tf.keras.layers.Layer):
                  deform_fitting_power=1.0,
                  offset_param=False,
                  **kwargs):
-
+        """
+        Initialize parameters for Kernel Point Convolution.
+        :param kernel_size: Number of kernel points.
+        :param p_dim: dimension of the point space.
+        :param in_channels: dimension of input features.
+        :param out_channels: dimension of output features.
+        :param KP_extent: influence radius of each kernel point.
+        :param radius: radius used for kernel point init. Even for deformable, use the config.conv_radius.
+        :param fixed_kernel_points: fix position of certain kernel points ('none', 'center' or 'verticals').
+        :param KP_influence: influence function of the kernel points ('constant', 'linear', 'gaussian').
+        :param aggregation_mode: choose to sum influences, or only keep the closest ('closest', 'sum').
+        :param deformable: choose deformable or not.
+        :param modulated: choose if kernel weights are modulated in addition to deformed.
+        """
         super(KPConv, self).__init__(**kwargs)
 
         self.KP_extent = KP_extent  # TODO : verify correct kp extent
@@ -418,6 +431,12 @@ class KPConv(tf.keras.layers.Layer):
 class BatchNormBlock(tf.keras.layers.Layer):
 
     def __init__(self, in_dim, use_bn, bn_momentum):
+        """
+        Initialize a batch normalization block. If network does not use batch normalization, replace with biases.
+        :param in_dim: dimension input features.
+        :param use_bn: boolean indicating if we use Batch Norm.
+        :param bn_momentum: Batch norm momentum.
+        """
         super(BatchNormBlock, self).__init__()
         self.bn_momentum = bn_momentum
         self.use_bn = use_bn
@@ -453,7 +472,13 @@ class UnaryBlock(tf.keras.layers.Layer):
                  bn_momentum,
                  no_relu=False,
                  l_relu=0.1):
-
+        """
+        Initialize a standard unary block with its ReLU and BatchNorm.
+        :param in_dim: dimension input features.
+        :param out_dim: dimension input features.
+        :param use_bn: boolean indicating if we use Batch Norm.
+        :param bn_momentum: Batch norm momentum.
+        """
         super(UnaryBlock, self).__init__()
         self.bn_momentum = bn_momentum
         self.use_bn = use_bn
@@ -485,6 +510,13 @@ class UnaryBlock(tf.keras.layers.Layer):
 class SimpleBlock(tf.keras.layers.Layer):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
+        """
+        Initialize a simple convolution block with its ReLU and BatchNorm.
+        :param in_dim: dimension input features.
+        :param out_dim: dimension input features.
+        :param radius: current radius of convolution.
+        :param cfg: parameters.
+        """
         super(SimpleBlock, self).__init__()
 
         current_extent = radius * cfg.KP_extent / cfg.conv_radius
@@ -530,6 +562,9 @@ class SimpleBlock(tf.keras.layers.Layer):
 class IdentityBlock(tf.keras.layers.Layer):
 
     def __init__(self):
+        """
+        Initialize an Identity block.
+        """
         super(IdentityBlock, self).__init__()
 
     def call(self, x, training=False):
@@ -539,6 +574,13 @@ class IdentityBlock(tf.keras.layers.Layer):
 class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
+        """
+        Initialize a resnet bottleneck block.
+        :param in_dim: dimension input features.
+        :param out_dim: dimension input features.
+        :param radius: current radius of convolution.
+        :param cfg: parameters.
+        """
 
         super(ResnetBottleneckBlock, self).__init__()
 
@@ -644,7 +686,9 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 class NearestUpsampleBlock(tf.keras.layers.Layer):
 
     def __init__(self, layer_ind):
-
+        """
+        Initialize a nearest upsampling block.
+        """
         super(NearestUpsampleBlock, self).__init__()
         self.layer_ind = layer_ind
         return
@@ -660,20 +704,23 @@ class NearestUpsampleBlock(tf.keras.layers.Layer):
 class MaxPoolBlock(tf.keras.layers.Layer):
 
     def __init__(self, layer_ind):
-
+        """
+        Initialize a Max Pool block.
+        """
         super(MaxPoolBlock, self).__init__()
         self.layer_ind = layer_ind
         return
 
     def forward(self, x, batch):
-        return max_pool(x, batch['pools'][self.layer_ind +
-                                          1])  # TODO : check 1 here
+        return max_pool(x, batch['pools'][self.layer_ind + 1])
 
 
 class GlobalAverageBlock(tf.keras.layers.Layer):
 
     def __init__(self):
-
+        """
+        Initialize a global average block.
+        """
         super(GlobalAverageBlock, self).__init__()
         return
 
