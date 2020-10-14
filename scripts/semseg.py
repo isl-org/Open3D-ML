@@ -50,20 +50,19 @@ def parse_args():
     return args, vars(args_extra)
 
 
-import ml3d.datasets
-from ml3d.utils import Config, get_module, convert_framework_name
+import open3d.ml as _ml3d
 
 
 def main():
     cmd_line = ' '.join(sys.argv[:])
     args, extra_dict = parse_args()
 
-    framework = convert_framework_name(args.framework)
+    framework = _ml3d.utils.convert_framework_name(args.framework)
     if framework == 'torch':
-        import ml3d.torch
+        import open3d.ml.torch as ml3d
     else:
         import tensorflow as tf
-        import ml3d.tf
+        import open3d.ml.tf as ml3d
 
         device = args.device
         gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -82,14 +81,15 @@ def main():
                 print(e)
 
     if args.cfg_file is not None:
-        cfg = Config.load_from_file(args.cfg_file)
+        cfg = _ml3d.utils.Config.load_from_file(args.cfg_file)
 
-        Pipeline = get_module("pipeline", cfg.pipeline.name, framework)
-        Model = get_module("model", cfg.model.name, framework)
-        Dataset = get_module("dataset", cfg.dataset.name)
+        Pipeline = _ml3d.utils.get_module("pipeline", cfg.pipeline.name,
+                                          framework)
+        Model = _ml3d.utils.get_module("model", cfg.model.name, framework)
+        Dataset = _ml3d.utils.get_module("dataset", cfg.dataset.name)
 
         cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
-                        Config.merge_cfg_file(cfg, args, extra_dict)
+                        _ml3d.utils.Config.merge_cfg_file(cfg, args, extra_dict)
 
         dataset = Dataset(cfg_dict_dataset.pop('dataset_path', None),
                           **cfg_dict_dataset)
@@ -100,13 +100,13 @@ def main():
             raise ValueError("please specify pipeline, model, and dataset " +
                              "if no cfg_file given")
 
-        Pipeline = get_module("pipeline", args.pipeline, framework)
-        Model = get_module("model", args.model, framework)
-        Dataset = get_module("dataset", args.dataset)
+        Pipeline = _ml3d.utils.get_module("pipeline", args.pipeline, framework)
+        Model = _ml3d.utils.get_module("model", args.model, framework)
+        Dataset = _ml3d.utils.get_module("dataset", args.dataset)
 
 
         cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
-                        Config.merge_module_cfg_file(args, extra_dict)
+                        _ml3d.utils.Config.merge_module_cfg_file(args, extra_dict)
 
         dataset = Dataset(**cfg_dict_dataset)
         model = Model(**cfg_dict_model)
