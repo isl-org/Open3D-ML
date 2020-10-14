@@ -8,6 +8,9 @@ Users can inspect the prediction results using the visualizer. Run `python examp
 
 First, initialize a `Visualizer` and set up `LabelLUT` as label names to visualize. Here we would like to visualize points from `SemanticKITTI`. The labels can be obtained by `get_label_to_names()`
 ```python
+    from ml3d.vis import Visualizer, LabelLUT
+    from ml3d.datasets import SemanticKITTI
+    
     kitti_labels = SemanticKITTI.get_label_to_names()
     v = Visualizer()
     lut = LabelLUT()
@@ -19,6 +22,9 @@ First, initialize a `Visualizer` and set up `LabelLUT` as label names to visuali
 
 Second, we will construct the networks and pipelines, load the pretrained weights, and prepare the data to be visualized.
 ```python
+    from ml3d.torch.pipelines import SemanticSegmentation
+    from ml3d.torch.models import RandLANet, KPFCNN
+
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
     
@@ -41,6 +47,10 @@ Second, we will construct the networks and pipelines, load the pretrained weight
 
     data_path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
     pc_names = ["000700", "000750"]
+
+    # see this function in examples/vis_pred.py, 
+    # or it can be your customized dataloader,
+    # or you can use the exsisting get_data() methods in ml3d/datasets
     pcs = get_custom_data(pc_names, data_path)
 ```
 
