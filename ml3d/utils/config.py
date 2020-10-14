@@ -1,4 +1,3 @@
-#coding: future_fstrings
 import os.path
 import shutil
 import sys

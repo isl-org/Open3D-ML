@@ -1,4 +1,3 @@
-#coding: future_fstrings
 import torch, pickle
 import torch.nn as nn
 import numpy as np

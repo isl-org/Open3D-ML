@@ -1,5 +1,4 @@
 addict
-future-fstrings
 matplotlib
 numpy
 pandas

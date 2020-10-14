@@ -1,4 +1,3 @@
-#coding: future_fstrings
 import numpy as np
 import logging
 import sys
