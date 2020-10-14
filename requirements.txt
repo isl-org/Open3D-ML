@@ -5,6 +5,6 @@ pandas
 plyfile
 pyyaml
 sklearn
-tensorflow==2.3
+tensorflow==2.3.1
 torch==1.6
 tqdm
