@@ -1,3 +1,7 @@
+"""
+Tensorflow network models.
+"""
+
 from .kpconv import *
 from .randlanet import *
 

@@ -65,6 +65,9 @@ class Custom3DSplit():
 
 
 class Custom3D:
+    """
+    A template for customized dataset. Can be modified by users.
+    """
 
     def __init__(self, cfg):
         self.cfg = cfg

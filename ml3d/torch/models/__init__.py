@@ -1,3 +1,5 @@
+"""Networks for torch."""
+
 from .randlanet import RandLANet
 from .kpconv import KPFCNN
 

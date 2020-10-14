@@ -1,4 +1,5 @@
 class Colormap:
+    """Color map for visulization of points."""
 
     class Point:
 

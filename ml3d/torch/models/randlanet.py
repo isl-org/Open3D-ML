@@ -20,6 +20,9 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
+    """
+    Class defining RandLANet. A model for Semantic Segmentation.
+    """
 
     def __init__(
             self,

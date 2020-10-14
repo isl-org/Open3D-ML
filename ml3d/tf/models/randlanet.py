@@ -16,6 +16,9 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
 
 
 class RandLANet(BaseModel):
+    """
+    Class defining RandLANet. A model for Semantic Segmentation.
+    """
 
     def __init__(
             self,

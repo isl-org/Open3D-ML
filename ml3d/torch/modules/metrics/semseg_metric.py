@@ -3,7 +3,7 @@ import numpy as np
 
 
 class SemSegMetric(object):
-    """docstring for SemSegLoss"""
+    """Metrics for semantic segmentation"""
 
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegMetric, self).__init__()
