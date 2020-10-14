@@ -1,5 +1,3 @@
-import tensorflow as tf
-import torch
 import numpy as np
 import threading
 import open3d as o3d
@@ -95,12 +93,22 @@ class Model:
                 return np.array(ary, dtype='float32')
             else:
                 return ary
-        elif isinstance(ary, tf.Tensor):
-            return self._convert_to_numpy(ary.numpy())
-        elif isinstance(ary, torch.Tensor):
-            return self._convert_to_numpy(ary.detach().cpu().numpy())
-        else:
-            return None
+
+        try:
+            import tensorflow as tf
+            if isinstance(ary, tf.Tensor):
+                return self._convert_to_numpy(ary.numpy())
+        except:
+            pass
+
+        try:
+            import torch
+            if isinstance(ary, torch.Tensor):
+                return self._convert_to_numpy(ary.detach().cpu().numpy())
+        except:
+            pass
+
+        return None
 
     def get_attr(self, name, attr_name):
         if name in self._data:
