@@ -5,6 +5,8 @@
 
 ![Ubuntu CI](https://github.com/intel-isl/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
 ![Style check](https://github.com/intel-isl/Open3D-ML/workflows/Style%20check/badge.svg)
+![PyTorch badge](https://img.shields.io/badge/PyTorch-supported-brightgreen?style=flat&logo=pytorch)
+![TensorFlow badge](https://img.shields.io/badge/TensorFlow-supported-brightgreen?style=flat&logo=tensorflow)
 
 [**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Model Zoo**](model_zoo.md) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
 
@@ -13,6 +15,10 @@ It builds on top of the Open3D core library and extends it with machine learning
 tools for 3D data processing. This repo focuses on applications such as semantic
 point cloud segmentation and provides pretrained models that can be applied to 
 common tasks as well as pipelines for training.
+
+Open3D-ML works with **TensorFlow** and **PyTorch** to integrate easily into
+existing projects and also provides general functionality independent of
+ML frameworks such as data visualization.
 
 ## Installation
 
@@ -151,7 +157,7 @@ setting up a training pipeline or running a network on a dataset.
 ### Segmentation
 
 The table shows the available models and datasets for the segmentation task and
-the respective scores.
+the respective scores. Each score links to the respective weight file.
 
 
 
@@ -178,7 +184,6 @@ The following is a list of datasets for which we provide dataset reader classes.
 * Semantic 3D ([project-page](http://www.semantic3d.net/))
 * S3DIS ([project-page](http://3dsemantics.stanford.edu/))
 * Paris-Lille 3D ([project-page](https://npm3d.fr/paris-lille-3d))
-images
 
 For downloading these datasets visit the respective webpages and have a look at
 the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).

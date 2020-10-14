@@ -116,8 +116,8 @@ class MyModel(BaseModel):
 
 ## Adding a new dataset
 
-For adding a new dataset, you can the dataset code to `ml3d/datasets`.
-Dataset class is independent of framework and it has to be derived from 
+For adding a new dataset, you can add the dataset code to `ml3d/datasets`.
+A Dataset class is independent of an ML framework and has to be derived from 
 `BaseDataset` defined in `ml3d/datasets/base_dataset.py`. You must implement 
 another class `MyDatasetSplit` which is used to return data and attributes 
 for files corresponding to a particular split.
