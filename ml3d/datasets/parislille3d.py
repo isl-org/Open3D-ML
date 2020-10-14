@@ -58,18 +58,7 @@ class ParisLille3D(BaseDataset):
 
         cfg = self.cfg
 
-        self.label_to_names = {
-            0: 'unclassified',
-            1: 'ground',
-            2: 'building',
-            3: 'pole-road_sign-traffic_light',
-            4: 'bollard-small_pole',
-            5: 'trash_can',
-            6: 'barrier',
-            7: 'pedestrian',
-            8: 'car',
-            9: 'natural-vegetation'
-        }
+        self.label_to_names = self.get_label_to_names()
 
         self.num_classes = len(self.label_to_names)
         self.label_values = np.sort([k for k, v in self.label_to_names.items()])
@@ -87,6 +76,22 @@ class ParisLille3D(BaseDataset):
 
         test_path = cfg.dataset_path + "/test_10_classes/"
         self.test_files = glob.glob(test_path + '*.ply')
+
+    @staticmethod
+    def get_label_to_names():
+        label_to_names = {
+            0: 'unclassified',
+            1: 'ground',
+            2: 'building',
+            3: 'pole-road_sign-traffic_light',
+            4: 'bollard-small_pole',
+            5: 'trash_can',
+            6: 'barrier',
+            7: 'pedestrian',
+            8: 'car',
+            9: 'natural-vegetation'
+        }
+        return label_to_names
 
     def get_split(self, split):
         return ParisLille3DSplit(self, split=split)
