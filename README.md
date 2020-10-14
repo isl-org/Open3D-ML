@@ -126,7 +126,7 @@ For more examples see [`examples/`](https://github.com/intel-isl/Open3D-ML/tree/
 and the [`scripts/`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts) directories.
 
 
-## Using predefined scripts
+### Using predefined scripts
 
 [`scripts/semseg.py`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/semseg.py)
 provides an easy interface for training and evaluating a model on a dataset. It saves
