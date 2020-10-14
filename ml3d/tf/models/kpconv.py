@@ -23,7 +23,7 @@ from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
 
 class KPFCNN(BaseModel):
     """
-    Class defining KPFCNN
+    Class defining KPFCNN. A model for Semantic Segmentation.
     """
 
     def __init__(
