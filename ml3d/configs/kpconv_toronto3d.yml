@@ -48,7 +48,6 @@ model:
   - false
   batch_limit: 10000
   batch_norm_momentum: 0.98
-  batch_num: 50
   batcher: ConcatBatcher
   conv_radius: 2.5
   deform_fitting_mode: point2point
@@ -72,7 +71,6 @@ model:
   num_layers: 5
   repulse_extent: 1.2
   use_batch_norm: true
-  val_batch_num: 30
   reduce_fc: true
   l_relu: 0.2
   t_normalize:

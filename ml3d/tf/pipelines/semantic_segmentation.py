@@ -142,16 +142,14 @@ class SemanticSegmentation(BasePipeline):
                                    model=model,
                                    use_cache=dataset.cfg.use_cache,
                                    steps_per_epoch=dataset.cfg.get(
-                                       'steps_per_epoch_train',
-                                       model.cfg.get('batch_num', None)))
+                                       'steps_per_epoch_train', None))
         train_loader, len_train = train_split.get_loader(cfg.batch_size)
 
         valid_split = TFDataloader(dataset=dataset.get_split('validation'),
                                    model=model,
                                    use_cache=dataset.cfg.use_cache,
                                    steps_per_epoch=dataset.cfg.get(
-                                       'steps_per_epoch_valid',
-                                       model.cfg.get('val_batch_num', None)))
+                                       'steps_per_epoch_valid', None))
         valid_loader, len_val = valid_split.get_loader(cfg.val_batch_size)
 
         dataset_name = dataset.name if dataset is not None else ''
