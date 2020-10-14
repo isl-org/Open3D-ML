@@ -5,7 +5,6 @@ import tensorflow as tf
 import numpy as np
 import time
 import random
-import pudb
 from sklearn.neighbors import KDTree
 
 # use relative import for being compatible with Open3d main repo
