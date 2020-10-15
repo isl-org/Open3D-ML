@@ -6,25 +6,6 @@ from pathlib import Path
 from .utils.kernels.kernel_points import load_kernels as create_kernel_points
 
 
-def get_weight(shape):
-    # tf.set_random_seed(42)
-    initial = tf.keras.initializers.TruncatedNormal(mean=0.0,
-                                                    stddev=np.sqrt(2 /
-                                                                   shape[-1]))
-    weight = initial(shape=shape, dtype=tf.float32)
-    weight = tf.round(weight * tf.constant(
-        1000, dtype=tf.float32)) / tf.constant(1000, dtype=tf.float32)
-
-    return tf.Variable(initial_value=weight, trainable=True, name='weight')
-
-
-def get_bias(shape):
-    initial = tf.zeros_initializer()
-    return tf.Variable(initial_value=initial(shape=shape, dtype="float32"),
-                       trainable=True,
-                       name='bias')
-
-
 def radius_gaussian(sq_r, sig, eps=1e-9):
     """
     Compute a radius gaussian (gaussian of distance)
@@ -167,7 +148,7 @@ class KPConv(tf.keras.layers.Layer):
         """
         super(KPConv, self).__init__(**kwargs)
 
-        self.KP_extent = KP_extent  # TODO : verify correct kp extent
+        self.KP_extent = KP_extent
         self.K = kernel_size
         self.p_dim = p_dim
         self.in_channels = in_channels
@@ -237,7 +218,6 @@ class KPConv(tf.keras.layers.Layer):
                                               dimension=self.p_dim,
                                               fixed=self.fixed_kernel_points)
 
-        # TODO : reshape to (num_kernel_points, points_dim)
         return tf.Variable(K_points_numpy.astype(np.float32),
                            trainable=False,
                            name='kernel_points')
@@ -453,7 +433,6 @@ class BatchNormBlock(tf.keras.layers.Layer):
 
     def call(self, x, training=False):
         if (self.use_bn):
-            # TODO : same as torch
             return self.batch_norm(x, training)
         else:
             return x + self.bias
@@ -485,10 +464,7 @@ class UnaryBlock(tf.keras.layers.Layer):
         self.no_relu = no_relu
         self.in_dim = in_dim
         self.out_dim = out_dim
-        # self.mlp = tf.keras.models.Sequential(
-        #     tf.keras.Input(shape=(in_dim,),
-        #     tf.keras.layers.Dense(out_dim, use_bias=False)
-        # )
+
         self.mlp = tf.keras.layers.Dense(out_dim, use_bias=False)
         self.batch_norm = BatchNormBlock(out_dim, self.use_bn, self.bn_momentum)
 
@@ -546,8 +522,7 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         # TODO : check x, batch
         if 'strided' in self.block_name:
-            q_pts = batch['points'][self.layer_ind +
-                                    1]  # TODO : 1 will not come here.
+            q_pts = batch['points'][self.layer_ind + 1]
             s_pts = batch['points'][self.layer_ind]
             neighb_inds = batch['pools'][self.layer_ind]
         else:
