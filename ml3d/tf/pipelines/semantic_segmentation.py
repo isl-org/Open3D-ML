@@ -1,6 +1,8 @@
 import numpy as np
 import logging
 import sys
+import warnings
+
 from tqdm import tqdm
 from datetime import datetime
 from os.path import exists, join, isfile, dirname, abspath
@@ -250,11 +252,14 @@ class SemanticSegmentation(BasePipeline):
                 self.save_ckpt(epoch)
 
     def save_logs(self, writer, epoch):
-        accs = np.nanmean(np.array(self.accs), axis=0)
-        ious = np.nanmean(np.array(self.ious), axis=0)
 
-        valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-        valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
+        with warnings.catch_warnings():  # ignore Mean of empty slice.
+            warnings.simplefilter('ignore', category=RuntimeWarning)
+            accs = np.nanmean(np.array(self.accs), axis=0)
+            ious = np.nanmean(np.array(self.ious), axis=0)
+
+            valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
+            valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
 
         loss_dict = {
             'Training loss': np.mean(self.losses),
