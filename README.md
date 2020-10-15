@@ -178,8 +178,8 @@ setting up a training pipeline or running a network on a dataset.
 
 ### Segmentation
 
-The table shows the available models and datasets for the segmentation task and
-the respective scores. Each score links to the respective weight file.
+For the task of semantic segmentation, we measure the performance of different methods using the mean intersection-over-union (mIoU) over all classes.
+The table shows the available models and datasets for the segmentation task and the respective scores. Each score links to the respective weight file.
 
 
 
@@ -207,8 +207,7 @@ The following is a list of datasets for which we provide dataset reader classes.
 * S3DIS ([project-page](http://3dsemantics.stanford.edu/))
 * Paris-Lille 3D ([project-page](https://npm3d.fr/paris-lille-3d))
 
-For downloading these datasets visit the respective webpages and have a look at
-the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
+For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
 
 
 
