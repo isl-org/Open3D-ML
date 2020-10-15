@@ -10,6 +10,7 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
+from .base_dataset import BaseDataset
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(
@@ -39,7 +40,6 @@ class Custom3DSplit():
 
     def get_data(self, idx):
         pc_path = self.path_list[idx]
-        log.debug("get_data called {}".format(pc_path))
 
         data = np.load(pc_path)
         points = np.array(data[:, :3], dtype=np.float32)
@@ -64,16 +64,51 @@ class Custom3DSplit():
         return attr
 
 
-class Custom3D:
+class Custom3D(BaseDataset):
     """
     A template for customized dataset. Can be modified by users.
     """
 
-    def __init__(self, cfg):
-        self.cfg = cfg
-        self.name = 'Custom3D'
+    def __init__(self,
+                 dataset_path,
+                 name='Custom3D',
+                 cache_dir='./logs/cache',
+                 use_cache=False,
+                 num_points=65536,
+                 ignored_label_inds=[],
+                 test_result_folder='./test',
+                 **kwargs):
+
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         num_points=num_points,
+                         ignored_label_inds=ignored_label_inds,
+                         test_result_folder=test_result_folder,
+                         **kwargs)
+
+        cfg = self.cfg
+
         self.dataset_path = cfg.dataset_path
-        self.label_to_names = {
+        self.label_to_names = self.get_label_to_names()
+
+        self.num_classes = len(self.label_to_names)
+        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
+        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
+        self.ignored_labels = np.array(cfg.ignored_label_inds)
+
+        self.train_dir = str(Path(cfg.dataset_path) / cfg.train_dir)
+        self.val_dir = str(Path(cfg.dataset_path) / cfg.val_dir)
+        self.test_dir = str(Path(cfg.dataset_path) / cfg.test_dir)
+
+        self.train_files = [f for f in glob.glob(self.train_dir + "/*.npy")]
+        self.val_files = [f for f in glob.glob(self.val_dir + "/*.npy")]
+        self.test_files = [f for f in glob.glob(self.test_dir + "/*.npy")]
+
+    @staticmethod
+    def get_label_to_names():
+        label_to_names = {
             0: 'Unclassified',
             1: 'Ground',
             2: 'Road_markings',
@@ -84,19 +119,7 @@ class Custom3D:
             7: 'Car',
             8: 'Fence'
         }
-
-        self.num_classes = len(self.label_to_names)
-        self.label_values = np.sort([k for k, v in self.label_to_names.items()])
-        self.label_to_idx = {l: i for i, l in enumerate(self.label_values)}
-        self.ignored_labels = np.array([0])
-
-        self.train_dir = str(Path(cfg.dataset_path) / cfg.train_dir)
-        self.val_dir = str(Path(cfg.dataset_path) / cfg.val_dir)
-        self.test_dir = str(Path(cfg.dataset_path) / cfg.test_dir)
-
-        self.train_files = [f for f in glob.glob(self.train_dir + "/*.npy")]
-        self.val_files = [f for f in glob.glob(self.val_dir + "/*.npy")]
-        self.test_files = [f for f in glob.glob(self.test_dir + "/*.npy")]
+        return label_to_names
 
     def get_split(self, split):
         return Custom3DSplit(self, split=split)
@@ -111,8 +134,22 @@ class Custom3D:
         elif split in ['train', 'training']:
             random.shuffle(self.train_files)
             return self.train_files
+        elif split in ['all']:
+            files = self.val_files + self.train_files + self.test_files
+            return files
         else:
             raise ValueError("Invalid split {}".format(split))
+
+    def is_tested(self, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        store_path = join(path, self.name, name + '.npy')
+        if exists(store_path):
+            print("{} already exists.".format(store_path))
+            return True
+        else:
+            return False
 
     def save_test_result(self, results, attr):
         cfg = self.cfg

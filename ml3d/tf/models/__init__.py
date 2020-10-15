@@ -2,7 +2,7 @@
 Tensorflow network models.
 """
 
-from .kpconv import *
-from .randlanet import *
+from .randlanet import RandLANet
+from .kpconv import KPFCNN
 
-# __all__ = ['RandLANet', 'KPFCNN']
+__all__ = ['RandLANet', 'KPFCNN']

@@ -132,9 +132,6 @@ class KPFCNN(BaseModel):
         #                                    hist_n,
         #                                    dtype=np.int32)
 
-        # self.dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
-        self.dropout_prob = tf.constant(0.2, name='dropout_prob')
-
         lbl_values = cfg.lbl_values
         ign_lbls = cfg.ignored_label_inds
 
@@ -909,29 +906,6 @@ class KPFCNN(BaseModel):
             data['proj_inds'] = proj_inds
 
         return data
-
-    def crop_pc(self, points, feat, labels, search_tree, pick_idx):
-        # crop a fixed size point cloud for training
-        num_points = 65536
-        if (points.shape[0] < num_points):
-            select_idx = np.array(range(points.shape[0]))
-            diff = num_points - points.shape[0]
-            select_idx = list(select_idx) + list(
-                random.choices(select_idx, k=diff))
-            random.shuffle(select_idx)
-        else:
-            center_point = points[pick_idx, :].reshape(1, -1)
-            select_idx = search_tree.query(center_point, k=num_points)[1][0]
-
-        # select_idx = DataProcessing.shuffle_idx(select_idx)
-        random.shuffle(select_idx)
-        select_points = points[select_idx]
-        select_labels = labels[select_idx]
-        if (feat is None):
-            select_feat = None
-        else:
-            select_feat = feat[select_idx]
-        return select_points, select_feat, select_labels, select_idx
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
 
