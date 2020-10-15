@@ -3,6 +3,10 @@
 
 ## Pretrained weights
 
+For the task of semantic segmentation, we measure the performance of different methods using the mean intersection-over-union (mIoU) over all classes.
+The table shows the available models and datasets for the segmentation task and the respective scores. Each score links to the respective weight file.
+
+
 | Model / Dataset    | SemanticKITTI | Toronto 3D | S3DIS |
 |--------------------|---------------|----------- |-------|
 | RandLA-Net (tf)    |  [53.7](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |   [69.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) |   [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.zip)    |
@@ -27,8 +31,6 @@ The following is a list of datasets for which we provide dataset reader classes.
 * Semantic 3D ([project-page](http://www.semantic3d.net/))
 * S3DIS ([project-page](http://3dsemantics.stanford.edu/))
 * Paris-Lille 3D ([project-page](https://npm3d.fr/paris-lille-3d))
-images
 
-For downloading these datasets visit the respective webpages and have a look at
-the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
+For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
 
