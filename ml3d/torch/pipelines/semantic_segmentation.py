@@ -340,7 +340,7 @@ class SemanticSegmentation(BasePipeline):
             raise FileNotFoundError(f' ckpt {ckpt_path} not found')
 
         log.info(f'Loading checkpoint {ckpt_path}')
-        ckpt = torch.load(ckpt_path)
+        ckpt = torch.load(ckpt_path, map_location=self.device)
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
             log.info(f'Loading checkpoint optimizer_state_dict')
