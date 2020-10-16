@@ -28,14 +28,14 @@ def convert_framework_name(framework):
 
 def get_module(module_type, module_name, framework=None, **kwargs):
     """Fetch modules (pipeline, model, or) from registry."""
-    if module_type is 'pipeline':
+    if module_type == 'pipeline':
         framework = convert_framework_name(framework)
         return get_from_name(module_name, PIPELINE, framework)
 
-    elif module_type is "dataset":
+    elif module_type == "dataset":
         return get_from_name(module_name, DATASET, framework)
 
-    elif module_type is "model":
+    elif module_type == "model":
         framework = convert_framework_name(framework)
         return get_from_name(module_name, MODEL, framework)
     else:
