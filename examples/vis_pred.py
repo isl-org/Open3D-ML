@@ -9,6 +9,7 @@ import sys
 import torch
 from os.path import exists, join, isfile, dirname, abspath, split
 
+example_dir = os.path.dirname(os.path.realpath(__file__))
 
 def get_custom_data(pc_names, path):
 
@@ -85,7 +86,7 @@ def main():
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
 
-    ckpt_path = "./vis_weights_{}.pth".format('RandLANet')
+    ckpt_path = example_dir + "/vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
         os.system(cmd)
@@ -93,7 +94,7 @@ def main():
     pipeline_r = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_r.load_ckpt(model.cfg.ckpt_path)
 
-    ckpt_path = "./vis_weights_{}.pth".format('KPFCNN')
+    ckpt_path = example_dir + "/vis_weights_{}.pth".format('KPFCNN')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(kpconv_url, ckpt_path)
         print(cmd)
@@ -102,7 +103,7 @@ def main():
     pipeline_k = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_k.load_ckpt(model.cfg.ckpt_path)
 
-    data_path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
+    data_path = example_dir + "/demo_data"
     pc_names = ["000700", "000750"]
     pcs = get_custom_data(pc_names, data_path)
     pcs_with_pred = pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k)
