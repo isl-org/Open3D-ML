@@ -5,6 +5,7 @@ import tensorflow as tf
 import numpy as np
 import time
 import random
+from tqdm import tqdm
 from sklearn.neighbors import KDTree
 
 # use relative import for being compatible with Open3d main repo
@@ -16,9 +17,6 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
 
 
 class RandLANet(BaseModel):
-    """
-    Class defining RandLANet. A model for Semantic Segmentation.
-    """
 
     def __init__(
             self,
@@ -512,6 +510,8 @@ class RandLANet(BaseModel):
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
 
     def inference_preprocess(self):
         min_posbility_idx = np.argmin(self.possibility)
@@ -540,7 +540,12 @@ class RandLANet(BaseModel):
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
 
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] -
+                         self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
+
         if np.min(self.possibility) > 0.5:
+            self.pbar.close()
             reproj_inds = self.inference_data['proj_inds']
             self.test_probs = self.test_probs[reproj_inds]
             inference_result = {
