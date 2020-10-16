@@ -112,7 +112,7 @@ def main():
         model = Model(**cfg_dict_model)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
-    with open(Path(__file__).parent / 'readme.md', 'r') as f:
+    with open(Path(__file__).parent / 'README.md', 'r') as f:
         readme = f.read()
     pipeline.cfg_tb = {
         'readme': readme,
