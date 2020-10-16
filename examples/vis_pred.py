@@ -73,7 +73,6 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 # ------------------------------
 
 
-
 def main():
     kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names()
     v = ml3d.vis.Visualizer()
@@ -100,7 +99,7 @@ def main():
         print(cmd)
         os.system(cmd)
     model = ml3d.models.KPFCNN(ckpt_path=ckpt_path, in_radius=10)
-    pipeline_k = ml3d.datasets.SemanticSegmentation(model)
+    pipeline_k = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_k.load_ckpt(model.cfg.ckpt_path)
 
     data_path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
