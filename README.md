@@ -35,7 +35,8 @@ pip install \
     plyfile \
     pyyaml \
     sklearn \
-    tqdm
+    tqdm \
+    tensorboard
 ```
 
 Our Open3D v0.11 package is compatible with the following versions of the ML
