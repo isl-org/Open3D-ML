@@ -85,7 +85,7 @@ def main():
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
 
-    ckpt_path = "./logs/vis_weights_{}.pth".format('RandLANet')
+    ckpt_path = "./vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
         os.system(cmd)
@@ -93,7 +93,7 @@ def main():
     pipeline_r = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_r.load_ckpt(model.cfg.ckpt_path)
 
-    ckpt_path = "./logs/vis_weights_{}.pth".format('KPFCNN')
+    ckpt_path = "./vis_weights_{}.pth".format('KPFCNN')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(kpconv_url, ckpt_path)
         print(cmd)
