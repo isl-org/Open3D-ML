@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 import open3d.ml.torch as ml3d
-from ml3d.datasets import ParisLille3D
-from ml3d.datasets import S3DIS
-from ml3d.datasets import Semantic3D
-from ml3d.datasets import SemanticKITTI
-from ml3d.datasets import Toronto3D
-from ml3d.vis import Visualizer, LabelLUT
-from ml3d.utils import get_module
+from open3d.ml.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
+                                Toronto3D)
+from open3d.ml.vis import Visualizer, LabelLUT
+from open3d.ml.utils import get_module
 
 import argparse
 import math
@@ -124,8 +121,8 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
 # ------------------------------
 
-from ml3d.torch.pipelines import SemanticSegmentation
-from ml3d.torch.models import RandLANet, KPFCNN
+from open3d.ml.torch.pipelines import SemanticSegmentation
+from open3d.ml.torch.models import RandLANet, KPFCNN
 
 
 def main():
