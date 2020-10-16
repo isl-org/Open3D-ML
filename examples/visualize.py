@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import open3d.ml.torch as ml3d
 from ml3d.datasets import ParisLille3D
 from ml3d.datasets import S3DIS
 from ml3d.datasets import Semantic3D
