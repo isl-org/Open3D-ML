@@ -8,7 +8,7 @@ import random
 import shutil
 from tqdm import tqdm
 import argparse
-from ml3d.datasets.utils import DataProcessing
+from open3d.ml.datasets.utils import DataProcessing
 
 
 def parse_args():
