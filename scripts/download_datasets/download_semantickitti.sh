@@ -15,7 +15,7 @@ BASE_DIR="$1"/SemanticKitti
 
 mkdir -p $BASE_DIR
 
-export url_data="http://www.cvlibs.net/download.php?file=data_odometry_velodyne.zip"
+export url_data="https://s3.eu-central-1.amazonaws.com/avg-kitti/data_odometry_velodyne.zip"
 export url_label="http://semantic-kitti.org/assets/data_odometry_labels.zip"
 
 
