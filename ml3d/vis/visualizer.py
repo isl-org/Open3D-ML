@@ -632,7 +632,8 @@ class Visualizer:
         self._objects = DataModel(data)
 
     def _init_user_interface(self, title, width, height):
-        self.window = gui.Window(title, width, height)
+        self.window = gui.Application.instance.create_window(
+            title, width, height)
         self.window.set_on_layout(self._on_layout)
 
         em = self.window.theme.font_size
@@ -1389,5 +1390,4 @@ class Visualizer:
             self.setup_camera()
 
         self._load_geometries(self._objects.data_names, on_done_ui)
-        gui.Application.instance.add_window(self.window)
         gui.Application.instance.run()

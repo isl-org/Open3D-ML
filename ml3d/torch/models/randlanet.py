@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import random
 import time
+from tqdm import tqdm
 
 from pathlib import Path
 from sklearn.neighbors import KDTree
@@ -209,6 +210,8 @@ class RandLANet(BaseModel):
         self.possibility = np.random.rand(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
         self.batcher = DefaultBatcher()
 
     def inference_preprocess(self):
@@ -234,9 +237,12 @@ class RandLANet(BaseModel):
         inds = inputs['data']['point_inds']
         self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
             1 - self.test_smooth) * probs
-        print(np.min(self.possibility))
 
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] -
+                         self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
         if np.min(self.possibility) > 0.5:
+            self.pbar.close()
             pred_labels = np.argmax(self.test_probs, 1)
 
             pred_labels = pred_labels[self.inference_proj_inds]

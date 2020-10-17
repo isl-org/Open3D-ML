@@ -8,7 +8,7 @@
 ![PyTorch badge](https://img.shields.io/badge/PyTorch-supported-brightgreen?style=flat&logo=pytorch)
 ![TensorFlow badge](https://img.shields.io/badge/TensorFlow-supported-brightgreen?style=flat&logo=tensorflow)
 
-[**Installation**](#installation) | [**Getting started**](#getting-started) | [**Repo structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Model Zoo**](model_zoo.md) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
+[**Installation**](#installation) | [**Get started**](#getting-started) | [**Structure**](#repository-structure) | [**Tasks & Algorithms**](#tasks-and-algorithms) | [**Model Zoo**](model_zoo.md) | [**Datasets**](#datasets) | [**How-tos**](#how-tos) | [**Contribute**](#contribute)
 
 Open3D-ML is an extension of Open3D for 3D machine learning tasks.
 It builds on top of the Open3D core library and extends it with machine learning
@@ -23,18 +23,48 @@ ML frameworks such as data visualization.
 ## Installation
 
 ### Requirements
-Open3D-ML is integrated in the Open3D v0.11 python distribution.
-To use all of the machine learning functionality you need to have installed
-PyTorch or TensorFlow. Open3D v0.11 is compatible with the following versions
+Open3D-ML is integrated in the Open3D v0.11 python distribution. To use all of
+the machine learning functionality you need to install additional dependencies 
+and PyTorch or TensorFlow. 
+
+```bash
+pip install \
+    addict \
+    matplotlib \
+    pandas \
+    plyfile \
+    pyyaml \
+    sklearn \
+    tqdm \
+    tensorboard
+```
+
+Our Open3D v0.11 package is compatible with the following versions of the ML
+frameworks.
 
  * PyTorch 1.6
  * TensorFlow 2.3
  * CUDA 10.1 (optional)
 
+TensorFlow can be installed with 
+```bash
+pip install tensorflow==2.3.1
+```
+Note that you may need to upgrade to the latest pip version before installing
+TensorFlow with `pip install --upgrade pip`.
+
+For PyTorch the install command on Linux with CUDA 10.1 for `pip` is
+```bash
+pip install torch==1.6.0+cu101 torchvision==0.7.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+```
+
+For more details please see the install documentation of the respective 
+frameworks if you don't need CUDA or use a different package manager.
+
 If you need to use different versions we recommend to 
 [build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
 
-### Install commands
+### Install Open3D
 We provide pre-built pip packages that include Open3D-ML for Ubuntu 18.04+ with Python 3.6+ that can be installed with
 ```bash
 $ pip install open3d

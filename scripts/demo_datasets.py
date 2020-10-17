@@ -1,5 +1,5 @@
-from ml3d.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
-                           Toronto3D)
+from open3d.ml.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
+                                Toronto3D)
 import argparse
 import yaml
 import numpy as np

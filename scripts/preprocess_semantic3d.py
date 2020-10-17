@@ -8,7 +8,7 @@ import random
 import shutil
 from tqdm import tqdm
 import argparse
-from ml3d.datasets.utils import DataProcessing
+from open3d.ml.datasets import utils
 
 
 def parse_args():
@@ -84,7 +84,7 @@ def preprocess(args):
                 labels = np.array(labels, dtype=np.int32).reshape((-1,))
 
                 print(pc.shape, labels.shape)
-                points, feat, labels = DataProcessing.grid_subsampling(
+                points, feat, labels = utils.DataProcessing.grid_subsampling(
                     pc[:, :3],
                     features=pc[:, 3:],
                     labels=labels,
@@ -122,7 +122,7 @@ def preprocess(args):
         for i, pc in enumerate(pcs):
             lbl = lbls[i]
             print(pc.shape, lbl.shape)
-            pc, feat, lbl = DataProcessing.grid_subsampling(
+            pc, feat, lbl = utils.DataProcessing.grid_subsampling(
                 pc[:, :3],
                 features=pc[:, 3:],
                 labels=lbl,

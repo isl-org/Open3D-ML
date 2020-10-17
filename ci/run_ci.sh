@@ -4,7 +4,7 @@
 # - NPROC
 #
 TENSORFLOW_VER="2.3.0"
-TORCH_GLNX_VER=("1.5.0+cu101" "1.6.0+cpu")
+TORCH_GLNX_VER="1.6.0+cpu"
 YAPF_VER="0.30.0"
 
 set -euo pipefail
@@ -21,13 +21,12 @@ python -m pip install -U Cython
 
 #
 # 2. clone Open3D and install dependencies
-# For now we have to clone the o3dml_integration branch of open3d
 #
 git clone --recursive --branch master  https://github.com/intel-isl/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -U tensorflow==$TENSORFLOW_VER
-python -m pip install -U torch==${TORCH_GLNX_VER[1]} -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.org/whl/torch_stable.html
 python -m pip install -U pytest
 python -m pip install -U yapf=="$YAPF_VER"
 
@@ -60,4 +59,12 @@ pushd test_workdir
 mv $PATH_TO_OPEN3D_ML/tests .
 pytest tests/test_integration.py
 pytest tests/test_models.py
+
+# now do the same but in dev mode by setting OPEN3D_ML_ROOT
+export OPEN3D_ML_ROOT=$PATH_TO_OPEN3D_ML
+pytest tests/test_integration.py
+pytest tests/test_models.py
+unset OPEN3D_ML_ROOT
+
 popd
+

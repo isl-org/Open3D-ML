@@ -1,21 +1,15 @@
 #!/usr/bin/env python
-from ml3d.datasets import ParisLille3D
-from ml3d.datasets import S3DIS
-from ml3d.datasets import Semantic3D
-from ml3d.datasets import SemanticKITTI
-from ml3d.datasets import Toronto3D
-from ml3d.vis import Visualizer, LabelLUT
-from ml3d.utils import get_module
-
+import open3d.ml.torch as ml3d
 import argparse
 import math
 import numpy as np
 import os
 import random
 import sys
-import tensorflow as tf
 import torch
 from os.path import exists, join, isfile, dirname, abspath, split
+
+example_dir = os.path.dirname(os.path.realpath(__file__))
 
 
 def get_custom_data(pc_names, path):
@@ -80,14 +74,11 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
 # ------------------------------
 
-from ml3d.torch.pipelines import SemanticSegmentation
-from ml3d.torch.models import RandLANet, KPFCNN
-
 
 def main():
-    kitti_labels = SemanticKITTI.get_label_to_names()
-    v = Visualizer()
-    lut = LabelLUT()
+    kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names()
+    v = ml3d.vis.Visualizer()
+    lut = ml3d.vis.LabelLUT()
     for val in sorted(kitti_labels.keys()):
         lut.add_label(kitti_labels[val], val)
     v.set_lut("labels", lut)
@@ -96,24 +87,24 @@ def main():
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
 
-    ckpt_path = "./logs/vis_weights_{}.pth".format('RandLANet')
+    ckpt_path = example_dir + "/vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
         os.system(cmd)
-    model = RandLANet(ckpt_path=ckpt_path)
-    pipeline_r = SemanticSegmentation(model)
+    model = ml3d.models.RandLANet(ckpt_path=ckpt_path)
+    pipeline_r = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_r.load_ckpt(model.cfg.ckpt_path)
 
-    ckpt_path = "./logs/vis_weights_{}.pth".format('KPFCNN')
+    ckpt_path = example_dir + "/vis_weights_{}.pth".format('KPFCNN')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(kpconv_url, ckpt_path)
         print(cmd)
         os.system(cmd)
-    model = KPFCNN(ckpt_path=ckpt_path, in_radius=10)
-    pipeline_k = SemanticSegmentation(model)
+    model = ml3d.models.KPFCNN(ckpt_path=ckpt_path, in_radius=10)
+    pipeline_k = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_k.load_ckpt(model.cfg.ckpt_path)
 
-    data_path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
+    data_path = example_dir + "/demo_data"
     pc_names = ["000700", "000750"]
     pcs = get_custom_data(pc_names, data_path)
     pcs_with_pred = pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k)
