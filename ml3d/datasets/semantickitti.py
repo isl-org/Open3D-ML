@@ -1,7 +1,6 @@
 import numpy as np
 import os, argparse, pickle, sys
 from os.path import exists, join, isfile, dirname, abspath, split
-import torch
 import logging
 
 from sklearn.neighbors import KDTree
