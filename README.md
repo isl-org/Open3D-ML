@@ -173,7 +173,7 @@ For eg.
 python scripts/semseg.py torch -c ml3d/configs/randlanet_semantickitti.yml --dataset.dataset_path <path-to-dataset> --dataset.use_cache True
 
 # Launch testing for KPConv on Toronto3D with tensorflow.
-python scripts/semseg.py tf -c ml3d/configs/kpconv_toronto3d.yml --dataset.dataset_path <path-to-dataset> --model.ckpt_path <path-to-checkpoint>
+python scripts/semseg.py tf -c ml3d/configs/kpconv_toronto3d.yml --split test --dataset.dataset_path <path-to-dataset> --model.ckpt_path <path-to-checkpoint>
 ```
 For further help, run `python scripts/semseg.py --help`.
 
