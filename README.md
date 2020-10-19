@@ -13,7 +13,7 @@
 Open3D-ML is an extension of Open3D for 3D machine learning tasks.
 It builds on top of the Open3D core library and extends it with machine learning
 tools for 3D data processing. This repo focuses on applications such as semantic
-point cloud segmentation and provides pretrained models that can be applied to 
+point cloud segmentation and provides pretrained models that can be applied to
 common tasks as well as pipelines for training.
 
 Open3D-ML works with **TensorFlow** and **PyTorch** to integrate easily into
@@ -22,63 +22,35 @@ ML frameworks such as data visualization.
 
 ## Installation
 
-### Requirements
-Open3D-ML is integrated in the Open3D v0.11 python distribution. To use all of
-the machine learning functionality you need to install additional dependencies 
-and PyTorch or TensorFlow. 
+### Users
+
+Open3D-ML is integrated in the Open3D v0.11+ python distribution. If you want to use any of the functionality, install Open3D with the `ml-torch` or `ml-tensorflow` extras:
 
 ```bash
-pip install \
-    addict \
-    matplotlib \
-    pandas \
-    plyfile \
-    pyyaml \
-    sklearn \
-    tqdm \
-    tensorboard
+# Upgrade to the latest pip version
+pip install --upgrade pip
+# For use with PyTorch
+pip install open3d[ml-torch] -f https://download.pytorch.org/whl/torch_stable.html
+# For use with Tensorflow
+pip install open3d[ml-tensorflow]
+# For use with both
+pip install open3d[ml-torch,ml-tensorflow] -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
-Our Open3D v0.11 package is compatible with the following versions of the ML
-frameworks.
+Open3D v0.11 is compatible with the following versions of the ML frameworks.
 
  * PyTorch 1.6
  * TensorFlow 2.3
- * CUDA 10.1 (optional)
+ * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
 
-TensorFlow can be installed with 
-```bash
-pip install tensorflow==2.3.1
-```
-Note that you may need to upgrade to the latest pip version before installing
-TensorFlow with `pip install --upgrade pip`.
+To test the installation use
 
-For PyTorch the install command on Linux with CUDA 10.1 for `pip` is
-```bash
-pip install torch==1.6.0+cu101 torchvision==0.7.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
-```
-
-For more details please see the install documentation of the respective 
-frameworks if you don't need CUDA or use a different package manager.
-
-If you need to use different versions we recommend to 
-[build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
-
-### Install Open3D
-We provide pre-built pip packages that include Open3D-ML for Ubuntu 18.04+ with Python 3.6+ that can be installed with
-```bash
-$ pip install open3d
-```
-
-To test the installation use 
 ```bash
 # with PyTorch
 $ python -c "import open3d.ml.torch as ml3d"
 # or with TensorFlow
 $ python -c "import open3d.ml.tf as ml3d"
 ```
-
-
 
 ## Getting started
 
@@ -113,7 +85,7 @@ vis.visualize_dataset(dataset, 'all', indices=range(100))
 ### Running a pretrained model
 
 Building on the previous example we can instantiate a pipeline with a
-pretrained model for semantic segmentation and run it on a point cloud of our 
+pretrained model for semantic segmentation and run it on a point cloud of our
 dataset. See the [model zoo](#model-zoo) for obtaining the weights of the
 pretrained model.
 ```python
@@ -179,9 +151,9 @@ For further help, run `python scripts/semseg.py --help`.
 
 
 ## Repository structure
-The core part of Open3D-ML lives in the `ml3d` subfolder, which is integrated 
+The core part of Open3D-ML lives in the `ml3d` subfolder, which is integrated
 into Open3D in the `ml` namespace. In addition to the core part, the directories
-`examples` and `scripts` provide supporting scripts for getting started with 
+`examples` and `scripts` provide supporting scripts for getting started with
 setting up a training pipeline or running a network on a dataset.
 
 ```
@@ -193,9 +165,9 @@ setting up a training pipeline or running a network on a dataset.
      ├─ utils             # Framework independent utilities; available as open3d.ml.{tf,torch}.utils
      ├─ vis               # ML specific visualization functions
      ├─ tf                # Directory for TensorFlow specific code. same structure as ml3d/torch.
-     │                    # This will be available as open3d.ml.tf 
+     │                    # This will be available as open3d.ml.tf
      ├─ torch             # Directory for PyTorch specific code; available as open3d.ml.torch
-          ├─ dataloaders  # Framework specific dataset code, e.g. wrappers that can make use of the 
+          ├─ dataloaders  # Framework specific dataset code, e.g. wrappers that can make use of the
           │               # generic dataset code.
           ├─ models       # Code for models
           ├─ modules      # Smaller modules, e.g., metrics and losses
@@ -243,13 +215,13 @@ For downloading these datasets visit the respective webpages and have a look at 
 
 ## How-tos
 
-* [Visualize network predictions](docs/howtos.md#visualize-network-predictions) 
-* [Visualize custom data](docs/howtos.md#visualize-custom-data) 
-* [Adding a new model](docs/howtos.md#adding-a-new-model) 
-* [Adding a new dataset](docs/howtos.md#adding-a-new-dataset) 
+* [Visualize network predictions](docs/howtos.md#visualize-network-predictions)
+* [Visualize custom data](docs/howtos.md#visualize-custom-data)
+* [Adding a new model](docs/howtos.md#adding-a-new-model)
+* [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
 
-## Contribute 
-There are many ways to contribute to this project. You can 
+## Contribute
+There are many ways to contribute to this project. You can
 * implement a new model
 * add code for reading a new dataset
 * share parameters and weights for an existing model
@@ -260,7 +232,7 @@ community!
 
 If you want to share weights for a model you trained please attach or link the
 weights file in the pull request.
-For bugs and problems, [open an issue](https://github.com/intel-isl/Open3D-ML/issues). 
+For bugs and problems, [open an issue](https://github.com/intel-isl/Open3D-ML/issues).
 Please also check out our communication channels to get in contact with the community.
 
 ## Communication channels
@@ -282,4 +254,3 @@ Please cite our work ([pdf](https://arxiv.org/abs/1801.09847)) if you use Open3D
     year      = {2018},
 }
 ```
-
