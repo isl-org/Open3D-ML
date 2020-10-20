@@ -1,3 +1,4 @@
+
 <p align="center">
 <img src="https://raw.githubusercontent.com/intel-isl/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
 <span style="font-size: 220%"><b>ML</b></span>
@@ -109,6 +110,27 @@ vis.visualize_dataset(dataset, 'all', indices=range(100))
 ```
 ![Visualizer GIF](docs/images/getting_started_ml_visualizer.gif)
 
+### Loading a config file
+Configs of models, datasets, and pipelines are stored in `ml3d/configs`. Users can also construct their own yaml files to keep record of their customized configurations. Here is an example of reading a config file and constructing modules from it.
+```python
+import open3d.ml as _ml3d
+import open3d.ml.torch as ml3d # or open3d.ml.tf as ml3d  
+
+framework = "torch" # or tf
+cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
+cfg = _ml3d.utils.Config.load_from_file(cfg_file)
+
+# fetch the classes by the name
+Pipeline = _ml3d.utils.get_module("pipeline", cfg.pipeline.name, framework)
+Model = _ml3d.utils.get_module("model", cfg.model.name, framework)
+Dataset = _ml3d.utils.get_module("dataset", cfg.dataset.name)
+
+# use the arguments in the config file to construct the instances 
+cfg.dataset['dataset_path'] = "/path/to/your/dataset"
+dataset = Dataset(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
+model = Model(**cfg.model)
+pipeline = Pipeline(model, dataset, **cfg.pipeline)
+```
 
 ### Running a pretrained model
 
@@ -117,12 +139,32 @@ pretrained model for semantic segmentation and run it on a point cloud of our
 dataset. See the [model zoo](#model-zoo) for obtaining the weights of the
 pretrained model.
 ```python
-model = ml3d.models.RandLANet()
-pipeline = ml3d.pipelines.SemanticSegmentation(model=model, dataset=dataset, device="gpu")
+import os
+import open3d.ml as _ml3d
+import open3d.ml.torch as ml3d
 
+cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
+cfg = _ml3d.utils.Config.load_from_file(cfg_file)
+
+model = ml3d.models.RandLANet(**cfg.model)
+#path_dataset = cfg.dataset.pop('dataset_path', "/path/to/your/dataset")
+cfg.dataset['dataset_path'] = "/path/to/your/dataset"
+dataset = ml3d.datasets.SemanticKITTI(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
+pipeline = ml3d.pipelines.SemanticSegmentation(model, dataset=dataset, device="gpu", **cfg.pipeline)
+
+# download the weights.
+ckpt_folder = "./logs/"
+os.makedirs(ckpt_folder, exist_ok=True)
+ckpt_path = ckpt_folder + "randlanet_semantickitti_202009090354utc.pth"
+randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+if not os.path.exists(ckpt_path):
+    cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
+    os.system(cmd)
+    
 # load the parameters.
-pipeline.load_ckpt(ckpt_path='randlanet_semantickitti_202009090354utc.pth', is_train=False)
+pipeline.load_ckpt(ckpt_path=ckpt_path)
 
+test_split = dataset.get_split("test")
 data = test_split.get_data(0)
 
 # run inference on a single example.
@@ -132,6 +174,7 @@ result = pipeline.run_inference(data)
 # evaluate performance on the test set; this will write logs to './logs'.
 pipeline.run_test()
 ```
+Users can also [use predefined scripts](README.md#using-predefined-scripts) to load pretrained weights and run testing.
 
 
 ### Training a model
