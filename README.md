@@ -174,6 +174,7 @@ result = pipeline.run_inference(data)
 # evaluate performance on the test set; this will write logs to './logs'.
 pipeline.run_test()
 ```
+Users can also [use predefined scripts](README.md#using-predefined-scripts) to load pretrained weights and run testing.
 
 
 ### Training a model
