@@ -6,6 +6,7 @@ from glob import glob
 import logging
 import yaml
 
+from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
 
 logging.basicConfig(
@@ -15,7 +16,7 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class KITTI():
+class KITTI(BaseDataset):
     """
     KITTI 3D dataset for Object Detection, used in visualizer, training, or test
     """
@@ -33,17 +34,15 @@ class KITTI():
             dataset_path (str): path to the dataset
             kwargs:
         """
+        super().__init__(dataset_path=dataset_path,
+                         name=name,
+                         cache_dir=cache_dir,
+                         use_cache=use_cache,
+                         val_split=val_split,
+                         **kwargs)
 
-        cfg = Config({
-            'name': name,
-            'dataset_path': dataset_path,
-            'cache_dir': cache_dir,
-            'use_cache': use_cache,
-            'val_split': val_split
-        })
-        cfg = cfg.merge_from_dict(kwargs)
+        cfg = self.cfg
 
-        self.cfg = cfg
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
         self.num_classes = 3
@@ -66,11 +65,7 @@ class KITTI():
 
     @staticmethod
     def get_label_to_names():
-        label_to_names = {
-            0: 'Car',
-            1: 'Pedestrian',
-            2: 'Cyclist',
-        }
+        label_to_names = {0: 'Car', 1: 'Pedestrian', 2: 'Cyclist', 3: 'Van'}
         return label_to_names
 
     @staticmethod
@@ -134,6 +129,12 @@ class KITTI():
         else:
             raise ValueError("Invalid split {}".format(split))
 
+    def is_tested():
+        pass
+
+    def save_test_result():
+        pass
+
 
 class KITTISplit():
 
@@ -177,6 +178,9 @@ class KITTISplit():
 
 
 class Object3d(object):
+    """
+    Stores object specific details like bbox coordinates, occlusion etc.
+    """
 
     def __init__(self, line):
         label = line.strip().split(' ')
@@ -205,12 +209,18 @@ class Object3d(object):
 
     @staticmethod
     def cls_type_to_id(cls_type):
+        """
+        get object id from name.
+        """
         type_to_id = {'Car': 1, 'Pedestrian': 2, 'Cyclist': 3, 'Van': 4}
         if cls_type not in type_to_id.keys():
             return -1
         return type_to_id[cls_type]
 
     def get_kitti_obj_level(self):
+        """
+        determines the difficulty level of object.
+        """
         height = float(self.box2d[3]) - float(self.box2d[1]) + 1
 
         if height >= 40 and self.truncation <= 0.15 and self.occlusion <= 0:
