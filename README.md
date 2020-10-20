@@ -20,12 +20,20 @@ Open3D-ML works with **TensorFlow** and **PyTorch** to integrate easily into
 existing projects and also provides general functionality independent of
 ML frameworks such as data visualization.
 
+
 ## Installation
 
 ### Users
 
-Open3D-ML is integrated in the Open3D v0.11+ python distribution. If you want to use any of the functionality, install Open3D with the `ml-torch` or `ml-tensorflow` extras:
+Open3D-ML is integrated in the Open3D v0.11+ python distribution and is
+compatible with the following versions of ML frameworks.
 
+ * PyTorch 1.6
+ * TensorFlow 2.3
+ * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
+
+You can use the extras `ml-torch` and `ml-tensorflow` to install open3d and
+a compatible version of the respective framework:
 ```bash
 # Upgrade to the latest pip version
 pip install --upgrade pip
@@ -37,12 +45,6 @@ pip install open3d[ml-tensorflow]
 pip install open3d[ml-torch,ml-tensorflow] -f https://download.pytorch.org/whl/torch_stable.html
 ```
 
-Open3D v0.11 is compatible with the following versions of the ML frameworks.
-
- * PyTorch 1.6
- * TensorFlow 2.3
- * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
-
 To test the installation use
 
 ```bash
@@ -52,8 +54,8 @@ $ python -c "import open3d.ml.torch as ml3d"
 $ python -c "import open3d.ml.tf as ml3d"
 ```
 
-## Getting started
 
+## Getting started
 
 ### Reading a dataset
 
