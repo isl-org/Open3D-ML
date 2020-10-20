@@ -147,7 +147,6 @@ cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
 cfg = _ml3d.utils.Config.load_from_file(cfg_file)
 
 model = ml3d.models.RandLANet(**cfg.model)
-#path_dataset = cfg.dataset.pop('dataset_path', "/path/to/your/dataset")
 cfg.dataset['dataset_path'] = "/path/to/your/dataset"
 dataset = ml3d.datasets.SemanticKITTI(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
 pipeline = ml3d.pipelines.SemanticSegmentation(model, dataset=dataset, device="gpu", **cfg.pipeline)
