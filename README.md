@@ -54,6 +54,9 @@ $ python -c "import open3d.ml.torch as ml3d"
 $ python -c "import open3d.ml.tf as ml3d"
 ```
 
+If you need to use different versions of the ML frameworks or CUDA we recommend
+to 
+[build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
 
 ## Getting started
 
