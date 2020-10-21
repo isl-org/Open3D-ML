@@ -32,17 +32,21 @@ compatible with the following versions of ML frameworks.
  * TensorFlow 2.3
  * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
 
-You can use the extras `ml-torch` and `ml-tensorflow` to install open3d and
-a compatible version of the respective framework:
+You can install Open3D with
 ```bash
-# Upgrade to the latest pip version
+# make sure you have the latest pip version
 pip install --upgrade pip
-# For use with PyTorch
-pip install open3d[ml-torch] -f https://download.pytorch.org/whl/torch_stable.html
-# For use with Tensorflow
-pip install open3d[ml-tensorflow]
-# For use with both
-pip install open3d[ml-torch,ml-tensorflow] -f https://download.pytorch.org/whl/torch_stable.html
+# install open3d
+pip install open3d
+```
+
+To install a compatible version of PyTorch or TensorFlow you can use the
+respective requirements files:
+```bash
+# To install a compatible version of TensorFlow
+pip install -r requirements-tensorflow.txt
+# To install a compatible version of PyTorch with CUDA
+pip install -r requirements-torch-cuda.txt
 ```
 
 To test the installation use
