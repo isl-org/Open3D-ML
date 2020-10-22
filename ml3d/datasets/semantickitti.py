@@ -125,7 +125,7 @@ class SemanticKITTI(BaseDataset):
     def is_tested(self, attr):
         cfg = self.cfg
         name = attr['name']
-        name_seq, name_points = name.split("_")
+        name_seq, name_points = name.split("/")
         test_path = join(cfg.test_result_folder, 'sequences')
         save_path = join(test_path, name_seq, 'predictions')
         test_file_name = name_points
@@ -139,7 +139,7 @@ class SemanticKITTI(BaseDataset):
     def save_test_result(self, results, attr):
         cfg = self.cfg
         name = attr['name']
-        name_seq, name_points = name.split("_")
+        name_seq, name_points = name.split("/")
 
         test_path = join(cfg.test_result_folder, 'sequences')
         make_dir(test_path)
@@ -159,7 +159,7 @@ class SemanticKITTI(BaseDataset):
         cfg = self.cfg
         for j in range(1):
             name = inputs['attr']['name']
-            name_seq, name_points = name.split("_")
+            name_seq, name_points = name.split("/")
 
             test_path = join(cfg.test_result_folder, 'sequences')
             make_dir(test_path)
@@ -251,7 +251,7 @@ class SemanticKITTISplit():
         pc_path = self.path_list[idx]
         dir, file = split(pc_path)
         _, seq = split(split(dir)[0])
-        name = '{}_{}'.format(seq, file[:-4])
+        name = '{}/{}'.format(seq, file[:-4])
 
         attr = {'name': name, 'path': pc_path, 'split': self.split}
         return attr
