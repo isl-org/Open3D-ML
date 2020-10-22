@@ -120,3 +120,26 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     select_points = select_points - center_point
 
     return select_points, select_feat, select_labels, select_idx
+
+
+def sample_balanced_points(points, feat, labels, search_tree, pick_idx, num_points, **kwargs):
+    n_class_per_batch = 100
+    select_idx = np.empty((0,), dtype=np.int32)
+
+    for pick_label in cfg.label_values:
+        if pick_label not in cfg.ignored_label_inds:
+            pick_idx = np.where(np.equal(labels, pick_label))[0]
+        if len(pick_label) > n_class_per_batch:
+            pick_idx = np.random.choice(pick_idx, size=n_class_per_batch, replace=False)
+        select_idx = np.hstack((select_idx, pick_idx))
+
+    random.shuffle(select_idx)
+
+    select_points = points[select_idx]
+    select_labels = labels[select_idx]
+    if (feat is None):
+        select_feat = None
+    else:
+        select_feat = feat[select_idx]
+
+    return select_points, select_feat, select_labels, select_idx
