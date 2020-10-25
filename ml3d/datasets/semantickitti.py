@@ -221,6 +221,9 @@ class SemanticKITTISplit():
         self.split = split
         self.dataset = dataset
 
+        if self.cache_in_memory:
+            self.data_list = [None] * len(self.path_list)
+
     def __len__(self):
         return len(self.path_list)
 

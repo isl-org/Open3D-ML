@@ -180,7 +180,7 @@ class SemanticSegmentation(BasePipeline):
 
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
-                                  shuffle=True,
+                                  sampler=train_split.sampler,
                                   collate_fn=batcher.collate_fn)
 
         valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
@@ -246,31 +246,31 @@ class SemanticSegmentation(BasePipeline):
 
             self.scheduler.step()
 
-            # --------------------- validation
-            model.eval()
-            self.valid_losses = []
-            self.valid_accs = []
-            self.valid_ious = []
-            with torch.no_grad():
-                for step, inputs in enumerate(
-                        tqdm(valid_loader, desc='validation')):
+            # # --------------------- validation
+            # model.eval()
+            # self.valid_losses = []
+            # self.valid_accs = []
+            # self.valid_ious = []
+            # with torch.no_grad():
+            #     for step, inputs in enumerate(
+            #             tqdm(valid_loader, desc='validation')):
 
-                    results = model(inputs['data'])
-                    loss, gt_labels, predict_scores = model.get_loss(
-                        Loss, results, inputs, device)
+            #         results = model(inputs['data'])
+            #         loss, gt_labels, predict_scores = model.get_loss(
+            #             Loss, results, inputs, device)
 
-                    if predict_scores.size()[-1] == 0:
-                        continue
-                    acc = metric.acc(predict_scores, gt_labels)
-                    iou = metric.iou(predict_scores, gt_labels)
+            #         if predict_scores.size()[-1] == 0:
+            #             continue
+            #         acc = metric.acc(predict_scores, gt_labels)
+            #         iou = metric.iou(predict_scores, gt_labels)
 
-                    self.valid_losses.append(loss.cpu().item())
-                    self.valid_accs.append(acc)
-                    self.valid_ious.append(iou)
+            #         self.valid_losses.append(loss.cpu().item())
+            #         self.valid_accs.append(acc)
+            #         self.valid_ious.append(iou)
 
-                    step = step + 1
+            #         step = step + 1
 
-            self.save_logs(writer, epoch)
+            # self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)

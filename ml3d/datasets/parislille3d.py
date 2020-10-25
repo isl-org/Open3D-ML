@@ -133,16 +133,9 @@ class ParisLille3D(BaseDataset):
         log.info("Saved {} in {}.".format(name, store_path))
 
 
-class ParisLille3DSplit():
-
+class ParisLille3DSplit(BaseDatasetSplit):
     def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+        super().__init__(self, dataset, split=split)
 
     def __len__(self):
         return len(self.path_list)

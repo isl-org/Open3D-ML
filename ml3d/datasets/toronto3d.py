@@ -139,22 +139,13 @@ class Toronto3D(BaseDataset):
         log.info("Saved {} in {}.".format(name, store_path))
 
 
-class Toronto3DSplit():
+class Toronto3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
-
+        super().__init__(self, dataset, split=split)
+        
         self.UTM_OFFSET = [627285, 4841948, 0]
 
-        self.cache_in_memory = self.cfg.get('cache_in_memory', False)
-        if self.cache_in_memory:
-            self.data_list = [None] * len(self.path_list)
 
     def __len__(self):
         return len(self.path_list)

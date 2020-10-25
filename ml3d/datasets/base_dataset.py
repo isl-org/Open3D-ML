@@ -2,7 +2,7 @@ import yaml
 from abc import ABC, abstractmethod
 from os.path import join, exists, dirname, abspath
 
-from ..utils import Config
+from ..utils import Config, get_module
 
 
 class BaseDataset(ABC):
@@ -97,8 +97,16 @@ class BaseDatasetSplit(ABC):
 
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
+        path_list = dataset.get_split_list(split)
+        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+
+        self.path_list = path_list
         self.split = split
         self.dataset = dataset
+
+        sampler_cfg = self.cfg.get('sampler', {'type': 'SemSegRandomSampler'})
+        sampler_cls = get_module('sampler', sampler_cfg['name'])
+        self.sampler = sampler_cls(self)
 
     @abstractmethod
     def __len__(self):
