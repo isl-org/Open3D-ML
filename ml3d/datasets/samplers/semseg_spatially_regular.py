@@ -3,8 +3,8 @@ import random
 
 from ...utils import SAMPLER
 
-class SemSegRandomSampler(object):
-    """Random sampler for semantic segmentation datsets"""
+class SemSegSpatiallyRegularSampler(object):
+    """Spatially regularSampler sampler for semantic segmentation datsets"""
     def __init__(self, dataset_split):
         self.dataset_split = dataset_split
 
@@ -34,7 +34,7 @@ class SemSegRandomSampler(object):
             if pc is None or num_points is None or search_tree is None:
                 raise KeyError(
                     "Please provide pc, num_points, and search_tree \
-                    for point_sampler in SemSegRandomSampler")
+                    for point_sampler in SemSegSpatiallyRegularSampler")
 
             center_idx = np.random.choice(len(pc), 1)
             center_point = pc[center_idx, :].reshape(1, -1)
@@ -52,4 +52,4 @@ class SemSegRandomSampler(object):
 
 
 
-SAMPLER._register_module(SemSegRandomSampler)
+SAMPLER._register_module(SemSegSpatiallyRegularSampler)

@@ -9,7 +9,7 @@ from sklearn.neighbors import KDTree
 import logging
 
 from .utils import DataProcessing as DP
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(

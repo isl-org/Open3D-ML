@@ -10,7 +10,7 @@ from tqdm import tqdm
 import logging
 
 from .utils import DataProcessing
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(

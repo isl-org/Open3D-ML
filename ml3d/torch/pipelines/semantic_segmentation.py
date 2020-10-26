@@ -8,13 +8,13 @@ import warnings
 from datetime import datetime
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
+from torch.utils.data import Dataset, IterableDataset, DataLoader
 from pathlib import Path
 
 from os.path import exists, join, isfile, dirname, abspath
 
 from .base_pipeline import BasePipeline
-from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
+from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
@@ -171,16 +171,17 @@ class SemanticSegmentation(BasePipeline):
 
         batcher = self.get_batcher(device)
 
-        train_split = TorchDataloader(dataset=dataset.get_split('training'),
+        train_dataset = dataset.get_split('training')
+        train_sampler = train_dataset.sampler
+        train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
-                                  sampler=train_split.sampler,
+                                  sampler=get_sampler(train_sampler.get_cloud_sampler()),
                                   collate_fn=batcher.collate_fn)
 
         valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
@@ -221,6 +222,7 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             self.accs = []
             self.ious = []
+            model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])

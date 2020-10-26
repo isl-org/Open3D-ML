@@ -1,3 +1,3 @@
-from .samplers import SemSegRandomSampler
+from .semseg_random import SemSegRandomSampler
 
 __all__ = ['SemSegRandomSampler']

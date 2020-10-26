@@ -139,24 +139,42 @@ class RandLANet(BaseModel):
         feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
-        if min_posbility_idx is None:  # training
-            pick_idx = np.random.choice(len(pc), 1)
+        pc, selected_idxs, center_point = self.trans_point_sampler(
+            pc=pc, 
+            feat=feat, 
+            label=label, 
+            search_tree=tree, 
+            num_points=self.cfg.num_points
+        )
+
+        label = label[selected_idxs]
+        if (feat is None):
+            select_feat = None
         else:
-            pick_idx = min_posbility_idx
+            select_feat = feat[selected_idxs]
 
-        center_point = pc[pick_idx, :].reshape(1, -1)
+        if cfg.get('recentering', True):
+            pc = pc - center_point
 
-        pc, feat, label, selected_idx = \
-            trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
 
-        if min_posbility_idx is not None:
-            dists = np.sum(np.square((pc).astype(np.float32)), axis=1)
-            delta = np.square(1 - dists / np.max(dists))
-            self.possibility[selected_idx] += delta
-            inputs['point_inds'] = selected_idx
+        # if min_posbility_idx is None:  # training
+        #     pick_idx = np.random.choice(len(pc), 1)
+        # else:
+        #     pick_idx = min_posbility_idx
 
-        if not cfg.get('recentering', True):
-            pc = pc + center_point
+        # center_point = pc[pick_idx, :].reshape(1, -1)
+
+        # pc, feat, label, selected_idx = \
+        #     trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
+
+        # if min_posbility_idx is not None:
+        #     dists = np.sum(np.square((pc).astype(np.float32)), axis=1)
+        #     delta = np.square(1 - dists / np.max(dists))
+        #     self.possibility[selected_idx] += delta
+        #     inputs['point_inds'] = selected_idx
+
+        # if not cfg.get('recentering', True):
+        #     pc = pc + center_point
 
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)

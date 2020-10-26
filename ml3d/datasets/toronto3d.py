@@ -8,7 +8,7 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 import logging
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(
@@ -142,8 +142,11 @@ class Toronto3D(BaseDataset):
 class Toronto3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-        super().__init__(self, dataset, split=split)
+        super().__init__(dataset, split=split)
         
+        log.info(  
+            "Found {} pointclouds for {}".format(len(self.path_list), split)
+        )
         self.UTM_OFFSET = [627285, 4841948, 0]
 
 
@@ -154,15 +157,7 @@ class Toronto3DSplit(BaseDatasetSplit):
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        if self.cache_in_memory:
-            if self.data_list[idx] is not None:
-                data = self.data_list[idx]
-            else:
-                data = PlyData.read(pc_path)['vertex']
-                self.data_list[idx] = data
-        else:
-            data = PlyData.read(pc_path)['vertex']
-
+        data = PlyData.read(pc_path)['vertex']
         points = np.vstack(
             (data['x'], data['y'], data['z'])).astype(np.float64).T
         points = points - self.UTM_OFFSET

@@ -6,7 +6,7 @@ import logging
 from sklearn.neighbors import KDTree
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from .utils import DataProcessing
 from ..utils import make_dir, DATASET
 
@@ -205,24 +205,14 @@ class SemanticKITTI(BaseDataset):
         return file_list
 
 
-class SemanticKITTISplit():
+class SemanticKITTISplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
+        super().__init__(dataset, split=split)
+        log.info(  
+            "Found {} pointclouds for {}".format(len(self.path_list), split)
+        )
         self.remap_lut_val = dataset.remap_lut_val
-
-        if split == 'test':
-            dataset.test_list = path_list
-
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
-
-        if self.cache_in_memory:
-            self.data_list = [None] * len(self.path_list)
 
     def __len__(self):
         return len(self.path_list)
