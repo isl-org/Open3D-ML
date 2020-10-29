@@ -7,7 +7,7 @@ class TorchSamplerWrapper(Sampler):
         self.sampler = sampler
 
     def __iter__(self):
-        return self.sampler.__iter__()
+        return self.sampler.get_cloud_sampler()
 
     def __len__(self):
         return len(self.sampler)

@@ -7,24 +7,20 @@ class SemSegRandomSampler(object):
     """Random sampler for semantic segmentation datsets"""
     def __init__(self, dataset_split):
         self.dataset_split = dataset_split
+        self.length = len(dataset_split)
+
+    def __len__(self):
+        return self.length
+
+    def initialize_with_dataloader(self, dataloader):
+        self.length = len(dataloader)
 
     def get_cloud_sampler(self):
-        class _RandomSampler():
-            def __init__(self, num_samples):
-                self.num_samples = num_samples
-            
-            def __iter__(self):
-                def gen():
-                    ids = np.random.permutation(self.num_samples)
-                    for i in ids:
-                        yield i
-
-                return gen()
-
-            def __len__(self):
-                return self.num_samples
-
-        return _RandomSampler(len(self.dataset_split))
+        def gen():
+            ids = np.random.permutation(self.length)
+            for i in ids:
+                yield i
+        return gen()
 
     def get_point_sampler(self):
         def _random_centered_gen(**kwargs):

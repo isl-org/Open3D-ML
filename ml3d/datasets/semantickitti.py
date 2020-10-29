@@ -246,7 +246,9 @@ class SemanticKITTISplit(BaseDatasetSplit):
         _, seq = split(split(dir)[0])
         name = '{}_{}'.format(seq, file[:-4])
 
-        attr = {'name': name, 'path': pc_path, 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
         return attr
 
 

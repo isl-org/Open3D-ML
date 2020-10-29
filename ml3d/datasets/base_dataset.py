@@ -112,7 +112,7 @@ class BaseDatasetSplit(ABC):
         sampler_cfg = self.cfg.get('sampler', {'name': 'SemSegRandomSampler'})
         sampler_cls = get_module('sampler', sampler_cfg['name'])
         self.sampler = sampler_cls(self)
-        
+
 
     @abstractmethod
     def __len__(self):

@@ -178,7 +178,10 @@ class Toronto3DSplit(BaseDatasetSplit):
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.txt', '')
 
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
+        
         return attr
 
 
