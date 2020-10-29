@@ -20,21 +20,23 @@ from waymo_open_dataset.utils import range_image_utils, transform_utils
 from waymo_open_dataset.utils.frame_utils import \
     parse_range_image_and_camera_projection
 
+
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='Preprocess Waymo Dataset.')
+    parser = argparse.ArgumentParser(description='Preprocess Waymo Dataset.')
     parser.add_argument('--dataset_path',
                         help='path to Waymo tfrecord files',
                         required=True)
     parser.add_argument('--out_path', help='Output path', required=True)
 
-    parser.add_argument(
-        '--workers',
-        help='Number of workers.',
-        default=16,
-        type=int)
+    parser.add_argument('--workers',
+                        help='Number of workers.',
+                        default=16,
+                        type=int)
 
-    parser.add_argument('--is_test', help='True for processing test data (default False)', default=False, type=bool)
+    parser.add_argument('--is_test',
+                        help='True for processing test data (default False)',
+                        default=False,
+                        type=bool)
 
     args = parser.parse_args()
 
@@ -48,6 +50,7 @@ def parse_args():
 
 
 class Waymo2KITTI():
+
     def __init__(self, dataset_path, save_dir='', workers=8, is_test=False):
 
         self.write_image = True
@@ -55,14 +58,11 @@ class Waymo2KITTI():
         self.filter_no_label_zone_points = True
 
         self.classes = ['VEHICLE', 'PEDESTRIAN', 'SIGN', 'CYCLIST']
-        
+
         self.lidar_list = [
-            '_FRONT', '_FRONT_RIGHT', '_FRONT_LEFT', '_SIDE_RIGHT',
-            '_SIDE_LEFT'
+            '_FRONT', '_FRONT_RIGHT', '_FRONT_LEFT', '_SIDE_RIGHT', '_SIDE_LEFT'
         ]
-        self.type_list = [
-            'UNKNOWN', 'VEHICLE', 'PEDESTRIAN', 'SIGN', 'CYCLIST'
-        ]
+        self.type_list = ['UNKNOWN', 'VEHICLE', 'PEDESTRIAN', 'SIGN', 'CYCLIST']
 
         self.selected_waymo_classes = self.classes
 
@@ -75,7 +75,8 @@ class Waymo2KITTI():
         self.prefix = ''
         self.save_track_id = False
 
-        self.tfrecord_files = sorted(glob.glob(join(self.dataset_path, "*.tfrecord")))
+        self.tfrecord_files = sorted(
+            glob.glob(join(self.dataset_path, "*.tfrecord")))
 
         self.label_save_dir = f'{self.save_dir}/label_'
         self.label_all_save_dir = f'{self.save_dir}/label_all'
@@ -118,12 +119,12 @@ class Waymo2KITTI():
             frame = dataset_pb2.Frame()
             frame.ParseFromString(bytearray(data.numpy()))
 
-            if (self.selected_waymo_locations is not None
-                        and frame.context.stats.location
-                        not in self.selected_waymo_locations):
-                    print("continue")
-                    continue
-            
+            if (self.selected_waymo_locations is not None and
+                    frame.context.stats.location
+                    not in self.selected_waymo_locations):
+                print("continue")
+                continue
+
             if self.write_image:
                 self.save_image(frame, file_idx, frame_idx)
             self.save_calib(frame, file_idx, frame_idx)
@@ -136,12 +137,13 @@ class Waymo2KITTI():
     def __len__(self):
         return len(self.tfrecord_files)
 
-
     def save_image(self, frame, file_idx, frame_idx):
         self.prefix = ''
         import cv2
         for img in frame.images:
-            img_path = Path(self.image_save_dir + str(img.name - 1)) / (self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) + '.png')
+            img_path = Path(self.image_save_dir + str(img.name - 1)) / (
+                self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) +
+                '.png')
             image = tf.io.decode_jpeg(img.image).numpy()
             cv2.imwrite(str(img_path), image)
 
@@ -163,7 +165,7 @@ class Waymo2KITTI():
                 self.cart_to_homo(T_front_cam_to_ref) @ T_vehicle_to_cam
             if camera.name == 1:  # FRONT = 1, see dataset.proto for details
                 self.T_velo_to_front_cam = Tr_velo_to_cam.copy()
-            Tr_velo_to_cam = Tr_velo_to_cam[:3, :].reshape((12, ))
+            Tr_velo_to_cam = Tr_velo_to_cam[:3, :].reshape((12,))
             Tr_velo_to_cams.append([f'{i:e}' for i in Tr_velo_to_cam])
 
             # intrinsic parameters
@@ -290,8 +292,9 @@ class Waymo2KITTI():
         fp_label_all.close()
 
     def save_lidar(self, frame, file_idx, frame_idx):
-        range_images, camera_projections, range_image_top_pose = parse_range_image_and_camera_projection(frame)
- 
+        range_images, camera_projections, range_image_top_pose = parse_range_image_and_camera_projection(
+            frame)
+
         # First return
         points_0, cp_points_0, intensity_0, elongation_0 = \
             self.convert_range_image_to_point_cloud(
@@ -329,8 +332,7 @@ class Waymo2KITTI():
 
         pc_path = f'{self.point_cloud_save_dir}/{self.prefix}' + \
             f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.bin'
-        point_cloud.astype(np.float32).tofile(pc_path)        
-
+        point_cloud.astype(np.float32).tofile(pc_path)
 
     def convert_range_image_to_point_cloud(self,
                                            frame,
@@ -338,8 +340,8 @@ class Waymo2KITTI():
                                            camera_projections,
                                            range_image_top_pose,
                                            ri_index=0):
-        calibrations = sorted(
-            frame.context.laser_calibrations, key=lambda c: c.name)
+        calibrations = sorted(frame.context.laser_calibrations,
+                              key=lambda c: c.name)
         points = []
         cp_points = []
         intensity = []
@@ -404,8 +406,8 @@ class Waymo2KITTI():
                                          tf.compat.v1.where(range_image_mask))
 
             cp = camera_projections[c.name][ri_index]
-            cp_tensor = tf.reshape(
-                tf.convert_to_tensor(value=cp.data), cp.shape.dims)
+            cp_tensor = tf.reshape(tf.convert_to_tensor(value=cp.data),
+                                   cp.shape.dims)
             cp_points_tensor = tf.gather_nd(
                 cp_tensor, tf.compat.v1.where(range_image_mask))
             points.append(points_tensor.numpy())
@@ -435,5 +437,6 @@ class Waymo2KITTI():
 
 if __name__ == '__main__':
     args = parse_args()
-    converter = Waymo2KITTI(args.dataset_path, args.out_path, args.workers, args.is_test)
+    converter = Waymo2KITTI(args.dataset_path, args.out_path, args.workers,
+                            args.is_test)
     converter.convert()

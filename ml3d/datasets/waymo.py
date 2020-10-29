@@ -48,8 +48,7 @@ class Waymo(BaseDataset):
         self.num_classes = 4
         self.label_to_names = self.get_label_to_names()
 
-        self.all_files = glob(
-            join(cfg.dataset_path, 'velodyne', '*.bin'))
+        self.all_files = glob(join(cfg.dataset_path, 'velodyne', '*.bin'))
         self.train_files = []
         self.val_files = []
 
@@ -66,7 +65,12 @@ class Waymo(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        label_to_names = {0: 'PEDESTRIAN', 1: 'VEHICLE', 2: 'CYCLIST', 3: 'SIGN'}
+        label_to_names = {
+            0: 'PEDESTRIAN',
+            1: 'VEHICLE',
+            2: 'CYCLIST',
+            3: 'SIGN'
+        }
         return label_to_names
 
     @staticmethod
