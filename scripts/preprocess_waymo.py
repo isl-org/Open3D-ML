@@ -11,6 +11,7 @@ from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from os import makedirs
 import random
+import argparse
 import tensorflow as tf
 import matplotlib.image as mpimg
 from multiprocessing import Pool
@@ -18,6 +19,32 @@ from tqdm import tqdm
 from waymo_open_dataset.utils import range_image_utils, transform_utils
 from waymo_open_dataset.utils.frame_utils import \
     parse_range_image_and_camera_projection
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description='Preprocess Waymo Dataset.')
+    parser.add_argument('--dataset_path',
+                        help='path to Waymo tfrecord files',
+                        required=True)
+    parser.add_argument('--out_path', help='Output path', required=True)
+
+    parser.add_argument(
+        '--workers',
+        help='Number of workers.',
+        default=16,
+        type=int)
+
+    parser.add_argument('--is_test', help='True for processing test data (default False)', default=False, type=bool)
+
+    args = parser.parse_args()
+
+    dict_args = vars(args)
+    for k in dict_args:
+        v = dict_args[k]
+        print("{}: {}".format(k, v) if v is not None else "{} not given".
+              format(k))
+
+    return args
 
 
 class Waymo2KITTI():
@@ -405,5 +432,8 @@ class Waymo2KITTI():
             raise ValueError(mat.shape)
         return ret
 
-d = Waymo2KITTI("/Users/sanskara/data/waymo/", './way')
-d.convert()
+
+if __name__ == '__main__':
+    args = parse_args()
+    converter = Waymo2KITTI(args.dataset_path, args.out_path, args.workers, args.is_test)
+    converter.convert()
