@@ -50,6 +50,14 @@ def parse_args():
 
 
 class Waymo2KITTI():
+    """Waymo to KITTI converter.
+    This class converts tfrecord files from Waymo dataset to KITTI format.
+    Args:
+        dataset_path (str): Directory to load waymo raw data.
+        save_dir (str): Directory to save data in KITTI format.
+        workers (str): Number of workers for the parallel process.
+        is_test (bool): Whether in the test_mode. Default: False.
+    """
 
     def __init__(self, dataset_path, save_dir='', workers=8, is_test=False):
 
