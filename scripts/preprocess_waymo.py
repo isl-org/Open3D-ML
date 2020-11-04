@@ -147,13 +147,14 @@ class Waymo2KITTI():
 
     def save_image(self, frame, file_idx, frame_idx):
         self.prefix = ''
-        import cv2
+
         for img in frame.images:
             img_path = Path(self.image_save_dir + str(img.name - 1)) / (
                 self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) +
-                '.png')
+                '.npy')
             image = tf.io.decode_jpeg(img.image).numpy()
-            cv2.imwrite(str(img_path), image)
+
+            np.save(img_path, image)
 
     def save_calib(self, frame, file_idx, frame_idx):
         # waymo front camera to kitti reference camera
@@ -251,8 +252,6 @@ class Waymo2KITTI():
 
             # if self.filter_empty_3dboxes and obj.num_lidar_points_in_box < 1:
             #     continue
-
-            # my_type = self.waymo_to_kitti_class_map[my_type]
 
             height = obj.box.height
             width = obj.box.width
