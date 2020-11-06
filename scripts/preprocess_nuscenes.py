@@ -15,6 +15,27 @@ import random
 import argparse
 from tqdm import tqdm
 
+def parse_args():
+    parser = argparse.ArgumentParser(description='Preprocess NuScenes Dataset.')
+    parser.add_argument('--dataset_path',
+                        help='path to Nuscene root',
+                        required=True)
+    parser.add_argument('--out_path', help='Output path to store infos', required=True)
+
+    parser.add_argument('--version',
+                        help='one of {v1.0-trainval, v1.0-test, v1.0-mini}',
+                        default='v1.0-trainval')
+
+    args = parser.parse_args()
+
+    dict_args = vars(args)
+    for k in dict_args:
+        v = dict_args[k]
+        print("{}: {}".format(k, v) if v is not None else "{} not given".
+              format(k))
+
+    return args
+
 
 class NuScenesProcess():
     def __init__(self, dataset_path, out_path, version='v1.0'):
@@ -38,6 +59,8 @@ class NuScenesProcess():
             raise ValueError('unknown')
 
         self.version = version
+        self.mapping = self.get_mapping()
+
         available_scenes = self.get_available_scenes()
         names = [sc['name'] for sc in available_scenes]
         train_scenes = list(filter(lambda x : x in names, train_scenes))
@@ -54,20 +77,42 @@ class NuScenesProcess():
         self.train_scenes = train_scenes
         self.val_scenes = val_scenes
 
+    @staticmethod
+    def get_mapping():
+        mapping = {
+            'movable_object.barrier': 'barrier',
+            'vehicle.bicycle': 'bicycle',
+            'vehicle.bus.bendy': 'bus',
+            'vehicle.bus.rigid': 'bus',
+            'vehicle.car': 'car',
+            'vehicle.construction': 'construction_vehicle',
+            'vehicle.motorcycle': 'motorcycle',
+            'human.pedestrian.adult': 'pedestrian',
+            'human.pedestrian.child': 'pedestrian',
+            'human.pedestrian.construction_worker': 'pedestrian',
+            'human.pedestrian.police_officer': 'pedestrian',
+            'movable_object.trafficcone': 'traffic_cone',
+            'vehicle.trailer': 'trailer',
+            'vehicle.truck': 'truck'
+        }
+        return mapping
+
     def convert(self):
         train_info, val_info = self.process_scenes()
-        train_info['version'] = self.version
-        val_info['version'] = self.version
         out_path = self.out_path
+        makedirs(out_path, exist_ok=True)
 
         if self.is_test:
             with open(join(out_path, 'infos_test.pkl'), 'wb') as f:
                 pickle.dump(train_info, f)
+            print(f"Saved test info at {join(out_path, 'infos_test.pkl')}")
         else:
             with open(join(out_path, 'infos_train.pkl'), 'wb') as f:
                 pickle.dump(train_info, f)
             with open(join(out_path, 'infos_val.pkl'), 'wb') as f:
                 pickle.dump(val_info, f)
+            print(f"Saved train info at {join(out_path, 'infos_train.pkl')}")
+            print(f"Saved val info at {join(out_path, 'infos_val.pkl')}")
 
     def process_scenes(self):
         nusc = self.nusc
@@ -94,28 +139,28 @@ class NuScenesProcess():
                 'timestamp' : sample['timestamp']
             }
 
-        if not self.is_test:
-            annotations = [nusc.get('sample_annotation', token) for token in sample['anns']]
-            locs = np.array([b.center for b in boxes]).reshape(-1, 3)
-            dims = np.array([b.wlh for b in boxes]).reshape(-1, 3)
-            rots = np.array([b.orientation.yaw_pitch_roll[0] for b in boxes]).reshape(-1, 1)
+            if not self.is_test:
+                annotations = [nusc.get('sample_annotation', token) for token in sample['anns']]
+                locs = np.array([b.center for b in boxes]).reshape(-1, 3)
+                dims = np.array([b.wlh for b in boxes]).reshape(-1, 3)
+                rots = np.array([b.orientation.yaw_pitch_roll[0] for b in boxes]).reshape(-1, 1)
 
-            valid_flag = np.array([(ann['num_lidar_pts'] + ann['num_radar_pts']) > 0 for ann in annotations]).reshape(-1)
+                valid_flag = np.array([(ann['num_lidar_pts'] + ann['num_radar_pts']) > 0 for ann in annotations]).reshape(-1)
 
-            names = [b.name if b.name not in self.mapping else self.mapping[b.name] for b in boxes]
-            names = np.array(names)
+                names = [b.name if b.name not in self.mapping else self.mapping[b.name] for b in boxes]
+                names = np.array(names)
 
-            gt_boxes = np.concatenate([locs, dims, -rots - np.pi/2], axis=1)
+                gt_boxes = np.concatenate([locs, dims, -rots - np.pi/2], axis=1)
 
-            data['gt_boxes'] = gt_boxes
-            data['gt_names'] = names
-            data['num_lidar_points'] = np.array([ann['num_lidar_points'] for ann in annotations])
-            data['valid_flag'] = valid_flag
+                data['gt_boxes'] = gt_boxes
+                data['gt_names'] = names
+                data['num_lidar_pts'] = np.array([ann['num_lidar_pts'] for ann in annotations])
+                data['valid_flag'] = valid_flag
 
-        if sample['scene_token'] in self.train_scenes:
-            train_info.append(data)
-        else:
-            val_info.append(data)
+            if sample['scene_token'] in self.train_scenes:
+                train_info.append(data)
+            else:
+                val_info.append(data)
         
         return train_info, val_info
 
@@ -141,5 +186,6 @@ class NuScenesProcess():
 
 
 if __name__ == '__main__':
-    converter = NuScenesProcess("../../data/nuscenes/", './nusc/', 'v1.0-mini')
+    args = parse_args()
+    converter = NuScenesProcess(args.dataset_path, args.out_path, args.version)
     converter.convert()
