@@ -53,14 +53,16 @@ class NuScenes(BaseDataset):
         self.val_info = {}
 
         if os.path.exists(join(info_path, 'infos_train.pkl')):
-            self.train_info = pickle.load(open(join(info_path, 'infos_train.pkl'), 'rb'))
+            self.train_info = pickle.load(
+                open(join(info_path, 'infos_train.pkl'), 'rb'))
 
         if os.path.exists(join(info_path, 'infos_val.pkl')):
-            self.val_info = pickle.load(open(join(info_path, 'infos_val.pkl'), 'rb'))
+            self.val_info = pickle.load(
+                open(join(info_path, 'infos_val.pkl'), 'rb'))
 
         if os.path.exists(join(info_path, 'infos_test.pkl')):
-            self.test_info = pickle.load(open(join(info_path, 'infos_test.pkl'), 'rb'))
-
+            self.test_info = pickle.load(
+                open(join(info_path, 'infos_test.pkl'), 'rb'))
 
     @staticmethod
     def get_label_to_names():
@@ -113,7 +115,7 @@ class NuScenes(BaseDataset):
     def get_split(self, split):
         return NuSceneSplit(self, split=split)
 
-    def get_split_list(self, split):        
+    def get_split_list(self, split):
         if split in ['train', 'training']:
             return self.train_info
         elif split in ['test', 'testing']:

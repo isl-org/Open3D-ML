@@ -9,7 +9,7 @@ from .toronto3d import Toronto3D
 from .customdataset import Custom3D
 from .semantic3d import Semantic3D
 from .kitti import KITTI
-from.nuscenes import NuScenes
+from .nuscenes import NuScenes
 from . import utils
 
 __all__ = [
