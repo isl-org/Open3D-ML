@@ -53,14 +53,16 @@ class NuScenes(BaseDataset):
         self.val_info = {}
 
         if os.path.exists(join(info_path, 'infos_train.pkl')):
-            self.train_info = pickle.load(open(join(info_path, 'infos_train.pkl'), 'rb'))
+            self.train_info = pickle.load(
+                open(join(info_path, 'infos_train.pkl'), 'rb'))
 
         if os.path.exists(join(info_path, 'infos_val.pkl')):
-            self.val_info = pickle.load(open(join(info_path, 'infos_val.pkl'), 'rb'))
+            self.val_info = pickle.load(
+                open(join(info_path, 'infos_val.pkl'), 'rb'))
 
         if os.path.exists(join(info_path, 'infos_test.pkl')):
-            self.test_info = pickle.load(open(join(info_path, 'infos_test.pkl'), 'rb'))
-
+            self.test_info = pickle.load(
+                open(join(info_path, 'infos_test.pkl'), 'rb'))
 
     @staticmethod
     def get_label_to_names():
@@ -94,13 +96,13 @@ class NuScenes(BaseDataset):
         objects = []
         for name, box in zip(names, boxes):
             objects.append(Object3d(name, box))
-        
+
         return objects
 
     def get_split(self, split):
         return NuSceneSplit(self, split=split)
 
-    def get_split_list(self, split):        
+    def get_split_list(self, split):
         if split in ['train', 'training']:
             return self.train_info
         elif split in ['test', 'testing']:
@@ -176,9 +178,8 @@ class Object3d(object):
         self.h = float(box[5])
         self.w = float(box[3])
         self.l = float(box[4])
-        self.loc = np.array(
-            (float(box[0]), float(box[1]), float(box[2])),
-            dtype=np.float32)
+        self.loc = np.array((float(box[0]), float(box[1]), float(box[2])),
+                            dtype=np.float32)
         self.dis_to_cam = np.linalg.norm(self.loc)
         self.ry = float(box[6])
 
@@ -199,7 +200,7 @@ class Object3d(object):
             'traffic_cone': 8,
             'trailer': 9,
             'truck': 10,
-            }
+        }
         if cls_type not in type_to_id.keys():
             return -1
         return type_to_id[cls_type]
