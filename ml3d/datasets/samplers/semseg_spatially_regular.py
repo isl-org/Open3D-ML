@@ -21,8 +21,6 @@ class SemSegSpatiallyRegularSampler(object):
         self.length = len(dataloader)
         dataset = self.dataset_split
 
-        for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-
         for index in range(len(dataset)):
 
             attr = dataset.get_attr(index)
@@ -39,36 +37,44 @@ class SemSegSpatiallyRegularSampler(object):
 
     def get_cloud_sampler(self):
         def gen():
-            for i in range(len(self.length)):
+            for i in range(self.length):
                 self.cloud_id = int(np.argmin(self.min_possibilities))
                 yield self.cloud_id
-        return gen
+        return gen()
 
     def get_point_sampler(self):
         def _random_centered_gen(**kwargs):
             pc = kwargs.get('pc', None)
             num_points = kwargs.get('num_points', None)
+            radius = kwargs.get('radius', None)
             search_tree = kwargs.get('search_tree', None)
-            if pc is None or num_points is None or search_tree is None:
+            if pc is None or num_points is None or (search_tree is None
+                and radius is None):
                 raise KeyError(
-                    "Please provide pc, num_points, and search_tree \
+                    "Please provide pc, num_points, and (search_tree or radius) \
                     for point_sampler in SemSegSpatiallyRegularSampler")
 
             cloud_id = self.cloud_id
             center_id = np.argmin(self.possibilities[cloud_id])
             center_point = pc[center_id, :].reshape(1, -1)
 
-            if (pc.shape[0] < num_points):
-                idxs = np.array(range(pc.shape[0]))
-                idxs = list(idxs) + list(random.choices(idxs, k=diff))
-            else:
-                idxs = search_tree.query(center_point, k=num_points)[1][0]
+            if radius is not None:
+                idxs = search_tree.query_radius(center_point, r=radius)[0]
+            elif num_points is not None:
+                if (pc.shape[0] < num_points):
+                    idxs = np.array(range(pc.shape[0]))
+                    idxs = list(idxs) + list(random.choices(idxs, k=diff))
+                else:
+                    idxs = search_tree.query(center_point, k=num_points)[1][0]
+
+
             random.shuffle(idxs)
             pc = pc[idxs]
 
             dists = np.sum(np.square((pc-center_point).astype(np.float32)), axis=1)
             delta = np.square(1 - dists / np.max(dists))
-            self.possibilities[cloud_id] += delta
+          
+            self.possibilities[cloud_id][idxs] += delta
             new_min = float(np.min(self.possibilities[cloud_id]))
             self.min_possibilities[cloud_id] = new_min
 

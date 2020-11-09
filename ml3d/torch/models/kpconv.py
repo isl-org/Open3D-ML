@@ -436,22 +436,16 @@ class KPFCNN(BaseModel):
         while curr_num_points < min_in_points:
 
             new_points = points.copy()
+            curr_new_points, mask_inds, p0 = self.trans_point_sampler(
+                pc=new_points, 
+                feat=feat, 
+                label=sem_labels, 
+                search_tree=search_tree, 
+                num_points=min_in_points,
+                radius=self.cfg.in_radius
+            )
 
-            if attr['split'] in ['test']:
-                wanted_ind = np.argmin(self.possibility)
-            else:
-                wanted_ind = np.random.choice(new_points.shape[0])
-
-            # print(new_points.shape, wanted_ind, p0)
-            p0 = new_points[wanted_ind]
-
-            mask_inds = search_tree.query_radius(p0.reshape(1, -1),
-                                                 r=self.cfg.in_radius)[0]
-
-            # Shuffle points
-            rand_order = np.random.permutation(mask_inds)
-            curr_new_points = new_points[rand_order]
-            curr_sem_labels = sem_labels[rand_order]
+            curr_sem_labels = sem_labels[mask_inds]
 
             # In case of validation, keep the original points in memory
             if attr['split'] in ['test']:
@@ -468,9 +462,9 @@ class KPFCNN(BaseModel):
                 curr_new_coords = curr_new_points.copy()
             else:
                 curr_new_coords = np.hstack(
-                    (curr_new_points, curr_feat[rand_order, :]))
+                    (curr_new_points, curr_feat[mask_inds, :]))
 
-            curr_new_coords[:, 2] += p0[2]
+            curr_new_coords[:, 2] += p0[:, 2]
 
             in_pts = curr_new_points
             in_fts = curr_new_coords
@@ -493,7 +487,7 @@ class KPFCNN(BaseModel):
                 in_pts = in_pts[input_inds, :]
                 in_fts = in_fts[input_inds, :]
                 in_lbls = in_lbls[input_inds]
-                rand_order = rand_order[input_inds]
+                mask_inds = mask_inds[input_inds]
                 n = input_inds.shape[0]
 
             curr_num_points += n

@@ -238,7 +238,7 @@ class SemanticSegmentation(BasePipeline):
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
-
+              
                 if predict_scores.size()[-1] == 0:
                     continue
 
@@ -251,6 +251,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = metric.acc(predict_scores, gt_labels)
                 iou = metric.iou(predict_scores, gt_labels)
+                print(acc[-1], iou[-1], predict_scores.size())
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
@@ -258,31 +259,33 @@ class SemanticSegmentation(BasePipeline):
 
             self.scheduler.step()
 
-            # # --------------------- validation
-            # model.eval()
-            # self.valid_losses = []
-            # self.valid_accs = []
-            # self.valid_ious = []
-            # with torch.no_grad():
-            #     for step, inputs in enumerate(
-            #             tqdm(valid_loader, desc='validation')):
+            # --------------------- validation
+            model.eval()
+            self.valid_losses = []
+            self.valid_accs = []
+            self.valid_ious = []
+            model.trans_point_sampler = valid_sampler.get_point_sampler()
 
-            #         results = model(inputs['data'])
-            #         loss, gt_labels, predict_scores = model.get_loss(
-            #             Loss, results, inputs, device)
+            with torch.no_grad():
+                for step, inputs in enumerate(
+                        tqdm(valid_loader, desc='validation')):
 
-            #         if predict_scores.size()[-1] == 0:
-            #             continue
-            #         acc = metric.acc(predict_scores, gt_labels)
-            #         iou = metric.iou(predict_scores, gt_labels)
+                    results = model(inputs['data'])
+                    loss, gt_labels, predict_scores = model.get_loss(
+                        Loss, results, inputs, device)
 
-            #         self.valid_losses.append(loss.cpu().item())
-            #         self.valid_accs.append(acc)
-            #         self.valid_ious.append(iou)
+                    if predict_scores.size()[-1] == 0:
+                        continue
+                    acc = metric.acc(predict_scores, gt_labels)
+                    iou = metric.iou(predict_scores, gt_labels)
 
-            #         step = step + 1
+                    self.valid_losses.append(loss.cpu().item())
+                    self.valid_accs.append(acc)
+                    self.valid_ious.append(iou)
 
-            # self.save_logs(writer, epoch)
+                    step = step + 1
+
+            self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
