@@ -40,6 +40,13 @@ def parse_args():
 
 
 class NuScenesProcess():
+    """Preprocess NuScenes.
+    This class collects paths and labels using nuscenes-devkit.
+    Args:
+        dataset_path (str): Directory to load nuscenes data.
+        out_path (str): Directory to save pickle file(infos).
+        version (str): version of dataset. Default: v1.0.
+    """
 
     def __init__(self, dataset_path, out_path, version='v1.0'):
 
