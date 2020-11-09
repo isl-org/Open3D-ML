@@ -166,7 +166,7 @@ class NuScenesProcess():
                 ]).reshape(-1)
 
                 names = [
-                    b.name
+                    'ignore'
                     if b.name not in self.mapping else self.mapping[b.name]
                     for b in boxes
                 ]
