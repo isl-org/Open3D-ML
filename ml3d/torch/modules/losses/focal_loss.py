@@ -12,48 +12,48 @@ def one_hot(index, classes):
     return (index==out_idx).float()
 
 
-def focal_loss(pred,
-               target,
-               weight=None,
-               gamma=2.0,
-               alpha=0.25,
-               avg_factor=None):
-    """PyTorch version of `Focal Loss <https://arxiv.org/abs/1708.02002>`_.
+class FocalLoss(nn.Module):
 
-    Args:
-        pred (torch.Tensor): The prediction with shape (N, C), C is the
-            number of classes
-        target (torch.Tensor): The learning label of the prediction.
-        weight (torch.Tensor, optional): Sample-wise loss weight.
-        gamma (float, optional): The gamma for calculating the modulating
-            factor. Defaults to 2.0.
-        alpha (float, optional): A balanced form for Focal Loss.
-            Defaults to 0.25.
-        avg_factor (int, optional): Average factor that is used to average
-            the loss. Defaults to None.
-    """
-    pred_sigmoid = pred.sigmoid()
+    def __init__(self,
+                 gamma=2.0,
+                 alpha=0.25,
+                 loss_weight=1.0):
+        """`Focal Loss <https://arxiv.org/abs/1708.02002>`_
 
-    target = one_hot(target, int(pred.shape[-1])).type_as(pred)
+        Args:
+            gamma (float, optional): The gamma for calculating the modulating
+                factor. Defaults to 2.0.
+            alpha (float, optional): A balanced form for Focal Loss.
+                Defaults to 0.25.
+            loss_weight (float, optional): Weight of loss. Defaults to 1.0.
+        """
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.loss_weight = loss_weight
 
-    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
-    focal_weight = (alpha * target + (1 - alpha) *
-                    (1 - target)) * pt.pow(gamma)
-    loss = F.binary_cross_entropy_with_logits(
-        pred, target, reduction='none') * focal_weight
+    def forward(self,
+                pred,
+                target,
+                weight=None,
+                avg_factor=None):
 
-    if weight is not None:
-        loss = loss * weight
-            
-    if avg_factor:
-        return loss.sum() / avg_factor
-    else:
-        return loss.mean()
+        pred_sigmoid = pred.sigmoid()
 
+        target = one_hot(target, int(pred.shape[-1])).type_as(pred)
 
+        pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
+        focal_weight = (self.alpha * target + (1 - self.alpha) *
+                        (1 - target)) * pt.pow(self.gamma)
+        loss = F.binary_cross_entropy_with_logits(
+            pred, target, reduction='none') * focal_weight
 
-if __name__ == '__main__':
-    device = torch.device('cuda:0')
-    input = torch.tensor([[0.8,0.4,0.5],[0.1,0.2,0.7],[0.1,0.2,0.7],[0.1,0.2,0.7]], dtype=torch.float32, device=device)
-    gt = torch.tensor([0,1,2,0], dtype=torch.int64, device=device)
-    print(focal_loss(input, gt))
+        if weight is not None:
+            loss = loss * weight
+                
+        loss = loss * self.loss_weight
+        
+        if avg_factor:
+            return loss.sum() / avg_factor
+        else:
+            return loss.mean()

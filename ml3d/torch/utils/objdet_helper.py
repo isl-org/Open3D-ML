@@ -1,9 +1,622 @@
 import numpy as np
 import torch
 
+from functools import partial
+
 from mmdet3d.ops.iou3d.iou3d_utils import nms_gpu
 
 # source mmdet3d (MIT)
+
+
+def images_to_levels(target, num_levels):
+    """Convert targets by image to targets by feature level.
+
+    [target_img0, target_img1] -> [target_level0, target_level1, ...]
+    """
+    target = torch.stack(target, 0)
+    level_targets = []
+    start = 0
+    for n in num_levels:
+        end = start + n
+        # level_targets.append(target[:, start:end].squeeze(0))
+        level_targets.append(target[:, start:end])
+        start = end
+    return level_targets
+
+
+
+def get_direction_target(anchors,
+                        reg_targets,
+                        dir_offset=0,
+                        num_bins=2,
+                        one_hot=True):
+    """Encode direction to 0 ~ num_bins-1.
+
+    Args:
+        anchors (torch.Tensor): Concatenated multi-level anchor.
+        reg_targets (torch.Tensor): Bbox regression targets.
+        dir_offset (int): Direction offset.
+        num_bins (int): Number of bins to divide 2*PI.
+        one_hot (bool): Whether to encode as one hot.
+
+    Returns:
+        torch.Tensor: Encoded direction targets.
+    """
+    rot_gt = reg_targets[..., 6] + anchors[..., 6]
+    offset_rot = limit_period(rot_gt - dir_offset, 0, 2 * np.pi)
+    dir_cls_targets = torch.floor(offset_rot / (2 * np.pi / num_bins)).long()
+    dir_cls_targets = torch.clamp(dir_cls_targets, min=0, max=num_bins - 1)
+    if one_hot:
+        dir_targets = torch.zeros(
+            *list(dir_cls_targets.shape),
+            num_bins,
+            dtype=anchors.dtype,
+            device=dir_cls_targets.device)
+        dir_targets.scatter_(dir_cls_targets.unsqueeze(dim=-1).long(), 1.0)
+        dir_cls_targets = dir_targets
+    return dir_cls_targets
+
+class SamplingResult(object):
+    """Bbox sampling result.
+
+    Example:
+        >>> # xdoctest: +IGNORE_WANT
+        >>> from mmdet.core.bbox.samplers.sampling_result import *  # NOQA
+        >>> self = SamplingResult.random(rng=10)
+        >>> print(f'self = {self}')
+        self = <SamplingResult({
+            'neg_bboxes': torch.Size([12, 4]),
+            'neg_inds': tensor([ 0,  1,  2,  4,  5,  6,  7,  8,  9, 10, 11, 12]),
+            'num_gts': 4,
+            'pos_assigned_gt_inds': tensor([], dtype=torch.int64),
+            'pos_bboxes': torch.Size([0, 4]),
+            'pos_inds': tensor([], dtype=torch.int64),
+            'pos_is_gt': tensor([], dtype=torch.uint8)
+        })>
+    """
+
+    def __init__(self, pos_inds, neg_inds, bboxes, gt_bboxes, assign_result,
+                 gt_flags):
+        self.pos_inds = pos_inds
+        self.neg_inds = neg_inds
+        self.pos_bboxes = bboxes[pos_inds]
+        self.neg_bboxes = bboxes[neg_inds]
+        self.pos_is_gt = gt_flags[pos_inds]
+
+        self.num_gts = gt_bboxes.shape[0]
+        self.pos_assigned_gt_inds = assign_result.gt_inds[pos_inds] - 1
+
+        if gt_bboxes.numel() == 0:
+            # hack for index error case
+            assert self.pos_assigned_gt_inds.numel() == 0
+            self.pos_gt_bboxes = torch.empty_like(gt_bboxes).view(-1, 4)
+        else:
+            if len(gt_bboxes.shape) < 2:
+                gt_bboxes = gt_bboxes.view(-1, 4)
+
+            self.pos_gt_bboxes = gt_bboxes[self.pos_assigned_gt_inds, :]
+
+        if assign_result.labels is not None:
+            self.pos_gt_labels = assign_result.labels[pos_inds]
+        else:
+            self.pos_gt_labels = None
+
+
+class PseudoSampler(object):
+    """A pseudo sampler that does not do sampling actually."""
+
+    def sample(self, assign_result, bboxes, gt_bboxes, **kwargs):
+        """Directly returns the positive and negative indices  of samples.
+
+        Args:
+            assign_result (:obj:`AssignResult`): Assigned results
+            bboxes (torch.Tensor): Bounding boxes
+            gt_bboxes (torch.Tensor): Ground truth boxes
+
+        Returns:
+            :obj:`SamplingResult`: sampler results
+        """
+        pos_inds = torch.nonzero(
+            assign_result.gt_inds > 0, as_tuple=False).squeeze(-1).unique()
+        neg_inds = torch.nonzero(
+            assign_result.gt_inds == 0, as_tuple=False).squeeze(-1).unique()
+        gt_flags = bboxes.new_zeros(bboxes.shape[0], dtype=torch.uint8)
+        sampling_result = SamplingResult(pos_inds, neg_inds, bboxes, gt_bboxes,
+                                         assign_result, gt_flags)
+        return sampling_result
+
+
+def bbox_overlaps(bboxes1, bboxes2, eps=1e-6):
+    """Calculate overlap between two set of bboxes.
+
+    Calculate the overlaps between each aligned
+    pair of bboxes1 and bboxes2.
+
+    Args:
+        bboxes1 (Tensor): shape (B, m, 4) in <x1, y1, x2, y2> format or empty.
+        bboxes2 (Tensor): shape (B, n, 4) in <x1, y1, x2, y2> format or empty.
+            B indicates the batch dim, in shape (B1, B2, ..., Bn).
+        mode (str): "iou" (intersection over union) or "iof" (intersection over
+            foreground).
+        eps (float, optional): A value added to the denominator for numerical
+            stability. Default 1e-6.
+
+    Returns:
+        Tensor: shape (m, n)
+
+    Example:
+        >>> bboxes1 = torch.FloatTensor([
+        >>>     [0, 0, 10, 10],
+        >>>     [10, 10, 20, 20],
+        >>>     [32, 32, 38, 42],
+        >>> ])
+        >>> bboxes2 = torch.FloatTensor([
+        >>>     [0, 0, 10, 20],
+        >>>     [0, 10, 10, 19],
+        >>>     [10, 10, 20, 20],
+        >>> ])
+        >>> bbox_overlaps(bboxes1, bboxes2)
+        tensor([[0.5000, 0.0000, 0.0000],
+                [0.0000, 0.0000, 1.0000],
+                [0.0000, 0.0000, 0.0000]])
+        >>> bbox_overlaps(bboxes1, bboxes2, mode='giou', eps=1e-7)
+        tensor([[0.5000, 0.0000, -0.5000],
+                [-0.2500, -0.0500, 1.0000],
+                [-0.8371, -0.8766, -0.8214]])
+
+    Example:
+        >>> empty = torch.FloatTensor([])
+        >>> nonempty = torch.FloatTensor([
+        >>>     [0, 0, 10, 9],
+        >>> ])
+        >>> assert tuple(bbox_overlaps(empty, nonempty).shape) == (0, 1)
+        >>> assert tuple(bbox_overlaps(nonempty, empty).shape) == (1, 0)
+        >>> assert tuple(bbox_overlaps(empty, empty).shape) == (0, 0)
+    """
+
+    # Either the boxes are empty or the length of boxes's last dimenstion is 4
+    assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
+    assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
+
+    # Batch dim must be the same
+    # Batch dim: (B1, B2, ... Bn)
+    assert bboxes1.shape[:-2] == bboxes2.shape[:-2]
+    batch_shape = bboxes1.shape[:-2]
+
+    rows = bboxes1.size(-2)
+    cols = bboxes2.size(-2)
+
+    if rows * cols == 0:
+        return bboxes1.new(batch_shape + (rows, cols))
+
+    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
+        bboxes1[..., 3] - bboxes1[..., 1])
+    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
+        bboxes2[..., 3] - bboxes2[..., 1])
+
+    lt = torch.max(bboxes1[..., :, None, :2],
+                    bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
+    rb = torch.min(bboxes1[..., :, None, 2:],
+                    bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
+
+    wh = (rb - lt).clamp(min=0)  # [B, rows, cols, 2]
+    overlap = wh[..., 0] * wh[..., 1]
+
+    union = area1[..., None] + area2[..., None, :] - overlap
+
+    eps = union.new_tensor([eps])
+    union = torch.max(union, eps)
+    ious = overlap / union
+    
+    return ious
+
+def bbox_ovelaps_nearest(bboxes1, bboxes2):
+    """Calculate nearest 3D IoU.
+
+    Note:
+        It calculates the ious between
+        each bbox of bboxes1 and bboxes2.
+
+    Args:
+        bboxes1 (torch.Tensor): shape (N, 7+N) [x, y, z, h, w, l, ry, v].
+        bboxes2 (torch.Tensor): shape (M, 7+N) [x, y, z, h, w, l, ry, v].
+        mode (str): "iou" (intersection over union) or iof
+            (intersection over foreground).
+
+    Return:
+        torch.Tensor: Return ious between \
+            bboxes1 and bboxes2 with shape (M, N).
+    """
+    assert bboxes1.size(-1) == bboxes2.size(-1) >= 7
+
+    bboxes1 = LiDARInstance3DBoxes(bboxes1, box_dim=bboxes1.shape[-1])
+    bboxes2 = LiDARInstance3DBoxes(bboxes2, box_dim=bboxes2.shape[-1])
+
+    # Change the bboxes to bev
+    # box conversion and iou calculation in torch version on CUDA
+    # is 10x faster than that in numpy version
+    bboxes1_bev = bboxes1.nearest_bev
+    bboxes2_bev = bboxes2.nearest_bev
+
+    ret = bbox_overlaps(
+        bboxes1_bev, bboxes2_bev)
+    return ret
+
+
+class AssignResult(object):
+    """Stores assignments between predicted and truth boxes.
+
+    Attributes:
+        num_gts (int): the number of truth boxes considered when computing this
+            assignment
+
+        gt_inds (LongTensor): for each predicted box indicates the 1-based
+            index of the assigned truth box. 0 means unassigned and -1 means
+            ignore.
+
+        max_overlaps (FloatTensor): the iou between the predicted box and its
+            assigned truth box.
+
+        labels (None | LongTensor): If specified, for each predicted box
+            indicates the category label of the assigned truth box.
+
+    Example:
+        >>> # An assign result between 4 predicted boxes and 9 true boxes
+        >>> # where only two boxes were assigned.
+        >>> num_gts = 9
+        >>> max_overlaps = torch.LongTensor([0, .5, .9, 0])
+        >>> gt_inds = torch.LongTensor([-1, 1, 2, 0])
+        >>> labels = torch.LongTensor([0, 3, 4, 0])
+        >>> self = AssignResult(num_gts, gt_inds, max_overlaps, labels)
+        >>> print(str(self))  # xdoctest: +IGNORE_WANT
+        <AssignResult(num_gts=9, gt_inds.shape=(4,), max_overlaps.shape=(4,),
+                      labels.shape=(4,))>
+        >>> # Force addition of gt labels (when adding gt as proposals)
+        >>> new_labels = torch.LongTensor([3, 4, 5])
+        >>> self.add_gt_(new_labels)
+        >>> print(str(self))  # xdoctest: +IGNORE_WANT
+        <AssignResult(num_gts=9, gt_inds.shape=(7,), max_overlaps.shape=(7,),
+                      labels.shape=(7,))>
+    """
+
+    def __init__(self, num_gts, gt_inds, max_overlaps, labels=None):
+        self.num_gts = num_gts
+        self.gt_inds = gt_inds
+        self.max_overlaps = max_overlaps
+        self.labels = labels
+        # Interface for possible user-defined properties
+        self._extra_properties = {}
+
+    @property
+    def num_preds(self):
+        """int: the number of predictions in this assignment"""
+        return len(self.gt_inds)
+
+    def set_extra_property(self, key, value):
+        """Set user-defined new property."""
+        assert key not in self.info
+        self._extra_properties[key] = value
+
+    def get_extra_property(self, key):
+        """Get user-defined property."""
+        return self._extra_properties.get(key, None)
+
+    @property
+    def info(self):
+        """dict: a dictionary of info about the object"""
+        basic_info = {
+            'num_gts': self.num_gts,
+            'num_preds': self.num_preds,
+            'gt_inds': self.gt_inds,
+            'max_overlaps': self.max_overlaps,
+            'labels': self.labels,
+        }
+        basic_info.update(self._extra_properties)
+        return basic_info
+
+    def __nice__(self):
+        """str: a "nice" summary string describing this assign result"""
+        parts = []
+        parts.append(f'num_gts={self.num_gts!r}')
+        if self.gt_inds is None:
+            parts.append(f'gt_inds={self.gt_inds!r}')
+        else:
+            parts.append(f'gt_inds.shape={tuple(self.gt_inds.shape)!r}')
+        if self.max_overlaps is None:
+            parts.append(f'max_overlaps={self.max_overlaps!r}')
+        else:
+            parts.append('max_overlaps.shape='
+                         f'{tuple(self.max_overlaps.shape)!r}')
+        if self.labels is None:
+            parts.append(f'labels={self.labels!r}')
+        else:
+            parts.append(f'labels.shape={tuple(self.labels.shape)!r}')
+        return ', '.join(parts)
+
+    @classmethod
+    def random(cls, **kwargs):
+        """Create random AssignResult for tests or debugging.
+
+        Args:
+            num_preds: number of predicted boxes
+            num_gts: number of true boxes
+            p_ignore (float): probability of a predicted box assinged to an
+                ignored truth
+            p_assigned (float): probability of a predicted box not being
+                assigned
+            p_use_label (float | bool): with labels or not
+            rng (None | int | numpy.random.RandomState): seed or state
+
+        Returns:
+            :obj:`AssignResult`: Randomly generated assign results.
+
+        Example:
+            >>> from mmdet.core.bbox.assigners.assign_result import *  # NOQA
+            >>> self = AssignResult.random()
+            >>> print(self.info)
+        """
+        from mmdet.core.bbox import demodata
+        rng = demodata.ensure_rng(kwargs.get('rng', None))
+
+        num_gts = kwargs.get('num_gts', None)
+        num_preds = kwargs.get('num_preds', None)
+        p_ignore = kwargs.get('p_ignore', 0.3)
+        p_assigned = kwargs.get('p_assigned', 0.7)
+        p_use_label = kwargs.get('p_use_label', 0.5)
+        num_classes = kwargs.get('p_use_label', 3)
+
+        if num_gts is None:
+            num_gts = rng.randint(0, 8)
+        if num_preds is None:
+            num_preds = rng.randint(0, 16)
+
+        if num_gts == 0:
+            max_overlaps = torch.zeros(num_preds, dtype=torch.float32)
+            gt_inds = torch.zeros(num_preds, dtype=torch.int64)
+            if p_use_label is True or p_use_label < rng.rand():
+                labels = torch.zeros(num_preds, dtype=torch.int64)
+            else:
+                labels = None
+        else:
+            import numpy as np
+            # Create an overlap for each predicted box
+            max_overlaps = torch.from_numpy(rng.rand(num_preds))
+
+            # Construct gt_inds for each predicted box
+            is_assigned = torch.from_numpy(rng.rand(num_preds) < p_assigned)
+            # maximum number of assignments constraints
+            n_assigned = min(num_preds, min(num_gts, is_assigned.sum()))
+
+            assigned_idxs = np.where(is_assigned)[0]
+            rng.shuffle(assigned_idxs)
+            assigned_idxs = assigned_idxs[0:n_assigned]
+            assigned_idxs.sort()
+
+            is_assigned[:] = 0
+            is_assigned[assigned_idxs] = True
+
+            is_ignore = torch.from_numpy(
+                rng.rand(num_preds) < p_ignore) & is_assigned
+
+            gt_inds = torch.zeros(num_preds, dtype=torch.int64)
+
+            true_idxs = np.arange(num_gts)
+            rng.shuffle(true_idxs)
+            true_idxs = torch.from_numpy(true_idxs)
+            gt_inds[is_assigned] = true_idxs[:n_assigned]
+
+            gt_inds = torch.from_numpy(
+                rng.randint(1, num_gts + 1, size=num_preds))
+            gt_inds[is_ignore] = -1
+            gt_inds[~is_assigned] = 0
+            max_overlaps[~is_assigned] = 0
+
+            if p_use_label is True or p_use_label < rng.rand():
+                if num_classes == 0:
+                    labels = torch.zeros(num_preds, dtype=torch.int64)
+                else:
+                    labels = torch.from_numpy(
+                        # remind that we set FG labels to [0, num_class-1]
+                        # since mmdet v2.0
+                        # BG cat_id: num_class
+                        rng.randint(0, num_classes, size=num_preds))
+                    labels[~is_assigned] = 0
+            else:
+                labels = None
+
+        self = cls(num_gts, gt_inds, max_overlaps, labels)
+        return self
+
+    def add_gt_(self, gt_labels):
+        """Add ground truth as assigned results.
+
+        Args:
+            gt_labels (torch.Tensor): Labels of gt boxes
+        """
+        self_inds = torch.arange(
+            1, len(gt_labels) + 1, dtype=torch.long, device=gt_labels.device)
+        self.gt_inds = torch.cat([self_inds, self.gt_inds])
+
+        self.max_overlaps = torch.cat(
+            [self.max_overlaps.new_ones(len(gt_labels)), self.max_overlaps])
+
+        if self.labels is not None:
+            self.labels = torch.cat([gt_labels, self.labels])
+
+class MaxIoUAssigner(object):
+    """Assign a corresponding gt bbox or background to each bbox.
+
+    Each proposals will be assigned with `-1`, or a semi-positive integer
+    indicating the ground truth index.
+
+    - -1: negative sample, no assigned gt
+    - semi-positive integer: positive sample, index (0-based) of assigned gt
+
+    Args:
+        pos_iou_thr (float): IoU threshold for positive bboxes.
+        neg_iou_thr (float or tuple): IoU threshold for negative bboxes.
+        min_pos_iou (float): Minimum iou for a bbox to be considered as a
+            positive bbox. Positive samples can have smaller IoU than
+            pos_iou_thr due to the 4th step (assign max IoU sample to each gt).
+        match_low_quality (bool): Whether to allow low quality matches. This is
+            usually allowed for RPN and single stage detectors, but not allowed
+            in the second stage. Details are demonstrated in Step 4.
+        gpu_assign_thr (int): The upper bound of the number of GT for GPU
+            assign. When the number of gt is above this threshold, will assign
+            on CPU device. Negative values mean not assign on CPU.
+    """
+
+    def __init__(self,
+                 pos_iou_thr,
+                 neg_iou_thr,
+                 min_pos_iou=.0):
+        self.pos_iou_thr = pos_iou_thr
+        self.neg_iou_thr = neg_iou_thr
+        self.min_pos_iou = min_pos_iou
+
+
+    def assign(self, bboxes, gt_bboxes, gt_bboxes_ignore=None, gt_labels=None):
+        """Assign gt to bboxes.
+
+        This method assign a gt bbox to every bbox (proposal/anchor), each bbox
+        will be assigned with -1, or a semi-positive number. -1 means negative
+        sample, semi-positive number is the index (0-based) of assigned gt.
+        The assignment is done in following steps, the order matters.
+
+        1. assign every bbox to the background
+        2. assign proposals whose iou with all gts < neg_iou_thr to 0
+        3. for each bbox, if the iou with its nearest gt >= pos_iou_thr,
+           assign it to that bbox
+        4. for each gt bbox, assign its nearest proposals (may be more than
+           one) to itself
+
+        Args:
+            bboxes (Tensor): Bounding boxes to be assigned, shape(n, 4).
+            gt_bboxes (Tensor): Groundtruth boxes, shape (k, 4).
+            gt_bboxes_ignore (Tensor, optional): Ground truth bboxes that are
+                labelled as `ignored`, e.g., crowd boxes in COCO.
+            gt_labels (Tensor, optional): Label of gt_bboxes, shape (k, ).
+
+        Returns:
+            :obj:`AssignResult`: The assign result.
+
+        Example:
+            >>> self = MaxIoUAssigner(0.5, 0.5)
+            >>> bboxes = torch.Tensor([[0, 0, 10, 10], [10, 10, 20, 20]])
+            >>> gt_bboxes = torch.Tensor([[0, 0, 10, 9]])
+            >>> assign_result = self.assign(bboxes, gt_bboxes)
+            >>> expected_gt_inds = torch.LongTensor([1, 0])
+            >>> assert torch.all(assign_result.gt_inds == expected_gt_inds)
+        """
+        overlaps = bbox_ovelaps_nearest(gt_bboxes, bboxes)
+        assign_result = self.assign_wrt_overlaps(overlaps, gt_labels)
+        return assign_result
+
+    def assign_wrt_overlaps(self, overlaps, gt_labels=None):
+        """Assign w.r.t. the overlaps of bboxes with gts.
+
+        Args:
+            overlaps (Tensor): Overlaps between k gt_bboxes and n bboxes,
+                shape(k, n).
+            gt_labels (Tensor, optional): Labels of k gt_bboxes, shape (k, ).
+
+        Returns:
+            :obj:`AssignResult`: The assign result.
+        """
+        num_gts, num_bboxes = overlaps.size(0), overlaps.size(1)
+
+        # 1. assign -1 by default
+        assigned_gt_inds = overlaps.new_full((num_bboxes, ),
+                                             -1,
+                                             dtype=torch.long)
+
+        if num_gts == 0 or num_bboxes == 0:
+            # No ground truth or boxes, return empty assignment
+            max_overlaps = overlaps.new_zeros((num_bboxes, ))
+            if num_gts == 0:
+                # No truth, assign everything to background
+                assigned_gt_inds[:] = 0
+            if gt_labels is None:
+                assigned_labels = None
+            else:
+                assigned_labels = overlaps.new_full((num_bboxes, ),
+                                                    -1,
+                                                    dtype=torch.long)
+            return AssignResult(
+                num_gts,
+                assigned_gt_inds,
+                max_overlaps,
+                labels=assigned_labels)
+
+        # for each anchor, which gt best overlaps with it
+        # for each anchor, the max iou of all gts
+        max_overlaps, argmax_overlaps = overlaps.max(dim=0)
+        # for each gt, which anchor best overlaps with it
+        # for each gt, the max iou of all proposals
+        gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)
+
+        # 2. assign negative: below
+        # the negative inds are set to be 0
+        if isinstance(self.neg_iou_thr, float):
+            assigned_gt_inds[(max_overlaps >= 0)
+                             & (max_overlaps < self.neg_iou_thr)] = 0
+        elif isinstance(self.neg_iou_thr, tuple):
+            assert len(self.neg_iou_thr) == 2
+            assigned_gt_inds[(max_overlaps >= self.neg_iou_thr[0])
+                             & (max_overlaps < self.neg_iou_thr[1])] = 0
+
+        # 3. assign positive: above positive IoU threshold
+        pos_inds = max_overlaps >= self.pos_iou_thr
+        assigned_gt_inds[pos_inds] = argmax_overlaps[pos_inds] + 1
+
+        # Low-quality matching will overwirte the assigned_gt_inds assigned
+        # in Step 3. Thus, the assigned gt might not be the best one for
+        # prediction.
+        # For example, if bbox A has 0.9 and 0.8 iou with GT bbox 1 & 2,
+        # bbox 1 will be assigned as the best target for bbox A in step 3.
+        # However, if GT bbox 2's gt_argmax_overlaps = A, bbox A's
+        # assigned_gt_inds will be overwritten to be bbox B.
+        # This might be the reason that it is not used in ROI Heads.
+        for i in range(num_gts):
+            if gt_max_overlaps[i] >= self.min_pos_iou:
+                max_iou_inds = overlaps[i, :] == gt_max_overlaps[i]
+                assigned_gt_inds[max_iou_inds] = i + 1
+
+        if gt_labels is not None:
+            assigned_labels = assigned_gt_inds.new_full((num_bboxes, ), -1)
+            pos_inds = torch.nonzero(
+                assigned_gt_inds > 0, as_tuple=False).squeeze()
+            if pos_inds.numel() > 0:
+                assigned_labels[pos_inds] = gt_labels[
+                    assigned_gt_inds[pos_inds] - 1]
+        else:
+            assigned_labels = None
+
+        return AssignResult(
+            num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)
+
+
+def multi_apply(func, *args, **kwargs):
+    """Apply function to a list of arguments.
+
+    Note:
+        This function applies the ``func`` to multiple inputs and
+        map the multiple outputs of the ``func`` into different
+        list. Each list contains the same type of outputs corresponding
+        to different inputs.
+
+    Args:
+        func (Function): A function that will be applied to a list of
+            arguments
+
+    Returns:
+        tuple(list): A tuple containing multiple list, each list contains \
+            a kind of returned results by the function
+    """
+    pfunc = partial(func, **kwargs) if kwargs else func
+    map_results = map(pfunc, *args)
+    return tuple(map(list, zip(*map_results)))
+
 
 def limit_period(val, offset=0.5, period=np.pi):
     """Limit the value into a period for periodic function.
