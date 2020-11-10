@@ -150,6 +150,58 @@ class SemanticSegmentation(BasePipeline):
             log.info("test iou: {}".format(
                 np.nanmean(np.array(self.test_ious)[:, -1])))
 
+
+    def run_valid(self):
+        model = self.model
+        dataset = self.dataset
+        device = self.device
+        cfg = self.cfg
+
+
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        metric = SemSegMetric(self, model, dataset, device)
+
+        log.info("DEVICE : {}".format(device))
+        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
+        test_split = TorchDataloader(dataset=dataset.get_split('validation'),
+                                     preprocess=model.preprocess,
+                                     transform=model.transform,
+                                     use_cache=dataset.cfg.use_cache,
+                                     shuffle=False)
+
+
+        datset_split = self.dataset.get_split('test')
+
+        log.info("Started testing")
+
+        self.test_accs = []
+        self.test_ious = []
+
+        with torch.no_grad():
+            for idx in tqdm(range(len(test_split)), desc='validation'):
+                attr = datset_split.get_attr(idx)
+                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
+                    continue
+                data = datset_split.get_data(idx)
+                results = self.run_inference(data)
+
+                predict_label = results['predict_labels']
+             
+                acc = metric.acc_np_label(predict_label, data['label'])
+                iou = metric.iou_np_label(predict_label, data['label'])
+                self.test_accs.append(acc)
+                self.test_ious.append(iou)
+
+
+        if cfg.get('test_compute_metric', True):
+            log.info("test acc: {}".format(
+                np.nanmean(np.array(self.test_accs)[:, -1])))
+            log.info("test iou: {}".format(
+                np.nanmean(np.array(self.test_ious)[:, -1])))
+
     def run_train(self):
         model = self.model
         device = self.device
@@ -169,7 +221,7 @@ class SemanticSegmentation(BasePipeline):
         Loss = SemSegLoss(self, model, dataset, device)
         metric = SemSegMetric(self, model, dataset, device)
 
-        batcher = self.get_batcher(device)
+        self.batcher = self.get_batcher(device)
 
         train_dataset = dataset.get_split('training')
         train_sampler = train_dataset.sampler
@@ -183,7 +235,7 @@ class SemanticSegmentation(BasePipeline):
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   sampler=get_sampler(train_sampler),
-                                  collate_fn=batcher.collate_fn)
+                                  collate_fn=self.batcher.collate_fn)
 
         valid_dataset = dataset.get_split('validation')
         valid_sampler = valid_dataset.sampler
@@ -197,7 +249,7 @@ class SemanticSegmentation(BasePipeline):
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
                                   sampler=get_sampler(valid_sampler),
-                                  collate_fn=batcher.collate_fn)
+                                  collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -227,36 +279,37 @@ class SemanticSegmentation(BasePipeline):
             self.ious = []
             model.trans_point_sampler = train_sampler.get_point_sampler()
 
-            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-                results = model(inputs['data'])
-                loss, gt_labels, predict_scores = model.get_loss(
-                    Loss, results, inputs, device)
+            # for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+            #     results = model(inputs['data'])
+            #     loss, gt_labels, predict_scores = model.get_loss(
+            #         Loss, results, inputs, device)
 
-                if predict_scores.size()[-1] == 0:
-                    continue
+            #     if predict_scores.size()[-1] == 0:
+            #         continue
 
-                self.optimizer.zero_grad()
-                loss.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
-                self.optimizer.step()
+            #     self.optimizer.zero_grad()
+            #     loss.backward()
+            #     if model.cfg.get('grad_clip_norm', -1) > 0:
+            #         torch.nn.utils.clip_grad_value_(model.parameters(),
+            #                                         model.cfg.grad_clip_norm)
+            #     self.optimizer.step()
 
-                acc = metric.acc(predict_scores, gt_labels)
-                iou = metric.iou(predict_scores, gt_labels)
+            #     acc = metric.acc(predict_scores, gt_labels)
+            #     iou = metric.iou(predict_scores, gt_labels)
 
-                self.losses.append(loss.cpu().item())
-                self.accs.append(acc)
-                self.ious.append(iou)
+            #     self.losses.append(loss.cpu().item())
+            #     self.accs.append(acc)
+            #     self.ious.append(iou)
 
-            self.scheduler.step()
+            # self.scheduler.step()
 
             # --------------------- validation
             model.eval()
+            model.trans_point_sampler = valid_sampler.get_point_sampler()
+            self.run_valid()
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
-            model.trans_point_sampler = valid_sampler.get_point_sampler()
 
             with torch.no_grad():
                 for step, inputs in enumerate(
