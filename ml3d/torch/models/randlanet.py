@@ -140,12 +140,11 @@ class RandLANet(BaseModel):
         tree = data['search_tree']
 
         pc, selected_idxs, center_point = self.trans_point_sampler(
-            pc=pc, 
-            feat=feat, 
-            label=label, 
-            search_tree=tree, 
-            num_points=self.cfg.num_points
-        )
+            pc=pc,
+            feat=feat,
+            label=label,
+            search_tree=tree,
+            num_points=self.cfg.num_points)
 
         label = label[selected_idxs]
         if (feat is None):
@@ -154,7 +153,8 @@ class RandLANet(BaseModel):
             feat = feat[selected_idxs]
 
         if attr['split'] == 'test':
-            dists = np.sum(np.square((pc - center_point).astype(np.float32)), axis=1)
+            dists = np.sum(np.square((pc - center_point).astype(np.float32)),
+                           axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idxs] += delta
             inputs['point_inds'] = selected_idx

@@ -2,7 +2,7 @@ dataset:
   name: ParisLille3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  # class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
   ignored_label_inds:
   - 0
   test_result_folder: ./test
@@ -19,7 +19,8 @@ model:
   KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
-  architecture: ['simple',
+  architecture: [
+  'simple',
   'resnetb',
   'resnetb_strided',
   'resnetb',
@@ -37,6 +38,7 @@ model:
   'unary',
   'nearest_upsample',
   'unary']
+  reduce_fc: true
   augment_color: 0.8
   augment_noise: 0.01
   augment_rotation: vertical
@@ -47,7 +49,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 30000
+  batch_limit: 20000
   grad_clip_norm: 100.0
   batch_norm_momentum: 0.98
   batcher: ConcatBatcher
@@ -64,8 +66,8 @@ model:
   in_points_dim: 3
   in_radius: 4.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-  min_in_points: 15000
-  max_in_points: 25000
+  min_in_points: 5000
+  max_in_points: 10000
   modulated: false
   num_classes: 9
   num_kernel_points: 15

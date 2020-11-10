@@ -437,13 +437,12 @@ class KPFCNN(BaseModel):
 
             new_points = points.copy()
             curr_new_points, mask_inds, p0 = self.trans_point_sampler(
-                pc=new_points, 
-                feat=feat, 
-                label=sem_labels, 
-                search_tree=search_tree, 
+                pc=new_points,
+                feat=feat,
+                label=sem_labels,
+                search_tree=search_tree,
                 num_points=min_in_points,
-                radius=self.cfg.in_radius
-            )
+                radius=self.cfg.in_radius)
 
             curr_sem_labels = sem_labels[mask_inds]
 
@@ -926,7 +925,12 @@ class KPConv(nn.Module):
         self.reset_parameters()
 
         # Initialize kernel points
-        self.kernel_points = self.init_KP()
+        # self.kernel_points = self.init_KP()
+
+        if deformable:
+            self.kernel_points = self.offset_conv.kernel_points
+        else:
+            self.kernel_points = self.init_KP()
 
         return
 

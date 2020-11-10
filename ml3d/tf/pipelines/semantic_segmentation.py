@@ -16,6 +16,8 @@ from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
 
+from tf2tf import tf2tf
+
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
     level=logging.INFO,
@@ -169,6 +171,7 @@ class SemanticSegmentation(BasePipeline):
 
         is_resume = model.cfg.get('is_resume', True)
         self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
+
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
             # --------------------- training
@@ -190,6 +193,10 @@ class SemanticSegmentation(BasePipeline):
 
                 if predict_scores.shape[0] == 0:
                     continue
+
+                # if idx == 0:
+                #     path = "../dataset/checkpoints/Log_pretrained_NPM3D/snapshots/snap-85345"
+                #     tf2tf(model, path)
                 # params for deformable convolutions.
                 scaled_params = []
                 params = []
@@ -216,6 +223,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+                print(acc[-1], iou[-1])
 
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)

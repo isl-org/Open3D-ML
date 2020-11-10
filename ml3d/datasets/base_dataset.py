@@ -113,7 +113,6 @@ class BaseDatasetSplit(ABC):
         sampler_cls = get_module('sampler', sampler_cfg['name'])
         self.sampler = sampler_cls(self)
 
-
     @abstractmethod
     def __len__(self):
         """Returns the number of samples in the split."""

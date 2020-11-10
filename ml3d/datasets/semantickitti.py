@@ -209,9 +209,8 @@ class SemanticKITTISplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
-        log.info(  
-            "Found {} pointclouds for {}".format(len(self.path_list), split)
-        )
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
         self.remap_lut_val = dataset.remap_lut_val
 
     def __len__(self):

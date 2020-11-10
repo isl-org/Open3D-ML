@@ -129,6 +129,7 @@ class ParisLille3D(BaseDataset):
 
 
 class ParisLille3DSplit(BaseDatasetSplit):
+
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
 

@@ -206,7 +206,10 @@ class KPConv(tf.keras.layers.Layer):
 
         self.reset_parameters()
 
-        self.kernel_points = self.init_KP()
+        if deformable:
+            self.kernel_points = self.offset_conv.kernel_points
+        else:
+            self.kernel_points = self.init_KP()
         return
 
     def reset_parameters(self):

@@ -65,7 +65,7 @@ class TorchDataloader(Dataset):
             self.cache_convert = None
 
         self.transform = transform
-        
+
         if sampler is not None:
             sampler.initialize_with_dataloader(self)
 

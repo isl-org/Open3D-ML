@@ -143,12 +143,10 @@ class Toronto3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
-        
-        log.info(  
-            "Found {} pointclouds for {}".format(len(self.path_list), split)
-        )
-        self.UTM_OFFSET = [627285, 4841948, 0]
 
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
+        self.UTM_OFFSET = [627285, 4841948, 0]
 
     def __len__(self):
         return len(self.path_list)
@@ -181,7 +179,7 @@ class Toronto3DSplit(BaseDatasetSplit):
         pc_path = str(pc_path)
         split = self.split
         attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
-        
+
         return attr
 
 

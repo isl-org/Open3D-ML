@@ -1,8 +1,10 @@
 import torch
 from torch.utils.data import Sampler
 
+
 class TorchSamplerWrapper(Sampler):
     """docstring for TorchSamplerWrapper"""
+
     def __init__(self, sampler):
         self.sampler = sampler
 
@@ -11,7 +13,7 @@ class TorchSamplerWrapper(Sampler):
 
     def __len__(self):
         return len(self.sampler)
-        
+
 
 def get_sampler(sampler):
     return TorchSamplerWrapper(sampler)
