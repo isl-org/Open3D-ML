@@ -16,8 +16,6 @@ from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
 
-from tf2tf import tf2tf
-
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
     level=logging.INFO,
@@ -193,11 +191,6 @@ class SemanticSegmentation(BasePipeline):
 
                 if predict_scores.shape[0] == 0:
                     continue
-
-                # if idx == 0:
-                #     path = "../dataset/checkpoints/Log_pretrained_NPM3D/snapshots/snap-85345"
-                #     tf2tf(model, path)
-                # params for deformable convolutions.
                 scaled_params = []
                 params = []
                 for val in model.trainable_weights:
@@ -223,7 +216,6 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
-                print(acc[-1], iou[-1])
 
                 self.losses.append(loss.numpy())
                 self.accs.append(acc)
