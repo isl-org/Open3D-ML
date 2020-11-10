@@ -8,9 +8,11 @@ from ...utils import SAMPLER
 class SemSegSpatiallyRegularSampler(object):
     """Spatially regularSampler sampler for semantic segmentation datsets"""
 
-    def __init__(self, dataset_split):
-        self.dataset_split = dataset_split
-        self.length = len(dataset_split)
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.length = len(dataset)
+        self.split = self.dataset.split
+
 
     def __len__(self):
         return self.length
@@ -21,10 +23,9 @@ class SemSegSpatiallyRegularSampler(object):
         self.possibilities = []
 
         self.length = len(dataloader)
-        dataset = self.dataset_split
+        dataset = self.dataset
 
         for index in range(len(dataset)):
-
             attr = dataset.get_attr(index)
             if dataloader.cache_convert:
                 data = dataloader.cache_convert(attr['name'])
@@ -38,12 +39,24 @@ class SemSegSpatiallyRegularSampler(object):
             self.min_possibilities += [float(np.min(self.possibilities[-1]))]
 
     def get_cloud_sampler(self):
-
-        def gen():
+        def gen_train():
             for i in range(self.length):
                 self.cloud_id = int(np.argmin(self.min_possibilities))
                 yield self.cloud_id
 
+        def gen_test():
+            curr_could_id = 0
+            while curr_could_id < self.length:
+                if self.min_possibilities[curr_could_id] > 0.5:
+                    curr_could_id = curr_could_id + 1
+                self.cloud_id = curr_could_id
+                print(self.cloud_id)
+                yield self.cloud_id
+
+        if self.split == 'train':
+            gen = gen_train
+        else:
+            gen = gen_test
         return gen()
 
     def get_point_sampler(self):

@@ -112,11 +112,21 @@ class SemanticSegmentation(BasePipeline):
 
         batcher = self.get_batcher(device, split='test')
 
-        test_split = TorchDataloader(dataset=dataset.get_split('test'),
-                                     preprocess=model.preprocess,
-                                     transform=model.transform,
-                                     use_cache=dataset.cfg.use_cache,
-                                     shuffle=False)
+        test_dataset = dataset.get_split('test')
+        test_sampler = test_dataset.sampler
+        test_split = TorchDataloader(dataset=test_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      sampler=train_sampler,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                        'steps_per_epoch_train', None))
+        test_loader = DataLoader(test_split,
+                                  batch_size=cfg.batch_size,
+                                  sampler=get_sampler(train_sampler),
+                                  collate_fn=self.batcher.collate_fn)
+
+
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -159,6 +169,8 @@ class SemanticSegmentation(BasePipeline):
 
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+        Loss = SemSegLoss(self, model, dataset, device)
         metric = SemSegMetric(self, model, dataset, device)
 
         log.info("DEVICE : {}".format(device))
@@ -166,19 +178,56 @@ class SemanticSegmentation(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        test_split = TorchDataloader(dataset=dataset.get_split('validation'),
-                                     preprocess=model.preprocess,
-                                     transform=model.transform,
-                                     use_cache=dataset.cfg.use_cache,
-                                     shuffle=False)
+        batcher = self.get_batcher(device)
+        test_dataset = dataset.get_split('validation')
+        test_sampler = test_dataset.sampler
+        test_split = TorchDataloader(dataset=test_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      sampler=test_sampler,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                        'steps_per_epoch_train', None))
+        test_loader = DataLoader(test_split,
+                                  batch_size=cfg.batch_size,
+                                  sampler=get_sampler(test_sampler),
+                                  collate_fn=self.batcher.collate_fn)
+
+
 
 
         datset_split = self.dataset.get_split('test')
 
-        log.info("Started testing")
+        log.info("Started validation")
 
-        self.test_accs = []
-        self.test_ious = []
+        self.valid_losses = []
+        self.valid_accs = []
+        self.valid_ious = []
+        model.trans_point_sampler = test_sampler.get_point_sampler()
+
+        self.pbar = tqdm(
+            total=test_sampler.possibilities[test_sampler.cloud_id].shape[0])
+        
+        self.pbar_update = 0
+
+        with torch.no_grad():
+            for step, inputs in enumerate(test_loader):
+
+
+                results = model(inputs['data'])
+                loss, gt_labels, predict_scores = model.get_loss(
+                    Loss, results, inputs, device)
+
+                if predict_scores.size()[-1] == 0:
+                    continue
+                acc = metric.acc(predict_scores, gt_labels)
+                iou = metric.iou(predict_scores, gt_labels)
+
+                self.valid_losses.append(loss.cpu().item())
+                self.valid_accs.append(acc)
+                self.valid_ious.append(iou)
+
+                step = step + 1
 
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='validation'):
