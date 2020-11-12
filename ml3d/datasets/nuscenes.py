@@ -89,7 +89,7 @@ class NuScenes(BaseDataset):
 
     @staticmethod
     def read_label(info):
-        mask = info['num_lidar_pts'] > 0
+        mask = info['num_lidar_pts'] != 0
         boxes = info['gt_boxes'][mask]
         names = info['gt_names'][mask]
 
@@ -137,7 +137,6 @@ class NuSceneSplit():
     def get_data(self, idx):
         info = self.infos[idx]
         lidar_path = info['lidar_path']
-        print(info.keys())
 
         pc = self.dataset.read_lidar(lidar_path)
         label = self.dataset.read_label(info)
@@ -163,7 +162,7 @@ class NuSceneSplit():
         pc_path = info['lidar_path']
         name = Path(pc_path).name.split('.')[0]
 
-        attr = {'name': name, 'path': pc_path, 'split': self.split}
+        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
         return attr
 
 
