@@ -53,13 +53,24 @@ class LyftProcess():
         self.is_test = 'test' in version
         self.out_path = out_path
 
-        self.lyft = Lyft(data_path=join(dataset_path, version), json_path=join(dataset_path, version, 'data'), verbose=True)
+        self.lyft = Lyft(data_path=join(dataset_path, version),
+                         json_path=join(dataset_path, version, 'data'),
+                         verbose=True)
 
         if version == 'v1.01-train':
-            train_scenes = open(join(dirname(__file__), '../ml3d/datasets/_resources/lyft/train.txt'), 'r').read().split('\n')
-            val_scenes = open(join(dirname(__file__), '../ml3d/datasets/_resources/lyft/val.txt'), 'r').read().split('\n')
+            train_scenes = open(
+                join(dirname(__file__),
+                     '../ml3d/datasets/_resources/lyft/train.txt'),
+                'r').read().split('\n')
+            val_scenes = open(
+                join(dirname(__file__),
+                     '../ml3d/datasets/_resources/lyft/val.txt'),
+                'r').read().split('\n')
         elif version == 'v1.0-test':
-            train_scenes = open(join(dirname(__file__), '../ml3d/datasets/_resources/lyft/test.txt'), 'r').read().split('\n')
+            train_scenes = open(
+                join(dirname(__file__),
+                     '../ml3d/datasets/_resources/lyft/test.txt'),
+                'r').read().split('\n')
             val_scenes = []
         else:
             raise ValueError('unknown')
