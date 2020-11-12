@@ -17,6 +17,7 @@ class TorchDataloader(Dataset):
                  dataset=None,
                  preprocess=None,
                  transform=None,
+                 sampler=None,
                  use_cache=True,
                  steps_per_epoch=None,
                  **kwargs):
@@ -64,6 +65,9 @@ class TorchDataloader(Dataset):
             self.cache_convert = None
 
         self.transform = transform
+
+        if sampler is not None:
+            sampler.initialize_with_dataloader(self)
 
     def __getitem__(self, index):
         """Returns the item at index idx. """

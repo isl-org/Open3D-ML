@@ -8,13 +8,14 @@ import warnings
 from datetime import datetime
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
+from torch.utils.data import Dataset, IterableDataset, DataLoader
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
 
 from os.path import exists, join, isfile, dirname, abspath
 
 from .base_pipeline import BasePipeline
-from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
+from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
@@ -112,11 +113,19 @@ class SemanticSegmentation(BasePipeline):
 
         batcher = self.get_batcher(device, split='test')
 
-        test_split = TorchDataloader(dataset=dataset.get_split('test'),
+        test_dataset = dataset.get_split('test')
+        test_sampler = test_dataset.sampler
+        test_split = TorchDataloader(dataset=test_dataset,
                                      preprocess=model.preprocess,
                                      transform=model.transform,
+                                     sampler=train_sampler,
                                      use_cache=dataset.cfg.use_cache,
-                                     shuffle=False)
+                                     steps_per_epoch=dataset.cfg.get(
+                                         'steps_per_epoch_train', None))
+        test_loader = DataLoader(test_split,
+                                 batch_size=cfg.batch_size,
+                                 sampler=get_sampler(train_sampler),
+                                 collate_fn=self.batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -150,6 +159,90 @@ class SemanticSegmentation(BasePipeline):
             log.info("test iou: {}".format(
                 np.nanmean(np.array(self.test_ious)[:, -1])))
 
+    def run_valid(self):
+        model = self.model
+        dataset = self.dataset
+        device = self.device
+        cfg = self.cfg
+
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+        Loss = SemSegLoss(self, model, dataset, device)
+        metric = SemSegMetric(self, model, dataset, device)
+
+        log.info("DEVICE : {}".format(device))
+        log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
+        batcher = self.get_batcher(device)
+        valid_dataset = dataset.get_split('validation')
+        valid_sampler = valid_dataset.sampler
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      sampler=valid_sampler,
+                                      use_cache=dataset.cfg.use_cache)
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.batch_size,
+                                  sampler=get_sampler(valid_sampler),
+                                  collate_fn=self.batcher.collate_fn)
+
+        datset_split = self.dataset.get_split('validation')
+
+        log.info("Started validation")
+
+        self.valid_losses = []
+        self.valid_accs = []
+        self.valid_ious = []
+        model.trans_point_sampler = valid_sampler.get_point_sampler()
+        self.curr_cloud_id = -1
+        self.test_probs = []
+        self.test_labels = []
+
+        with torch.no_grad():
+            for step, inputs in enumerate(valid_loader):
+
+                results = model(inputs['data'])
+                loss, gt_labels, predict_scores = model.get_loss(
+                    Loss, results, inputs, device)
+
+                if predict_scores.size()[-1] == 0:
+                    continue
+                self.update_tests(valid_sampler, inputs, results)
+
+        test_probs = np.concatenate([t for t in self.test_probs], axis=0)
+        test_labels = np.concatenate([t for t in self.test_labels], axis=0)
+
+        conf_matrix = confusion_matrix(test_labels, np.argmax(test_probs,
+                                                              axis=1))
+        IoUs = DataProcessing.IoU_from_confusions(conf_matrix)
+        Accs = DataProcessing.Acc_from_confusions(conf_matrix)
+
+    def update_tests(self, sampler, inputs, results):
+        if self.curr_cloud_id != sampler.cloud_id:
+            self.curr_cloud_id = sampler.cloud_id
+            num_points = sampler.possibilities[sampler.cloud_id].shape[0]
+            self.pbar = tqdm(total=num_points,
+                             desc="validation {}/{}".format(
+                                 self.curr_cloud_id, len(sampler.dataset)))
+            self.pbar_update = 0
+            self.test_probs.append(
+                np.zeros(shape=[num_points, self.model.cfg.num_classes],
+                         dtype=np.float16))
+            self.test_labels.append(np.zeros(shape=[num_points],
+                                             dtype=np.int16))
+        else:
+            this_possiblility = sampler.possibilities[sampler.cloud_id]
+            self.pbar.update(this_possiblility[this_possiblility > 0.5].shape[0] \
+                - self.pbar_update)
+            self.pbar_update = this_possiblility[
+                this_possiblility > 0.5].shape[0]
+            self.test_probs[self.curr_cloud_id], self.test_labels[self.curr_cloud_id] \
+                = self.model.update_probs(inputs, results,
+                    self.test_probs[self.curr_cloud_id],
+                    self.test_labels[self.curr_cloud_id])
+
     def run_train(self):
         model = self.model
         device = self.device
@@ -169,31 +262,35 @@ class SemanticSegmentation(BasePipeline):
         Loss = SemSegLoss(self, model, dataset, device)
         metric = SemSegMetric(self, model, dataset, device)
 
-        batcher = self.get_batcher(device)
+        self.batcher = self.get_batcher(device)
 
-        train_split = TorchDataloader(dataset=dataset.get_split('training'),
+        train_dataset = dataset.get_split('training')
+        train_sampler = train_dataset.sampler
+        train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
+                                      sampler=train_sampler,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
-                                  shuffle=True,
-                                  collate_fn=batcher.collate_fn)
+                                  sampler=get_sampler(train_sampler),
+                                  collate_fn=self.batcher.collate_fn)
 
-        valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
+        valid_dataset = dataset.get_split('validation')
+        valid_sampler = valid_dataset.sampler
+        valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
+                                      sampler=valid_sampler,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
-
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
-                                  shuffle=True,
-                                  collate_fn=batcher.collate_fn)
+                                  sampler=get_sampler(valid_sampler),
+                                  collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -221,56 +318,38 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             self.accs = []
             self.ious = []
+            model.trans_point_sampler = train_sampler.get_point_sampler()
 
-            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-                results = model(inputs['data'])
-                loss, gt_labels, predict_scores = model.get_loss(
-                    Loss, results, inputs, device)
+            # for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+            #     results = model(inputs['data'])
+            #     loss, gt_labels, predict_scores = model.get_loss(
+            #         Loss, results, inputs, device)
 
-                if predict_scores.size()[-1] == 0:
-                    continue
+            #     if predict_scores.size()[-1] == 0:
+            #         continue
 
-                self.optimizer.zero_grad()
-                loss.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
-                self.optimizer.step()
+            #     self.optimizer.zero_grad()
+            #     loss.backward()
+            #     if model.cfg.get('grad_clip_norm', -1) > 0:
+            #         torch.nn.utils.clip_grad_value_(model.parameters(),
+            #                                         model.cfg.grad_clip_norm)
+            #     self.optimizer.step()
 
-                acc = metric.acc(predict_scores, gt_labels)
-                iou = metric.iou(predict_scores, gt_labels)
+            #     acc = metric.acc(predict_scores, gt_labels)
+            #     iou = metric.iou(predict_scores, gt_labels)
 
-                self.losses.append(loss.cpu().item())
-                self.accs.append(acc)
-                self.ious.append(iou)
+            #     self.losses.append(loss.cpu().item())
+            #     self.accs.append(acc)
+            #     self.ious.append(iou)
 
-            self.scheduler.step()
+            # self.scheduler.step()
 
             # --------------------- validation
             model.eval()
-            self.valid_losses = []
-            self.valid_accs = []
-            self.valid_ious = []
-            with torch.no_grad():
-                for step, inputs in enumerate(
-                        tqdm(valid_loader, desc='validation')):
+            model.trans_point_sampler = valid_sampler.get_point_sampler()
+            self.run_valid()
 
-                    results = model(inputs['data'])
-                    loss, gt_labels, predict_scores = model.get_loss(
-                        Loss, results, inputs, device)
-
-                    if predict_scores.size()[-1] == 0:
-                        continue
-                    acc = metric.acc(predict_scores, gt_labels)
-                    iou = metric.iou(predict_scores, gt_labels)
-
-                    self.valid_losses.append(loss.cpu().item())
-                    self.valid_accs.append(acc)
-                    self.valid_ious.append(iou)
-
-                    step = step + 1
-
-            self.save_logs(writer, epoch)
+            # self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)

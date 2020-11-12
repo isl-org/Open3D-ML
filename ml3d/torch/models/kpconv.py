@@ -379,7 +379,7 @@ class KPFCNN(BaseModel):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-        if split in ["test", "testing"]:
+        if split in ["test", "testing", "validation", "valid"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
             proj_inds = proj_inds.astype(np.int32)
@@ -436,28 +436,22 @@ class KPFCNN(BaseModel):
         while curr_num_points < min_in_points:
 
             new_points = points.copy()
+            curr_new_points, mask_inds, p0 = self.trans_point_sampler(
+                pc=new_points,
+                feat=feat,
+                label=sem_labels,
+                search_tree=search_tree,
+                num_points=min_in_points,
+                radius=self.cfg.in_radius)
 
-            if attr['split'] in ['test']:
-                wanted_ind = np.argmin(self.possibility)
-            else:
-                wanted_ind = np.random.choice(new_points.shape[0])
+            curr_sem_labels = sem_labels[mask_inds]
 
-            # print(new_points.shape, wanted_ind, p0)
-            p0 = new_points[wanted_ind]
-
-            mask_inds = search_tree.query_radius(p0.reshape(1, -1),
-                                                 r=self.cfg.in_radius)[0]
-
-            # Shuffle points
-            rand_order = np.random.permutation(mask_inds)
-            curr_new_points = new_points[rand_order]
-            curr_sem_labels = sem_labels[rand_order]
-
+            o_labels = sem_labels.astype(np.int32)
             # In case of validation, keep the original points in memory
-            if attr['split'] in ['test']:
-                selected_points = curr_new_points.copy()
-                o_pts = new_points
-                o_labels = sem_labels.astype(np.int32)
+            # if attr['split'] in ['test']:
+            #     selected_points = curr_new_points.copy()
+            #     o_pts = new_points
+            #     o_labels = sem_labels.astype(np.int32)
 
             curr_new_points = curr_new_points - p0
             t_normalize = self.cfg.get('t_normalize', None)
@@ -468,21 +462,15 @@ class KPFCNN(BaseModel):
                 curr_new_coords = curr_new_points.copy()
             else:
                 curr_new_coords = np.hstack(
-                    (curr_new_points, curr_feat[rand_order, :]))
+                    (curr_new_points, curr_feat[mask_inds, :]))
 
-            curr_new_coords[:, 2] += p0[2]
+            curr_new_coords[:, 2] += p0[:, 2]
 
             in_pts = curr_new_points
             in_fts = curr_new_coords
             in_lbls = curr_sem_labels
 
-            # Number collected
             n = in_pts.shape[0]
-            # Safe check
-            if n < 2:
-                if attr['split'] in ['test']:
-                    self.possibility[wanted_ind] += 0.001
-                continue
 
             # Randomly drop some points (augmentation process and safety for GPU memory consumption)
             residual_num_points = max_num_points - curr_num_points
@@ -493,26 +481,30 @@ class KPFCNN(BaseModel):
                 in_pts = in_pts[input_inds, :]
                 in_fts = in_fts[input_inds, :]
                 in_lbls = in_lbls[input_inds]
-                rand_order = rand_order[input_inds]
+                mask_inds = mask_inds[input_inds]
                 n = input_inds.shape[0]
 
             curr_num_points += n
 
-            # Before augmenting, compute reprojection inds (only for validation and test)
+            reproj_mask = mask_inds
             if attr['split'] in ['test']:
-                proj_inds = np.zeros((0,))
-
-                reproj_mask = rand_order
-                dists = np.sum(np.square(
-                    (o_pts[reproj_mask] - p0).astype(np.float32)),
-                               axis=1)
-                delta = np.square(1 - dists / (np.max(dists) + 0.001))
-
-                self.possibility[reproj_mask] += delta
-
+                proj_inds = data['proj_inds']
             else:
                 proj_inds = np.zeros((0,))
-                reproj_mask = np.zeros((0,))
+            # Before augmenting, compute reprojection inds (only for validation and test)
+            # if attr['split'] in ['test', 'validation']:
+            #     proj_inds = np.zeros((0,))
+            #     reproj_mask = rand_order
+            #     dists = np.sum(np.square(
+            #         (o_pts[reproj_mask] - p0).astype(np.float32)),
+            #                    axis=1)
+            #     delta = np.square(1 - dists / (np.max(dists) + 0.001))
+
+            #     self.possibility[reproj_mask] += delta
+
+            # else:
+            #     proj_inds = np.zeros((0,))
+            #     reproj_mask = np.zeros((0,))
 
             # Data augmentation
             in_pts, scale, R = self.augmentation_transform(in_pts,
@@ -558,6 +550,36 @@ class KPFCNN(BaseModel):
         self.inference_input = inputs
 
         return inputs
+
+    def update_probs(self, inputs, results, test_probs, test_labels):
+        self.test_smooth = 0.95
+        stk_probs = torch.nn.functional.softmax(results, dim=-1)
+        stk_probs = results.cpu().data.numpy()
+
+        batch = inputs['data']
+        stk_labels = batch.labels.cpu().data.numpy()
+
+        # Get probs and labels
+        lengths = batch.lengths[0].cpu().numpy()
+
+        f_inds = batch.frame_inds.cpu().numpy()
+        r_inds_list = batch.reproj_inds
+        r_mask_list = batch.reproj_masks
+        labels_list = batch.val_labels
+
+        i0 = 0
+        for b_i, length in enumerate(lengths):
+            # Get prediction
+            probs = stk_probs[i0:i0 + length]
+            labels = stk_labels[i0:i0 + length]
+            proj_inds = r_inds_list[b_i]
+            proj_mask = r_mask_list[b_i]
+            test_probs[proj_mask] = self.test_smooth * test_probs[proj_mask] + (
+                1 - self.test_smooth) * probs
+            test_labels[proj_mask] = labels
+            i0 += length
+
+        return test_probs, test_labels
 
     def inference_end(self, inputs, results):
         m_softmax = torch.nn.Softmax(dim=-1)
@@ -932,7 +954,12 @@ class KPConv(nn.Module):
         self.reset_parameters()
 
         # Initialize kernel points
-        self.kernel_points = self.init_KP()
+        # self.kernel_points = self.init_KP()
+
+        if deformable:
+            self.kernel_points = self.offset_conv.kernel_points
+        else:
+            self.kernel_points = self.init_KP()
 
         return
 
