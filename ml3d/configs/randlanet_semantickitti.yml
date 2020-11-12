@@ -14,6 +14,8 @@ dataset:
   use_cache: true
   validation_split:
   - '08'
+  sampler:
+    name: 'SemSegSpatiallyRegularSampler'
 model:
   name: RandLANet
   batcher: DefaultBatcher

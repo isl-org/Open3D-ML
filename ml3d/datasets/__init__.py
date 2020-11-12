@@ -12,9 +12,10 @@ from .kitti import KITTI
 from .nuscenes import NuScenes
 from .waymo import Waymo
 from .lyft import Lyft
+from .samplers import SemSegRandomSampler
 from . import utils
 
 __all__ = [
     'SemanticKITTI', 'S3DIS', 'Toronto3D', 'ParisLille3D', 'Semantic3D',
-    'Custom3D', 'utils', 'KITTI', 'Waymo', 'NuScenes', 'Lyft'
+    'Custom3D', 'utils', 'KITTI', 'Waymo', 'NuScenes', 'Lyft', 'SemSegRandomSampler'
 ]

@@ -16,6 +16,8 @@ dataset:
   val_files:
   - L002.ply
   use_cache: true
+  sampler:
+    name: SemSegSpatiallyRegularSampler
   steps_per_epoch_train: 100
   steps_per_epoch_valid: 10
 model:

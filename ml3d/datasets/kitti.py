@@ -6,7 +6,7 @@ from glob import glob
 import logging
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
 
 logging.basicConfig(
