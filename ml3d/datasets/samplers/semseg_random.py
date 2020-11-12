@@ -23,10 +23,10 @@ class SemSegRandomSampler(object):
             ids = np.random.permutation(self.length)
             for i in ids:
                 yield i
-
         return gen()
 
-    def get_point_sampler(self):
+    @staticmethod
+    def get_point_sampler():
 
         def _random_centered_gen(**kwargs):
             pc = kwargs.get('pc', None)
@@ -40,6 +40,7 @@ class SemSegRandomSampler(object):
             center_point = pc[center_idx, :].reshape(1, -1)
 
             if (pc.shape[0] < num_points):
+                diff = num_points - pc.shape[0]
                 idxs = np.array(range(pc.shape[0]))
                 idxs = list(idxs) + list(random.choices(idxs, k=diff))
             else:

@@ -149,6 +149,11 @@ class DataProcessing:
         IoU += mask * mIoU
         return IoU
 
+
+    @staticmethod
+    def Acc_from_confusions(confusions):
+        return confusions.diagonal() / confusions.sum(axis=0)
+
     @staticmethod
     def get_class_weights(num_per_class):
         # pre-calculate the number of points in each category

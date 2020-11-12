@@ -10,6 +10,7 @@ from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, IterableDataset, DataLoader
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
 
 from os.path import exists, join, isfile, dirname, abspath
 
@@ -160,7 +161,6 @@ class SemanticSegmentation(BasePipeline):
             log.info("test iou: {}".format(
                 np.nanmean(np.array(self.test_ious)[:, -1])))
 
-
     def run_valid(self):
         model = self.model
         dataset = self.dataset
@@ -174,45 +174,38 @@ class SemanticSegmentation(BasePipeline):
         metric = SemSegMetric(self, model, dataset, device)
 
         log.info("DEVICE : {}".format(device))
-        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
+        log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
         batcher = self.get_batcher(device)
-        test_dataset = dataset.get_split('validation')
-        test_sampler = test_dataset.sampler
-        test_split = TorchDataloader(dataset=test_dataset,
+        valid_dataset = dataset.get_split('validation')
+        valid_sampler = valid_dataset.sampler
+        valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      sampler=test_sampler,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                        'steps_per_epoch_train', None))
-        test_loader = DataLoader(test_split,
+                                      sampler=valid_sampler,
+                                      use_cache=dataset.cfg.use_cache)
+        valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.batch_size,
-                                  sampler=get_sampler(test_sampler),
+                                  sampler=get_sampler(valid_sampler),
                                   collate_fn=self.batcher.collate_fn)
 
 
-
-
-        datset_split = self.dataset.get_split('test')
+        datset_split = self.dataset.get_split('validation')
 
         log.info("Started validation")
 
         self.valid_losses = []
         self.valid_accs = []
         self.valid_ious = []
-        model.trans_point_sampler = test_sampler.get_point_sampler()
-
-        self.pbar = tqdm(
-            total=test_sampler.possibilities[test_sampler.cloud_id].shape[0])
-        
-        self.pbar_update = 0
+        model.trans_point_sampler = valid_sampler.get_point_sampler()
+        self.curr_cloud_id = -1
+        self.test_probs = []
+        self.test_labels = []
 
         with torch.no_grad():
-            for step, inputs in enumerate(test_loader):
-
+            for step, inputs in enumerate(valid_loader):
 
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
@@ -220,36 +213,40 @@ class SemanticSegmentation(BasePipeline):
 
                 if predict_scores.size()[-1] == 0:
                     continue
-                acc = metric.acc(predict_scores, gt_labels)
-                iou = metric.iou(predict_scores, gt_labels)
-
-                self.valid_losses.append(loss.cpu().item())
-                self.valid_accs.append(acc)
-                self.valid_ious.append(iou)
-
-                step = step + 1
-
-        with torch.no_grad():
-            for idx in tqdm(range(len(test_split)), desc='validation'):
-                attr = datset_split.get_attr(idx)
-                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
-                    continue
-                data = datset_split.get_data(idx)
-                results = self.run_inference(data)
-
-                predict_label = results['predict_labels']
-             
-                acc = metric.acc_np_label(predict_label, data['label'])
-                iou = metric.iou_np_label(predict_label, data['label'])
-                self.test_accs.append(acc)
-                self.test_ious.append(iou)
+                self.update_tests(valid_sampler, inputs, results)
 
 
-        if cfg.get('test_compute_metric', True):
-            log.info("test acc: {}".format(
-                np.nanmean(np.array(self.test_accs)[:, -1])))
-            log.info("test iou: {}".format(
-                np.nanmean(np.array(self.test_ious)[:, -1])))
+
+        test_probs = np.concatenate([t for t in self.test_probs], axis=0)
+        test_labels = np.concatenate([t for t in self.test_labels], axis=0)
+
+        conf_matrix = confusion_matrix(test_labels, np.argmax(test_probs, axis=1))
+        IoUs = DataProcessing.IoU_from_confusions(conf_matrix)
+        Accs = DataProcessing.Acc_from_confusions(conf_matrix)
+
+
+    def update_tests(self, sampler, inputs, results):
+        if self.curr_cloud_id != sampler.cloud_id:
+            self.curr_cloud_id = sampler.cloud_id
+            num_points = sampler.possibilities[sampler.cloud_id].shape[0]
+            self.pbar = tqdm(
+                total=num_points,
+                desc="validation {}/{}".format(self.curr_cloud_id, len(sampler.dataset)))
+            self.pbar_update = 0
+            self.test_probs.append(np.zeros(shape=[num_points, self.model.cfg.num_classes],
+                                   dtype=np.float16))
+            self.test_labels.append(np.zeros(shape=[num_points], dtype=np.int16))
+        else:
+            this_possiblility = sampler.possibilities[sampler.cloud_id]
+            self.pbar.update(this_possiblility[this_possiblility > 0.5].shape[0] \
+                - self.pbar_update)
+            self.pbar_update = this_possiblility[this_possiblility > 0.5].shape[0]
+            self.test_probs[self.curr_cloud_id], self.test_labels[self.curr_cloud_id] \
+                = self.model.update_probs(inputs, results, 
+                    self.test_probs[self.curr_cloud_id], 
+                    self.test_labels[self.curr_cloud_id])
+
+
 
     def run_train(self):
         model = self.model
@@ -356,30 +353,8 @@ class SemanticSegmentation(BasePipeline):
             model.eval()
             model.trans_point_sampler = valid_sampler.get_point_sampler()
             self.run_valid()
-            self.valid_losses = []
-            self.valid_accs = []
-            self.valid_ious = []
-
-            with torch.no_grad():
-                for step, inputs in enumerate(
-                        tqdm(valid_loader, desc='validation')):
-
-                    results = model(inputs['data'])
-                    loss, gt_labels, predict_scores = model.get_loss(
-                        Loss, results, inputs, device)
-
-                    if predict_scores.size()[-1] == 0:
-                        continue
-                    acc = metric.acc(predict_scores, gt_labels)
-                    iou = metric.iou(predict_scores, gt_labels)
-
-                    self.valid_losses.append(loss.cpu().item())
-                    self.valid_accs.append(acc)
-                    self.valid_ious.append(iou)
-
-                    step = step + 1
-
-            self.save_logs(writer, epoch)
+           
+            # self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)

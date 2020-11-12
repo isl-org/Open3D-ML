@@ -7,6 +7,7 @@ from os import makedirs, listdir
 from os.path import exists, join, isfile, dirname, abspath, splitext
 
 
+
 def make_dir(folder_name):
     """Create a directory. If already exists, do nothing"""
     if not exists(folder_name):
