@@ -574,13 +574,12 @@ class KPFCNN(BaseModel):
             labels = stk_labels[i0:i0 + length]
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
-            test_probs[proj_mask] = self.test_smooth * test_probs[
-                proj_mask] + (1 - self.test_smooth) * probs
+            test_probs[proj_mask] = self.test_smooth * test_probs[proj_mask] + (
+                1 - self.test_smooth) * probs
             test_labels[proj_mask] = labels
             i0 += length
 
         return test_probs, test_labels
-
 
     def inference_end(self, inputs, results):
         m_softmax = torch.nn.Softmax(dim=-1)

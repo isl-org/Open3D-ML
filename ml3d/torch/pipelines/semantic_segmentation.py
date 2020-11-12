@@ -116,18 +116,16 @@ class SemanticSegmentation(BasePipeline):
         test_dataset = dataset.get_split('test')
         test_sampler = test_dataset.sampler
         test_split = TorchDataloader(dataset=test_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      sampler=train_sampler,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                        'steps_per_epoch_train', None))
+                                     preprocess=model.preprocess,
+                                     transform=model.transform,
+                                     sampler=train_sampler,
+                                     use_cache=dataset.cfg.use_cache,
+                                     steps_per_epoch=dataset.cfg.get(
+                                         'steps_per_epoch_train', None))
         test_loader = DataLoader(test_split,
-                                  batch_size=cfg.batch_size,
-                                  sampler=get_sampler(train_sampler),
-                                  collate_fn=self.batcher.collate_fn)
-
-
+                                 batch_size=cfg.batch_size,
+                                 sampler=get_sampler(train_sampler),
+                                 collate_fn=self.batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -167,7 +165,6 @@ class SemanticSegmentation(BasePipeline):
         device = self.device
         cfg = self.cfg
 
-
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
         Loss = SemSegLoss(self, model, dataset, device)
@@ -190,7 +187,6 @@ class SemanticSegmentation(BasePipeline):
                                   batch_size=cfg.batch_size,
                                   sampler=get_sampler(valid_sampler),
                                   collate_fn=self.batcher.collate_fn)
-
 
         datset_split = self.dataset.get_split('validation')
 
@@ -215,38 +211,37 @@ class SemanticSegmentation(BasePipeline):
                     continue
                 self.update_tests(valid_sampler, inputs, results)
 
-
-
         test_probs = np.concatenate([t for t in self.test_probs], axis=0)
         test_labels = np.concatenate([t for t in self.test_labels], axis=0)
 
-        conf_matrix = confusion_matrix(test_labels, np.argmax(test_probs, axis=1))
+        conf_matrix = confusion_matrix(test_labels, np.argmax(test_probs,
+                                                              axis=1))
         IoUs = DataProcessing.IoU_from_confusions(conf_matrix)
         Accs = DataProcessing.Acc_from_confusions(conf_matrix)
-
 
     def update_tests(self, sampler, inputs, results):
         if self.curr_cloud_id != sampler.cloud_id:
             self.curr_cloud_id = sampler.cloud_id
             num_points = sampler.possibilities[sampler.cloud_id].shape[0]
-            self.pbar = tqdm(
-                total=num_points,
-                desc="validation {}/{}".format(self.curr_cloud_id, len(sampler.dataset)))
+            self.pbar = tqdm(total=num_points,
+                             desc="validation {}/{}".format(
+                                 self.curr_cloud_id, len(sampler.dataset)))
             self.pbar_update = 0
-            self.test_probs.append(np.zeros(shape=[num_points, self.model.cfg.num_classes],
-                                   dtype=np.float16))
-            self.test_labels.append(np.zeros(shape=[num_points], dtype=np.int16))
+            self.test_probs.append(
+                np.zeros(shape=[num_points, self.model.cfg.num_classes],
+                         dtype=np.float16))
+            self.test_labels.append(np.zeros(shape=[num_points],
+                                             dtype=np.int16))
         else:
             this_possiblility = sampler.possibilities[sampler.cloud_id]
             self.pbar.update(this_possiblility[this_possiblility > 0.5].shape[0] \
                 - self.pbar_update)
-            self.pbar_update = this_possiblility[this_possiblility > 0.5].shape[0]
+            self.pbar_update = this_possiblility[
+                this_possiblility > 0.5].shape[0]
             self.test_probs[self.curr_cloud_id], self.test_labels[self.curr_cloud_id] \
-                = self.model.update_probs(inputs, results, 
-                    self.test_probs[self.curr_cloud_id], 
+                = self.model.update_probs(inputs, results,
+                    self.test_probs[self.curr_cloud_id],
                     self.test_labels[self.curr_cloud_id])
-
-
 
     def run_train(self):
         model = self.model
@@ -353,7 +348,7 @@ class SemanticSegmentation(BasePipeline):
             model.eval()
             model.trans_point_sampler = valid_sampler.get_point_sampler()
             self.run_valid()
-           
+
             # self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:

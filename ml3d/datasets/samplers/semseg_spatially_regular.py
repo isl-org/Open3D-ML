@@ -13,7 +13,6 @@ class SemSegSpatiallyRegularSampler(object):
         self.length = len(dataset)
         self.split = self.dataset.split
 
-
     def __len__(self):
         return self.length
 
@@ -39,6 +38,7 @@ class SemSegSpatiallyRegularSampler(object):
             self.min_possibilities += [float(np.min(self.possibilities[-1]))]
 
     def get_cloud_sampler(self):
+
         def gen_train():
             for i in range(self.length):
                 self.cloud_id = int(np.argmin(self.min_possibilities))
@@ -86,11 +86,11 @@ class SemSegSpatiallyRegularSampler(object):
                         idxs = np.array(range(pc.shape[0]))
                         idxs = list(idxs) + list(random.choices(idxs, k=diff))
                     else:
-                        idxs = search_tree.query(center_point, k=num_points)[1][0]
+                        idxs = search_tree.query(center_point,
+                                                 k=num_points)[1][0]
                 n = len(idxs)
                 if n < 2:
                     self.possibilities[cloud_id][center_id] += 0.001
-                    
 
             random.shuffle(idxs)
             pc = pc[idxs]

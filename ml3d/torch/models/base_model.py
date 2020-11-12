@@ -27,7 +27,6 @@ class BaseModel(ABC, torch.nn.Module):
         """
         super().__init__()
 
-
         self.trans_point_sampler = SemSegRandomSampler.get_point_sampler()
         self.cfg = Config(kwargs)
 

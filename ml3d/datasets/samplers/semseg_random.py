@@ -23,6 +23,7 @@ class SemSegRandomSampler(object):
             ids = np.random.permutation(self.length)
             for i in ids:
                 yield i
+
         return gen()
 
     @staticmethod
