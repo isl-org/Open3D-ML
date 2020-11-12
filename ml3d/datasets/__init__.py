@@ -17,5 +17,6 @@ from . import utils
 
 __all__ = [
     'SemanticKITTI', 'S3DIS', 'Toronto3D', 'ParisLille3D', 'Semantic3D',
-    'Custom3D', 'utils', 'KITTI', 'Waymo', 'NuScenes', 'Lyft', 'SemSegRandomSampler'
+    'Custom3D', 'utils', 'KITTI', 'Waymo', 'NuScenes', 'Lyft',
+    'SemSegRandomSampler'
 ]
