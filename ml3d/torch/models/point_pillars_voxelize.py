@@ -2,6 +2,7 @@ import torch
 import open3d.ml.torch as ml3d
 from torch.nn.modules.utils import _pair
 
+
 class PointPillarsVoxelization(torch.nn.Module):
 
     def __init__(self,
@@ -59,7 +60,8 @@ class PointPillarsVoxelization(torch.nn.Module):
                                 max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.
-        feats = torch.cat([torch.zeros_like(points_feats[0:1, :]), points_feats])
+        feats = torch.cat(
+            [torch.zeros_like(points_feats[0:1, :]), points_feats])
 
         # create dense matrix of indices. index 0 maps to the zero vector.
         voxels_point_indices_dense = ml3d.ops.ragged_to_dense(
