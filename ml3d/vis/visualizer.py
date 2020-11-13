@@ -886,7 +886,6 @@ class Visualizer:
             if n.startswith(prefix):
                 self._3d.scene.show_geometry(n, show)
                 node.checkbox.checked = show
-        self._update_bounding_boxes()
         self._3d.force_redraw()
 
     def _add_tree_name(self, name, is_geometry=True):
@@ -910,7 +909,6 @@ class Visualizer:
         def on_checked(checked):
             self._3d.scene.show_geometry(name, checked)
             if self._is_tree_name_geometry(name):
-                self._update_bounding_boxes()
                 # available attrs could change
                 self._update_datasource_combobox()
             self._3d.force_redraw()
@@ -1054,7 +1052,7 @@ class Visualizer:
 
         return material
 
-    def _update_bounding_boxes(self):
+    def _update_bounding_boxes(self, animation_frame=None):
         if len(self._attrname2lut) == 1:
             # Can't do dict.values()[0], so have to iterate over the 1 element
             for v in self._attrname2lut.values():
@@ -1072,11 +1070,16 @@ class Visualizer:
         if self._consolidate_bounding_boxes:
             name = Model.bounding_box_prefix.split("/")[0]
             boxes = []
-            for bbox_data in self._objects.bounding_box_data:
-                # When consolidated we assume bbox_data.name is the geometry
-                # name.
-                if bbox_data.name in self._name2treenode and self._name2treenode[bbox_data.name].checkbox.checked:
+            # When consolidated we assume bbox_data.name is the geometry name.
+            if animation_frame is None:
+                for bbox_data in self._objects.bounding_box_data:
                     boxes += bbox_data.boxes
+            else:
+                geom_name = self._animation_frames[animation_frame]
+                for bbox_data in self._objects.bounding_box_data:
+                    if bbox_data.name == geom_name:
+                        boxes = bbox_data.boxes
+                        break
 
             self._3d.scene.remove_geometry(name)
             if len(boxes) > 0:
@@ -1085,9 +1088,10 @@ class Visualizer:
 
                 if name not in self._name2treenode:
                     self._add_tree_name(name, is_geometry=False)
+            self._3d.force_redraw()
         else:
-            # Only run this once if we aren't consolidating, because nothing will
-            # change.
+            # Don't run this more than once if we aren't consolidating,
+            # because nothing will change.
             if len(self._objects.bounding_box_data) > 0:
                 if self._objects.bounding_box_data[0].name in self._name2treenode:
                     return
@@ -1098,6 +1102,8 @@ class Visualizer:
 
             for bbox_data in self._objects.bounding_box_data:
                 self._add_tree_name(bbox_data.name, is_geometry=False)
+
+            self._3d.force_redraw()
 
     def _update_gradient(self):
         if self._shader.selected_text == self.LABELS_NAME:
@@ -1239,6 +1245,7 @@ class Visualizer:
         def ui_callback():
             self._update_attr_range()
             self._update_geometry(check_unloaded=True)
+            self._update_bounding_boxes()
 
         if not self._objects.is_loaded(name):
             self._load_geometry(name, ui_callback)
@@ -1248,15 +1255,18 @@ class Visualizer:
             self._animation_frames = self._get_selected_names()
             self._slider.set_limits(0, len(self._animation_frames) - 1)
             self._on_animation_slider_changed(self._slider.int_value)
+            # _on_animation_slider_changed() calls _update_bounding_boxes()
         else:
             for name, node in self._name2treenode.items():
                 self._3d.scene.show_geometry(name, node.checkbox.checked)
+            self._update_bounding_boxes()
 
     def _on_animation_slider_changed(self, new_value):
         idx = int(new_value)
         for i in range(0, len(self._animation_frames)):
             self._3d.scene.show_geometry(self._animation_frames[i], (i == idx))
-            self._3d.force_redraw()
+        self._update_bounding_boxes(animation_frame=idx)
+        self._3d.force_redraw()
         self._slider_current.text = self._animation_frames[idx]
         r = self._slider_current.frame
         self._slider_current.frame = gui.Rect(r.x, r.y,
