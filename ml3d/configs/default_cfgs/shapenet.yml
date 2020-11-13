@@ -1,0 +1,8 @@
+name: ShapeNet
+dataset_path: # path/to/your/dataset
+cache_dir: .logs/cache/
+class_weights: [2690, 76, 55, 1824, 3746, 69, 787, 392, 1546, 445, 202, 184, 275, 66, 152, 5266]
+ignored_label_inds: []
+num_points: 17775
+test_result_folder: ./test
+use_cache: false

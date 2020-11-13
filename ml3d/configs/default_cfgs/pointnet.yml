@@ -1,0 +1,12 @@
+name: PointNet
+batcher: DefaultBatcher
+ckpt_path: # path/to/your/checkpoint
+dim_feature: 0
+dim_input: 3 # 3 + feature dimension.
+ignored_label_inds: []
+num_classes: 16
+num_points: 1024
+reg_weight: 0.001
+dropout: 0.3
+normalize: true
+task: classification
