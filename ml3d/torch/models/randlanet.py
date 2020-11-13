@@ -157,7 +157,7 @@ class RandLANet(BaseModel):
                            axis=1)
             delta = np.square(1 - dists / np.max(dists))
             self.possibility[selected_idxs] += delta
-            inputs['point_inds'] = selected_idx
+            inputs['point_inds'] = selected_idxs
 
         if cfg.get('recentering', True):
             pc = pc - center_point

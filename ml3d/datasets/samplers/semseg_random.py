@@ -28,7 +28,6 @@ class SemSegRandomSampler(object):
 
     @staticmethod
     def get_point_sampler():
-
         def _random_centered_gen(**kwargs):
             pc = kwargs.get('pc', None)
             num_points = kwargs.get('num_points', None)

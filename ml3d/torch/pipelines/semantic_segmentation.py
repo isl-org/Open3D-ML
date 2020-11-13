@@ -21,6 +21,8 @@ from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord, Config, PIPELINE, get_runid, code2md
 from ...datasets.utils import DataProcessing
+from ...datasets import InferenceDummySplit
+
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -84,16 +86,37 @@ class SemanticSegmentation(BasePipeline):
         model.device = device
         model.eval()
 
-        model.inference_begin(data)
+
+        batcher = self.get_batcher(device)
+        infer_dataset = InferenceDummySplit(data)
+        infer_sampler = infer_dataset.sampler
+        infer_split = TorchDataloader(dataset=infer_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      sampler=infer_sampler,
+                                      use_cache=False)
+        infer_loader = DataLoader(infer_split,
+                                  batch_size=cfg.batch_size,
+                                  sampler=get_sampler(infer_sampler),
+                                  collate_fn=batcher.collate_fn)
+
+
+        model.trans_point_sampler = infer_sampler.get_point_sampler()
+        self.curr_cloud_id = -1
+        self.test_probs = []
+        self.test_labels = []
 
         with torch.no_grad():
-            while True:
-                inputs = model.inference_preprocess()
-                results = model(inputs['data'])
-                if model.inference_end(inputs, results):
-                    break
+            for step, inputs in enumerate(infer_loader):
 
-        return model.inference_result
+                results = model(inputs['data'])
+                loss, gt_labels, predict_scores = model.get_loss(
+                    Loss, results, inputs, device)
+
+                if predict_scores.size()[-1] == 0:
+                    continue
+                self.update_tests(valid_sampler, inputs, results)
+
 
     def run_test(self):
         model = self.model
@@ -111,7 +134,7 @@ class SemanticSegmentation(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        batcher = self.get_batcher(device, split='test')
+        batcher = self.get_batcher(device)
 
         test_dataset = dataset.get_split('test')
         test_sampler = test_dataset.sampler
@@ -125,7 +148,7 @@ class SemanticSegmentation(BasePipeline):
         test_loader = DataLoader(test_split,
                                  batch_size=cfg.batch_size,
                                  sampler=get_sampler(train_sampler),
-                                 collate_fn=self.batcher.collate_fn)
+                                 collate_fn=batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -354,7 +377,7 @@ class SemanticSegmentation(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
-    def get_batcher(self, device, split='training'):
+    def get_batcher(self, device):
 
         batcher_name = getattr(self.model.cfg, 'batcher')
 
