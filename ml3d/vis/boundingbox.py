@@ -1,16 +1,29 @@
 import numpy as np
 import open3d as o3d
 
+
 class BoundingBox3D:
     next_id = 1
-    def __init__(self, center, front, up, left, size, label_class, confidence,
-                 meta=None, show_class=False, show_confidence=False,
-                 show_meta=None, identifier=None, arrow_length=1.0):
-        assert(len(center) == 3)
-        assert(len(front) == 3)
-        assert(len(up) == 3)
-        assert(len(left) == 3)
-        assert(len(size) == 3)
+
+    def __init__(self,
+                 center,
+                 front,
+                 up,
+                 left,
+                 size,
+                 label_class,
+                 confidence,
+                 meta=None,
+                 show_class=False,
+                 show_confidence=False,
+                 show_meta=None,
+                 identifier=None,
+                 arrow_length=1.0):
+        assert (len(center) == 3)
+        assert (len(front) == 3)
+        assert (len(up) == 3)
+        assert (len(left) == 3)
+        assert (len(size) == 3)
 
         self.center = np.array(center, dtype="float32")
         self.front = np.array(front, dtype="float32")
@@ -31,7 +44,8 @@ class BoundingBox3D:
         self.arrow_length = arrow_length
 
     def __repr__(self):
-        s = str(self.identifier) + " (class=" + str(self.label_class) + ", conf=" + str(self.confidence)
+        s = str(self.identifier) + " (class=" + str(
+            self.label_class) + ", conf=" + str(self.confidence)
         if self.meta is not None:
             s = s + ", meta=" + str(self.meta)
         s = s + ")"
@@ -56,7 +70,7 @@ class BoundingBox3D:
             head_length = 0.3 * box.arrow_length
             # It seems to be substantially faster to assign directly for the
             # points, as opposed to points[pidx:pidx+nverts] = np.stack((...))
-            points[pidx    ] = box.center + x + y + z
+            points[pidx] = box.center + x + y + z
             points[pidx + 1] = box.center - x + y + z
             points[pidx + 2] = box.center - x + y - z
             points[pidx + 3] = box.center + x + y - z
@@ -76,23 +90,17 @@ class BoundingBox3D:
             box = boxes[i]
             pidx = nverts * i
             idx = nlines * i
-            indices[idx:idx+nlines] = ((pidx,     pidx + 1),
-                                       (pidx + 1, pidx + 2),
-                                       (pidx + 2, pidx + 3),
-                                       (pidx + 3, pidx),
-                                       (pidx + 4, pidx + 5),
-                                       (pidx + 5, pidx + 6),
-                                       (pidx + 6, pidx + 7),
-                                       (pidx + 7, pidx + 4),
-                                       (pidx + 0, pidx + 4),
-                                       (pidx + 1, pidx + 5),
-                                       (pidx + 2, pidx + 6),
-                                       (pidx + 3, pidx + 7),
-                                       (pidx + 8, pidx + 9),
-                                       (pidx + 9, pidx + 10),
-                                       (pidx + 9, pidx + 11),
-                                       (pidx + 9, pidx + 12),
-                                       (pidx + 9, pidx + 13))
+            indices[idx:idx +
+                    nlines] = ((pidx, pidx + 1), (pidx + 1, pidx + 2),
+                               (pidx + 2, pidx + 3), (pidx + 3, pidx),
+                               (pidx + 4, pidx + 5), (pidx + 5, pidx + 6),
+                               (pidx + 6, pidx + 7), (pidx + 7, pidx + 4),
+                               (pidx + 0, pidx + 4), (pidx + 1, pidx + 5),
+                               (pidx + 2, pidx + 6), (pidx + 3, pidx + 7),
+                               (pidx + 8, pidx + 9), (pidx + 9, pidx + 10),
+                               (pidx + 9, pidx + 11), (pidx + 9,
+                                                       pidx + 12), (pidx + 9,
+                                                                    pidx + 13))
 
             if lut is not None:
                 label = lut.labels[box.label_class]
@@ -100,7 +108,8 @@ class BoundingBox3D:
             else:
                 c = (0.5, 0.5, 0.5)
 
-            colors[idx:idx+nlines] = c  # copies c to each element in the range
+            colors[idx:idx +
+                   nlines] = c  # copies c to each element in the range
 
         lines = o3d.geometry.LineSet()
         lines.points = o3d.utility.Vector3dVector(points)

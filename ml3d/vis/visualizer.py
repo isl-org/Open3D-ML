@@ -18,6 +18,7 @@ class Model:
     bounding_box_prefix = "Bounding Boxes/"
 
     class BoundingBoxData:
+
         def __init__(self, name, boxes):
             self.name = name
             self.boxes = boxes
@@ -274,7 +275,8 @@ class DatasetModel(Model):
         data["points"] = data["point"]
 
         if 'bounding_boxes' in data:
-            self.bounding_box_data.append(Model.BoundingBoxData(name, data['bounding_boxes']))
+            self.bounding_box_data.append(
+                Model.BoundingBoxData(name, data['bounding_boxes']))
 
         self.create_point_cloud(data)
         size = self._calc_pointcloud_size(self._data[name], self.tclouds[name])
@@ -1093,7 +1095,8 @@ class Visualizer:
             # Don't run this more than once if we aren't consolidating,
             # because nothing will change.
             if len(self._objects.bounding_box_data) > 0:
-                if self._objects.bounding_box_data[0].name in self._name2treenode:
+                if self._objects.bounding_box_data[
+                        0].name in self._name2treenode:
                     return
 
             for bbox_data in self._objects.bounding_box_data:
@@ -1136,7 +1139,7 @@ class Visualizer:
         material = self._get_material()
         for name, tcloud in self._objects.tclouds.items():
             if not tcloud.is_empty() and self._3d.scene.has_geometry(name):
-                    self._3d.scene.modify_geometry_material(name, material)
+                self._3d.scene.modify_geometry_material(name, material)
         self._3d.force_redraw()
 
     def _update_datasource_combobox(self):
@@ -1421,9 +1424,13 @@ class Visualizer:
         self._consolidate_bounding_boxes = True
         self._init_dataset(dataset, split, indices)
         self._visualize("Open3D - " + dataset.name, width, height)
- 
-    def visualize(self, data, lut=None, bounding_boxes=None,
-                  width=1024, height=768):
+
+    def visualize(self,
+                  data,
+                  lut=None,
+                  bounding_boxes=None,
+                  width=1024,
+                  height=768):
         """Visualizes custom point cloud data
 
         Example:
@@ -1462,8 +1469,10 @@ class Visualizer:
             # many.
             group_size = int(math.floor(float(len(bounding_boxes)) / 100.0))
             if group_size < 2:
-                box_data = [Model.BoundingBoxData(prefix + str(bbox), [bbox])
-                            for bbox in bounding_boxes]
+                box_data = [
+                    Model.BoundingBoxData(prefix + str(bbox), [bbox])
+                    for bbox in bounding_boxes
+                ]
             else:
                 box_data = []
                 current_group = []
@@ -1472,10 +1481,12 @@ class Visualizer:
                     current_group.append(bounding_boxes[i])
                     if len(current_group) >= group_size or i == n - 1:
                         if i < n - 1:
-                            name = prefix + "Boxes " + str(i + 1 - group_size) + " - " + str(i)
+                            name = prefix + "Boxes " + str(
+                                i + 1 - group_size) + " - " + str(i)
                         else:
                             if len(current_group) > 1:
-                                name = prefix + "Boxes " + str(i + 1  - len(current_group)) + " - " + str(i)
+                                name = prefix + "Boxes " + str(
+                                    i + 1 - len(current_group)) + " - " + str(i)
                             else:
                                 name = prefix + "Box " + str(i)
                         data = Model.BoundingBoxData(name, current_group)
