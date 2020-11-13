@@ -8,6 +8,7 @@ from ..modules.losses import filter_valid_label
 
 
 class PointNet(BaseModel):
+
     def __init__(self,
                  name='PointNet',
                  num_points=1024,
@@ -22,24 +23,27 @@ class PointNet(BaseModel):
                  ckpt_path=None,
                  task='classification',
                  **kwargs):
-        super().__init__(name=name,
-                         num_points=num_points,
-                         num_classes=num_classes,
-                         ignored_label_inds=ignored_label_inds,
-                         dim_input=dim_input,
-                         dim_feature=dim_feature,
-                         normalize=normalize,
-                         augment=augment,
-                         feature_transform_regularization=feature_transform_regularization,
-                         batcher=batcher,
-                         ckpt_path=ckpt_path,
-                         task=task,
-                         **kwargs)
+        super().__init__(
+            name=name,
+            num_points=num_points,
+            num_classes=num_classes,
+            ignored_label_inds=ignored_label_inds,
+            dim_input=dim_input,
+            dim_feature=dim_feature,
+            normalize=normalize,
+            augment=augment,
+            feature_transform_regularization=feature_transform_regularization,
+            batcher=batcher,
+            ckpt_path=ckpt_path,
+            task=task,
+            **kwargs)
 
         if task == 'classification':
-            self.net = Classifier(num_points, num_classes, dim_input, dim_feature)
+            self.net = Classifier(num_points, num_classes, dim_input,
+                                  dim_feature)
         elif task == 'segmentation':
-            self.net = SceneSegmenter(num_points, num_classes, dim_input, dim_feature)
+            self.net = SceneSegmenter(num_points, num_classes, dim_input,
+                                      dim_feature)
         else:
             raise ValueError(f"Invalid task {task}")
 
@@ -66,15 +70,17 @@ class PointNet(BaseModel):
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         if self.net.feat.feature_transform:
-            loss += transform_regularizer(results[2], reg_weight=self.feature_transform_regularization)
+            loss += transform_regularizer(
+                results[2], reg_weight=self.feature_transform_regularization)
 
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
         optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                    step_size=cfg_pipeline.max_epoch // 10,
-                                                    gamma=cfg_pipeline.scheduler_gamma)
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=cfg_pipeline.max_epoch // 10,
+            gamma=cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
 
     # Todo: Parameters not consistent for base class and usage
@@ -94,7 +100,7 @@ class PointNet(BaseModel):
             # Normalize and center
             if self.normalize:
                 point = point - np.mean(point, axis=0)
-                dist = np.max(np.sqrt(np.sum(point ** 2, axis=0)), axis=0)
+                dist = np.max(np.sqrt(np.sum(point**2, axis=0)), axis=0)
                 point /= dist
 
             # Data augmentation for classification training
@@ -102,19 +108,21 @@ class PointNet(BaseModel):
                 theta = np.random.uniform(0, np.pi * 2)
                 cosval = np.cos(theta)
                 sinval = np.sin(theta)
-                rotation_matrix = np.array([[cosval, 0, sinval],
-                                            [0, 1, 0],
+                rotation_matrix = np.array([[cosval, 0, sinval], [0, 1, 0],
                                             [-sinval, 0, cosval]])
                 point = np.dot(point, rotation_matrix).astype(np.float32)
                 # Following original implementation at
                 # https://github.com/charlesq34/pointnet/blob/master/train.py
                 # Paper: "[...] Gaussian noise with zero mean and 0.02 standard deviation."
-                point += np.clip(0.01 * np.random.randn(point.shape[0], point.shape[1]), -0.05, 0.05)
+                point += np.clip(
+                    0.01 * np.random.randn(point.shape[0], point.shape[1]),
+                    -0.05, 0.05)
 
         if data.get('feat') is not None:
             point = np.concatenate([point, data['feat'][choice].copy()], axis=1)
 
-        label = data['label'] if self.task == 'classification' else data['label'][choice]
+        label = data['label'] if self.task == 'classification' else data[
+            'label'][choice]
 
         return {'point': point.T, 'labels': label}
 
@@ -132,13 +140,19 @@ class PointNet(BaseModel):
         # Todo: Correct?
         if self.task == 'classification':
             inference_result = {
-                'predict_labels': np.array([results[0].argmax().detach().cpu().numpy()]),
-                'predict_scores': torch.nn.functional.softmax(results[0], dim=1).detach().cpu().numpy()
+                'predict_labels':
+                    np.array([results[0].argmax().detach().cpu().numpy()]),
+                'predict_scores':
+                    torch.nn.functional.softmax(results[0],
+                                                dim=1).detach().cpu().numpy()
             }
         else:
             inference_result = {
-                'predict_labels': results[0].argmax(dim=-1).detach().cpu().numpy().squeeze(),
-                'predict_scores': torch.nn.functional.softmax(results[0], dim=-1).detach().cpu().numpy().squeeze()
+                'predict_labels':
+                    results[0].argmax(dim=-1).detach().cpu().numpy().squeeze(),
+                'predict_scores':
+                    torch.nn.functional.softmax(
+                        results[0], dim=-1).detach().cpu().numpy().squeeze()
             }
         self.inference_result = inference_result
         return True
@@ -158,9 +172,7 @@ def init_weights(m):
 
 class Transform(torch.nn.Module):
     # Following original implementation at https://github.com/charlesq34/pointnet/blob/master/models/transform_nets.py
-    def __init__(self,
-                 num_points=1024,
-                 k=3):
+    def __init__(self, num_points=1024, k=3):
         super(Transform, self).__init__()
 
         self.num_points = num_points
@@ -200,7 +212,8 @@ class Transform(torch.nn.Module):
         x = self.fc3(x)
 
         # Todo: Is this identical to original implementation?
-        eye = torch.eye(self.k, device=x.device).view(1, -1).repeat(x.size()[0], 1)
+        eye = torch.eye(self.k,
+                        device=x.device).view(1, -1).repeat(x.size()[0], 1)
         x = x + eye
         return x.view(-1, self.k, self.k)
 
@@ -341,7 +354,10 @@ class SceneSegmenter(torch.nn.Module):
         # Initialize weights with Xavier as in original implementation (PyTorch default is Kaiming He)
         self.apply(init_weights)
 
-        self.feat = Feature(num_points, dim_input, dim_feature, global_feature=False)
+        self.feat = Feature(num_points,
+                            dim_input,
+                            dim_feature,
+                            global_feature=False)
 
         self.num_points = num_points
         self.num_classes = num_classes
@@ -359,6 +375,7 @@ class SceneSegmenter(torch.nn.Module):
 
 
 class PartSegmenter(torch.nn.Module):
+
     def __init__(self):
         super(PartSegmenter, self).__init__()
         raise NotImplementedError
@@ -366,7 +383,9 @@ class PartSegmenter(torch.nn.Module):
 
 def transform_regularizer(transform, reg_weight=0.001):
     eye = torch.eye(transform.size()[1], device=transform.device)[None, :, :]
-    return reg_weight * torch.mean(torch.norm(torch.bmm(transform, transform.transpose(2, 1)) - eye, dim=(1, 2)))
+    return reg_weight * torch.mean(
+        torch.norm(torch.bmm(transform, transform.transpose(2, 1)) - eye,
+                   dim=(1, 2)))
 
 
 MODEL._register_module(PointNet, 'torch')

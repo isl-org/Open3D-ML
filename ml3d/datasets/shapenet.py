@@ -18,12 +18,16 @@ log = logging.getLogger(__name__)
 
 
 class ShapeNet(BaseDataset):
+
     def __init__(self,
                  dataset_path,
                  name="ShapeNet",
                  cache_dir='./logs/cache',
                  use_cache=False,
-                 class_weights=[2690, 76, 55, 1824, 3746, 69, 787, 392, 1546, 445, 202, 184, 275, 66, 152, 5266],
+                 class_weights=[
+                     2690, 76, 55, 1824, 3746, 69, 787, 392, 1546, 445, 202,
+                     184, 275, 66, 152, 5266
+                 ],
                  ignored_label_inds=[],
                  test_result_folder='./test',
                  task="classification",
@@ -38,15 +42,18 @@ class ShapeNet(BaseDataset):
                          test_result_folder=test_result_folder,
                          **kwargs)
 
-        assert task in ['classification', 'segmentation'], f"Invalid task {task}"
+        assert task in ['classification',
+                        'segmentation'], f"Invalid task {task}"
 
         self.label_to_names = self.get_label_to_names()
         self.num_classes = len(self.label_to_names)
-        self.dataset_path = join(dataset_path, 'shapenetcore_partanno_segmentation_benchmark_v0')
+        self.dataset_path = join(
+            dataset_path, 'shapenetcore_partanno_segmentation_benchmark_v0')
         self.task = task
 
         self.cat = {}
-        self.catfile = os.path.join(self.dataset_path, 'synsetoffset2category.txt')
+        self.catfile = os.path.join(self.dataset_path,
+                                    'synsetoffset2category.txt')
         with open(self.catfile, 'r') as f:
             for idx, line in enumerate(f):
                 ls = line.strip().split()
@@ -55,21 +62,27 @@ class ShapeNet(BaseDataset):
         self.meta = {}
         for item in self.cat:
             self.meta[item] = []
-            dir_point = os.path.join(self.dataset_path, self.cat[item], 'points')
-            dir_seg = os.path.join(self.dataset_path, self.cat[item], 'points_label')
+            dir_point = os.path.join(self.dataset_path, self.cat[item],
+                                     'points')
+            dir_seg = os.path.join(self.dataset_path, self.cat[item],
+                                   'points_label')
             fns = sorted(os.listdir(dir_point))
             for fn in fns:
                 token = (os.path.splitext(os.path.basename(fn))[0])
-                self.meta[item].append((join(dir_point, token + '.pts'), join(dir_seg, token + '.seg')))
+                self.meta[item].append(
+                    (join(dir_point,
+                          token + '.pts'), join(dir_seg, token + '.seg')))
 
         splits = []
         splits_path = join(self.dataset_path, 'train_test_split')
-        for split in ['shuffled_train_file_list.json',
-                      'shuffled_test_file_list.json',
-                      'shuffled_val_file_list.json']:
+        for split in [
+                'shuffled_train_file_list.json', 'shuffled_test_file_list.json',
+                'shuffled_val_file_list.json'
+        ]:
             with open(join(splits_path, split)) as source:
                 json_source = source.read()
-                splits.append([i.split('/')[-1] for i in json.loads(json_source)])
+                splits.append(
+                    [i.split('/')[-1] for i in json.loads(json_source)])
         train_split, test_split, val_split = splits
 
         self.all_files = []
@@ -159,11 +172,10 @@ class ShapeNet(BaseDataset):
 
 
 class ShapeNetSplit:
-    def __init__(self,
-                 dataset,
-                 split='training',
-                 task='classification'):
-        assert task in ['classification', 'segmentation'], f"Invalid task {task}"
+
+    def __init__(self, dataset, split='training', task='classification'):
+        assert task in ['classification',
+                        'segmentation'], f"Invalid task {task}"
 
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
@@ -179,12 +191,19 @@ class ShapeNetSplit:
     def get_data(self, idx):
         path = self.path_list[idx]
         points = np.loadtxt(path[1], dtype=np.float32)
-        label = np.loadtxt(path[2], dtype=np.int64) if self.task == 'segmentation' else np.array([np.int64(path[0])])
+        label = np.loadtxt(
+            path[2],
+            dtype=np.int64) if self.task == 'segmentation' else np.array(
+                [np.int64(path[0])])
         return {'point': points, 'label': label}
 
     def get_attr(self, idx):
         name = self.path_list[idx][1].split('/')[-1].split('.')[0]
-        return {'name': name, 'path': str(Path(self.path_list[idx][1])), 'split': self.split}
+        return {
+            'name': name,
+            'path': str(Path(self.path_list[idx][1])),
+            'split': self.split
+        }
 
 
 DATASET._register_module(ShapeNet)

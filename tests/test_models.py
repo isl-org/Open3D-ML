@@ -22,11 +22,14 @@ def test_pointnet_torch():
 
     data = {
         'point':
-            np.array(np.random.random((num_points, dim_input)), dtype=np.float32),
+            np.array(np.random.random((num_points, dim_input)),
+                     dtype=np.float32),
         'feat':
-            np.array(np.random.random((num_points, dim_features)), dtype=np.float32),
+            np.array(np.random.random((num_points, dim_features)),
+                     dtype=np.float32),
         'label':
-            np.array(np.random.randint(num_classes)) if task == 'classification' else np.array(
+            np.array(np.random.randint(num_classes))
+            if task == 'classification' else np.array(
                 [np.random.randint(num_classes) for _ in range(num_points)])
     }
 
@@ -36,9 +39,11 @@ def test_pointnet_torch():
     model.inference_end(inputs, results)
 
     if task == 'classification':
-        assert model.inference_result['predict_scores'].shape == (1, num_classes)
+        assert model.inference_result['predict_scores'].shape == (1,
+                                                                  num_classes)
     elif task == 'segmentation':
-        assert model.inference_result['predict_scores'].shape == (num_points, num_classes)
+        assert model.inference_result['predict_scores'].shape == (num_points,
+                                                                  num_classes)
 
 
 def test_pointnet_tf():
