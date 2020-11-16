@@ -515,6 +515,7 @@ class KPFCNN(BaseModel):
             if np.random.rand() > self.cfg.augment_color:
                 in_fts[:, 3:] *= 0
 
+
             batch_data['p_list'] += [in_pts]
             batch_data['f_list'] += [in_fts]
             batch_data['l_list'] += [np.squeeze(in_lbls)]

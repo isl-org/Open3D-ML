@@ -44,7 +44,7 @@ class SemSegSpatiallyRegularSampler(object):
         def gen_test():
             curr_could_id = 0
             while curr_could_id < self.length:
-                if self.min_possibilities[curr_could_id] > 1e-8:
+                if self.min_possibilities[curr_could_id] > 0.5:
                     curr_could_id = curr_could_id + 1
                     continue
                 self.cloud_id = curr_could_id

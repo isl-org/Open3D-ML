@@ -7,9 +7,11 @@ from ...utils import SAMPLER
 class SemSegRandomSampler(object):
     """Random sampler for semantic segmentation datsets"""
 
-    def __init__(self, dataset_split):
-        self.dataset_split = dataset_split
-        self.length = len(dataset_split)
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.length = len(dataset)
+        self.dataset = dataset
+        self.split = self.dataset.split
 
     def __len__(self):
         return self.length

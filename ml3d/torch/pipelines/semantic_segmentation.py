@@ -86,9 +86,9 @@ class SemanticSegmentation(BasePipeline):
         model.device = device
         model.eval()
 
-
         batcher = self.get_batcher(device)
         infer_dataset = InferenceDummySplit(data)
+        self.dataset = infer_dataset
         infer_sampler = infer_dataset.sampler
         infer_split = TorchDataloader(dataset=infer_dataset,
                                       preprocess=model.preprocess,
@@ -100,23 +100,24 @@ class SemanticSegmentation(BasePipeline):
                                   sampler=get_sampler(infer_sampler),
                                   collate_fn=batcher.collate_fn)
 
-
         model.trans_point_sampler = infer_sampler.get_point_sampler()
         self.curr_cloud_id = -1
         self.test_probs = []
         self.test_labels = []
+        self.ori_test_probs = []
+        self.ori_test_labels = []
 
         with torch.no_grad():
             for step, inputs in enumerate(infer_loader):
-
                 results = model(inputs['data'])
-                loss, gt_labels, predict_scores = model.get_loss(
-                    Loss, results, inputs, device)
+                self.update_tests(infer_sampler, inputs, results)
 
-                if predict_scores.size()[-1] == 0:
-                    continue
-                self.update_tests(valid_sampler, inputs, results)
+        inference_result = {
+            'predict_labels': self.ori_test_labels.pop(),
+            'predict_scores': self.ori_test_probs.pop()
+        }
 
+        return inference_result
 
     def run_test(self):
         model = self.model
@@ -141,46 +142,39 @@ class SemanticSegmentation(BasePipeline):
         test_split = TorchDataloader(dataset=test_dataset,
                                      preprocess=model.preprocess,
                                      transform=model.transform,
-                                     sampler=train_sampler,
-                                     use_cache=dataset.cfg.use_cache,
-                                     steps_per_epoch=dataset.cfg.get(
-                                         'steps_per_epoch_train', None))
+                                     sampler=test_sampler,
+                                     use_cache=dataset.cfg.use_cache)
         test_loader = DataLoader(test_split,
                                  batch_size=cfg.batch_size,
-                                 sampler=get_sampler(train_sampler),
+                                 sampler=get_sampler(test_sampler),
                                  collate_fn=batcher.collate_fn)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
-        datset_split = self.dataset.get_split('test')
+        model.trans_point_sampler = test_sampler.get_point_sampler()
+        self.curr_cloud_id = -1
+        self.test_probs = []
+        self.test_labels = []
+        self.ori_test_probs = []
+        self.ori_test_labels = []
 
         log.info("Started testing")
 
-        self.test_accs = []
-        self.test_ious = []
 
         with torch.no_grad():
-            for idx in tqdm(range(len(test_split)), desc='test'):
-                attr = datset_split.get_attr(idx)
-                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
-                    continue
-                data = datset_split.get_data(idx)
-                results = self.run_inference(data)
+            for step, inputs in enumerate(test_loader):
+                results = model(inputs['data'])
+                self.update_tests(test_sampler, inputs, results)
 
-                predict_label = results['predict_labels']
-                if cfg.get('test_compute_metric', True):
-                    acc = metric.acc_np_label(predict_label, data['label'])
-                    iou = metric.iou_np_label(predict_label, data['label'])
-                    self.test_accs.append(acc)
-                    self.test_ious.append(iou)
-
-                dataset.save_test_result(results, attr)
-
-        if cfg.get('test_compute_metric', True):
-            log.info("test acc: {}".format(
-                np.nanmean(np.array(self.test_accs)[:, -1])))
-            log.info("test iou: {}".format(
-                np.nanmean(np.array(self.test_ious)[:, -1])))
+                if self.complete_infer:
+                  inference_result = {
+                      'predict_labels': self.ori_test_labels.pop(),
+                      'predict_scores': self.ori_test_probs.pop()
+                  }
+                  attr = self.dataset.get_attr(self.cloud_id)
+                  dataset.save_test_result(inference_result, attr)
+        
+        log.info("Finshed testing")
 
     def run_valid(self):
         model = self.model
@@ -243,18 +237,20 @@ class SemanticSegmentation(BasePipeline):
         Accs = DataProcessing.Acc_from_confusions(conf_matrix)
 
     def update_tests(self, sampler, inputs, results):
+        split = sampler.split
         if self.curr_cloud_id != sampler.cloud_id:
             self.curr_cloud_id = sampler.cloud_id
             num_points = sampler.possibilities[sampler.cloud_id].shape[0]
             self.pbar = tqdm(total=num_points,
-                             desc="validation {}/{}".format(
-                                 self.curr_cloud_id, len(sampler.dataset)))
+                             desc="{} {}/{}".format(
+                              split, self.curr_cloud_id, len(sampler.dataset)))
             self.pbar_update = 0
             self.test_probs.append(
                 np.zeros(shape=[num_points, self.model.cfg.num_classes],
                          dtype=np.float16))
             self.test_labels.append(np.zeros(shape=[num_points],
                                              dtype=np.int16))
+            self.complete_infer = False
         else:
             this_possiblility = sampler.possibilities[sampler.cloud_id]
             self.pbar.update(this_possiblility[this_possiblility > 0.5].shape[0] \
@@ -265,6 +261,16 @@ class SemanticSegmentation(BasePipeline):
                 = self.model.update_probs(inputs, results,
                     self.test_probs[self.curr_cloud_id],
                     self.test_labels[self.curr_cloud_id])
+
+            if split in ['test'] and this_possiblility[this_possiblility > 0.5].shape[0] \
+              == this_possiblility.shape[0]:
+
+                proj_inds = self.model.preprocess(self.dataset.get_data(self.curr_cloud_id),
+                   {'split': split})['proj_inds']
+                self.ori_test_probs.append(self.test_probs[self.curr_cloud_id][proj_inds])
+                self.ori_test_labels.append(self.test_labels[self.curr_cloud_id][proj_inds])
+                self.complete_infer = True
+   
 
     def run_train(self):
         model = self.model
