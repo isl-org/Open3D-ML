@@ -379,7 +379,7 @@ class Anchor3DHead(nn.Module):
                 and direction, respectively.
         """
         import numpy as np
-        ref_weights = np.load("/home/prantl/obj_det/test_data/weights.npy")
+        ref_weights = np.load("/home/lprantl/obj_det/test_data/weights.npy")
         np.testing.assert_allclose(label_weights.cpu().detach().numpy(), ref_weights)
 
         # classification loss

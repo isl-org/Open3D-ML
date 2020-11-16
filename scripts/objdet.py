@@ -12,7 +12,7 @@ Pipeline = _ml3d.utils.get_module("pipeline", "ObjectDetection",
                                         "torch")
 
 def main():
-    dataset = Dataset("/home/prantl/obj_det/mmdetection3d/data/kitti")
+    dataset = None#Dataset("/home/prantl/obj_det/mmdetection3d/data/kitti")
     model = Model()
     pipeline = Pipeline(model, dataset)
 
