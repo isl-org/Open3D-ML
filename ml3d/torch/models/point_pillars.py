@@ -15,7 +15,8 @@ from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 
-from mmdet3d.ops import Voxelization
+#from mmdet3d.ops import Voxelization
+from .point_pillars_voxelize import PointPillarsVoxelization
 
 class PointPillars(BaseModel):
     def __init__(self, name="PointPillars"):
@@ -378,9 +379,6 @@ class Anchor3DHead(nn.Module):
             tuple[torch.Tensor]: Losses of class, bbox \
                 and direction, respectively.
         """
-        import numpy as np
-        ref_weights = np.load("/home/lprantl/obj_det/test_data/weights.npy")
-        np.testing.assert_allclose(label_weights.cpu().detach().numpy(), ref_weights)
 
         # classification loss
         if num_total_samples is None:
