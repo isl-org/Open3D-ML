@@ -108,6 +108,8 @@ class ObjectDetection(BasePipeline):
         np.testing.assert_allclose(results[1][0].cpu().numpy(), ref_out_1)
         np.testing.assert_allclose(results[2][0].cpu().numpy(), ref_out_2)
 
+        print(model.inference_end(None, results))
+
         return
 
     def run_train(self):

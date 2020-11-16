@@ -3,7 +3,7 @@ import torch
 
 from functools import partial
 
-from mmdet3d.ops.iou3d.iou3d_utils import nms_gpu
+import open3d.ml.torch as ml3d
 
 # source mmdet3d (MIT)
 
@@ -1570,9 +1570,9 @@ def box3d_multiclass_nms(mlvl_bboxes,
         _scores = mlvl_scores[cls_inds, i]
         _bboxes_for_nms = mlvl_bboxes_for_nms[cls_inds, :]
 
-        nms_func = nms_gpu
 
-        selected = nms_func(_bboxes_for_nms, _scores, 0.1)
+        selected = ml3d.ops.nms(_bboxes_for_nms, _scores, 0.1)
+
         _mlvl_bboxes = mlvl_bboxes[cls_inds, :]
         bboxes.append(_mlvl_bboxes[selected])
         scores.append(_scores[selected])
