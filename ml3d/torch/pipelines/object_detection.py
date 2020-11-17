@@ -6,8 +6,12 @@ from datetime import datetime
 
 from os.path import exists, join
 
+<<<<<<< HEAD
 from ..modules.metrics.objdet_metric import kitti_eval
 
+=======
+from ..modules.metrics import kitti_eval
+>>>>>>> 42278a2591a0d408554b05b01691a3fd7b908ee3
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader
 from ..utils import latest_torch_ckpt
@@ -119,20 +123,16 @@ class ObjectDetection(BasePipeline):
 
         log.info("Started testing")
 
-        datset_split = self.dataset.get_split('training')
-        attr = datset_split.get_attr(0)
-        data = datset_split.get_data(0)
-
         results = []
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
-                data = test_split[idx]
+                data = datset_split.get_data(idx)
                 result = self.run_inference(data)
-                results.extend(result)
-                #dataset.save_test_result(results, attr)
+                results.append(result)
         
         ap_res, ap_dict = kitti_eval(gt, results, ['Car', 'Pedestrian', 'Cyclist'])
-        log.info("test acc: {}".format(ap_res))
+        log.info("test acc: {}".format(
+            ap_res))
 
     def run_train(self):
         raise NotImplementedError()
