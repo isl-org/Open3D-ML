@@ -7,6 +7,163 @@ import open3d.ml.torch as ml3d
 
 # source mmdet3d (MIT)
 
+def bbox2result_kitti(self,
+                        net_outputs,
+                        class_names):
+    """Convert 3D detection results to kitti format for evaluation and test
+    submission.
+
+    Args:
+        net_outputs (list[np.ndarray]): List of array storing the \
+            inferenced bounding boxes and scores.
+        class_names (list[String]): A list of class names.
+
+    Returns:
+        list[dict]: A list of dictionaries with the kitti format.
+    """
+    det_annos = []
+    print('\nConverting prediction to KITTI format')
+    for idx, pred_dicts in enumerate(net_outputs):
+        annos = []
+
+        box_dict = convert_valid_bboxes(pred_dicts, info)
+        if len(box_dict['bbox']) > 0:
+            box_2d_preds = box_dict['bbox']
+            box_preds = box_dict['box3d_camera']
+            scores = box_dict['scores']
+            box_preds_lidar = box_dict['box3d_lidar']
+            label_preds = box_dict['label_preds']
+
+            anno = {
+                'name': [],
+                'truncated': [],
+                'occluded': [],
+                'alpha': [],
+                'bbox': [],
+                'dimensions': [],
+                'location': [],
+                'rotation_y': [],
+                'score': []
+            }
+
+            for box, box_lidar, bbox, score, label in zip(
+                    box_preds, box_preds_lidar, box_2d_preds, scores,
+                    label_preds):
+                bbox[2:] = np.minimum(bbox[2:], image_shape[::-1])
+                bbox[:2] = np.maximum(bbox[:2], [0, 0])
+                anno['name'].append(class_names[int(label)])
+                anno['truncated'].append(0.0)
+                anno['occluded'].append(0)
+                anno['alpha'].append(
+                    -np.arctan2(-box_lidar[1], box_lidar[0]) + box[6])
+                anno['bbox'].append(bbox)
+                anno['dimensions'].append(box[3:6])
+                anno['location'].append(box[:3])
+                anno['rotation_y'].append(box[6])
+                anno['score'].append(score)
+
+            anno = {k: np.stack(v) for k, v in anno.items()}
+            annos.append(anno)
+        else:
+            annos.append({
+                'name': np.array([]),
+                'truncated': np.array([]),
+                'occluded': np.array([]),
+                'alpha': np.array([]),
+                'bbox': np.zeros([0, 4]),
+                'dimensions': np.zeros([0, 3]),
+                'location': np.zeros([0, 3]),
+                'rotation_y': np.array([]),
+                'score': np.array([]),
+            })
+
+        det_annos += annos
+
+    return det_annos
+    
+
+def convert_valid_bboxes(self, box_dict, info):
+    """Convert the predicted boxes into valid ones.
+
+    Args:
+        box_dict (dict): Box dictionaries to be converted.
+
+            - boxes_3d (:obj:`LiDARInstance3DBoxes`): 3D bounding boxes.
+            - scores_3d (torch.Tensor): Scores of boxes.
+            - labels_3d (torch.Tensor): Class labels of boxes.
+        info (dict): Data info.
+
+    Returns:
+        dict: Valid predicted boxes.
+
+            - bbox (np.ndarray): 2D bounding boxes.
+            - box3d_camera (np.ndarray): 3D bounding boxes in \
+                camera coordinate.
+            - box3d_lidar (np.ndarray): 3D bounding boxes in \
+                LiDAR coordinate.
+            - scores (np.ndarray): Scores of boxes.
+            - label_preds (np.ndarray): Class label predictions.
+    """
+    # TODO: refactor this function
+    box_preds = box_dict['boxes_3d']
+    scores = box_dict['scores_3d']
+    labels = box_dict['labels_3d']
+    # TODO: remove the hack of yaw
+    box_preds.tensor[:, -1] = box_preds.tensor[:, -1] - np.pi
+    box_preds.limit_yaw(offset=0.5, period=np.pi * 2)
+
+    if len(box_preds) == 0:
+        return dict(
+            bbox=np.zeros([0, 4]),
+            box3d_camera=np.zeros([0, 7]),
+            box3d_lidar=np.zeros([0, 7]),
+            scores=np.zeros([0]),
+            label_preds=np.zeros([0, 4])
+
+    rect = info['calib']['R0_rect'].astype(np.float32)
+    Trv2c = info['calib']['Tr_velo_to_cam'].astype(np.float32)
+    P2 = info['calib']['P2'].astype(np.float32)
+    img_shape = info['image']['image_shape']
+    P2 = box_preds.tensor.new_tensor(P2)
+
+    box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c)
+
+    box_corners = box_preds_camera.corners
+    box_corners_in_image = points_cam2img(box_corners, P2)
+    # box_corners_in_image: [N, 8, 2]
+    minxy = torch.min(box_corners_in_image, dim=1)[0]
+    maxxy = torch.max(box_corners_in_image, dim=1)[0]
+    box_2d_preds = torch.cat([minxy, maxxy], dim=1)
+    # Post-processing
+    # check box_preds_camera
+    image_shape = box_preds.tensor.new_tensor(img_shape)
+    valid_cam_inds = ((box_preds_camera.tensor[:, 0] < image_shape[1]) &
+                        (box_preds_camera.tensor[:, 1] < image_shape[0]) &
+                        (box_preds_camera.tensor[:, 2] > 0) &
+                        (box_preds_camera.tensor[:, 3] > 0))
+    # check box_preds
+    limit_range = box_preds.tensor.new_tensor(self.pcd_limit_range)
+    valid_pcd_inds = ((box_preds.center > limit_range[:3]) &
+                        (box_preds.center < limit_range[3:]))
+    valid_inds = valid_cam_inds & valid_pcd_inds.all(-1)
+
+    if valid_inds.sum() > 0:
+        return dict(
+            bbox=box_2d_preds[valid_inds, :].numpy(),
+            box3d_camera=box_preds_camera[valid_inds].tensor.numpy(),
+            box3d_lidar=box_preds[valid_inds].tensor.numpy(),
+            scores=scores[valid_inds].numpy(),
+            label_preds=labels[valid_inds].numpy()
+        )
+    else:
+        return dict(
+            bbox=np.zeros([0, 4]),
+            box3d_camera=np.zeros([0, 7]),
+            box3d_lidar=np.zeros([0, 7]),
+            scores=np.zeros([0]),
+            label_preds=np.zeros([0, 4])
+        )
+        
 
 def images_to_levels(target, num_levels):
     """Convert targets by image to targets by feature level.

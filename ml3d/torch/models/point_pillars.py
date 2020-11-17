@@ -15,12 +15,18 @@ from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 
-#from mmdet3d.ops import Voxelization
-from .point_pillars_voxelize import PointPillarsVoxelization
+from mmdet3d.ops import Voxelization
+#from .point_pillars_voxelize import PointPillarsVoxelization
 
 class PointPillars(BaseModel):
-    def __init__(self, name="PointPillars"):
-        super().__init__(name=name)
+    def __init__(self, 
+            name="PointPillars",
+            ckpt_path=None):
+
+        super().__init__(
+                name=name,
+                ckpt_path=ckpt_path)
+
         self.backbone = SECOND()
         self.neck = SECONDFPN()
         self.bbox_head = Anchor3DHead()
@@ -85,26 +91,46 @@ class PointPillars(BaseModel):
         return losses
 
     def preprocess(self, data, attr):
-        raise NotImplementedError
+        points = np.array(data['point'][:, 0:3], dtype=np.float32)       
+
+        if 'label' not in data.keys() or data['label'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
+
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = None
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+
+        data['point'] = points
+        data['feat'] = feat
+        data['label'] = labels
+
+        return data
 
     def transform(self, cfg_pipeline):
-        raise NotImplementedError
+        pass
 
     def inference_begin(self, data):
-        raise NotImplementedError
+        self.inference_data = data
 
     def inference_preprocess(self):
-        raise NotImplementedError
+        data = torch.tensor([self.inference_data["point"]], dtype=torch.float32, device=self.device)
+        return {
+            "data": data
+        }
 
     def inference_end(self, inputs, results):
         bbox_list = self.bbox_head.get_bboxes(*results)
-        return [
+        self.inference_result = [
             dict(
                 boxes_3d=bboxes.to('cpu'),
                 scores_3d=scores.cpu(),
                 labels_3d=labels.cpu()) 
             for bboxes, scores, labels in bbox_list
         ]
+        return True
 
 
 MODEL._register_module(PointPillars, 'torch')
