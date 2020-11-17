@@ -6,6 +6,7 @@ from datetime import datetime
 
 from os.path import exists, join
 
+from ..modules.metrics import kitti_eval
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader
 from ..utils import latest_torch_ckpt
@@ -119,15 +120,16 @@ class ObjectDetection(BasePipeline):
 
         log.info("Started testing")
 
+        results = []
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
-                attr = datset_split.get_attr(idx)
-                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
-                    continue
                 data = datset_split.get_data(idx)
-                results = self.run_inference(data)
-
-                dataset.save_test_result(results, attr)
+                result = self.run_inference(data)
+                results.append(result)
+        
+        ap_res, ap_dict = kitti_eval(gt, results, ['Car', 'Pedestrian', 'Cyclist'])
+        log.info("test acc: {}".format(
+            ap_res))
 
     def run_train(self):
         raise NotImplementedError()

@@ -127,7 +127,6 @@ def compute_statistics_jit(overlaps,
                            ignored_gt,
                            ignored_det,
                            dc_bboxes,
-                           metric,
                            min_overlap,
                            thresh=0,
                            compute_fp=False,
@@ -138,8 +137,6 @@ def compute_statistics_jit(overlaps,
     dt_scores = dt_datas[:, -1]
     dt_alphas = dt_datas[:, 4]
     gt_alphas = gt_datas[:, 4]
-    dt_bboxes = dt_datas[:, :4]
-    # gt_bboxes = gt_datas[:, :4]
 
     assigned_detection = [False] * det_size
     ignored_threshold = [False] * det_size
@@ -149,8 +146,6 @@ def compute_statistics_jit(overlaps,
                 ignored_threshold[i] = True
     NO_DETECTION = -10000000
     tp, fp, fn, similarity = 0, 0, 0, 0
-    # thresholds = [0.0]
-    # delta = [0.0]
     thresholds = np.zeros((gt_size, ))
     thresh_idx = 0
     delta = np.zeros((gt_size, ))
@@ -212,19 +207,6 @@ def compute_statistics_jit(overlaps,
                      or ignored_det[i] == 1 or ignored_threshold[i])):
                 fp += 1
         nstuff = 0
-        if metric == 0:
-            overlaps_dt_dc = image_box_overlap(dt_bboxes, dc_bboxes, 0)
-            for i in range(dc_bboxes.shape[0]):
-                for j in range(det_size):
-                    if (assigned_detection[j]):
-                        continue
-                    if (ignored_det[j] == -1 or ignored_det[j] == 1):
-                        continue
-                    if (ignored_threshold[j]):
-                        continue
-                    if overlaps_dt_dc[j, i] > min_overlap:
-                        assigned_detection[j] = True
-                        nstuff += 1
         fp -= nstuff
         if compute_aos:
             tmp = np.zeros((fp + delta_idx, ))
@@ -261,7 +243,6 @@ def fused_compute_statistics(overlaps,
                              dontcares,
                              ignored_gts,
                              ignored_dets,
-                             metric,
                              min_overlap,
                              thresholds,
                              compute_aos=False):
@@ -285,7 +266,6 @@ def fused_compute_statistics(overlaps,
                 ignored_gt,
                 ignored_det,
                 dontcare,
-                metric,
                 min_overlap=min_overlap,
                 thresh=thresh,
                 compute_fp=True,
@@ -300,14 +280,13 @@ def fused_compute_statistics(overlaps,
         dc_num += dc_nums[i]
 
 
-def calculate_iou_partly(gt_annos, dt_annos, metric, num_parts=50):
+def calculate_iou_partly(gt_annos, dt_annos, num_parts=50):
     """Fast iou algorithm. this function can be used independently to do result
     analysis. Must be used in CAMERA coordinate system.
 
     Args:
         gt_annos (dict): Must from get_label_annos() in kitti_common.py.
         dt_annos (dict): Must from get_label_annos() in kitti_common.py.
-        metric (int): Eval type. 0: bbox, 1: bev, 2: 3d.
         num_parts (int): A parameter for fast calculate algorithm.
     """
     assert len(gt_annos) == len(dt_annos)
@@ -391,9 +370,7 @@ def eval_class(gt_annos,
                dt_annos,
                current_classes,
                difficultys,
-               metric,
                min_overlaps,
-               compute_aos=False,
                num_parts=200):
     """Kitti eval. support 2d/bev/3d/aos eval. support 0.5:0.05:0.95 coco AP.
 
@@ -403,7 +380,7 @@ def eval_class(gt_annos,
         current_classes (list[int]): 0: car, 1: pedestrian, 2: cyclist.
         difficultys (list[int]): Eval difficulty, 0: easy, 1: normal, 2: hard
         min_overlaps (float): Min overlap. format:
-            [num_overlap, metric, class].
+            [num_overlap, class].
         num_parts (int): A parameter for fast calculate algorithm
 
     Returns:
@@ -431,7 +408,7 @@ def eval_class(gt_annos,
             rets = _prepare_data(gt_annos, dt_annos, current_class, difficulty)
             (gt_datas_list, dt_datas_list, ignored_gts, ignored_dets,
              dontcares, total_dc_num, total_num_valid_gt) = rets
-            for k, min_overlap in enumerate(min_overlaps[:, metric, m]):
+            for k, min_overlap in enumerate(min_overlaps[:, m]):
                 thresholdss = []
                 for i in range(len(gt_annos)):
                     rets = compute_statistics_jit(
@@ -441,11 +418,10 @@ def eval_class(gt_annos,
                         ignored_gts[i],
                         ignored_dets[i],
                         dontcares[i],
-                        metric,
                         min_overlap=min_overlap,
                         thresh=0.0,
                         compute_fp=False)
-                    tp, fp, fn, similarity, thresholds = rets
+                    thresholds = rets[-1]
                     thresholdss += thresholds.tolist()
                 thresholdss = np.array(thresholdss)
                 thresholds = get_thresholds(thresholdss, total_num_valid_gt)
@@ -474,25 +450,18 @@ def eval_class(gt_annos,
                         dc_datas_part,
                         ignored_gts_part,
                         ignored_dets_part,
-                        metric,
                         min_overlap=min_overlap,
-                        thresholds=thresholds,
-                        compute_aos=compute_aos)
+                        thresholds=thresholds)
                     idx += num_part
                 for i in range(len(thresholds)):
                     recall[m, idx_l, k, i] = pr[i, 0] / (pr[i, 0] + pr[i, 2])
                     precision[m, idx_l, k, i] = pr[i, 0] / (
                         pr[i, 0] + pr[i, 1])
-                    if compute_aos:
-                        aos[m, idx_l, k, i] = pr[i, 3] / (pr[i, 0] + pr[i, 1])
                 for i in range(len(thresholds)):
                     precision[m, idx_l, k, i] = np.max(
                         precision[m, idx_l, k, i:], axis=-1)
                     recall[m, idx_l, k, i] = np.max(
                         recall[m, idx_l, k, i:], axis=-1)
-                    if compute_aos:
-                        aos[m, idx_l, k, i] = np.max(
-                            aos[m, idx_l, k, i:], axis=-1)
     ret_dict = {
         'recall': recall,
         'precision': precision,
@@ -518,7 +487,7 @@ def do_eval(gt_annos,
             dt_annos,
             current_classes,
             min_overlaps):
-    # min_overlaps: [num_minoverlap, metric, num_class]
+    # min_overlaps: [num_minoverlap, num_class]
     difficulties = [0, 1, 2]
     ret = eval_class(gt_annos, dt_annos, current_classes, difficulties,
                         min_overlaps)
@@ -540,13 +509,9 @@ def kitti_eval(gt_annos,
         tuple: String and dict of evaluation results.
     """
 
-    overlap_0_7 = np.array([[0.7, 0.5, 0.5, 0.7,
-                             0.5], [0.7, 0.5, 0.5, 0.7, 0.5],
-                            [0.7, 0.5, 0.5, 0.7, 0.5]])
-    overlap_0_5 = np.array([[0.7, 0.5, 0.5, 0.7, 0.5],
-                            [0.5, 0.25, 0.25, 0.5, 0.25],
-                            [0.5, 0.25, 0.25, 0.5, 0.25]])
-    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 3, 5]
+    overlap_0_7 = np.array([0.7, 0.5, 0.5, 0.7, 0.5])
+    overlap_0_5 = np.array([0.5, 0.25, 0.25, 0.5, 0.25])
+    min_overlaps = np.stack([overlap_0_7, overlap_0_5], axis=0)  # [2, 5]
     class_to_name = {
         0: 'Car',
         1: 'Pedestrian',
@@ -564,33 +529,21 @@ def kitti_eval(gt_annos,
         else:
             current_classes_int.append(curcls)
     current_classes = current_classes_int
-    min_overlaps = min_overlaps[:, :, current_classes]
+    min_overlaps = min_overlaps[:, current_classes]
     result = ''
-    # check whether alpha is valid
-    compute_aos = False
-    pred_alpha = False
-    valid_alpha_gt = False
-    for anno in dt_annos:
-        if anno['alpha'].shape[0] != 0:
-            pred_alpha = True
-            break
-    for anno in gt_annos:
-        if anno['alpha'][0] != -10:
-            valid_alpha_gt = True
-            break
 
     mAP3d = do_eval(gt_annos, dt_annos, current_classes, min_overlaps)
 
     ret_dict = {}
     difficulty = ['easy', 'moderate', 'hard']
     for j, curcls in enumerate(current_classes):
-        # mAP threshold array: [num_minoverlap, metric, class]
+        # mAP threshold array: [num_minoverlap, class]
         # mAP result: [num_class, num_diff, num_minoverlap]
         curcls_name = class_to_name[curcls]
         for i in range(min_overlaps.shape[0]):
             # prepare results for print
             result += ('{} AP@{:.2f}, {:.2f}, {:.2f}:\n'.format(
-                curcls_name, *min_overlaps[i, :, j]))
+                curcls_name, *min_overlaps[i, j]))
             result += '3d   AP:{:.4f}, {:.4f}, {:.4f}\n'.format(
                 *mAP3d[j, :, i])
 
@@ -601,7 +554,7 @@ def kitti_eval(gt_annos,
                 else:
                     postfix = f'{difficulty[idx]}_loose'
                 prefix = f'KITTI/{curcls_name}'
-                iret_dict[f'{prefix}_3D_{postfix}'] = mAP3d[j, idx, i]
+                ret_dict[f'{prefix}_3D_{postfix}'] = mAP3d[j, idx, i]
 
     # calculate mAP over all classes if there are multiple classes
     if len(current_classes) > 1:
