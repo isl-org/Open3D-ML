@@ -17,7 +17,7 @@ class PointNet(BaseModel):
                  dim_input=3,
                  dim_feature=0,
                  normalize=True,
-                 augment=True,
+                 augment="normal",
                  feature_transform_regularization=0.001,
                  batcher='DefaultBatcher',
                  ckpt_path=None,
@@ -46,6 +46,8 @@ class PointNet(BaseModel):
                                       dim_feature)
         else:
             raise ValueError(f"Invalid task {task}")
+        assert augment in ['normal',
+                           'uniform'], f"Invalid augmentation {augment}"
 
         self.num_points = num_points
         self.normalize = normalize
@@ -99,7 +101,7 @@ class PointNet(BaseModel):
         if self.task == 'classification':
             # Normalize and center
             if self.normalize:
-                point = point - np.mean(point, axis=0)
+                point -= np.mean(point, axis=0)
                 dist = np.max(np.sqrt(np.sum(point**2, axis=0)), axis=0)
                 point /= dist
 
@@ -114,9 +116,11 @@ class PointNet(BaseModel):
                 # Following original implementation at
                 # https://github.com/charlesq34/pointnet/blob/master/train.py
                 # Paper: "[...] Gaussian noise with zero mean and 0.02 standard deviation."
-                point += np.clip(
-                    0.01 * np.random.randn(point.shape[0], point.shape[1]),
-                    -0.05, 0.05)
+                if self.augment == "uniform":
+                    point += np.clip(0.001 * np.random.randn(point.shape),
+                                     -0.005, 0.005)
+                else:
+                    point += np.random.normal(0, 0.002, point.shape)
 
         if data.get('feat') is not None:
             point = np.concatenate([point, data['feat'][choice].copy()], axis=1)
