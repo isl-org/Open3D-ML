@@ -1,4 +1,4 @@
-"""Torch dataloader."""
+"""Dataloader for PyTorch."""
 
 from .torch_dataloader import TorchDataloader
 from .default_batcher import DefaultBatcher
