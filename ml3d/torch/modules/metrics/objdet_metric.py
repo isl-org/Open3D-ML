@@ -1,10 +1,10 @@
 import gc
 import io as sysio
-import numba
+#import numba
 import numpy as np
 
 
-@numba.jit
+#@numba.jit
 def get_thresholds(scores: np.ndarray, num_gt, num_sample_pts=41):
     scores.sort()
     scores = scores[::-1]
@@ -81,7 +81,7 @@ def clean_data(gt_anno, dt_anno, current_class, difficulty):
 
 
 
-@numba.jit(nopython=True, parallel=True)
+#@numba.jit(nopython=True, parallel=True)
 def d3_box_overlap_kernel(boxes, qboxes, rinc, criterion=-1):
     # ONLY support overlap in CAMERA, not lidar.
     # TODO: change to use prange for parallel mode, should check the difference
@@ -120,7 +120,7 @@ def d3_box_overlap(boxes, qboxes, criterion=-1):
     return rinc
 
 
-@numba.jit(nopython=True)
+#@numba.jit(nopython=True)
 def compute_statistics_jit(overlaps,
                            gt_datas,
                            dt_datas,
@@ -232,7 +232,7 @@ def get_split_parts(num, num_part):
         return [same_part] * num_part + [remain_num]
 
 
-@numba.jit(nopython=True)
+#@numba.jit(nopython=True)
 def fused_compute_statistics(overlaps,
                              pr,
                              gt_nums,

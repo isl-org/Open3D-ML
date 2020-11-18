@@ -10,13 +10,13 @@ import numpy as np
 from .base_model import BaseModel
 
 from ...utils import MODEL
-from ..utils.objdet_helper import Anchor3DRangeGenerator, DeltaXYZWLHRBBoxCoder, xywhr2xyxyr, LiDARInstance3DBoxes, box3d_multiclass_nms, limit_period, multi_apply, MaxIoUAssigner, PseudoSampler, get_direction_target, images_to_levels
+from ..utils.objdet_helper import Anchor3DRangeGenerator, DeltaXYZWLHRBBoxCoder, xywhr2xyxyr, LiDARInstance3DBoxes, box3d_multiclass_nms, limit_period, multi_apply, MaxIoUAssigner, PseudoSampler, get_direction_target, images_to_levels, bbox2result_kitti
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 
-from mmdet3d.ops import Voxelization
-#from .point_pillars_voxelize import PointPillarsVoxelization
+#from mmdet3d.ops import Voxelization
+from .point_pillars_voxelize import PointPillarsVoxelization
 
 class PointPillars(BaseModel):
     def __init__(self, 
@@ -31,7 +31,7 @@ class PointPillars(BaseModel):
         self.neck = SECONDFPN()
         self.bbox_head = Anchor3DHead()
 
-        self.voxel_layer = Voxelization(
+        self.voxel_layer = PointPillarsVoxelization(
             voxel_size=[0.16, 0.16, 4],
             point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1],
             max_num_points=32,
@@ -91,26 +91,36 @@ class PointPillars(BaseModel):
         return losses
 
     def preprocess(self, data, attr):
-        points = np.array(data['point'][:, 0:3], dtype=np.float32)       
+        return data
+
+    def transform(self, data, attr):
+        #data = data['data']
+        points = np.array(data['point'][:, 0:4], dtype=np.float32)       
+
+        min_val = np.array([0.0, -40.0, -3.0])
+        max_val = np.array([70.4, 40.0, 1.0])
+
+        points = points[np.where(np.all( 
+            np.logical_and(
+                points[:,:3] >= min_val, 
+                points[:,:3] < max_val), axis=-1))]
 
         if 'label' not in data.keys() or data['label'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
-            labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
+            labels = data['label']
 
         if 'feat' not in data.keys() or data['feat'] is None:
             feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
+        data = dict()
         data['point'] = points
         data['feat'] = feat
         data['label'] = labels
 
         return data
-
-    def transform(self, cfg_pipeline):
-        pass
 
     def inference_begin(self, data):
         self.inference_data = data
@@ -130,6 +140,7 @@ class PointPillars(BaseModel):
                 labels_3d=labels.cpu()) 
             for bboxes, scores, labels in bbox_list
         ]
+        #self.inference_result = bbox2result_kitti(result, self.inference_data, ['Car', 'Pedestrian', 'Cyclist'])
         return True
 
 
@@ -876,7 +887,7 @@ class Anchor3DHead(nn.Module):
                                           0).reshape(-1, self.box_code_size)
 
             nms_pre = 100
-            if nms_pre > 0 and scores.shape[0] > nms_pre:  
+            if scores.shape[0] > nms_pre:  
                 max_scores, _ = scores.max(dim=1)
                 _, topk_inds = max_scores.topk(nms_pre)
                 anchors = anchors[topk_inds, :]
