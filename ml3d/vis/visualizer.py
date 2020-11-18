@@ -1,9 +1,11 @@
+import math
 import numpy as np
 import threading
 import open3d as o3d
 from open3d.visualization import gui
 from open3d.visualization import rendering
 from collections import deque
+from .boundingbox import *
 from .colormap import *
 from .labellut import *
 
@@ -13,6 +15,14 @@ import time
 class Model:
     """Attributes, data, and methods of visulization models."""
 
+    bounding_box_prefix = "Bounding Boxes/"
+
+    class BoundingBoxData:
+
+        def __init__(self, name, boxes):
+            self.name = name
+            self.boxes = boxes
+
     def __init__(self):
         # Note: the tpointcloud cannot store the actual data arrays, because
         # the tpointcloud requires specific names for some arrays (e.g. "points",
@@ -20,6 +30,7 @@ class Model:
         # contains the "points" array.
         self.tclouds = {}  # name -> tpointcloud
         self.data_names = []  # the order data will be displayed / animated
+        self.bounding_box_data = []  # [BoundingBoxData]
 
         self._data = {}  # name -> {attr_name -> numpyarray}
         self._known_attrs = {}  # name -> set(attrs)
@@ -35,7 +46,12 @@ class Model:
         self.data_names.append(name)
 
     def is_loaded(self, name):
-        return len(self._data[name]) > 0
+        if name in self._data:
+            return len(self._data[name]) > 0
+        else:
+            # if the name isn't in the data, presumably it is loaded
+            # (for instance, if this is a bounding box).
+            return True
 
     def load(self, name, fail_if_no_space=False):
         assert (False)  # pure virtual
@@ -86,7 +102,10 @@ class Model:
 
     def _convert_to_numpy(self, ary):
         if isinstance(ary, list):
-            return np.array(ary, dtype='float32')
+            try:
+                return np.array(ary, dtype='float32')
+            except TypeError:
+                return None
         elif isinstance(ary, np.ndarray):
             if len(ary.shape) == 2 and ary.shape[0] == 1:
                 ary = ary[0]  # "1D" array as 2D: [[1, 2, 3,...]]
@@ -249,7 +268,7 @@ class DatasetModel(Model):
 
     def is_loaded(self, name):
         loaded = super().is_loaded(name)
-        if loaded:
+        if loaded and name in self._cached_data:
             # make this point cloud the most recently used
             self._cached_data.remove(name)
             self._cached_data.append(name)
@@ -265,6 +284,10 @@ class DatasetModel(Model):
         data = self._dataset.get_data(idx)
         data["name"] = name
         data["points"] = data["point"]
+
+        if 'bounding_boxes' in data:
+            self.bounding_box_data.append(
+                Model.BoundingBoxData(name, data['bounding_boxes']))
 
         self.create_point_cloud(data)
         size = self._calc_pointcloud_size(self._data[name], self.tclouds[name])
@@ -304,6 +327,12 @@ class DatasetModel(Model):
                                                o3d.core.Device("CPU:0"))
             self.tclouds[name] = tcloud
             self._data[name] = {}
+
+            bbox_name = Model.bounding_box_prefix + name
+            for i in range(0, len(self.bounding_box_data)):
+                if self.bounding_box_data[i].name == bbox_name:
+                    self.bounding_box_data.pop(i)
+                    break
 
 
 class Visualizer:
@@ -634,6 +663,7 @@ class Visualizer:
         self._animation_frames = []
         self._last_animation_time = time.time()
         self._animation_delay_secs = 0.100
+        self._consolidate_bounding_boxes = False
         self._dont_update_geometry = False
 
     def _init_dataset(self, dataset, split, indices):
@@ -837,6 +867,7 @@ class Visualizer:
         # Populate tree, etc.
         for name in self._objects.data_names:
             self._add_tree_name(name)
+
         self._update_datasource_combobox()
 
     def set_lut(self, attr_name, lut):
@@ -870,7 +901,7 @@ class Visualizer:
                 node.checkbox.checked = show
         self._3d.force_redraw()
 
-    def _add_tree_name(self, name):
+    def _add_tree_name(self, name, is_geometry=True):
         names = name.split("/")
         parent = self._dataset.get_root_item()
         for i in range(0, len(names) - 1):
@@ -890,11 +921,14 @@ class Visualizer:
 
         def on_checked(checked):
             self._3d.scene.show_geometry(name, checked)
-            self._update_datasource_combobox()  # available attrs could change
+            if self._is_tree_name_geometry(name):
+                # available attrs could change
+                self._update_datasource_combobox()
             self._3d.force_redraw()
 
         cell = gui.CheckableTextTreeCell(names[-1], True, on_checked)
-        cell.label.text_color = gui.Color(1.0, 0.0, 0.0, 1.0)
+        if is_geometry:
+            cell.label.text_color = gui.Color(1.0, 0.0, 0.0, 1.0)
         node = self._dataset.add_item(parent, cell)
         self._name2treenode[name] = cell
         self._treeid2name[node] = name
@@ -959,11 +993,12 @@ class Visualizer:
             if not tcloud.is_empty():
                 self._name2treenode[n].label.text_color = gui.Color(
                     0.0, 1.0, 0.0, 1.0)
+                if self._3d.scene.has_geometry(n):
+                    self._3d.scene.modify_geometry_material(n, material)
             else:
                 self._name2treenode[n].label.text_color = gui.Color(
                     1.0, 0.0, 0.0, 1.0)
                 self._name2treenode[n].checkbox.checked = False
-        self._3d.scene.update_material(material)
         self._3d.force_redraw()
 
     def _update_point_cloud(self, name, tcloud, material):
@@ -1030,6 +1065,60 @@ class Visualizer:
 
         return material
 
+    def _update_bounding_boxes(self, animation_frame=None):
+        if len(self._attrname2lut) == 1:
+            # Can't do dict.values()[0], so have to iterate over the 1 element
+            for v in self._attrname2lut.values():
+                lut = v
+        elif "labels" in self._attrname2lut:
+            lut = self._attrname2lut["labels"]
+        elif "label" in self._attrname2lut:
+            lut = self._attrname2lut["label"]
+        else:
+            lut = None
+
+        mat = rendering.Material()
+        mat.shader = "defaultUnlit"
+
+        if self._consolidate_bounding_boxes:
+            name = Model.bounding_box_prefix.split("/")[0]
+            boxes = []
+            # When consolidated we assume bbox_data.name is the geometry name.
+            if animation_frame is None:
+                for bbox_data in self._objects.bounding_box_data:
+                    boxes += bbox_data.boxes
+            else:
+                geom_name = self._animation_frames[animation_frame]
+                for bbox_data in self._objects.bounding_box_data:
+                    if bbox_data.name == geom_name:
+                        boxes = bbox_data.boxes
+                        break
+
+            self._3d.scene.remove_geometry(name)
+            if len(boxes) > 0:
+                lines = BoundingBox3D.create_lines(boxes, lut)
+                self._3d.scene.add_geometry(name, lines, mat)
+
+                if name not in self._name2treenode:
+                    self._add_tree_name(name, is_geometry=False)
+            self._3d.force_redraw()
+        else:
+            # Don't run this more than once if we aren't consolidating,
+            # because nothing will change.
+            if len(self._objects.bounding_box_data) > 0:
+                if self._objects.bounding_box_data[
+                        0].name in self._name2treenode:
+                    return
+
+            for bbox_data in self._objects.bounding_box_data:
+                lines = BoundingBox3D.create_lines(bbox_data.boxes, lut)
+                self._3d.scene.add_geometry(bbox_data.name, lines, mat)
+
+            for bbox_data in self._objects.bounding_box_data:
+                self._add_tree_name(bbox_data.name, is_geometry=False)
+
+            self._3d.force_redraw()
+
     def _update_gradient(self):
         if self._shader.selected_text == self.LABELS_NAME:
             colors = self._label_edit.get_colors()
@@ -1059,7 +1148,9 @@ class Visualizer:
 
     def _update_geometry_colors(self):
         material = self._get_material()
-        self._3d.scene.update_material(material)
+        for name, tcloud in self._objects.tclouds.items():
+            if not tcloud.is_empty() and self._3d.scene.has_geometry(name):
+                self._3d.scene.modify_geometry_material(name, material)
         self._3d.force_redraw()
 
     def _update_datasource_combobox(self):
@@ -1078,7 +1169,7 @@ class Visualizer:
             # 2) geometries are selected: color solid
             has_checked = False
             for n, node in self._name2treenode.items():
-                if node.checkbox.checked:
+                if node.checkbox.checked and self._is_tree_name_geometry(n):
                     has_checked = True
                     break
             if has_checked:
@@ -1162,10 +1253,13 @@ class Visualizer:
 
     def _on_dataset_selection_changed(self, item):
         name = self._treeid2name[item]
+        if not self._is_tree_name_geometry(name):
+            return
 
         def ui_callback():
             self._update_attr_range()
             self._update_geometry(check_unloaded=True)
+            self._update_bounding_boxes()
 
         if not self._objects.is_loaded(name):
             self._load_geometry(name, ui_callback)
@@ -1175,15 +1269,18 @@ class Visualizer:
             self._animation_frames = self._get_selected_names()
             self._slider.set_limits(0, len(self._animation_frames) - 1)
             self._on_animation_slider_changed(self._slider.int_value)
+            # _on_animation_slider_changed() calls _update_bounding_boxes()
         else:
             for name, node in self._name2treenode.items():
                 self._3d.scene.show_geometry(name, node.checkbox.checked)
+            self._update_bounding_boxes()
 
     def _on_animation_slider_changed(self, new_value):
         idx = int(new_value)
         for i in range(0, len(self._animation_frames)):
             self._3d.scene.show_geometry(self._animation_frames[i], (i == idx))
-            self._3d.force_redraw()
+        self._update_bounding_boxes(animation_frame=idx)
+        self._3d.force_redraw()
         self._slider_current.text = self._animation_frames[idx]
         r = self._slider_current.frame
         self._slider_current.frame = gui.Rect(r.x, r.y,
@@ -1281,15 +1378,21 @@ class Visualizer:
         self._update_geometry()
 
     def _get_selected_names(self):
+        # Note that things like bounding boxes could be in the tree, and we
+        # do not want to include them in the list of things selected, even if
+        # they are checked.
         selected_names = []
-        for n, node in self._name2treenode.items():
-            if node.checkbox.checked:
+        for n in self._objects.data_names:
+            if self._name2treenode[n].checkbox.checked:
                 selected_names.append(n)
         return selected_names
 
     def _get_available_attrs(self):
         selected_names = self._get_selected_names()
         return self._objects.get_available_attrs(selected_names)
+
+    def _is_tree_name_geometry(self, name):
+        return (name in self._objects.data_names)
 
     @staticmethod
     def _make_tcloud_array(np_array, copy=False):
@@ -1329,10 +1432,16 @@ class Visualizer:
             lut.add_label(dataset.label_to_names[val], val)
         self.set_lut("labels", lut)
 
+        self._consolidate_bounding_boxes = True
         self._init_dataset(dataset, split, indices)
         self._visualize("Open3D - " + dataset.name, width, height)
 
-    def visualize(self, data, width=1024, height=768):
+    def visualize(self,
+                  data,
+                  lut=None,
+                  bounding_boxes=None,
+                  width=1024,
+                  height=768):
         """Visualizes custom point cloud data
 
         Example:
@@ -1360,6 +1469,42 @@ class Visualizer:
             height: window height.
         """
         self._init_data(data)
+
+        if lut is not None:
+            self.set_lut("labels", lut)
+
+        if bounding_boxes is not None:
+            prefix = Model.bounding_box_prefix
+            # Filament crashes if you have to many items, and anyway, hundreds
+            # of items is unweildy in a list. So combine items if we have too
+            # many.
+            group_size = int(math.floor(float(len(bounding_boxes)) / 100.0))
+            if group_size < 2:
+                box_data = [
+                    Model.BoundingBoxData(prefix + str(bbox), [bbox])
+                    for bbox in bounding_boxes
+                ]
+            else:
+                box_data = []
+                current_group = []
+                n = len(bounding_boxes)
+                for i in range(0, n):
+                    current_group.append(bounding_boxes[i])
+                    if len(current_group) >= group_size or i == n - 1:
+                        if i < n - 1:
+                            name = prefix + "Boxes " + str(
+                                i + 1 - group_size) + " - " + str(i)
+                        else:
+                            if len(current_group) > 1:
+                                name = prefix + "Boxes " + str(
+                                    i + 1 - len(current_group)) + " - " + str(i)
+                            else:
+                                name = prefix + "Box " + str(i)
+                        data = Model.BoundingBoxData(name, current_group)
+                        box_data.append(data)
+                        current_group = []
+            self._objects.bounding_box_data = box_data
+
         self._visualize("Open3D", width, height)
 
     def _visualize(self, title, width, height):
@@ -1377,6 +1522,10 @@ class Visualizer:
             self._3d.scene.show_geometry(name, True)
 
         def on_done_ui():
+            # Add bounding boxes here: bounding boxes belonging to the dataset
+            # will not be loaded until now.
+            self._update_bounding_boxes()
+
             self._update_datasource_combobox()
             self._update_shaders_combobox()
 

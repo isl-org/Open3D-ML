@@ -6,7 +6,7 @@ from glob import glob
 import logging
 import yaml
 
-from .base_dataset import BaseDataset, BaseDatasetSplit
+from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
 
 logging.basicConfig(
@@ -16,17 +16,17 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class KITTI(BaseDataset):
+class Waymo(BaseDataset):
     """
-    KITTI 3D dataset for Object Detection, used in visualizer, training, or test
+    Waymo 3D dataset for Object Detection, used in visualizer, training, or test
     """
 
     def __init__(self,
                  dataset_path,
-                 name='KITTI',
+                 name='Waymo',
                  cache_dir='./logs/cache',
                  use_cache=False,
-                 val_split=3712,
+                 val_split=3,
                  **kwargs):
         """
         Initialize
@@ -45,16 +45,16 @@ class KITTI(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
-        self.num_classes = 3
+        self.num_classes = 4
         self.label_to_names = self.get_label_to_names()
 
-        self.all_files = glob(
-            join(cfg.dataset_path, 'training', 'velodyne', '*.bin'))
+        self.all_files = glob(join(cfg.dataset_path, 'velodyne', '*.bin'))
         self.train_files = []
         self.val_files = []
 
         for f in self.all_files:
-            idx = int(Path(f).name.replace('.bin', ''))
+            idx = Path(f).name.replace('.bin', '')[:3]
+            idx = int(idx)
             if idx < cfg.val_split:
                 self.train_files.append(f)
             else:
@@ -65,14 +65,19 @@ class KITTI(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        label_to_names = {0: 'Car', 1: 'Pedestrian', 2: 'Cyclist', 3: 'Van'}
+        label_to_names = {
+            0: 'PEDESTRIAN',
+            1: 'VEHICLE',
+            2: 'CYCLIST',
+            3: 'SIGN'
+        }
         return label_to_names
 
     @staticmethod
     def read_lidar(path):
         assert Path(path).exists()
 
-        return np.fromfile(path, dtype=np.float32).reshape(-1, 4)
+        return np.fromfile(path, dtype=np.float32).reshape(-1, 6)
 
     @staticmethod
     def read_label(path):
@@ -90,6 +95,12 @@ class KITTI(BaseDataset):
 
         with open(path, 'r') as f:
             lines = f.readlines()
+        obj = lines[0].strip().split(' ')[1:]
+        P0 = np.array(obj, dtype=np.float32)
+
+        obj = lines[1].strip().split(' ')[1:]
+        P1 = np.array(obj, dtype=np.float32)
+
         obj = lines[2].strip().split(' ')[1:]
         P2 = np.array(obj, dtype=np.float32)
 
@@ -97,20 +108,26 @@ class KITTI(BaseDataset):
         P3 = np.array(obj, dtype=np.float32)
 
         obj = lines[4].strip().split(' ')[1:]
-        R0 = np.array(obj, dtype=np.float32)
+        P4 = np.array(obj, dtype=np.float32)
 
         obj = lines[5].strip().split(' ')[1:]
+        R0 = np.array(obj, dtype=np.float32)
+
+        obj = lines[6].strip().split(' ')[1:]
         Tr_velo_to_cam = np.array(obj, dtype=np.float32)
 
         return {
+            'P0': P0.reshape(3, 4),
+            'P1': P1.reshape(3, 4),
             'P2': P2.reshape(3, 4),
             'P3': P3.reshape(3, 4),
+            'P4': P3.reshape(3, 4),
             'R0': R0.reshape(3, 3),
             'Tr_velo2cam': Tr_velo_to_cam.reshape(3, 4)
         }
 
     def get_split(self, split):
-        return KITTISplit(self, split=split)
+        return WaymoSplit(self, split=split)
 
     def get_split_list(self, split):
         cfg = self.cfg
@@ -136,7 +153,7 @@ class KITTI(BaseDataset):
         pass
 
 
-class KITTISplit():
+class WaymoSplit():
 
     def __init__(self, dataset, split='train'):
         self.cfg = dataset.cfg
@@ -153,8 +170,8 @@ class KITTISplit():
     def get_data(self, idx):
         pc_path = self.path_list[idx]
         label_path = pc_path.replace('velodyne',
-                                     'label_2').replace('.bin', '.txt')
-        calib_path = label_path.replace('label_2', 'calib')
+                                     'label_all').replace('.bin', '.txt')
+        calib_path = label_path.replace('label_all', 'calib')
 
         pc = self.dataset.read_lidar(pc_path)
         label = self.dataset.read_label(label_path)
@@ -212,7 +229,7 @@ class Object3d(object):
         """
         get object id from name.
         """
-        type_to_id = {'Car': 1, 'Pedestrian': 2, 'Cyclist': 3, 'Van': 4}
+        type_to_id = {'PEDESTRIAN': 1, 'VEHICLE': 2, 'CYCLIST': 3, 'SIGN': 4}
         if cls_type not in type_to_id.keys():
             return -1
         return type_to_id[cls_type]
@@ -268,4 +285,4 @@ class Object3d(object):
         return kitti_str
 
 
-DATASET._register_module(KITTI)
+DATASET._register_module(Waymo)

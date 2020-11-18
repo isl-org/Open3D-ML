@@ -169,6 +169,7 @@ class SemanticSegmentation(BasePipeline):
 
         is_resume = model.cfg.get('is_resume', True)
         self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
+
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
             # --------------------- training
@@ -190,7 +191,6 @@ class SemanticSegmentation(BasePipeline):
 
                 if predict_scores.shape[0] == 0:
                     continue
-                # params for deformable convolutions.
                 scaled_params = []
                 params = []
                 for val in model.trainable_weights:
