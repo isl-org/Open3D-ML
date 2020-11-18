@@ -10,7 +10,7 @@ import numpy as np
 from .base_model import BaseModel
 
 from ...utils import MODEL
-from ..utils.objdet_helper import Anchor3DRangeGenerator, DeltaXYZWLHRBBoxCoder, xywhr2xyxyr, LiDARInstance3DBoxes, box3d_multiclass_nms, limit_period, multi_apply, MaxIoUAssigner, PseudoSampler, get_direction_target, images_to_levels
+from ..utils.objdet_helper import Anchor3DRangeGenerator, DeltaXYZWLHRBBoxCoder, xywhr2xyxyr, LiDARInstance3DBoxes, box3d_multiclass_nms, limit_period, multi_apply, MaxIoUAssigner, PseudoSampler, get_direction_target, images_to_levels, bbox2result_kitti
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
@@ -91,7 +91,7 @@ class PointPillars(BaseModel):
         return losses
 
     def preprocess(self, data, attr):
-        points = np.array(data['point'][:, 0:3], dtype=np.float32)       
+        """points = np.array(data['point'][:, 0:4], dtype=np.float32)       
 
         if 'label' not in data.keys() or data['label'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
@@ -103,9 +103,10 @@ class PointPillars(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
+        data = dict()
         data['point'] = points
         data['feat'] = feat
-        data['label'] = labels
+        data['label'] = labels"""
 
         return data
 
@@ -130,6 +131,7 @@ class PointPillars(BaseModel):
                 labels_3d=labels.cpu()) 
             for bboxes, scores, labels in bbox_list
         ]
+        #self.inference_result = bbox2result_kitti(result, self.inference_data, ['Car', 'Pedestrian', 'Cyclist'])
         return True
 
 
@@ -876,7 +878,7 @@ class Anchor3DHead(nn.Module):
                                           0).reshape(-1, self.box_code_size)
 
             nms_pre = 100
-            if nms_pre > 0 and scores.shape[0] > nms_pre:  
+            if scores.shape[0] > nms_pre:  
                 max_scores, _ = scores.max(dim=1)
                 _, topk_inds = max_scores.topk(nms_pre)
                 anchors = anchors[topk_inds, :]

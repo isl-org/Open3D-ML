@@ -6,12 +6,7 @@ from datetime import datetime
 
 from os.path import exists, join
 
-<<<<<<< HEAD
-from ..modules.metrics.objdet_metric import kitti_eval
-
-=======
 from ..modules.metrics import kitti_eval
->>>>>>> 42278a2591a0d408554b05b01691a3fd7b908ee3
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader
 from ..utils import latest_torch_ckpt
@@ -126,7 +121,7 @@ class ObjectDetection(BasePipeline):
         results = []
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
-                data = datset_split.get_data(idx)
+                data = test_split[idx]
                 result = self.run_inference(data)
                 results.append(result)
         
