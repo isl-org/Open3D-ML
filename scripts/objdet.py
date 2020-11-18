@@ -1,23 +1,30 @@
-
-import open3d.ml as _ml3d
-import open3d.ml.torch as ml3d
-
 import torch
 
-from tqdm import tqdm
+import open3d.ml as ml3d
 
-Model = _ml3d.utils.get_module("model", "PointPillars", "torch")
-Dataset = _ml3d.utils.get_module("dataset", "KITTI")
-Pipeline = _ml3d.utils.get_module("pipeline", "ObjectDetection",
-                                        "torch")
+from ml3d.vis import Visualizer
+from ml3d.datasets import KITTI
 
-def main():
-    dataset = None#Dataset("/home/prantl/obj_det/mmdetection3d/data/kitti")
-    model = Model()
-    pipeline = Pipeline(model, dataset)
+from ml3d.torch.pipelines import ObjectDetection
+from ml3d.torch.models import PointPillars
 
-    pipeline.run_train()
-    pipeline.run_test()
 
-if __name__ == '__main__':
-    main()
+dataset_path = "/home/prantl/obj_det/mmdetection3d/data/kitti"
+ckpt_path = "/home/prantl/obj_det/mmdetection3d/checkpoints/hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class_20200620_230421-aa0f3adb.pth"
+
+
+model = PointPillars()
+dataset = KITTI(dataset_path)
+pipeline = ObjectDetection(model, dataset, device="gpu")
+    
+# load the parameters.
+pipeline.load_ckpt(ckpt_path=ckpt_path)
+
+test_split = dataset.get_split("training")
+data = test_split.get_data(0)
+
+# run inference on a single example.
+result = pipeline.run_inference(data)
+
+vis = Visualizer()
+vis.visualize(data['point'][:,:3])

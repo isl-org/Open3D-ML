@@ -7,9 +7,8 @@ import open3d.ml.torch as ml3d
 
 # source mmdet3d (MIT)
 
-def bbox2result_kitti(self,
-                        net_outputs,
-                        class_names):
+def bbox2result_kitti(net_outputs, info, class_names):
+                        
     """Convert 3D detection results to kitti format for evaluation and test
     submission.
 
@@ -82,7 +81,27 @@ def bbox2result_kitti(self,
     return det_annos
     
 
-def convert_valid_bboxes(self, box_dict, info):
+def points_cam2img(points_3d, proj_mat):
+    """Project points from camera coordicates to image coordinates.
+
+    Args:
+        points_3d (torch.Tensor): Points in shape (N, 3)
+        proj_mat (torch.Tensor): Transformation matrix between coordinates.
+
+    Returns:
+        torch.Tensor: Points in image coordinates with shape [N, 2].
+    """
+    points_num = list(points_3d.shape)[:-1]
+    points_shape = np.concatenate([points_num, [1]], axis=0).tolist()
+    # previous implementation use new_zeros, new_one yeilds better results
+    points_4 = torch.cat(
+        [points_3d, points_3d.new_ones(*points_shape)], dim=-1)
+    point_2d = torch.matmul(points_4, proj_mat.t())
+    point_2d_res = point_2d[..., :2] / point_2d[..., 2:3]
+    return point_2d_res
+
+
+def convert_valid_bboxes(box_dict, info):
     """Convert the predicted boxes into valid ones.
 
     Args:
@@ -118,15 +137,15 @@ def convert_valid_bboxes(self, box_dict, info):
             box3d_camera=np.zeros([0, 7]),
             box3d_lidar=np.zeros([0, 7]),
             scores=np.zeros([0]),
-            label_preds=np.zeros([0, 4])
+            label_preds=np.zeros([0, 4]))
 
-    rect = info['calib']['R0_rect'].astype(np.float32)
-    Trv2c = info['calib']['Tr_velo_to_cam'].astype(np.float32)
+    rect = info['calib']['R0'].astype(np.float32)
+    Trv2c = info['calib']['Tr_velo2cam'].astype(np.float32)
     P2 = info['calib']['P2'].astype(np.float32)
-    img_shape = info['image']['image_shape']
+    img_shape = [375, 1242]
     P2 = box_preds.tensor.new_tensor(P2)
 
-    box_preds_camera = box_preds.convert_to(Box3DMode.CAM, rect @ Trv2c)
+    box_preds_camera = box_preds.convert_to(1, rect @ Trv2c)
 
     box_corners = box_preds_camera.corners
     box_corners_in_image = points_cam2img(box_corners, P2)
