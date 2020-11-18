@@ -90,7 +90,7 @@ class KITTI(BaseDataset):
                 continue
             center = np.array([float(label[13]), float(label[12]), float(label[11])]).reshape(-1, 3)
 
-            rect = calib['R0']
+            rect = calib['R0_rect']
             Trv2c = calib['Tr_velo2cam']
 
             points = np.concatenate([center, np.ones([1, 1])], axis=-1)
@@ -99,7 +99,6 @@ class KITTI(BaseDataset):
             center = [-1*points[0, 1], -1*points[0, 0], 1 + points[0, 2]]
 
             ry = float(label[14])
-            print(center)
             front = [-1*np.sin(ry), -1*np.cos(ry), 0]
             up = [0, 0, 1]
             left = [-1*np.cos(ry), np.sin(ry), 0]
@@ -110,31 +109,51 @@ class KITTI(BaseDataset):
         return objects
 
     @staticmethod
+    def _extend_matrix(mat):
+        mat = np.concatenate([mat, np.array([[0., 0., 0., 1.]])], axis=0)
+        return mat
+
+    @staticmethod
     def read_calib(path):
         assert Path(path).exists()
 
         with open(path, 'r') as f:
             lines = f.readlines()
+
+        obj = lines[0].strip().split(' ')[1:]
+        P0 = np.array(obj, dtype=np.float32).reshape(3, 4)
+
+        obj = lines[1].strip().split(' ')[1:]
+        P1 = np.array(obj, dtype=np.float32).reshape(3, 4)
+
         obj = lines[2].strip().split(' ')[1:]
-        P2 = np.array(obj, dtype=np.float32)
+        P2 = np.array(obj, dtype=np.float32).reshape(3, 4)
 
         obj = lines[3].strip().split(' ')[1:]
-        P3 = np.array(obj, dtype=np.float32)
+        P3 = np.array(obj, dtype=np.float32).reshape(3, 4)
+
+        P0 = KITTI._extend_matrix(P0)
+        P1 = KITTI._extend_matrix(P1)
+        P2 = KITTI._extend_matrix(P2)
+        P3 = KITTI._extend_matrix(P3)
 
         obj = lines[4].strip().split(' ')[1:]
         R0 = np.array(obj, dtype=np.float32).reshape(3, 3)
+
         rect_4x4 = np.zeros([4, 4], dtype=R0.dtype)
         rect_4x4[3, 3] = 1
         rect_4x4[:3, :3] = R0
 
         obj = lines[5].strip().split(' ')[1:]
         Tr_velo_to_cam = np.array(obj, dtype=np.float32).reshape(3, 4)
-        Tr_velo_to_cam = np.concatenate([Tr_velo_to_cam, np.array([[0., 0., 0., 1.]])], axis=0)
+        Tr_velo_to_cam = KITTI._extend_matrix(Tr_velo_to_cam)
 
         return {
-            'P2': P2.reshape(3, 4),
-            'P3': P3.reshape(3, 4),
-            'R0': rect_4x4,
+            'P0': P0,
+            'P1': P1,
+            'P2': P2,
+            'P3': P3,
+            'R0_rect': rect_4x4,
             'Tr_velo2cam': Tr_velo_to_cam
         }
 
@@ -218,27 +237,22 @@ class Object3d(BoundingBox3D):
 
         super().__init__(center, front, up, left, size, label_class, confidence)
 
-        # self.cls_type = label[0]
-        # self.cls_id = self.cls_type_to_id(self.cls_type)
-        # self.truncation = float(label[1])
-        # self.occlusion = float(
-        #     label[2]
-        # )  # 0:fully visible 1:partly occluded 2:largely occluded 3:unknown
-        # self.alpha = float(label[3])
+        self.name = label[0]
+        self.cls_id = self.cls_type_to_id(self.name)
+        self.truncation = float(label[1])
+        self.occlusion = float(
+            label[2]
+        )  # 0:fully visible 1:partly occluded 2:largely occluded 3:unknown
+ 
+        self.alpha = float(label[3])
         self.box2d = np.array((float(label[4]), float(label[5]), float(
             label[6]), float(label[7])),
                               dtype=np.float32)
-        # self.h = float(label[8])
-        # self.w = float(label[9])
-        # self.l = float(label[10])
-        # self.loc = np.array(
-        #     (float(label[11]), float(label[12]), float(label[13])),
-        #     dtype=np.float32)
-        # self.dis_to_cam = np.linalg.norm(self.loc)
-        # self.ry = float(label[14])
-        # self.score = float(label[15]) if label.__len__() == 16 else -1.0
-        # self.level_str = None
-        # self.level = self.get_kitti_obj_level()
+ 
+        self.dis_to_cam = np.linalg.norm(self.center)
+        self.ry = float(label[14])
+        self.score = float(label[15]) if label.__len__() == 16 else -1.0
+        self.level = self.get_kitti_obj_level()
 
     @staticmethod
     def cls_type_to_id(cls_type):
@@ -247,8 +261,7 @@ class Object3d(BoundingBox3D):
         """
         type_to_id = {'Car': 1, 'Pedestrian': 2, 'Cyclist': 3, 'Van': 4}
         if cls_type not in type_to_id.keys():
-            print(cls_type)
-            return -1
+            return 0
         return type_to_id[cls_type]
 
     def get_kitti_obj_level(self):
@@ -270,36 +283,36 @@ class Object3d(BoundingBox3D):
             self.level_str = 'UnKnown'
             return -1
 
-    # def generate_corners3d(self):
-    #     """
-    #     generate corners3d representation for this object
-    #     :return corners_3d: (8, 3) corners of box3d in camera coord
-    #     """
-    #     l, h, w = self.l, self.h, self.w
-    #     x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
-    #     y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
-    #     z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
+    def generate_corners3d(self):
+        """
+        generate corners3d representation for this object
+        :return corners_3d: (8, 3) corners of box3d in camera coord
+        """
+        l, h, w = self.size[2::-1]
+        x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
+        y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
+        z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
 
-    #     R = np.array([[np.cos(self.ry), 0, np.sin(self.ry)], [0, 1, 0],
-    #                   [-np.sin(self.ry), 0,
-    #                    np.cos(self.ry)]])
-    #     corners3d = np.vstack([x_corners, y_corners, z_corners])  # (3, 8)
-    #     corners3d = np.dot(R, corners3d).T
-    #     corners3d = corners3d + self.loc
-    #     return corners3d
+        R = np.array([[np.cos(self.ry), 0, np.sin(self.ry)], [0, 1, 0],
+                      [-np.sin(self.ry), 0,
+                       np.cos(self.ry)]])
+        corners3d = np.vstack([x_corners, y_corners, z_corners])  # (3, 8)
+        corners3d = np.dot(R, corners3d).T
+        corners3d = corners3d + self.center
+        return corners3d
 
-    # def to_str(self):
-    #     print_str = '%s %.3f %.3f %.3f box2d: %s hwl: [%.3f %.3f %.3f] pos: %s ry: %.3f' \
-    #                  % (self.cls_type, self.truncation, self.occlusion, self.alpha, self.box2d, self.h, self.w, self.l,
-    #                     self.loc, self.ry)
-    #     return print_str
+    def to_str(self):
+        print_str = '%s %.3f %.3f %.3f box2d: %s hwl: [%.3f %.3f %.3f] pos: %s ry: %.3f' \
+                     % (self.name, self.truncation, self.occlusion, self.alpha, self.box2d, self.size[2], self.size[0], self.size[1],
+                        self.center, self.ry)
+        return print_str
 
-    # def to_kitti_format(self):
-    #     kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
-    #                 % (self.cls_type, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
-    #                    self.box2d[2], self.box2d[3], self.h, self.w, self.l, self.loc[0], self.loc[1], self.loc[2],
-    #                    self.ry)
-    #     return kitti_str
+    def to_kitti_format(self):
+        kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
+                    % (self.name, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
+                       self.box2d[2], self.box2d[3], self.size[2], self.size[0], self.size[1], self.center[0], self.center[1], self.center[2],
+                       self.ry)
+        return kitti_str
 
 
 DATASET._register_module(KITTI)
