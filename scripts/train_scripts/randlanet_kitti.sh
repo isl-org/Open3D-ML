@@ -9,5 +9,5 @@ if [ "$#" -ne 2 ]; then
 fi
 
 cd ../..
-python scripts/semseg.py $1 -c ml3d/configs/randlanet_semantickitti.yml \
+python scripts/run_pipeline.py $1 -c ml3d/configs/randlanet_semantickitti.yml \
 --dataset_path $2

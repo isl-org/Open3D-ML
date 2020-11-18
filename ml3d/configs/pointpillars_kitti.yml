@@ -1,0 +1,34 @@
+dataset:
+  name: KITTI
+  dataset_path: "/home/prantl/obj_det/mmdetection3d/data/kitti"
+
+  cache_dir: ./logs/cache
+  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
+    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
+    476491114, 9833174, 129609852, 4506626, 1168181]
+  test_result_folder: ./test
+  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
+  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
+  '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  validation_split: ['08']
+  use_cache: true
+  validation_split:
+  - '08'
+model:
+  name: PointPillars
+  ckpt_path: "/home/prantl/obj_det/mmdetection3d/checkpoints/hv_pointpillars_secfpn_6x8_160e_kitti-3d-3class_20200620_230421-aa0f3adb.pth"
+  
+pipeline:
+  name: ObjectDetection
+
+  adam_lr: 0.01
+  batch_size: 1
+  learning_rate: 0.01
+  main_log_dir: ./logs
+  max_epoch: 100
+  save_ckpt_freq: 2
+  scheduler_gamma: 0.95
+  test_batch_size: 1
+  train_sum_dir: train_log
+  val_batch_size: 1
