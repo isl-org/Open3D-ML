@@ -6,7 +6,6 @@ from datetime import datetime
 
 from os.path import exists, join
 
-from ..modules.metrics import kitti_eval
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader
 from ..utils import latest_torch_ckpt
@@ -108,10 +107,10 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
 
-        test_split = TorchDataloader(dataset=dataset.get_split('training'),
+        test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
-                                     #transform=model.transform,
-                                     use_cache=dataset.cfg.use_cache,
+                                     transform=model.transform,
+                                     use_cache=False,#dataset.cfg.use_cache,
                                      shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path)
@@ -122,12 +121,9 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             for idx in tqdm(range(len(test_split)), desc='test'):
                 data = test_split[idx]
-                result = self.run_inference(data)
+                result = self.run_inference(data['data'])
                 results.append(result)
         
-        ap_res, ap_dict = kitti_eval(gt, results, ['Car', 'Pedestrian', 'Cyclist'])
-        log.info("test acc: {}".format(
-            ap_res))
 
     def run_train(self):
         raise NotImplementedError()
