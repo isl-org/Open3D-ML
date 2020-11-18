@@ -88,7 +88,10 @@ class KITTI(BaseDataset):
             label = line.strip().split(' ')
             if label[0] == 'DontCare':
                 continue
-            center = np.array([float(label[13]), float(label[12]), float(label[11])]).reshape(-1, 3)
+            center = np.array(
+                [float(label[13]),
+                 float(label[12]),
+                 float(label[11])]).reshape(-1, 3)
 
             rect = calib['R0_rect']
             Trv2c = calib['Tr_velo2cam']
@@ -96,12 +99,12 @@ class KITTI(BaseDataset):
             points = np.concatenate([center, np.ones([1, 1])], axis=-1)
             points = points @ np.linalg.inv((rect @ Trv2c).T)
 
-            center = [-1*points[0, 1], -1*points[0, 0], 1 + points[0, 2]]
+            center = [-1 * points[0, 1], -1 * points[0, 0], 1 + points[0, 2]]
 
             ry = float(label[14])
-            front = [-1*np.sin(ry), -1*np.cos(ry), 0]
+            front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
             up = [0, 0, 1]
-            left = [-1*np.cos(ry), np.sin(ry), 0]
+            left = [-1 * np.cos(ry), np.sin(ry), 0]
             size = [float(label[9]), float(label[8]), float(label[10])]
 
             objects.append(Object3d(center, front, up, left, size, label))
@@ -243,12 +246,12 @@ class Object3d(BoundingBox3D):
         self.occlusion = float(
             label[2]
         )  # 0:fully visible 1:partly occluded 2:largely occluded 3:unknown
- 
+
         self.alpha = float(label[3])
         self.box2d = np.array((float(label[4]), float(label[5]), float(
             label[6]), float(label[7])),
                               dtype=np.float32)
- 
+
         self.dis_to_cam = np.linalg.norm(self.center)
         self.ry = float(label[14])
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
