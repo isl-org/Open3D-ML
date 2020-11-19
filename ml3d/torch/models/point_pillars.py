@@ -105,10 +105,10 @@ class PointPillars(BaseModel):
                 points[:,:3] >= min_val, 
                 points[:,:3] < max_val), axis=-1))]
 
-        if 'label' not in data.keys() or data['label'] is None:
+        if 'bounding_boxes' not in data.keys() or data['bounding_boxes'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
-            labels = data['label']
+            labels = data['bounding_boxes']
 
         if 'feat' not in data.keys() or data['feat'] is None:
             feat = None
@@ -118,7 +118,7 @@ class PointPillars(BaseModel):
         data = dict()
         data['point'] = points
         data['feat'] = feat
-        data['label'] = labels
+        data['bounding_boxes'] = labels
 
         return data
 

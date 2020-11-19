@@ -47,9 +47,9 @@ def gen_box(loc, yaw, dim, label):
 
 
 boxes = []
-for label in data['label']:
-    boxes.append(gen_box([label.loc[2],-label.loc[0],-label.loc[1]], label.ry+math.pi, [label.w, label.h, label.l], label.cls_id))
-
+for label in data['bounding_boxes']:
+    boxes.append(label)
+    
 #boxes = []
 _boxes = result['boxes_3d']
 labels = result['labels_3d']
