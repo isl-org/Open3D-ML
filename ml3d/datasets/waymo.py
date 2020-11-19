@@ -120,7 +120,6 @@ class Waymo(BaseDataset):
         mat = np.concatenate([mat, np.array([[0., 0., 0., 1.]])], axis=0)
         return mat
 
-
     @staticmethod
     def read_calib(path):
         assert Path(path).exists()
