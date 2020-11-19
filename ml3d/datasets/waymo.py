@@ -8,6 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
+from ..vis.boundingbox import BoundingBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -80,14 +81,45 @@ class Waymo(BaseDataset):
         return np.fromfile(path, dtype=np.float32).reshape(-1, 6)
 
     @staticmethod
-    def read_label(path):
+    def read_label(path, calib):
         if not Path(path).exists():
             return None
 
         with open(path, 'r') as f:
             lines = f.readlines()
-        objects = [Object3d(line) for line in lines]
+
+        objects = []
+        for line in lines:
+            label = line.strip().split(' ')
+
+            center = np.array(
+                [float(label[11]),
+                 float(label[12]),
+                 float(label[13])]).reshape(-1, 3)
+
+            rect = calib['R0_rect']
+            Trv2c = calib['Tr_velo2cam']
+
+            points = np.concatenate([center, np.ones([1, 1])], axis=-1)
+            points = points @ np.linalg.inv((rect @ Trv2c).T)
+
+            center = [-1 * points[0, 0], -1 * points[0, 1], 1 + points[0, 2]]
+
+            ry = float(label[14])
+            front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
+            up = [0, 0, 1]
+            left = [-1 * np.cos(ry), np.sin(ry), 0]
+            size = [float(label[9]), float(label[8]), float(label[10])]
+
+            objects.append(Object3d(center, front, up, left, size, label))
+
         return objects
+
+    @staticmethod
+    def _extend_matrix(mat):
+        mat = np.concatenate([mat, np.array([[0., 0., 0., 1.]])], axis=0)
+        return mat
+
 
     @staticmethod
     def read_calib(path):
@@ -111,10 +143,15 @@ class Waymo(BaseDataset):
         P4 = np.array(obj, dtype=np.float32)
 
         obj = lines[5].strip().split(' ')[1:]
-        R0 = np.array(obj, dtype=np.float32)
+        R0 = np.array(obj, dtype=np.float32).reshape(3, 3)
+
+        rect_4x4 = np.zeros([4, 4], dtype=R0.dtype)
+        rect_4x4[3, 3] = 1
+        rect_4x4[:3, :3] = R0
 
         obj = lines[6].strip().split(' ')[1:]
-        Tr_velo_to_cam = np.array(obj, dtype=np.float32)
+        Tr_velo_to_cam = np.array(obj, dtype=np.float32).reshape(3, 4)
+        Tr_velo_to_cam = Waymo._extend_matrix(Tr_velo_to_cam)
 
         return {
             'P0': P0.reshape(3, 4),
@@ -122,8 +159,8 @@ class Waymo(BaseDataset):
             'P2': P2.reshape(3, 4),
             'P3': P3.reshape(3, 4),
             'P4': P3.reshape(3, 4),
-            'R0': R0.reshape(3, 3),
-            'Tr_velo2cam': Tr_velo_to_cam.reshape(3, 4)
+            'R0_rect': rect_4x4,
+            'Tr_velo2cam': Tr_velo_to_cam
         }
 
     def get_split(self, split):
@@ -174,14 +211,14 @@ class WaymoSplit():
         calib_path = label_path.replace('label_all', 'calib')
 
         pc = self.dataset.read_lidar(pc_path)
-        label = self.dataset.read_label(label_path)
         calib = self.dataset.read_calib(calib_path)
+        label = self.dataset.read_label(label_path, calib)
 
         data = {
             'point': pc,
             'feat': None,
             'calib': calib,
-            'label': label,
+            'bounding_boxes': label,
         }
 
         return data
@@ -194,34 +231,32 @@ class WaymoSplit():
         return attr
 
 
-class Object3d(object):
+class Object3d(BoundingBox3D):
     """
     Stores object specific details like bbox coordinates, occlusion etc.
     """
 
-    def __init__(self, line):
-        label = line.strip().split(' ')
-        self.src = line
-        self.cls_type = label[0]
-        self.cls_id = self.cls_type_to_id(self.cls_type)
+    def __init__(self, center, front, up, left, size, label):
+        label_class = self.cls_type_to_id(label[0])
+        confidence = float(label[15]) if label.__len__() == 16 else -1.0
+
+        super().__init__(center, front, up, left, size, label_class, confidence)
+
+        self.name = label[0]
+        self.cls_id = self.cls_type_to_id(self.name)
         self.truncation = float(label[1])
         self.occlusion = float(
             label[2]
         )  # 0:fully visible 1:partly occluded 2:largely occluded 3:unknown
+
         self.alpha = float(label[3])
         self.box2d = np.array((float(label[4]), float(label[5]), float(
             label[6]), float(label[7])),
                               dtype=np.float32)
-        self.h = float(label[8])
-        self.w = float(label[9])
-        self.l = float(label[10])
-        self.loc = np.array(
-            (float(label[11]), float(label[12]), float(label[13])),
-            dtype=np.float32)
-        self.dis_to_cam = np.linalg.norm(self.loc)
+
+        self.dis_to_cam = np.linalg.norm(self.center)
         self.ry = float(label[14])
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
-        self.level_str = None
         self.level = self.get_kitti_obj_level()
 
     @staticmethod
@@ -229,7 +264,7 @@ class Object3d(object):
         """
         get object id from name.
         """
-        type_to_id = {'PEDESTRIAN': 1, 'VEHICLE': 2, 'CYCLIST': 3, 'SIGN': 4}
+        type_to_id = {'PEDESTRIAN': 1, 'VEHICLE': 2, 'CYCLIST': 3, 'SIGN': 3}
         if cls_type not in type_to_id.keys():
             return -1
         return type_to_id[cls_type]
