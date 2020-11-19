@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 
 class S3DIS(BaseDataset):
     """
-    S3DIS dataset, used in visualizer, training, or test
+    This class is used to create a dataset based on the S3DIS (Stanford Large-Scale 3D Indoor Spaces) dataset, and used in visualizer, training, or testing. The S3DIS dataset is best used to train models for building indoors. 
     """
 
     def __init__(self,
@@ -40,13 +40,21 @@ class S3DIS(BaseDataset):
                  test_result_folder='./test',
                  **kwargs):
         """
-        Initialize
-        Args:
-            dataset_path (str): path to the dataset
-            kwargs:
-        Returns:
-            class: The corresponding class.
-        """
+		Initialize the function by passing the dataset and other details.
+	
+		Args:
+			dataset_path: The path to the dataset to use.
+			name: The name of the dataset (S3DIS in this case).
+			cache_dir: The directory where the cache is stored.
+			use_cache: Indicates if the dataset should be cached.
+			class_weights: The class weights to use in the dataset.
+			num_points: The maximum number of points to use when splitting the dataset.
+			test_area_idx: The area to use for testing. The valid values are 1 through 6.
+			ignored_label_inds: A list of labels that should be ignored in the dataset.
+			test_result_folder: The folder where the test results should be stored.
+			
+	
+		"""
         super().__init__(dataset_path=dataset_path,
                          name=name,
                          cache_dir=cache_dir,
@@ -81,6 +89,13 @@ class S3DIS(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
+	"""
+	Returns a label to names dictonary object.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            values are the corresponding names.
+    """
         label_to_names = {
             0: 'ceiling',
             1: 'floor',
@@ -99,9 +114,32 @@ class S3DIS(BaseDataset):
         return label_to_names
 
     def get_split(self, split):
+	
+	"""Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+	"""	
         return S3DISSplit(self, split=split)
 
     def get_split_list(self, split):
+	"""Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+			
+		Raises:
+			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+            'training', 'test', 'validation', or 'all'.
+    """
         cfg = self.cfg
         dataset_path = cfg.dataset_path
         file_list = []
@@ -124,6 +162,7 @@ class S3DIS(BaseDataset):
         return file_list
 
     def get_data(self, file_path, is_test=False):
+	"""Returns the data for the given index."""
         file_path = Path(file_path)
         kdtree_path = Path(
             file_path
@@ -148,6 +187,16 @@ class S3DIS(BaseDataset):
         return points, feat, search_tree, labels
 
     def is_tested(self, attr):
+	"""Checks if a datum in the dataset has been tested.
+        
+        Args:
+            dataset: The current dataset to which the datum belongs to.
+			attr: The attribute that needs to be checked.
+
+        Returns:
+            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+			
+	"""	
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -159,6 +208,12 @@ class S3DIS(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
+	"""Saves the output of a model.
+
+        Args:
+            results: The output of a model for the datum associated with the attribute passed.
+            attr: The attributes that correspond to the outputs passed in results.
+    """
         cfg = self.cfg
         name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
@@ -323,8 +378,21 @@ class S3DIS(BaseDataset):
 
 
 class S3DISSplit():
-
+	"""
+	This class is used to create a split for S3DIS dataset.
+	
+	"""
     def __init__(self, dataset, split='training'):
+	"""
+	Initialize the class.
+	Args:
+		dataset: The dataset to split.
+		split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+		**kwargs: The configuration of the model as keyword arguments.
+	Returns:
+        A dataset split object providing the requested subset of the data.		
+	"""
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))

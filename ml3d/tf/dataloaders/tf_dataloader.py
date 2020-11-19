@@ -16,7 +16,7 @@ class TFDataloader():
     """
     This class allows you to load datasets for a TensorFlow framework.
 	
-	**Example:** <NTD>
+	**Example:** 
         This example loads the SemanticKITTI dataset using the   a point cloud to the visualizer::
 			
 			
