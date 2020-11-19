@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import open3d.ml as ml3d
+import math
 
 from ml3d.vis import Visualizer, BoundingBox3D
 from ml3d.datasets import KITTI
@@ -27,24 +28,34 @@ test_split = TorchDataloader(dataset=dataset.get_split('training'),
                                 transform=model.transform,
                                 use_cache=False,#dataset.cfg.use_cache,
                                 shuffle=False)
-data = test_split[0]['data']
+data = test_split[5]['data']
 
 # run inference on a single example.
-result = pipeline.run_inference(data)
+result = pipeline.run_inference(data)[0]
+
+def gen_box(loc, yaw, dim, label):
+    cos = math.cos(yaw)
+    sin = math.sin(yaw)
+
+    front = np.array((sin, cos, 0))   # (0,  1,  0)
+    left = np.array((-cos, sin, 0))   # (-1, 0,  0)
+    up = np.array((0, 0, 1))          # (0,  0,  1)
+
+    box = BoundingBox3D(np.array([loc[0],loc[1],loc[2]+dim[1]/2]), front, up, left, dim,
+                    label, 0.0)
+    return box
+
 
 boxes = []
 for label in data['label']:
-    front = np.array((0, 0, 1))
-    up = np.array((0, 1, 0))
-    left = np.array((1, 0, 0))
+    boxes.append(gen_box([label.loc[2],-label.loc[0],-label.loc[1]], label.ry+math.pi, [label.w, label.h, label.l], label.cls_id))
 
-    rot = np.array(((1.0, 0.0, 1,0),
-                    (0.0, 1.0, 0.0),
-                    (1.0, 0.0, 1,0)))
-
-    box = BoundingBox3D(label.loc, front, up, left, (label.w, label.l, label.h),
-                    label.cls_id, 0.0)
-    boxes.append(box)
+#boxes = []
+_boxes = result['boxes_3d']
+labels = result['labels_3d']
+for i in range(len(_boxes)):
+    dim = _boxes.dims[i].numpy()
+    boxes.append(gen_box(_boxes.center[i].numpy(), _boxes.yaw[i].numpy(), [dim[0], dim[2], dim[1]], labels[i].numpy()))
 
 vis = Visualizer()
 vis.visualize([{
