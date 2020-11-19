@@ -18,6 +18,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
 class ObjectDetection(BasePipeline):
     """
     Pipeline for object detection. 
@@ -122,7 +123,7 @@ class ObjectDetection(BasePipeline):
             for idx in tqdm(range(len(test_split)), desc='test'):
                 data = test_split[idx]
                 result = self.run_inference(data['data'])
-                results.append(result)
+                results.extend(result)
         
 
     def run_train(self):
