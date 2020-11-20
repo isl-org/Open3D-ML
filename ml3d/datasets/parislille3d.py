@@ -8,7 +8,7 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(
@@ -30,10 +30,6 @@ class ParisLille3D(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  num_points=65536,
-                 class_weights=[
-                     65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,
-                     4212295, 10599237
-                 ],
                  test_result_folder='./test',
                  val_files=['Lille2.ply'],
                  **kwargs):
@@ -55,7 +51,6 @@ class ParisLille3D(BaseDataset):
                          name=name,
                          cache_dir=cache_dir,
                          use_cache=use_cache,
-                         class_weights=class_weights,
                          num_points=num_points,
                          test_result_folder=test_result_folder,
                          val_files=val_files,
@@ -190,31 +185,11 @@ class ParisLille3D(BaseDataset):
         log.info("Saved {} in {}.".format(name, store_path))
 
 
-class ParisLille3DSplit():
-	"""
-	This class is used to create a split for paris-lille-3d dataset.
-	
-	"""
-    def __init__(self, dataset, split='training'):
-	
-	"""
-	Initialize the class.
-	Args:
-		dataset: The dataset to split.
-		split: A string identifying the dataset split that is usually one of
-            'training', 'test', 'validation', or 'all'.
-		**kwargs: The configuration of the model as keyword arguments.
-	Returns:
-        A dataset split object providing the requested subset of the data.		
-	"""
-	
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+class ParisLille3DSplit(BaseDatasetSplit):
+
+    def __init__(self, dataset, split='training'):
+        super().__init__(dataset, split=split)
 
     def __len__(self):
         return len(self.path_list)
@@ -242,7 +217,9 @@ class ParisLille3DSplit():
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.ply', '')
 
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
         return attr
 
 

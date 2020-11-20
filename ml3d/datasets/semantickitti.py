@@ -6,7 +6,7 @@ import logging
 from sklearn.neighbors import KDTree
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from .utils import DataProcessing
 from ..utils import make_dir, DATASET
 
@@ -259,34 +259,14 @@ class SemanticKITTI(BaseDataset):
         return file_list
 
 
-class SemanticKITTISplit():
-	"""
-	This class is used to create a split for SemanticKITTI dataset.
-	"""
+
+class SemanticKITTISplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-	"""
-	Initialize the class.
-	Args:
-		dataset: The dataset to split.
-		split: A string identifying the dataset split that is usually one of
-            'training', 'test', 'validation', or 'all'.
-		**kwargs: The configuration of the model as keyword arguments.
-	Returns:
-        A dataset split object providing the requested subset of the data.		
-	"""
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
+        super().__init__(dataset, split=split)
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
         self.remap_lut_val = dataset.remap_lut_val
-
-        if split == 'test':
-            dataset.test_list = path_list
-
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
 
     def __len__(self):
         return len(self.path_list)
@@ -320,7 +300,9 @@ class SemanticKITTISplit():
         _, seq = split(split(dir)[0])
         name = '{}_{}'.format(seq, file[:-4])
 
-        attr = {'name': name, 'path': pc_path, 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
         return attr
 
 

@@ -17,15 +17,15 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
-class NuScenes(BaseDataset):
+class Lyft(BaseDataset):
     """
-    NuScenes 3D dataset for Object Detection, used in visualizer, training, or test
+    Lyft level 5 dataset for Object Detection, used in visualizer, training, or test
     """
 
     def __init__(self,
                  dataset_path,
                  info_path,
-                 name='NuScenes',
+                 name='Lyft',
                  cache_dir='./logs/cache',
                  use_cache=False,
                  **kwargs):
@@ -46,7 +46,7 @@ class NuScenes(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
-        self.num_classes = 10
+        self.num_classes = 9
         self.label_to_names = self.get_label_to_names()
 
         self.train_info = {}
@@ -69,17 +69,17 @@ class NuScenes(BaseDataset):
     def get_label_to_names():
         label_to_names = {
             0: 'ignore',
-            1: 'barrier',
-            2: 'bicycle',
-            3: 'bus',
-            4: 'car',
-            5: 'construction_vehicle',
-            6: 'motorcycle',
+            1: 'bicycle',
+            2: 'bus',
+            3: 'car',
+            4: 'emergency_vehicle',
+            5: 'motorcycle',
+            6: 'other_vehicle',
             7: 'pedestrian',
-            8: 'traffic_cone',
-            9: 'trailer',
-            10: 'truck'
+            8: 'truck',
+            9: 'animal'
         }
+
         return label_to_names
 
     @staticmethod
@@ -96,7 +96,6 @@ class NuScenes(BaseDataset):
 
         objects = []
         for name, box in zip(names, boxes):
-
             center = [float(box[0]), float(box[1]), float(box[2])]
             size = [float(box[3]), float(box[5]), float(box[4])]
             ry = float(box[6])
@@ -109,7 +108,7 @@ class NuScenes(BaseDataset):
         return objects
 
     def get_split(self, split):
-        return NuSceneSplit(self, split=split)
+        return LyftSplit(self, split=split)
 
     def get_split_list(self, split):
         if split in ['train', 'training']:
@@ -128,18 +127,18 @@ class NuScenes(BaseDataset):
         pass
 
 
-class NuSceneSplit():
+class LyftSplit():
 
     def __init__(self, dataset, split='train'):
         self.cfg = dataset.cfg
 
         self.infos = dataset.get_split_list(split)
-        self.path_list = []
-        for info in self.infos:
-            self.path_list.append(info['lidar_path'])
 
         log.info("Found {} pointclouds for {}".format(len(self.infos), split))
 
+        self.path_list = []
+        for info in self.infos:
+            self.path_list.append(info['lidar_path'])
         self.split = split
         self.dataset = dataset
 
@@ -200,16 +199,15 @@ class Object3d(BoundingBox3D):
         """
         type_to_id = {
             'ignore': 0,
-            'barrier': 1,
-            'bicycle': 2,
-            'bus': 3,
-            'car': 4,
-            'construction_vehicle': 5,
-            'motorcycle': 6,
+            'bicycle': 1,
+            'bus': 2,
+            'car': 3,
+            'emergency_vehicle': 4,
+            'motorcycle': 5,
+            'other_vehicle': 6,
             'pedestrian': 7,
-            'traffic_cone': 8,
-            'trailer': 9,
-            'truck': 10,
+            'truck': 8,
+            'animal': 9,
         }
         if cls_type not in type_to_id.keys():
             return -1
@@ -234,4 +232,4 @@ class Object3d(BoundingBox3D):
         return corners3d
 
 
-DATASET._register_module(NuScenes)
+DATASET._register_module(Lyft)

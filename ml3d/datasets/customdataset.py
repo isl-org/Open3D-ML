@@ -8,7 +8,7 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(

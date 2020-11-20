@@ -1,3 +1,4 @@
+
 <p align="center">
 <img src="https://raw.githubusercontent.com/intel-isl/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
 <span style="font-size: 220%"><b>ML</b></span>
@@ -13,64 +14,44 @@
 Open3D-ML is an extension of Open3D for 3D machine learning tasks.
 It builds on top of the Open3D core library and extends it with machine learning
 tools for 3D data processing. This repo focuses on applications such as semantic
-point cloud segmentation and provides pretrained models that can be applied to 
+point cloud segmentation and provides pretrained models that can be applied to
 common tasks as well as pipelines for training.
 
 Open3D-ML works with **TensorFlow** and **PyTorch** to integrate easily into
 existing projects and also provides general functionality independent of
 ML frameworks such as data visualization.
 
+
 ## Installation
 
-### Requirements
-Open3D-ML is integrated in the Open3D v0.11 python distribution. To use all of
-the machine learning functionality you need to install additional dependencies 
-and PyTorch or TensorFlow. 
+### Users
 
-```bash
-pip install \
-    addict \
-    matplotlib \
-    pandas \
-    plyfile \
-    pyyaml \
-    sklearn \
-    tqdm \
-    tensorboard
-```
-
-Our Open3D v0.11 package is compatible with the following versions of the ML
-frameworks.
+Open3D-ML is integrated in the Open3D v0.11+ python distribution and is
+compatible with the following versions of ML frameworks.
 
  * PyTorch 1.6
  * TensorFlow 2.3
- * CUDA 10.1 (optional)
+ * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
 
-TensorFlow can be installed with 
+You can install Open3D with
 ```bash
-pip install tensorflow==2.3.1
-```
-Note that you may need to upgrade to the latest pip version before installing
-TensorFlow with `pip install --upgrade pip`.
-
-For PyTorch the install command on Linux with CUDA 10.1 for `pip` is
-```bash
-pip install torch==1.6.0+cu101 torchvision==0.7.0+cu101 -f https://download.pytorch.org/whl/torch_stable.html
+# make sure you have the latest pip version
+pip install --upgrade pip
+# install open3d
+pip install open3d
 ```
 
-For more details please see the install documentation of the respective 
-frameworks if you don't need CUDA or use a different package manager.
-
-If you need to use different versions we recommend to 
-[build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
-
-### Install Open3D
-We provide pre-built pip packages that include Open3D-ML for Ubuntu 18.04+ with Python 3.6+ that can be installed with
+To install a compatible version of PyTorch or TensorFlow you can use the
+respective requirements files:
 ```bash
-$ pip install open3d
+# To install a compatible version of TensorFlow
+pip install -r requirements-tensorflow.txt
+# To install a compatible version of PyTorch with CUDA
+pip install -r requirements-torch-cuda.txt
 ```
 
-To test the installation use 
+To test the installation use
+
 ```bash
 # with PyTorch
 $ python -c "import open3d.ml.torch as ml3d"
@@ -78,10 +59,11 @@ $ python -c "import open3d.ml.torch as ml3d"
 $ python -c "import open3d.ml.tf as ml3d"
 ```
 
-
+If you need to use different versions of the ML frameworks or CUDA we recommend
+to 
+[build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
 
 ## Getting started
-
 
 ### Reading a dataset
 
@@ -109,20 +91,60 @@ vis.visualize_dataset(dataset, 'all', indices=range(100))
 ```
 ![Visualizer GIF](docs/images/getting_started_ml_visualizer.gif)
 
+### Loading a config file
+Configs of models, datasets, and pipelines are stored in `ml3d/configs`. Users can also construct their own yaml files to keep record of their customized configurations. Here is an example of reading a config file and constructing modules from it.
+```python
+import open3d.ml as _ml3d
+import open3d.ml.torch as ml3d # or open3d.ml.tf as ml3d  
+
+framework = "torch" # or tf
+cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
+cfg = _ml3d.utils.Config.load_from_file(cfg_file)
+
+# fetch the classes by the name
+Pipeline = _ml3d.utils.get_module("pipeline", cfg.pipeline.name, framework)
+Model = _ml3d.utils.get_module("model", cfg.model.name, framework)
+Dataset = _ml3d.utils.get_module("dataset", cfg.dataset.name)
+
+# use the arguments in the config file to construct the instances 
+cfg.dataset['dataset_path'] = "/path/to/your/dataset"
+dataset = Dataset(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
+model = Model(**cfg.model)
+pipeline = Pipeline(model, dataset, **cfg.pipeline)
+```
 
 ### Running a pretrained model
 
 Building on the previous example we can instantiate a pipeline with a
-pretrained model for semantic segmentation and run it on a point cloud of our 
+pretrained model for semantic segmentation and run it on a point cloud of our
 dataset. See the [model zoo](#model-zoo) for obtaining the weights of the
 pretrained model.
 ```python
-model = ml3d.models.RandLANet()
-pipeline = ml3d.pipelines.SemanticSegmentation(model=model, dataset=dataset, device="gpu")
+import os
+import open3d.ml as _ml3d
+import open3d.ml.torch as ml3d
 
+cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
+cfg = _ml3d.utils.Config.load_from_file(cfg_file)
+
+model = ml3d.models.RandLANet(**cfg.model)
+cfg.dataset['dataset_path'] = "/path/to/your/dataset"
+dataset = ml3d.datasets.SemanticKITTI(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
+pipeline = ml3d.pipelines.SemanticSegmentation(model, dataset=dataset, device="gpu", **cfg.pipeline)
+
+# download the weights.
+ckpt_folder = "./logs/"
+os.makedirs(ckpt_folder, exist_ok=True)
+ckpt_path = ckpt_folder + "randlanet_semantickitti_202009090354utc.pth"
+randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+if not os.path.exists(ckpt_path):
+    cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
+    os.system(cmd)
+    
 # load the parameters.
-pipeline.load_ckpt(ckpt_path='randlanet_semantickitti_202009090354utc.pth', is_train=False)
+pipeline.load_ckpt(ckpt_path=ckpt_path)
 
+test_split = dataset.get_split("test")
 data = test_split.get_data(0)
 
 # run inference on a single example.
@@ -132,6 +154,7 @@ result = pipeline.run_inference(data)
 # evaluate performance on the test set; this will write logs to './logs'.
 pipeline.run_test()
 ```
+Users can also [use predefined scripts](README.md#using-predefined-scripts) to load pretrained weights and run testing.
 
 
 ### Training a model
@@ -179,9 +202,9 @@ For further help, run `python scripts/semseg.py --help`.
 
 
 ## Repository structure
-The core part of Open3D-ML lives in the `ml3d` subfolder, which is integrated 
+The core part of Open3D-ML lives in the `ml3d` subfolder, which is integrated
 into Open3D in the `ml` namespace. In addition to the core part, the directories
-`examples` and `scripts` provide supporting scripts for getting started with 
+`examples` and `scripts` provide supporting scripts for getting started with
 setting up a training pipeline or running a network on a dataset.
 
 ```
@@ -193,9 +216,9 @@ setting up a training pipeline or running a network on a dataset.
      ├─ utils             # Framework independent utilities; available as open3d.ml.{tf,torch}.utils
      ├─ vis               # ML specific visualization functions
      ├─ tf                # Directory for TensorFlow specific code. same structure as ml3d/torch.
-     │                    # This will be available as open3d.ml.tf 
+     │                    # This will be available as open3d.ml.tf
      ├─ torch             # Directory for PyTorch specific code; available as open3d.ml.torch
-          ├─ dataloaders  # Framework specific dataset code, e.g. wrappers that can make use of the 
+          ├─ dataloaders  # Framework specific dataset code, e.g. wrappers that can make use of the
           │               # generic dataset code.
           ├─ models       # Code for models
           ├─ modules      # Smaller modules, e.g., metrics and losses
@@ -243,13 +266,13 @@ For downloading these datasets visit the respective webpages and have a look at 
 
 ## How-tos
 
-* [Visualize network predictions](docs/howtos.md#visualize-network-predictions) 
-* [Visualize custom data](docs/howtos.md#visualize-custom-data) 
-* [Adding a new model](docs/howtos.md#adding-a-new-model) 
-* [Adding a new dataset](docs/howtos.md#adding-a-new-dataset) 
+* [Visualize network predictions](docs/howtos.md#visualize-network-predictions)
+* [Visualize custom data](docs/howtos.md#visualize-custom-data)
+* [Adding a new model](docs/howtos.md#adding-a-new-model)
+* [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
 
-## Contribute 
-There are many ways to contribute to this project. You can 
+## Contribute
+There are many ways to contribute to this project. You can
 * implement a new model
 * add code for reading a new dataset
 * share parameters and weights for an existing model
@@ -260,7 +283,7 @@ community!
 
 If you want to share weights for a model you trained please attach or link the
 weights file in the pull request.
-For bugs and problems, [open an issue](https://github.com/intel-isl/Open3D-ML/issues). 
+For bugs and problems, [open an issue](https://github.com/intel-isl/Open3D-ML/issues).
 Please also check out our communication channels to get in contact with the community.
 
 ## Communication channels
@@ -282,4 +305,3 @@ Please cite our work ([pdf](https://arxiv.org/abs/1801.09847)) if you use Open3D
     year      = {2018},
 }
 ```
-
