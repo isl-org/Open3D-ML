@@ -259,12 +259,12 @@ class Waymo2KITTI():
 
             x = obj.box.center_x
             y = obj.box.center_y
-            z = obj.box.center_z - height / 2
+            z = obj.box.center_z
 
-            # project bounding box to the virtual reference frame
-            pt_ref = self.T_velo_to_front_cam @ \
-                np.array([x, y, z, 1]).reshape((4, 1))
-            x, y, z, _ = pt_ref.flatten().tolist()
+            # # project bounding box to the virtual reference frame
+            # pt_ref = self.T_velo_to_front_cam @ \
+            #     np.array([x, y, z, 1]).reshape((4, 1))
+            # x, y, z, _ = pt_ref.flatten().tolist()
 
             rotation_y = -obj.box.heading - np.pi / 2
             track_id = obj.id

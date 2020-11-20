@@ -81,7 +81,7 @@ class Waymo(BaseDataset):
         return np.fromfile(path, dtype=np.float32).reshape(-1, 6)
 
     @staticmethod
-    def read_label(path, calib):
+    def read_label(path):
         if not Path(path).exists():
             return None
 
@@ -92,18 +92,7 @@ class Waymo(BaseDataset):
         for line in lines:
             label = line.strip().split(' ')
 
-            center = np.array(
-                [float(label[11]),
-                 float(label[12]),
-                 float(label[13])]).reshape(-1, 3)
-
-            rect = calib['R0_rect']
-            Trv2c = calib['Tr_velo2cam']
-
-            points = np.concatenate([center, np.ones([1, 1])], axis=-1)
-            points = points @ np.linalg.inv((rect @ Trv2c).T)
-
-            center = [-1 * points[0, 0], -1 * points[0, 1], 1 + points[0, 2]]
+            center = [float(label[11]), float(label[12]), float(label[13])]
 
             ry = float(label[14])
             front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
@@ -211,7 +200,7 @@ class WaymoSplit():
 
         pc = self.dataset.read_lidar(pc_path)
         calib = self.dataset.read_calib(calib_path)
-        label = self.dataset.read_label(label_path, calib)
+        label = self.dataset.read_label(label_path)
 
         data = {
             'point': pc,
