@@ -102,20 +102,26 @@ class PointNet(BaseModel):
         if self.task == 'classification':
             # Normalize and center
             if self.normalize:
-                point, _ = transforms.trans_normalize(point, feat=None, t_normalize={'method': 'unit_sphere'})
+                point, _ = transforms.trans_normalize(
+                    point, feat=None, t_normalize={'method': 'unit_sphere'})
 
             # Data augmentation for classification training
             if self.augment and attr['split'] in ['train', 'training']:
                 # Paper: "[...] Gaussian noise with zero mean and 0.02 standard deviation."
                 if self.augment == 'gaussian':
-                    point = transforms.trans_augment(point, {'rotation_method': 'vertical',
-                                                             'noise_type': 'gaussian',
-                                                             'noise_level': 0.002})
+                    point = transforms.trans_augment(
+                        point, {
+                            'rotation_method': 'vertical',
+                            'noise_type': 'gaussian',
+                            'noise_level': 0.002
+                        })
                 # Following original implementation at
                 # https://github.com/charlesq34/pointnet/blob/master/train.py
                 elif self.augment == 'uniform':
-                    point = transforms.trans_augment(point, {'rotation_method': 'vertical',
-                                                             'noise_type': 'uniform_clip'})
+                    point = transforms.trans_augment(point, {
+                        'rotation_method': 'vertical',
+                        'noise_type': 'uniform_clip'
+                    })
 
         if data.get('feat') is not None:
             point = np.concatenate([point, data['feat'][choice].copy()], axis=1)

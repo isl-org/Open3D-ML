@@ -20,7 +20,7 @@ def trans_normalize(pc, feat, t_normalize):
             feat /= feat_scale
     elif method == 'unit_sphere':
         pc -= np.mean(pc, axis=0)
-        pc /= np.max(np.sqrt(np.sum(pc ** 2, axis=0)), axis=0)
+        pc /= np.max(np.sqrt(np.sum(pc**2, axis=0)), axis=0)
     elif method == 'coords_only':
         feat = None
 
@@ -101,7 +101,8 @@ def trans_augment(points, t_augment):
                  noise_level).astype(np.float32)
         noise = np.clip(noise, -clip_value, clip_value)
     elif noise_type == 'gaussian':
-        noise = np.random.normal(0, noise_level, (points.shape[0], points.shape[1]))
+        noise = np.random.normal(0, noise_level,
+                                 (points.shape[0], points.shape[1]))
 
     augmented_points = np.sum(np.expand_dims(points, 2) * R,
                               axis=1) * scale + noise
