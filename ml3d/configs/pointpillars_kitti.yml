@@ -1,34 +1,43 @@
 dataset:
   name: KITTI
-  dataset_path: "/Users/lprantl/Open3D-ML/data/kitti"
-
+  dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
-    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
-    476491114, 9833174, 129609852, 4506626, 1168181]
-  test_result_folder: ./test
-  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
-  training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
-  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
-  '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
-  validation_split: ['08']
-  use_cache: true
-  validation_split:
-  - '08'
+
 model:
   name: PointPillars
-  ckpt_path: "/Users/lprantl/Open3D-ML/checkpoints/pointpillars_kitti_3class.pth"
+  ckpt_path: # path/to/your/checkpoint
+
+  voxel_size: [0.16, 0.16, 4]
+  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
+
+  voxelize:
+    max_num_points: 32
+    max_voxels: [16000, 40000]
+  
+  voxel_encoder:
+    in_channels: 4
+    feat_channels: [64]
+
+  scatter:
+    in_channels: 64
+    output_shape: [496, 432]
+
+  backbone:
+    in_channels: 64
+    out_channels: [64, 128, 256]
+    layer_nums: [3, 5, 5]
+    layer_strides: [2, 2, 2]
+
+  neck:
+    in_channels: [64, 128, 256]
+    out_channels: [128, 128, 128]
+    upsample_strides: [1, 2, 4]
+    use_conv_for_no_stride: False
+
+  head:
+    num_classes: 3
+    in_channels: 384
+    feat_channels: 384
   
 pipeline:
   name: ObjectDetection
-
-  adam_lr: 0.01
-  batch_size: 1
-  learning_rate: 0.01
-  main_log_dir: ./logs
-  max_epoch: 100
-  save_ckpt_freq: 2
-  scheduler_gamma: 0.95
-  test_batch_size: 1
-  train_sum_dir: train_log
-  val_batch_size: 1

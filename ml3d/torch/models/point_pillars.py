@@ -22,9 +22,12 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from functools import partial
+from torch.nn.modules.utils import _pair
 
+from functools import partial
 import numpy as np
+
+import open3d.ml.torch as ml3d
 
 from ...vis.boundingbox import BoundingBox3D
 
@@ -36,31 +39,56 @@ from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 
-#from mmdet3d.ops import Voxelization
-from .point_pillars_voxelize import PointPillarsVoxelization
-
 
 class PointPillars(BaseModel):
+    """Object detection model. 
+    Based on the PointPillars architecture 
+    https://github.com/nutonomy/second.pytorch.
+
+    Args:
+        name (string): Name of model.
+            Default to "PointPillars".
+        voxel_size: voxel edge lengths with format [x, y, z].
+        point_cloud_range: The valid range of point coordinates as
+            [x_min, y_min, z_min, x_max, y_max, z_max].
+        voxelize: Config of PointPillarsVoxelization module.
+        voxelize_encoder: Config of PillarFeatureNet module.
+        scatter: Config of PointPillarsScatter module.
+        backbone: Config of backbone module (SECOND).
+        neck: Config of neck module (SECONDFPN).
+        head: Config of anchor head module.
+    """
+
     def __init__(self, 
             name="PointPillars",
-            ckpt_path=None):
+            voxel_size = [0.16, 0.16, 4],
+            point_cloud_range = [0, -40.0, -3, 70.0, 40.0, 1],
+            voxelize={},
+            voxel_encoder={},
+            scatter={},
+            backbone={},
+            neck={},
+            head={},
+            **kwargs):
 
         super().__init__(
                 name=name,
-                ckpt_path=ckpt_path)
-
-        self.backbone = SECOND()
-        self.neck = SECONDFPN()
-        self.bbox_head = Anchor3DHead()
+                **kwargs)
+        self.point_cloud_range = point_cloud_range
 
         self.voxel_layer = PointPillarsVoxelization(
-            voxel_size=[0.16, 0.16, 4],
-            point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1],
-            max_num_points=32,
-            max_voxels=(16000, 40000)
-        )
-        self.voxel_encoder = PillarFeatureNet()
-        self.middle_encoder = PointPillarsScatter()
+            point_cloud_range=point_cloud_range,
+            voxel_size=voxel_size,
+            **voxelize)
+        self.voxel_encoder = PillarFeatureNet(
+            point_cloud_range=point_cloud_range,
+            voxel_size=voxel_size,
+            **voxel_encoder)
+        self.middle_encoder = PointPillarsScatter(**scatter)
+
+        self.backbone = SECOND(**backbone)
+        self.neck = SECONDFPN(**neck)
+        self.bbox_head = Anchor3DHead(**head)
 
     def extract_feats(self, points):
         """Extract features from points."""
@@ -108,8 +136,8 @@ class PointPillars(BaseModel):
         #data = data['data']
         points = np.array(data['point'][:, 0:4], dtype=np.float32)       
 
-        min_val = np.array([0.0, -40.0, -3.0])
-        max_val = np.array([70.4, 40.0, 1.0])
+        min_val = np.array(self.point_cloud_range[:3])
+        max_val = np.array(self.point_cloud_range[3:])
 
         points = points[np.where(np.all( 
             np.logical_and(
@@ -176,101 +204,77 @@ class PointPillars(BaseModel):
 MODEL._register_module(PointPillars, 'torch')
 
 
-class PointPillarsScatter(nn.Module):
-    """Point Pillar's Scatter.
+class PointPillarsVoxelization(torch.nn.Module):
 
-    Converts learned features from dense tensor to sparse pseudo image.
+    def __init__(self,
+                 voxel_size,
+                 point_cloud_range,
+                 max_num_points=32,
+                 max_voxels=[16000, 40000]):
+        """Voxelization layer for the PointPillars model.
 
-    Args:
-        in_channels (int): Channels of input features.
-        output_shape (list[int]): Required output shape of features.
-    """
-
-    def __init__(self, 
-                 in_channels=64, 
-                 output_shape=[496, 432]):
+        Args:
+            voxel_size: voxel edge lengths with format [x, y, z].
+            point_cloud_range: The valid range of point coordinates as
+                [x_min, y_min, z_min, x_max, y_max, z_max].
+            max_num_points: The maximum number of points per voxel.
+            max_voxels: The maximum number of voxels. May be a tuple with
+                values for training and testing.
+        """
         super().__init__()
-        self.output_shape = output_shape
-        self.ny = output_shape[0]
-        self.nx = output_shape[1]
-        self.in_channels = in_channels
-        self.fp16_enabled = False
+        self.voxel_size = torch.Tensor(voxel_size)
+        self.point_cloud_range = point_cloud_range
+        self.points_range_min = torch.Tensor(point_cloud_range[:3])
+        self.points_range_max = torch.Tensor(point_cloud_range[3:])
 
-    #@auto_fp16(apply_to=('voxel_features', ))
-    def forward(self, voxel_features, coors, batch_size=None):
-        """Foraward function to scatter features."""
-        # TODO: rewrite the function in a batch manner
-        # no need to deal with different batch cases
-        if batch_size is not None:
-            return self.forward_batch(voxel_features, coors, batch_size)
+        self.max_num_points = max_num_points
+        if isinstance(max_voxels, tuple):
+            self.max_voxels = max_voxels
         else:
-            return self.forward_single(voxel_features, coors)
+            self.max_voxels = _pair(max_voxels)
 
-    def forward_single(self, voxel_features, coors):
-        """Scatter features of single sample.
-
-        Args:
-            voxel_features (torch.Tensor): Voxel features in shape (N, M, C).
-            coors (torch.Tensor): Coordinates of each voxel.
-                The first column indicates the sample ID.
-        """
-        # Create the canvas for this sample
-        canvas = torch.zeros(
-            self.in_channels,
-            self.nx * self.ny,
-            dtype=voxel_features.dtype,
-            device=voxel_features.device)
-
-        indices = coors[:, 1] * self.nx + coors[:, 2]
-        indices = indices.long()
-        voxels = voxel_features.t()
-        # Now scatter the blob back to the canvas.
-        canvas[:, indices] = voxels
-        # Undo the column stacking to final 4-dim tensor
-        canvas = canvas.view(1, self.in_channels, self.ny, self.nx)
-        return [canvas]
-
-    def forward_batch(self, voxel_features, coors, batch_size):
-        """Scatter features of single sample.
+    def forward(self, points_feats):
+        """Forward function
 
         Args:
-            voxel_features (torch.Tensor): Voxel features in shape (N, M, C).
-            coors (torch.Tensor): Coordinates of each voxel in shape (N, 4).
-                The first column indicates the sample ID.
-            batch_size (int): Number of samples in the current batch.
+            points_feats: Tensor with point coordinates and features. The shape
+                is [N, 3+C] with N as the number of points and C as the number 
+                of feature channels.
+        Returns:
+            (out_voxels, out_coords, out_num_points).
+            - out_voxels is a dense list of point coordinates and features for 
+              each voxel. The shape is [num_voxels, max_num_points, 3+C].
+            - out_coords is tensor with the integer voxel coords and shape
+              [num_voxels,3]. Note that the order of dims is [z,y,x].
+            - out_num_points is a 1D tensor with the number of points for each
+              voxel.
         """
-        # batch_canvas will be the final output.
-        batch_canvas = []
-        for batch_itt in range(batch_size):
-            # Create the canvas for this sample
-            canvas = torch.zeros(
-                self.in_channels,
-                self.nx * self.ny,
-                dtype=voxel_features.dtype,
-                device=voxel_features.device)
+        if self.training:
+            max_voxels = self.max_voxels[0]
+        else:
+            max_voxels = self.max_voxels[1]
 
-            # Only include non-empty pillars
-            batch_mask = coors[:, 0] == batch_itt
-            this_coors = coors[batch_mask, :]
-            indices = this_coors[:, 2] * self.nx + this_coors[:, 3]
-            indices = indices.type(torch.long)
-            voxels = voxel_features[batch_mask, :]
-            voxels = voxels.t()
+        points = points_feats[:, :3]
 
-            # Now scatter the blob back to the canvas.
-            canvas[:, indices] = voxels
+        ans = ml3d.ops.voxelize(points, self.voxel_size, self.points_range_min,
+                                self.points_range_max, self.max_num_points,
+                                max_voxels)
 
-            # Append to a list for later stacking.
-            batch_canvas.append(canvas)
+        # prepend row with zeros which maps to index 0 which maps to void points.
+        feats = torch.cat(
+            [torch.zeros_like(points_feats[0:1, :]), points_feats])
 
-        # Stack to 3-dim tensor (batch-size, in_channels, nrows*ncols)
-        batch_canvas = torch.stack(batch_canvas, 0)
+        # create dense matrix of indices. index 0 maps to the zero vector.
+        voxels_point_indices_dense = ml3d.ops.ragged_to_dense(
+            ans.voxel_point_indices, ans.voxel_point_row_splits,
+            self.max_num_points, torch.tensor(-1)) + 1
 
-        # Undo the column stacking to final 4-dim tensor
-        batch_canvas = batch_canvas.view(batch_size, self.in_channels, self.ny,
-                                         self.nx)
+        out_voxels = feats[voxels_point_indices_dense]
+        out_coords = ans.voxel_coords[:, [2, 1, 0]].contiguous()
+        out_num_points = ans.voxel_point_row_splits[
+            1:] - ans.voxel_point_row_splits[:-1]
 
-        return batch_canvas
+        return out_voxels, out_coords, out_num_points
 
 
 class PFNLayer(nn.Module):
@@ -282,7 +286,6 @@ class PFNLayer(nn.Module):
     Args:
         in_channels (int): Number of input channels.
         out_channels (int): Number of output channels.
-        norm_cfg (dict): Config dict of normalization layers
         last_layer (bool): If last_layer, there is no concatenation of
             features.
         mode (str): Pooling model to gather features inside voxels.
@@ -360,20 +363,10 @@ class PillarFeatureNet(nn.Module):
             either x, y, z or x, y, z, r. Defaults to 4.
         feat_channels (tuple, optional): Number of features in each of the
             N PFNLayers. Defaults to (64, ).
-        with_distance (bool, optional): Whether to include Euclidean distance
-            to points. Defaults to False.
-        with_cluster_center (bool, optional): [description]. Defaults to True.
-        with_voxel_center (bool, optional): [description]. Defaults to True.
         voxel_size (tuple[float], optional): Size of voxels, only utilize x
             and y size. Defaults to (0.2, 0.2, 4).
         point_cloud_range (tuple[float], optional): Point cloud range, only
             utilizes x and y min. Defaults to (0, -40, -3, 70.4, 40, 1).
-        norm_cfg ([type], optional): [description].
-            Defaults to dict(type='BN1d', eps=1e-3, momentum=0.01).
-        mode (str, optional): The mode to gather point features. Options are
-            'max' or 'avg'. Defaults to 'max'.
-        legacy (bool): Whether to use the new behavior or
-            the original behavior. Defaults to True.
     """
 
     def __init__(self,
@@ -466,6 +459,101 @@ class PillarFeatureNet(nn.Module):
         return features.squeeze()
 
 
+class PointPillarsScatter(nn.Module):
+    """Point Pillar's Scatter.
+
+    Converts learned features from dense tensor to sparse pseudo image.
+
+    Args:
+        in_channels (int): Channels of input features.
+        output_shape (list[int]): Required output shape of features.
+    """
+
+    def __init__(self, 
+                 in_channels=64, 
+                 output_shape=[496, 432]):
+        super().__init__()
+        self.output_shape = output_shape
+        self.ny = output_shape[0]
+        self.nx = output_shape[1]
+        self.in_channels = in_channels
+        self.fp16_enabled = False
+
+    #@auto_fp16(apply_to=('voxel_features', ))
+    def forward(self, voxel_features, coors, batch_size=None):
+        """Forward function to scatter features."""
+        if batch_size is not None:
+            return self.forward_batch(voxel_features, coors, batch_size)
+        else:
+            return self.forward_single(voxel_features, coors)
+
+    def forward_single(self, voxel_features, coors):
+        """Scatter features of single sample.
+
+        Args:
+            voxel_features (torch.Tensor): Voxel features in shape (N, M, C).
+            coors (torch.Tensor): Coordinates of each voxel.
+                The first column indicates the sample ID.
+        """
+        # Create the canvas for this sample
+        canvas = torch.zeros(
+            self.in_channels,
+            self.nx * self.ny,
+            dtype=voxel_features.dtype,
+            device=voxel_features.device)
+
+        indices = coors[:, 1] * self.nx + coors[:, 2]
+        indices = indices.long()
+        voxels = voxel_features.t()
+        # Now scatter the blob back to the canvas.
+        canvas[:, indices] = voxels
+        # Undo the column stacking to final 4-dim tensor
+        canvas = canvas.view(1, self.in_channels, self.ny, self.nx)
+        return [canvas]
+
+    def forward_batch(self, voxel_features, coors, batch_size):
+        """Scatter features of single sample.
+
+        Args:
+            voxel_features (torch.Tensor): Voxel features in shape (N, M, C).
+            coors (torch.Tensor): Coordinates of each voxel in shape (N, 4).
+                The first column indicates the sample ID.
+            batch_size (int): Number of samples in the current batch.
+        """
+        # batch_canvas will be the final output.
+        batch_canvas = []
+        for batch_itt in range(batch_size):
+            # Create the canvas for this sample
+            canvas = torch.zeros(
+                self.in_channels,
+                self.nx * self.ny,
+                dtype=voxel_features.dtype,
+                device=voxel_features.device)
+
+            # Only include non-empty pillars
+            batch_mask = coors[:, 0] == batch_itt
+            this_coors = coors[batch_mask, :]
+            indices = this_coors[:, 2] * self.nx + this_coors[:, 3]
+            indices = indices.type(torch.long)
+            voxels = voxel_features[batch_mask, :]
+            voxels = voxels.t()
+
+            # Now scatter the blob back to the canvas.
+            canvas[:, indices] = voxels
+
+            # Append to a list for later stacking.
+            batch_canvas.append(canvas)
+
+        # Stack to 3-dim tensor (batch-size, in_channels, nrows*ncols)
+        batch_canvas = torch.stack(batch_canvas, 0)
+
+        # Undo the column stacking to final 4-dim tensor
+        batch_canvas = batch_canvas.view(batch_size, self.in_channels, self.ny,
+                                         self.nx)
+
+        return batch_canvas
+
+
 class SECOND(nn.Module):
     """Backbone network for SECOND/PointPillars/PartA2/MVXNet.
 
@@ -474,8 +562,6 @@ class SECOND(nn.Module):
         out_channels (list[int]): Output channels for multi-scale feature maps.
         layer_nums (list[int]): Number of layers in each stage.
         layer_strides (list[int]): Strides of each stage.
-        norm_cfg (dict): Config dict of normalization layers.
-        conv_cfg (dict): Config dict of convolutional layers.
     """
 
     def __init__(self,
@@ -545,9 +631,6 @@ class SECONDFPN(nn.Module):
         out_channels (list[int]): Output channels of feature maps.
         upsample_strides (list[int]): Strides used to upsample the
             feature maps.
-        norm_cfg (dict): Config dict of normalization layers.
-        upsample_cfg (dict): Config dict of upsample layers.
-        conv_cfg (dict): Config dict of conv layers.
         use_conv_for_no_stride (bool): Whether to use conv when stride is 1.
     """
 
@@ -590,16 +673,6 @@ class SECONDFPN(nn.Module):
             deblocks.append(deblock)
         self.deblocks = nn.ModuleList(deblocks)
 
-        # TODO: check!!!
-        #self.init_weights()
-
-    def init_weights(self):
-        """Initialize weights of FPN."""
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                kaiming_init(m)
-            elif isinstance(m, nn.BatchNorm2d):
-                constant_init(m, 1)
 
     #@auto_fp16()
     def forward(self, x):
@@ -609,7 +682,7 @@ class SECONDFPN(nn.Module):
             x (torch.Tensor): 4D Tensor in (N, C, H, W) shape.
 
         Returns:
-            list[torch.Tensor]: Multi-level feature maps.
+            torch.Tensor: Feature maps.
         """
         assert len(x) == len(self.in_channels)
         ups = [deblock(x[i]) for i, deblock in enumerate(self.deblocks)]
@@ -625,7 +698,7 @@ class Anchor3DHead(nn.Module):
     def __init__(self,
                  num_classes=3,
                  in_channels=384,
-                 feat_channels=384): # TODO
+                 feat_channels=384): 
 
         super().__init__()
         self.in_channels = in_channels
@@ -691,7 +764,8 @@ class Anchor3DHead(nn.Module):
                 class predictions.
 
         Returns:
-            list[tuple]: Prediction resultes of batches.
+            tuple[torch.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
         """
         assert len(cls_scores) == len(bbox_preds)
         assert len(cls_scores) == len(dir_preds)
