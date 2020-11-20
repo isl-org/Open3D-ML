@@ -215,16 +215,21 @@ class Object3d(BoundingBox3D):
         """
         type_to_id = {
             'ignore': 0,
-            'barrier': 1,
-            'bicycle': 2,
-            'bus': 3,
-            'car': 4,
-            'construction_vehicle': 5,
-            'motorcycle': 6,
-            'pedestrian': 7,
-            'traffic_cone': 8,
-            'trailer': 9,
-            'truck': 10,
+            'VEHICLE': 1,
+            'PEDESTRIAN': 2,
+            'ON_ROAD_OBSTACLE': 3,
+            'LARGE_VEHICLE': 4,
+            'BICYCLE': 5,
+            'BICYCLIST': 6,
+            'BUS': 7,
+            'OTHER_MOVER': 8,
+            'TRAILER': 9,
+            'MOTORCYCLIST': 10,
+            'MOPED': 11,
+            'MOTORCYCLE': 12,
+            'STROLLER': 13,
+            'EMERGENCY_VEHICLE': 14,
+            'ANIMAL': 15
         }
         if cls_type not in type_to_id.keys():
             return 0
