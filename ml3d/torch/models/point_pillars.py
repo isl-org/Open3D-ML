@@ -132,10 +132,7 @@ class PointPillars(BaseModel):
         bboxes = bboxes.cpu().numpy()
         scores = scores.cpu().numpy()
         labels = labels.cpu().numpy()
-        
-        calib = self.inference_data["calib"]
-        trans = np.linalg.inv((calib['R0_rect'] @ calib['Tr_velo2cam']).T)
-
+    
         self.inference_result = []
         for i in range(len(bboxes)):
             yaw = bboxes[i][-1]
@@ -147,10 +144,7 @@ class PointPillars(BaseModel):
             up = np.array((0, 0, 1))    
 
             dim = bboxes[i][[3, 5, 4]]
-            #pos = bboxes[i][:3] + [0, 0,  dim[1]/2]
-            pos = bboxes[i][[0, 2, 1]] * [1,-1,-1]
-            points = np.concatenate([pos, [1]], axis=-1) @ trans
-            pos = [-1 * points[1], -1 * points[0], points[2] + dim[1]/2]
+            pos = bboxes[i][:3] + [0, 0,  dim[1]/2]
 
             self.inference_result.append(
                 BoundingBox3D(pos, front, up, left,

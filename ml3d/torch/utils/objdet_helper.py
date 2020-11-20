@@ -254,23 +254,23 @@ def multiclass_nms(boxes, scores, score_thr):
     """Multi-class nms for 3D boxes.
 
     Args:
-        mlvl_bboxes (torch.Tensor): Multi-level boxes with shape (N, M).
+        boxes (torch.Tensor): Multi-level boxes with shape (N, M).
             M is the dimensions of boxes.
-        mlvl_scores (torch.Tensor): Multi-level boxes with shape
+        scores (torch.Tensor): Multi-level boxes with shape
             (N, ). N is the number of boxes.
         score_thr (float): Score threshold to filter boxes with low
             confidence.
 
     Returns:
-        tuple[torch.Tensor]: Return results after nms, including 3D \
-            bounding boxes, scores, labels and direction scores.
+        list[torch.Tensor]: Return a list of indices after nms,
+            with an entry for each class.
     """
     
     idxs = []
     for i in range(scores.shape[1]):
         cls_inds = scores[:, i] > score_thr
         if not cls_inds.any():
-            idxs.append([])
+            idxs.append(torch.tensor([], dtype=torch.long))
             continue
         
         orig_idx = torch.arange(cls_inds.shape[0], 
@@ -284,82 +284,3 @@ def multiclass_nms(boxes, scores, score_thr):
         idxs.append(orig_idx[idx])
 
     return idxs
-
-
-def box3d_multiclass_nms(mlvl_bboxes,
-                         mlvl_bboxes_for_nms,
-                         mlvl_scores,
-                         score_thr,
-                         max_num,
-                         mlvl_dir_scores=None):
-    """Multi-class nms for 3D boxes.
-
-    Args:
-        mlvl_bboxes (torch.Tensor): Multi-level boxes with shape (N, M).
-            M is the dimensions of boxes.
-        mlvl_bboxes_for_nms (torch.Tensor): Multi-level boxes with shape
-            (N, 4). N is the number of boxes.
-        mlvl_scores (torch.Tensor): Multi-level boxes with shape
-            (N, ). N is the number of boxes.
-        score_thr (float): Score thredhold to filter boxes with low
-            confidence.
-        max_num (int): Maximum number of boxes will be kept.
-        mlvl_dir_scores (torch.Tensor, optional): Multi-level scores
-            of direction classifier. Defaults to None.
-
-    Returns:
-        tuple[torch.Tensor]: Return results after nms, including 3D \
-            bounding boxes, scores, labels and direction scores.
-    """
-    # do multi class nms
-    # the fg class id range: [0, num_classes-1]
-    num_classes = mlvl_scores.shape[1] - 1
-    bboxes = []
-    scores = []
-    labels = []
-    dir_scores = []
-    for i in range(0, num_classes):
-        # get bboxes and scores of this class
-        cls_inds = mlvl_scores[:, i] > score_thr
-        if not cls_inds.any():
-            continue
-
-        _scores = mlvl_scores[cls_inds, i]
-        _bboxes_for_nms = mlvl_bboxes_for_nms[cls_inds, :]
-
-
-        selected = ml3d.ops.nms(_bboxes_for_nms, _scores, 0.01)
-
-        _mlvl_bboxes = mlvl_bboxes[cls_inds, :]
-        bboxes.append(_mlvl_bboxes[selected])
-        scores.append(_scores[selected])
-        cls_label = mlvl_bboxes.new_full((len(selected), ),
-                                         i,
-                                         dtype=torch.long)
-        labels.append(cls_label)
-
-        if mlvl_dir_scores is not None:
-            _mlvl_dir_scores = mlvl_dir_scores[cls_inds]
-            dir_scores.append(_mlvl_dir_scores[selected])
-
-    if bboxes:
-        bboxes = torch.cat(bboxes, dim=0)
-        scores = torch.cat(scores, dim=0)
-        labels = torch.cat(labels, dim=0)
-        if mlvl_dir_scores is not None:
-            dir_scores = torch.cat(dir_scores, dim=0)
-        if bboxes.shape[0] > max_num:
-            _, inds = scores.sort(descending=True)
-            inds = inds[:max_num]
-            bboxes = bboxes[inds, :]
-            labels = labels[inds]
-            scores = scores[inds]
-            if mlvl_dir_scores is not None:
-                dir_scores = dir_scores[inds]
-    else:
-        bboxes = mlvl_scores.new_zeros((0, mlvl_bboxes.size(-1)))
-        scores = mlvl_scores.new_zeros((0, ))
-        labels = mlvl_scores.new_zeros((0, ), dtype=torch.long)
-        dir_scores = mlvl_scores.new_zeros((0, ))
-    return bboxes, scores, labels, dir_scores
-
