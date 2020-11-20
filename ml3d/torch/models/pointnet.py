@@ -5,6 +5,7 @@ from .base_model import BaseModel
 from ...utils import MODEL
 from ..dataloaders import DefaultBatcher
 from ..modules.losses import filter_valid_label
+from ...datasets.utils import transforms
 
 
 class PointNet(BaseModel):
@@ -17,7 +18,7 @@ class PointNet(BaseModel):
                  dim_input=3,
                  dim_feature=0,
                  normalize=True,
-                 augment="normal",
+                 augment='uniform',
                  feature_transform_regularization=0.001,
                  batcher='DefaultBatcher',
                  ckpt_path=None,
@@ -46,7 +47,7 @@ class PointNet(BaseModel):
                                       dim_feature)
         else:
             raise ValueError(f"Invalid task {task}")
-        assert augment in ['normal',
+        assert augment in ['gaussian',
                            'uniform'], f"Invalid augmentation {augment}"
 
         self.num_points = num_points
@@ -101,26 +102,20 @@ class PointNet(BaseModel):
         if self.task == 'classification':
             # Normalize and center
             if self.normalize:
-                point -= np.mean(point, axis=0)
-                dist = np.max(np.sqrt(np.sum(point**2, axis=0)), axis=0)
-                point /= dist
+                point, _ = transforms.trans_normalize(point, feat=None, t_normalize={'method': 'unit_sphere'})
 
             # Data augmentation for classification training
             if self.augment and attr['split'] in ['train', 'training']:
-                theta = np.random.uniform(0, np.pi * 2)
-                cosval = np.cos(theta)
-                sinval = np.sin(theta)
-                rotation_matrix = np.array([[cosval, 0, sinval], [0, 1, 0],
-                                            [-sinval, 0, cosval]])
-                point = np.dot(point, rotation_matrix).astype(np.float32)
+                # Paper: "[...] Gaussian noise with zero mean and 0.02 standard deviation."
+                if self.augment == 'gaussian':
+                    point = transforms.trans_augment(point, {'rotation_method': 'vertical',
+                                                             'noise_type': 'gaussian',
+                                                             'noise_level': 0.002})
                 # Following original implementation at
                 # https://github.com/charlesq34/pointnet/blob/master/train.py
-                # Paper: "[...] Gaussian noise with zero mean and 0.02 standard deviation."
-                if self.augment == "uniform":
-                    point += np.clip(0.001 * np.random.randn(point.shape),
-                                     -0.005, 0.005)
-                else:
-                    point += np.random.normal(0, 0.002, point.shape)
+                elif self.augment == 'uniform':
+                    point = transforms.trans_augment(point, {'rotation_method': 'vertical',
+                                                             'noise_type': 'uniform_clip'})
 
         if data.get('feat') is not None:
             point = np.concatenate([point, data['feat'][choice].copy()], axis=1)

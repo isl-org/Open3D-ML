@@ -22,8 +22,6 @@ class ShapeNet(BaseDataset):
     def __init__(self,
                  dataset_path,
                  name="ShapeNet",
-                 cache_dir='./logs/cache',
-                 use_cache=False,
                  class_weights=[
                      2690, 76, 55, 1824, 3746, 69, 787, 392, 1546, 445, 202,
                      184, 275, 66, 152, 5266
@@ -34,8 +32,8 @@ class ShapeNet(BaseDataset):
                  **kwargs):
         super().__init__(dataset_path=dataset_path,
                          name=name,
-                         cache_dir=cache_dir,
-                         use_cache=use_cache,
+                         cache_dir='./logs/cache',
+                         use_cache=False,
                          task=task,
                          class_weights=class_weights,
                          ignored_label_inds=ignored_label_inds,
@@ -195,7 +193,7 @@ class ShapeNetSplit:
             path[2],
             dtype=np.int64) if self.task == 'segmentation' else np.array(
                 [np.int64(path[0])])
-        return {'point': points, 'label': label}
+        return {'point': points, 'feat': None, 'label': label}
 
     def get_attr(self, idx):
         name = self.path_list[idx][1].split('/')[-1].split('.')[0]
