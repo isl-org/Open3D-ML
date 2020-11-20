@@ -86,12 +86,11 @@ class KITTI(BaseDataset):
         objects = []
         for line in lines:
             label = line.strip().split(' ')
-            if label[0] == 'DontCare':
-                continue
+
             center = np.array(
-                [float(label[13]),
+                [float(label[11]),
                  float(label[12]),
-                 float(label[11])]).reshape(-1, 3)
+                 float(label[13])]).reshape(-1, 3)
 
             rect = calib['R0_rect']
             Trv2c = calib['Tr_velo2cam']
@@ -99,13 +98,13 @@ class KITTI(BaseDataset):
             points = np.concatenate([center, np.ones([1, 1])], axis=-1)
             points = points @ np.linalg.inv((rect @ Trv2c).T)
 
-            center = [-1 * points[0, 1], -1 * points[0, 0], 1 + points[0, 2]]
+            size = [float(label[9]), float(label[8]), float(label[10])]  # w,h,l
+            center = [points[0, 0], points[0, 1], size[1] / 2 + points[0, 2]]
 
             ry = float(label[14])
             front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
             up = [0, 0, 1]
             left = [-1 * np.cos(ry), np.sin(ry), 0]
-            size = [float(label[9]), float(label[8]), float(label[10])]
 
             objects.append(Object3d(center, front, up, left, size, label))
 
@@ -262,7 +261,13 @@ class Object3d(BoundingBox3D):
         """
         get object id from name.
         """
-        type_to_id = {'Car': 1, 'Pedestrian': 2, 'Cyclist': 3, 'Van': 4}
+        type_to_id = {
+            'DontCare': 0,
+            'Car': 1,
+            'Pedestrian': 2,
+            'Cyclist': 3,
+            'Van': 4
+        }
         if cls_type not in type_to_id.keys():
             return 0
         return type_to_id[cls_type]
