@@ -90,16 +90,15 @@ class KITTI(BaseDataset):
             center = np.array(
                 [float(label[11]),
                  float(label[12]),
-                 float(label[13])]).reshape(-1, 3)
+                 float(label[13]), 1.0])
 
             rect = calib['R0_rect']
             Trv2c = calib['Tr_velo2cam']
 
-            points = np.concatenate([center, np.ones([1, 1])], axis=-1)
-            points = points @ np.linalg.inv((rect @ Trv2c).T)
+            points = center @ np.linalg.inv((rect @ Trv2c).T)
 
             size = [float(label[9]), float(label[8]), float(label[10])]  # w,h,l
-            center = [points[0, 0], points[0, 1], size[1] / 2 + points[0, 2]]
+            center = [points[0], points[1], size[1] / 2 + points[2]]
 
             ry = float(label[14])
             front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
