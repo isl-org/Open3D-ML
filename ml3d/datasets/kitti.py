@@ -99,7 +99,7 @@ class KITTI(BaseDataset):
             points = points @ np.linalg.inv((rect @ Trv2c).T)
 
             size = [float(label[9]), float(label[8]), float(label[10])]  # w,h,l
-            center = [points[0, 0], points[0, 1], size[1]/2 + points[0, 2]]
+            center = [points[0, 0], points[0, 1], size[1] / 2 + points[0, 2]]
 
             ry = float(label[14])
             front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
@@ -261,7 +261,13 @@ class Object3d(BoundingBox3D):
         """
         get object id from name.
         """
-        type_to_id = {'DontCare': 0, 'Car': 1, 'Pedestrian': 2, 'Cyclist': 3, 'Van': 4}
+        type_to_id = {
+            'DontCare': 0,
+            'Car': 1,
+            'Pedestrian': 2,
+            'Cyclist': 3,
+            'Van': 4
+        }
         if cls_type not in type_to_id.keys():
             return 0
         return type_to_id[cls_type]
