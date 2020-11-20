@@ -41,8 +41,8 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
-    max_num = torch.arange(
-        max_num, dtype=torch.int, device=actual_num.device).view(max_num_shape)
+    max_num = torch.arange(max_num, dtype=torch.int,
+                           device=actual_num.device).view(max_num_shape)
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num
@@ -139,12 +139,11 @@ class Anchor3DRangeGenerator(object):
         mr_anchors = []
         for anchor_range, anchor_size in zip(self.ranges, self.sizes):
             mr_anchors.append(
-                self.anchors_single_range(
-                    featmap_size,
-                    anchor_range,
-                    anchor_size,
-                    self.rotations,
-                    device=device))
+                self.anchors_single_range(featmap_size,
+                                          anchor_range,
+                                          anchor_size,
+                                          self.rotations,
+                                          device=device))
         mr_anchors = torch.cat(mr_anchors, dim=-3)
         return mr_anchors
 
@@ -175,12 +174,18 @@ class Anchor3DRangeGenerator(object):
         if len(feature_size) == 2:
             feature_size = [1, feature_size[0], feature_size[1]]
         anchor_range = torch.tensor(anchor_range, device=device)
-        z_centers = torch.linspace(
-            anchor_range[2], anchor_range[5], feature_size[0], device=device)
-        y_centers = torch.linspace(
-            anchor_range[1], anchor_range[4], feature_size[1], device=device)
-        x_centers = torch.linspace(
-            anchor_range[0], anchor_range[3], feature_size[2], device=device)
+        z_centers = torch.linspace(anchor_range[2],
+                                   anchor_range[5],
+                                   feature_size[0],
+                                   device=device)
+        y_centers = torch.linspace(anchor_range[1],
+                                   anchor_range[4],
+                                   feature_size[1],
+                                   device=device)
+        x_centers = torch.linspace(anchor_range[0],
+                                   anchor_range[3],
+                                   feature_size[2],
+                                   device=device)
         sizes = torch.tensor(sizes, device=device).reshape(-1, 3)
         rotations = torch.tensor(rotations, device=device)
 
@@ -285,16 +290,17 @@ def multiclass_nms(boxes, scores, score_thr):
         list[torch.Tensor]: Return a list of indices after nms,
             with an entry for each class.
     """
-    
+
     idxs = []
     for i in range(scores.shape[1]):
         cls_inds = scores[:, i] > score_thr
         if not cls_inds.any():
             idxs.append(torch.tensor([], dtype=torch.long))
             continue
-        
-        orig_idx = torch.arange(cls_inds.shape[0], 
-            device=cls_inds.device, dtype=torch.long)[cls_inds]
+
+        orig_idx = torch.arange(cls_inds.shape[0],
+                                device=cls_inds.device,
+                                dtype=torch.long)[cls_inds]
         _scores = scores[cls_inds, i]
         _boxes = boxes[cls_inds, :]
         _bev = xywhr2xyxyr(_boxes[:, [0, 1, 3, 4, 6]])

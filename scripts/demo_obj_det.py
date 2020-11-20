@@ -10,15 +10,13 @@ from ml3d.torch.pipelines import ObjectDetection
 from ml3d.torch.models import PointPillars
 from ml3d.torch.dataloaders import TorchDataloader
 
-
 import argparse
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Demo for inference of object detection')
-    parser.add_argument('--path_kitti',
-                        help='path to KITTI',
-                        required=True)
+    parser.add_argument('--path_kitti', help='path to KITTI', required=True)
     parser.add_argument('--path_ckpt_pointpillars',
                         help='path to PointPillars checkpoint')
 
@@ -35,12 +33,11 @@ def parse_args():
 
 def main(args):
 
-    model = PointPillars(
-        voxel_size = [0.16, 0.16, 4],
-        point_cloud_range = [0, -39.68, -3, 69.12, 39.68, 1])
+    model = PointPillars(voxel_size=[0.16, 0.16, 4],
+                         point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1])
     dataset = KITTI(args.path_kitti)
     pipeline = ObjectDetection(model, dataset, device="gpu")
-        
+
     # load the parameters.
     pipeline.load_ckpt(ckpt_path=args.path_ckpt_pointpillars)
 
@@ -59,9 +56,10 @@ def main(args):
 
     vis = Visualizer()
     vis.visualize([{
-            "name": "KITTI",
-            'points': data['point'][:,:3]
-        }], bounding_boxes=boxes)
+        "name": "KITTI",
+        'points': data['point'][:, :3]
+    }],
+                  bounding_boxes=boxes)
 
 
 if __name__ == '__main__':

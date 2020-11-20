@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,15 +8,12 @@ def one_hot(index, classes):
     out_idx = torch.arange(classes, device=index.device)
     out_idx = torch.unsqueeze(out_idx, 0)
     index = torch.unsqueeze(index, -1)
-    return (index==out_idx).float()
+    return (index == out_idx).float()
 
 
 class FocalLoss(nn.Module):
 
-    def __init__(self,
-                 gamma=2.0,
-                 alpha=0.25,
-                 loss_weight=1.0):
+    def __init__(self, gamma=2.0, alpha=0.25, loss_weight=1.0):
         """`Focal Loss <https://arxiv.org/abs/1708.02002>`_
 
         Args:
@@ -32,11 +28,7 @@ class FocalLoss(nn.Module):
         self.alpha = alpha
         self.loss_weight = loss_weight
 
-    def forward(self,
-                pred,
-                target,
-                weight=None,
-                avg_factor=None):
+    def forward(self, pred, target, weight=None, avg_factor=None):
 
         pred_sigmoid = pred.sigmoid()
 
@@ -50,9 +42,9 @@ class FocalLoss(nn.Module):
 
         if weight is not None:
             loss = loss * weight
-                
+
         loss = loss * self.loss_weight
-        
+
         if avg_factor:
             return loss.sum() / avg_factor
         else:

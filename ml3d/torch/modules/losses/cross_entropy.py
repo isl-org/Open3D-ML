@@ -2,17 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 def one_hot(index, classes):
     out_idx = torch.arange(classes, device=index.device)
     out_idx = torch.unsqueeze(out_idx, 0)
     index = torch.unsqueeze(index, -1)
-    return (index==out_idx).float()
+    return (index == out_idx).float()
 
 
 class CrossEntropyLoss(nn.Module):
 
-    def __init__(self,
-                 loss_weight=1.0):
+    def __init__(self, loss_weight=1.0):
         """CrossEntropyLoss.
 
         Args:
@@ -21,12 +21,7 @@ class CrossEntropyLoss(nn.Module):
         super(CrossEntropyLoss, self).__init__()
         self.loss_weight = loss_weight
 
-    def forward(self,
-                cls_score,
-                label,
-                weight=None,
-                avg_factor=None,
-                **kwargs):
+    def forward(self, cls_score, label, weight=None, avg_factor=None, **kwargs):
         """Forward function.
 
         Args:
@@ -38,7 +33,7 @@ class CrossEntropyLoss(nn.Module):
         Returns:
             torch.Tensor: The calculated loss
         """
-        
+
         loss = F.cross_entropy(cls_score, label, reduction='none')
 
         if weight is not None:

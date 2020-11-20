@@ -1,5 +1,6 @@
-import torch 
+import torch
 import torch.nn as nn
+
 
 class SmoothL1Loss(nn.Module):
     """Smooth L1 loss.
@@ -17,12 +18,7 @@ class SmoothL1Loss(nn.Module):
         self.beta = beta
         self.loss_weight = loss_weight
 
-    def forward(self,
-                pred,
-                target,
-                weight=None,
-                avg_factor=None,
-                **kwargs):
+    def forward(self, pred, target, weight=None, avg_factor=None, **kwargs):
         """Forward function.
 
         Args:
@@ -39,14 +35,13 @@ class SmoothL1Loss(nn.Module):
         assert pred.size() == target.size() and target.numel() > 0
         diff = torch.abs(pred - target)
         loss = torch.where(diff < self.beta, 0.5 * diff * diff / self.beta,
-                        diff - 0.5 * self.beta)
+                           diff - 0.5 * self.beta)
         if weight is not None:
             loss = loss * weight
-        
+
         loss = loss * self.loss_weight
 
         if avg_factor:
             return loss.sum() / avg_factor
         else:
             return loss.mean()
-

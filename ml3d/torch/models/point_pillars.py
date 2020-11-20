@@ -59,21 +59,19 @@ class PointPillars(BaseModel):
         head: Config of anchor head module.
     """
 
-    def __init__(self, 
-            name="PointPillars",
-            voxel_size = [0.16, 0.16, 4],
-            point_cloud_range = [0, -40.0, -3, 70.0, 40.0, 1],
-            voxelize={},
-            voxel_encoder={},
-            scatter={},
-            backbone={},
-            neck={},
-            head={},
-            **kwargs):
+    def __init__(self,
+                 name="PointPillars",
+                 voxel_size=[0.16, 0.16, 4],
+                 point_cloud_range=[0, -40.0, -3, 70.0, 40.0, 1],
+                 voxelize={},
+                 voxel_encoder={},
+                 scatter={},
+                 backbone={},
+                 neck={},
+                 head={},
+                 **kwargs):
 
-        super().__init__(
-                name=name,
-                **kwargs)
+        super().__init__(name=name, **kwargs)
         self.point_cloud_range = point_cloud_range
 
         self.voxel_layer = PointPillarsVoxelization(
@@ -125,7 +123,7 @@ class PointPillars(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
         raise NotImplementedError
-    
+
     def get_loss(self, Loss, results, inputs):
         raise NotImplementedError
 
@@ -134,17 +132,18 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         #data = data['data']
-        points = np.array(data['point'][:, 0:4], dtype=np.float32)       
+        points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
         max_val = np.array(self.point_cloud_range[3:])
 
-        points = points[np.where(np.all( 
-            np.logical_and(
-                points[:,:3] >= min_val, 
-                points[:,:3] < max_val), axis=-1))]
+        points = points[np.where(
+            np.all(np.logical_and(points[:, :3] >= min_val,
+                                  points[:, :3] < max_val),
+                   axis=-1))]
 
-        if 'bounding_boxes' not in data.keys() or data['bounding_boxes'] is None:
+        if 'bounding_boxes' not in data.keys(
+        ) or data['bounding_boxes'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
             labels = data['bounding_boxes']
@@ -168,10 +167,10 @@ class PointPillars(BaseModel):
         self.inference_data = data
 
     def inference_preprocess(self):
-        data = torch.tensor([self.inference_data["point"]], dtype=torch.float32, device=self.device)
-        return {
-            "data": data
-        }
+        data = torch.tensor([self.inference_data["point"]],
+                            dtype=torch.float32,
+                            device=self.device)
+        return {"data": data}
 
     def inference_end(self, inputs, results):
         bboxes, scores, labels = self.bbox_head.get_bboxes(*results)
@@ -179,25 +178,23 @@ class PointPillars(BaseModel):
         bboxes = bboxes.cpu().numpy()
         scores = scores.cpu().numpy()
         labels = labels.cpu().numpy()
-    
+
         self.inference_result = []
         for i in range(len(bboxes)):
             yaw = bboxes[i][-1]
             cos = np.cos(yaw)
             sin = np.sin(yaw)
 
-            front = np.array((sin, cos, 0))   
-            left = np.array((-cos, sin, 0))   
-            up = np.array((0, 0, 1))    
+            front = np.array((sin, cos, 0))
+            left = np.array((-cos, sin, 0))
+            up = np.array((0, 0, 1))
 
             dim = bboxes[i][[3, 5, 4]]
-            pos = bboxes[i][:3] + [0, 0,  dim[1]/2]
+            pos = bboxes[i][:3] + [0, 0, dim[1] / 2]
 
             self.inference_result.append(
-                BoundingBox3D(pos, front, up, left,
-                              dim, labels[i], 
-                              scores[i]))
-        
+                BoundingBox3D(pos, front, up, left, dim, labels[i], scores[i]))
+
         return True
 
 
@@ -292,11 +289,7 @@ class PFNLayer(nn.Module):
             Default to 'max'.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 last_layer=False,
-                 mode='max'):
+    def __init__(self, in_channels, out_channels, last_layer=False, mode='max'):
 
         super().__init__()
         self.fp16_enabled = False
@@ -340,9 +333,9 @@ class PFNLayer(nn.Module):
         elif self.mode == 'avg':
             if aligned_distance is not None:
                 x = x.mul(aligned_distance.unsqueeze(-1))
-            x_max = x.sum(
-                dim=1, keepdim=True) / num_voxels.type_as(inputs).view(
-                    -1, 1, 1)
+            x_max = x.sum(dim=1,
+                          keepdim=True) / num_voxels.type_as(inputs).view(
+                              -1, 1, 1)
 
         if self.last_vfe:
             return x_max
@@ -371,16 +364,16 @@ class PillarFeatureNet(nn.Module):
 
     def __init__(self,
                  in_channels=4,
-                 feat_channels=(64, ),
+                 feat_channels=(64,),
                  voxel_size=(0.16, 0.16, 4),
                  point_cloud_range=(0, -39.68, -3, 69.12, 39.68, 1)):
-                 
+
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
 
         # with cluster center (+3) + with voxel center (+2)
         in_channels += 5
-        
+
         # Create PillarFeatureNet layers
         self.in_channels = in_channels
         feat_channels = [in_channels] + list(feat_channels)
@@ -393,11 +386,10 @@ class PillarFeatureNet(nn.Module):
             else:
                 last_layer = True
             pfn_layers.append(
-                PFNLayer(
-                    in_filters,
-                    out_filters,
-                    last_layer=last_layer, 
-                    mode='max'))
+                PFNLayer(in_filters,
+                         out_filters,
+                         last_layer=last_layer,
+                         mode='max'))
         self.pfn_layers = nn.ModuleList(pfn_layers)
 
         self.fp16_enabled = False
@@ -425,14 +417,13 @@ class PillarFeatureNet(nn.Module):
         features_ls = [features]
         # Find distance of x, y, and z from cluster center
         points_mean = features[:, :, :3].sum(
-            dim=1, keepdim=True) / num_points.type_as(features).view(
-                -1, 1, 1)
+            dim=1, keepdim=True) / num_points.type_as(features).view(-1, 1, 1)
         f_cluster = features[:, :, :3] - points_mean
         features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
-        
+
         f_center = features[:, :, :2]
         f_center[:, :, 0] = f_center[:, :, 0] - (
             coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
@@ -440,7 +431,7 @@ class PillarFeatureNet(nn.Module):
         f_center[:, :, 1] = f_center[:, :, 1] - (
             coors[:, 2].type_as(features).unsqueeze(1) * self.vy +
             self.y_offset)
-            
+
         features_ls.append(f_center)
 
         # Combine together feature decorations
@@ -469,9 +460,7 @@ class PointPillarsScatter(nn.Module):
         output_shape (list[int]): Required output shape of features.
     """
 
-    def __init__(self, 
-                 in_channels=64, 
-                 output_shape=[496, 432]):
+    def __init__(self, in_channels=64, output_shape=[496, 432]):
         super().__init__()
         self.output_shape = output_shape
         self.ny = output_shape[0]
@@ -496,11 +485,10 @@ class PointPillarsScatter(nn.Module):
                 The first column indicates the sample ID.
         """
         # Create the canvas for this sample
-        canvas = torch.zeros(
-            self.in_channels,
-            self.nx * self.ny,
-            dtype=voxel_features.dtype,
-            device=voxel_features.device)
+        canvas = torch.zeros(self.in_channels,
+                             self.nx * self.ny,
+                             dtype=voxel_features.dtype,
+                             device=voxel_features.device)
 
         indices = coors[:, 1] * self.nx + coors[:, 2]
         indices = indices.long()
@@ -524,11 +512,10 @@ class PointPillarsScatter(nn.Module):
         batch_canvas = []
         for batch_itt in range(batch_size):
             # Create the canvas for this sample
-            canvas = torch.zeros(
-                self.in_channels,
-                self.nx * self.ny,
-                dtype=voxel_features.dtype,
-                device=voxel_features.device)
+            canvas = torch.zeros(self.in_channels,
+                                 self.nx * self.ny,
+                                 dtype=voxel_features.dtype,
+                                 device=voxel_features.device)
 
             # Only include non-empty pillars
             batch_mask = coors[:, 0] == batch_itt
@@ -579,27 +566,24 @@ class SECOND(nn.Module):
         blocks = []
         for i, layer_num in enumerate(layer_nums):
             block = [
-                nn.Conv2d(
-                    in_filters[i],
-                    out_channels[i],
-                    3,
-                    bias=False,
-                    stride=layer_strides[i],
-                    padding=1),
-                nn.BatchNorm2d(out_channels[i], 
-                    eps=1e-3, momentum=0.01),
+                nn.Conv2d(in_filters[i],
+                          out_channels[i],
+                          3,
+                          bias=False,
+                          stride=layer_strides[i],
+                          padding=1),
+                nn.BatchNorm2d(out_channels[i], eps=1e-3, momentum=0.01),
                 nn.ReLU(inplace=True),
             ]
             for j in range(layer_num):
                 block.append(
-                    nn.Conv2d(
-                        out_channels[i],
-                        out_channels[i],
-                        3,
-                        bias=False,
-                        padding=1))
-                block.append(nn.BatchNorm2d(out_channels[i], 
-                    eps=1e-3, momentum=0.01))
+                    nn.Conv2d(out_channels[i],
+                              out_channels[i],
+                              3,
+                              bias=False,
+                              padding=1))
+                block.append(
+                    nn.BatchNorm2d(out_channels[i], eps=1e-3, momentum=0.01))
                 block.append(nn.ReLU(inplace=True))
 
             block = nn.Sequential(*block)
@@ -659,20 +643,18 @@ class SECONDFPN(nn.Module):
                     bias=False)
             else:
                 stride = np.round(1 / stride).astype(np.int64)
-                upsample_layer = nn.Conv2d(
-                    in_channels=in_channels[i],
-                    out_channels=out_channel,
-                    kernel_size=stride,
-                    stride=stride,
-                    bias=False)
+                upsample_layer = nn.Conv2d(in_channels=in_channels[i],
+                                           out_channels=out_channel,
+                                           kernel_size=stride,
+                                           stride=stride,
+                                           bias=False)
 
-            deblock = nn.Sequential(upsample_layer,
-                                    nn.BatchNorm2d(out_channel, 
-                                        eps=1e-3, momentum=0.01),
-                                    nn.ReLU(inplace=True))
+            deblock = nn.Sequential(
+                upsample_layer,
+                nn.BatchNorm2d(out_channel, eps=1e-3, momentum=0.01),
+                nn.ReLU(inplace=True))
             deblocks.append(deblock)
         self.deblocks = nn.ModuleList(deblocks)
-
 
     #@auto_fp16()
     def forward(self, x):
@@ -695,25 +677,24 @@ class SECONDFPN(nn.Module):
 
 
 class Anchor3DHead(nn.Module):
-    def __init__(self,
-                 num_classes=3,
-                 in_channels=384,
-                 feat_channels=384): 
+
+    def __init__(self, num_classes=3, in_channels=384, feat_channels=384):
 
         super().__init__()
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.feat_channels = feat_channels
-        
+
         # build anchor generator
-        self.anchor_generator = Anchor3DRangeGenerator(
-            ranges=[
-                [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-            ],
-            sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
-            rotations=[0, 1.57])
+        self.anchor_generator = Anchor3DRangeGenerator(ranges=[
+            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+            [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+        ],
+                                                       sizes=[[0.6, 0.8, 1.73],
+                                                              [0.6, 1.76, 1.73],
+                                                              [1.6, 3.9, 1.56]],
+                                                       rotations=[0, 1.57])
 
         self.nms_pre = 100
         self.score_thr = 0.1
@@ -732,8 +713,8 @@ class Anchor3DHead(nn.Module):
         self.conv_cls = nn.Conv2d(self.feat_channels, self.cls_out_channels, 1)
         self.conv_reg = nn.Conv2d(self.feat_channels,
                                   self.num_anchors * self.box_code_size, 1)
-        self.conv_dir_cls = nn.Conv2d(self.feat_channels,
-                                        self.num_anchors * 2, 1)
+        self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
+                                      1)
 
     def forward(self, x):
         """Forward function on a feature map.
@@ -751,10 +732,7 @@ class Anchor3DHead(nn.Module):
         dir_cls_preds = self.conv_dir_cls(x)
         return cls_score, bbox_pred, dir_cls_preds
 
-    def get_bboxes(self,
-                   cls_scores,
-                   bbox_preds,
-                   dir_preds):
+    def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
         """Get bboxes of anchor head.
 
         Args:
@@ -773,19 +751,21 @@ class Anchor3DHead(nn.Module):
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]
         assert cls_scores.size()[-2:] == dir_preds.size()[-2:]
 
-        anchors = self.anchor_generator.grid_anchors(
-            cls_scores.shape[-2:], device=cls_scores.device)
+        anchors = self.anchor_generator.grid_anchors(cls_scores.shape[-2:],
+                                                     device=cls_scores.device)
         anchors = anchors.reshape(-1, self.box_code_size)
 
         dir_preds = dir_preds.permute(0, 2, 3, 1).reshape(-1, 2)
         dir_scores = torch.max(dir_preds, dim=-1)[1]
 
-        cls_scores = cls_scores.permute(0, 2, 3, 1).reshape(-1, self.num_classes)
+        cls_scores = cls_scores.permute(0, 2, 3,
+                                        1).reshape(-1, self.num_classes)
         scores = cls_scores.sigmoid()
-        
-        bbox_preds = bbox_preds.permute(0, 2, 3, 1).reshape(-1, self.box_code_size)
 
-        if scores.shape[0] > self.nms_pre:  
+        bbox_preds = bbox_preds.permute(0, 2, 3,
+                                        1).reshape(-1, self.box_code_size)
+
+        if scores.shape[0] > self.nms_pre:
             max_scores, _ = scores.max(dim=1)
             _, topk_inds = max_scores.topk(self.nms_pre)
             anchors = anchors[topk_inds, :]
@@ -797,8 +777,10 @@ class Anchor3DHead(nn.Module):
 
         idxs = multiclass_nms(bboxes, scores, self.score_thr)
 
-        labels = [torch.full((len(idxs[i]),), i,
-            dtype=torch.long) for i in range(self.num_classes)]
+        labels = [
+            torch.full((len(idxs[i]),), i, dtype=torch.long)
+            for i in range(self.num_classes)
+        ]
         labels = torch.cat(labels)
 
         scores = [scores[idxs[i], i] for i in range(self.num_classes)]
@@ -807,9 +789,8 @@ class Anchor3DHead(nn.Module):
         idxs = torch.cat(idxs)
         bboxes = bboxes[idxs]
         dir_scores = dir_scores[idxs]
-        
+
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
         return bboxes, scores, labels
-

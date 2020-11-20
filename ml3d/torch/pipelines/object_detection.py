@@ -24,15 +24,14 @@ class ObjectDetection(BasePipeline):
     Pipeline for object detection. 
     """
 
-    def __init__(
-            self,
-            model,
-            dataset=None,
-            name='ObjectDetection',
-            main_log_dir='./logs/',
-            device='gpu',
-            split='train',
-            **kwargs):
+    def __init__(self,
+                 model,
+                 dataset=None,
+                 name='ObjectDetection',
+                 main_log_dir='./logs/',
+                 device='gpu',
+                 split='train',
+                 **kwargs):
         super().__init__(model=model,
                          dataset=dataset,
                          name=name,
@@ -41,7 +40,6 @@ class ObjectDetection(BasePipeline):
                          split=split,
                          **kwargs)
 
-    
     def run_inference(self, data):
         """
         Run inference on a given data.
@@ -69,7 +67,6 @@ class ObjectDetection(BasePipeline):
 
         return model.inference_result
 
-
     def run_test(self):
         model = self.model
         dataset = self.dataset
@@ -84,7 +81,6 @@ class ObjectDetection(BasePipeline):
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
-
 
         test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
@@ -102,11 +98,9 @@ class ObjectDetection(BasePipeline):
                 data = test_split[idx]
                 result = self.run_inference(data['data'])
                 results.extend(result)
-        
 
     def run_train(self):
         raise NotImplementedError()
-
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         checkpoint = torch.load(ckpt_path, map_location=self.device)
