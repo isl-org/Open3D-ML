@@ -20,10 +20,9 @@ log = logging.getLogger(__name__)
 
 
 class Semantic3D(BaseDataset):
-	"""
+    """
     This class is used to create a dataset based on the Semantic3D dataset, and used in visualizer, training, or testing. The dataset includes 8 semantic classes and covers a variety of urban outdoor scenes.
     """
-    
 
     def __init__(self,
                  dataset_path,
@@ -104,7 +103,7 @@ class Semantic3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-	"""
+        """
 	Returns a label to names dictonary object.
         
         Returns:
@@ -126,8 +125,7 @@ class Semantic3D(BaseDataset):
 
     def get_split(self, split):
         return Semantic3DSplit(self, split=split)
-		
-	"""Returns a dataset split.
+        """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -135,10 +133,10 @@ class Semantic3D(BaseDataset):
 
         Returns:
             A dataset split object providing the requested subset of the data.
-	"""		
+	"""
 
     def get_split_list(self, split):
-	"""Returns the list of data splits available.
+        """Returns the list of data splits available.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -164,7 +162,7 @@ class Semantic3D(BaseDataset):
         return files
 
     def is_tested(self, attr):
-	"""Checks if a datum in the dataset has been tested.
+        """Checks if a datum in the dataset has been tested.
         
         Args:
             dataset: The current dataset to which the datum belongs to.
@@ -173,7 +171,7 @@ class Semantic3D(BaseDataset):
         Returns:
             If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
 			
-	"""	
+	"""
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -185,7 +183,7 @@ class Semantic3D(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
-	"""Saves the output of a model.
+        """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
@@ -205,21 +203,22 @@ class Semantic3D(BaseDataset):
 
 
 class Semantic3DSplit():
-	"""
-	This class is used to create a split for Semantic3D dataset.
-	
-	"""
-    def __init__(self, dataset, split='training'):
-	"""
-	Initialize the class.
-	Args:
-		dataset: The dataset to split.
-		split: A string identifying the dataset split that is usually one of
+    """
+    This class is used to create a split for Semantic3D dataset.
+    
+    
+    Initialize the class.
+    Args:
+        dataset: The dataset to split.
+        split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.
-		**kwargs: The configuration of the model as keyword arguments.
-	Returns:
+        **kwargs: The configuration of the model as keyword arguments.
+    Returns:
         A dataset split object providing the requested subset of the data.		
-	"""
+    """
+
+    def __init__(self, dataset, split='training'):
+
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))

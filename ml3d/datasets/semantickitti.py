@@ -21,7 +21,6 @@ class SemanticKITTI(BaseDataset):
     """
     This class is used to create a dataset based on the SemanticKitti dataset, and used in visualizer, training, or testing. The dataset is best for semantic scene understanding.
     """
-    
 
     def __init__(self,
                  dataset_path,
@@ -104,7 +103,7 @@ class SemanticKITTI(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-	"""
+        """
 	Returns a label to names dictonary object.
         
         Returns:
@@ -136,7 +135,7 @@ class SemanticKITTI(BaseDataset):
         return label_to_names
 
     def get_split(self, split):
-	"""Returns a dataset split.
+        """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -144,11 +143,11 @@ class SemanticKITTI(BaseDataset):
 
         Returns:
             A dataset split object providing the requested subset of the data.
-	"""	
+	"""
         return SemanticKITTISplit(self, split=split)
 
     def is_tested(self, attr):
-	"""Checks if a datum in the dataset has been tested.
+        """Checks if a datum in the dataset has been tested.
         
         Args:
             dataset: The current dataset to which the datum belongs to.
@@ -157,7 +156,7 @@ class SemanticKITTI(BaseDataset):
         Returns:
             If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
 			
-	"""	
+	"""
         cfg = self.cfg
         name = attr['name']
         name_seq, name_points = name.split("_")
@@ -172,7 +171,7 @@ class SemanticKITTI(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
-	"""Saves the output of a model.
+        """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
@@ -220,7 +219,7 @@ class SemanticKITTI(BaseDataset):
             pred.tofile(store_path)
 
     def get_split_list(self, split):
-	"""Returns a dataset split.
+        """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -257,7 +256,6 @@ class SemanticKITTI(BaseDataset):
         file_list = np.concatenate(file_list, axis=0)
 
         return file_list
-
 
 
 class SemanticKITTISplit(BaseDatasetSplit):

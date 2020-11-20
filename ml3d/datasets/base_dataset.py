@@ -25,14 +25,13 @@ class BaseDataset(ABC):
         cfg: The configuration file as Config object that stores the keyword
             arguments that were passed to the constructor.
         name: The name of the dataset.
-		
-	**Example:** 
+                                
+        **Example:** 
         This example shows a custom dataset that inherit from the base_dataset class:
-			
-		from .base_dataset import BaseDataset
-			
-		class MyDataset(BaseDataset): 
-		def __init__(self,
+            from .base_dataset import BaseDataset
+                                                
+            class MyDataset(BaseDataset): 
+            def __init__(self,
                  dataset_path,
                  name='CustomDataset',
                  cache_dir='./logs/cache',
@@ -43,22 +42,19 @@ class BaseDataset(ABC):
                  test_result_folder='./test',
                  val_files=['Custom.ply'],
                  **kwargs):
-				 
+
     """
 
     def __init__(self, **kwargs):
-		
-		""""
-		Initialize the class by passing the dataset path.		
-		
-		"""
-		
-        if kwargs['dataset_path'] is None:
-            raise KeyError(
-                "Please specify dataset_path to initialize a Dataset")
+        """"
+        Initialize the class by passing the dataset path.
+        """
 
-        if kwargs['name'] is None:
-            raise KeyError("Please give a name to the dataset")
+    if kwargs['dataset_path'] is None:
+        raise KeyError("Please specify dataset_path to initialize a Dataset")
+
+    if kwargs['name'] is None:
+        raise KeyError("Please give a name to the dataset")
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name

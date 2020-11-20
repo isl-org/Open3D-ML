@@ -88,7 +88,7 @@ class Toronto3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-	"""
+        """
 	Returns a label to names dictonary object.
         
         Returns:
@@ -109,7 +109,7 @@ class Toronto3D(BaseDataset):
         return label_to_names
 
     def get_split(self, split):
-	"""Returns a dataset split.
+        """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -117,11 +117,11 @@ class Toronto3D(BaseDataset):
 
         Returns:
             A dataset split object providing the requested subset of the data.
-	"""	
+	"""
         return Toronto3DSplit(self, split=split)
 
     def get_split_list(self, split):
-	"""Returns the list of data splits available.
+        """Returns the list of data splits available.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -148,7 +148,7 @@ class Toronto3D(BaseDataset):
         return files
 
     def is_tested(self, attr):
-	"""Checks if a datum in the dataset has been tested.
+        """Checks if a datum in the dataset has been tested.
         
         Args:
             dataset: The current dataset to which the datum belongs to.
@@ -157,7 +157,7 @@ class Toronto3D(BaseDataset):
         Returns:
             If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
 			
-	"""	
+	"""
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -169,7 +169,7 @@ class Toronto3D(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
-	"""Saves the output of a model.
+        """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
@@ -190,7 +190,6 @@ class Toronto3D(BaseDataset):
         make_dir(Path(store_path).parent)
         np.save(store_path, pred)
         log.info("Saved {} in {}.".format(name, store_path))
-
 
 
 class Toronto3DSplit(BaseDatasetSplit):

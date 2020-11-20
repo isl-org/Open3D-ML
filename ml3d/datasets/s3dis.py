@@ -89,13 +89,6 @@ class S3DIS(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-	"""
-	Returns a label to names dictonary object.
-        
-        Returns:
-            A dict where keys are label numbers and 
-            values are the corresponding names.
-    """
         label_to_names = {
             0: 'ceiling',
             1: 'floor',
@@ -113,9 +106,7 @@ class S3DIS(BaseDataset):
         }
         return label_to_names
 
-    def get_split(self, split):
-	
-	"""Returns a dataset split.
+    """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -123,11 +114,13 @@ class S3DIS(BaseDataset):
 
         Returns:
             A dataset split object providing the requested subset of the data.
-	"""	
+    """
+
+    def get_split(self, split):
+
         return S3DISSplit(self, split=split)
 
-    def get_split_list(self, split):
-	"""Returns a dataset split.
+    """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -140,6 +133,9 @@ class S3DIS(BaseDataset):
 			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
             'training', 'test', 'validation', or 'all'.
     """
+
+    def get_split_list(self, split):
+
         cfg = self.cfg
         dataset_path = cfg.dataset_path
         file_list = []
@@ -161,8 +157,9 @@ class S3DIS(BaseDataset):
 
         return file_list
 
+    """Returns the data for the given index."""
+
     def get_data(self, file_path, is_test=False):
-	"""Returns the data for the given index."""
         file_path = Path(file_path)
         kdtree_path = Path(
             file_path
@@ -186,17 +183,19 @@ class S3DIS(BaseDataset):
 
         return points, feat, search_tree, labels
 
-    def is_tested(self, attr):
-	"""Checks if a datum in the dataset has been tested.
+    """Checks if a datum in the dataset has been tested.
         
         Args:
             dataset: The current dataset to which the datum belongs to.
-			attr: The attribute that needs to be checked.
+            attr: The attribute that needs to be checked.
 
         Returns:
             If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
-			
-	"""	
+            
+    """
+
+    def is_tested(self, attr):
+
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -207,13 +206,15 @@ class S3DIS(BaseDataset):
         else:
             return False
 
-    def save_test_result(self, results, attr):
-	"""Saves the output of a model.
+    """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
             attr: The attributes that correspond to the outputs passed in results.
     """
+
+    def save_test_result(self, results, attr):
+
         cfg = self.cfg
         name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
@@ -378,21 +379,21 @@ class S3DIS(BaseDataset):
 
 
 class S3DISSplit():
-	"""
-	This class is used to create a split for S3DIS dataset.
-	
-	"""
-    def __init__(self, dataset, split='training'):
-	"""
-	Initialize the class.
-	Args:
-		dataset: The dataset to split.
-		split: A string identifying the dataset split that is usually one of
+    """
+    This class is used to create a split for S3DIS dataset.
+    
+    Initialize the class.
+    Args:
+        dataset: The dataset to split.
+        split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.
-		**kwargs: The configuration of the model as keyword arguments.
-	Returns:
+        **kwargs: The configuration of the model as keyword arguments.
+    Returns:
         A dataset split object providing the requested subset of the data.		
-	"""
+    """
+
+    def __init__(self, dataset, split='training'):
+
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))
