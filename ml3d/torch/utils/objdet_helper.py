@@ -1,3 +1,24 @@
+#***************************************************************************************/
+#
+#    Based on MMDetection3D Library (Apache 2.0 license):
+#    https://github.com/open-mmlab/mmdetection3d
+#
+#    Copyright 2018-2019 Open-MMLab.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+#
+#***************************************************************************************/
+
 import numpy as np
 import torch
 
@@ -5,7 +26,6 @@ from functools import partial
 
 import open3d.ml.torch as ml3d
 
-# source mmdet3d (MIT)
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
     """Create boolean mask by actually number of a padded tensor.
