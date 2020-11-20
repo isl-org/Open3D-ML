@@ -12,6 +12,7 @@ from .kitti import KITTI
 from .nuscenes import NuScenes
 from .waymo import Waymo
 from .lyft import Lyft
+from .argoverse import Argoverse
 from .samplers import SemSegRandomSampler
 from . import utils
 
