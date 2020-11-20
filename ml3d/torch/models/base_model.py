@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config
+from ...datasets.samplers import SemSegRandomSampler
 
 
 class BaseModel(ABC, torch.nn.Module):
@@ -25,6 +26,8 @@ class BaseModel(ABC, torch.nn.Module):
             class: The corresponding class.
         """
         super().__init__()
+
+        self.trans_point_sampler = SemSegRandomSampler.get_point_sampler()
         self.cfg = Config(kwargs)
 
     @abstractmethod

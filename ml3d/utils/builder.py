@@ -3,6 +3,7 @@ from .registry import Registry, get_from_name
 MODEL = Registry('model')
 DATASET = Registry('dataset')
 PIPELINE = Registry('pipeline')
+SAMPLER = Registry('sampler')
 
 
 def build(cfg, registry, args=None):
@@ -34,6 +35,9 @@ def get_module(module_type, module_name, framework=None, **kwargs):
 
     elif module_type == "dataset":
         return get_from_name(module_name, DATASET, framework)
+
+    elif module_type == "sampler":
+        return get_from_name(module_name, SAMPLER, framework)
 
     elif module_type == "model":
         framework = convert_framework_name(framework)

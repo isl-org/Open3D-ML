@@ -8,7 +8,7 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 import logging
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(
@@ -139,22 +139,14 @@ class Toronto3D(BaseDataset):
         log.info("Saved {} in {}.".format(name, store_path))
 
 
-class Toronto3DSplit():
+class Toronto3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+        super().__init__(dataset, split=split)
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
-
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
         self.UTM_OFFSET = [627285, 4841948, 0]
-
-        self.cache_in_memory = self.cfg.get('cache_in_memory', False)
-        if self.cache_in_memory:
-            self.data_list = [None] * len(self.path_list)
 
     def __len__(self):
         return len(self.path_list)
@@ -163,15 +155,7 @@ class Toronto3DSplit():
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        if self.cache_in_memory:
-            if self.data_list[idx] is not None:
-                data = self.data_list[idx]
-            else:
-                data = PlyData.read(pc_path)['vertex']
-                self.data_list[idx] = data
-        else:
-            data = PlyData.read(pc_path)['vertex']
-
+        data = PlyData.read(pc_path)['vertex']
         points = np.vstack(
             (data['x'], data['y'], data['z'])).astype(np.float64).T
         points = points - self.UTM_OFFSET
@@ -192,7 +176,10 @@ class Toronto3DSplit():
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.txt', '')
 
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
+
         return attr
 
 
