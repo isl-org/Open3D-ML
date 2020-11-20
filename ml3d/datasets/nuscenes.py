@@ -8,6 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
+from ..vis.boundingbox import BoundingBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -95,7 +96,15 @@ class NuScenes(BaseDataset):
 
         objects = []
         for name, box in zip(names, boxes):
-            objects.append(Object3d(name, box))
+
+            center = [float(box[0]), float(box[1]), float(box[2])]
+            size = [float(box[3]), float(box[5]), float(box[4])]
+            ry = float(box[6])
+            front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
+            up = [0, 0, 1]
+            left = [-1 * np.cos(ry), np.sin(ry), 0]
+
+            objects.append(Object3d(center, front, up, left, size, name, box))
 
         return objects
 
@@ -125,6 +134,9 @@ class NuSceneSplit():
         self.cfg = dataset.cfg
 
         self.infos = dataset.get_split_list(split)
+        self.path_list = []
+        for info in self.infos:
+            self.path_list.append(info['lidar_path'])
 
         log.info("Found {} pointclouds for {}".format(len(self.infos), split))
 
@@ -132,7 +144,7 @@ class NuSceneSplit():
         self.dataset = dataset
 
     def __len__(self):
-        return len(self.info)
+        return len(self.infos)
 
     def get_data(self, idx):
         info = self.infos[idx]
@@ -152,7 +164,7 @@ class NuSceneSplit():
             'point': pc,
             'feat': None,
             'calib': calib,
-            'label': label,
+            'bounding_boxes': label,
         }
 
         return data
@@ -166,20 +178,19 @@ class NuSceneSplit():
         return attr
 
 
-class Object3d(object):
+class Object3d(BoundingBox3D):
     """
     Stores object specific details like bbox coordinates.
     """
 
-    def __init__(self, name, box):
-        self.cls_type = name
-        self.cls_id = self.cls_type_to_id(self.cls_type)
-        self.h = float(box[5])
-        self.w = float(box[3])
-        self.l = float(box[4])
-        self.loc = np.array((float(box[0]), float(box[1]), float(box[2])),
-                            dtype=np.float32)
-        self.dis_to_cam = np.linalg.norm(self.loc)
+    def __init__(self, center, front, up, left, size, name, box):
+        label_class = self.cls_type_to_id(name)
+
+        super().__init__(center, front, up, left, size, label_class, 1.0)
+
+        self.name = name
+        self.cls_id = self.cls_type_to_id(name)
+        self.dis_to_cam = np.linalg.norm(self.center)
         self.ry = float(box[6])
 
     @staticmethod
