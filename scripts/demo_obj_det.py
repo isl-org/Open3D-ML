@@ -3,7 +3,7 @@ import numpy as np
 import open3d.ml as ml3d
 import math
 
-from ml3d.vis import Visualizer, BoundingBox3D
+from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT
 from ml3d.datasets import KITTI
 
 from ml3d.torch.pipelines import ObjectDetection
@@ -55,10 +55,16 @@ def main(args):
     boxes.extend(result)
 
     vis = Visualizer()
+
+    lut = LabelLUT()
+    for val in sorted(dataset.label_to_names.keys()):
+        lut.add_label(dataset.label_to_names[val], val)
+
     vis.visualize([{
         "name": "KITTI",
         'points': data['point'][:, :3]
     }],
+                  lut,
                   bounding_boxes=boxes)
 
 

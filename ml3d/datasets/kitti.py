@@ -66,7 +66,13 @@ class KITTI(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        label_to_names = {0: 'Car', 1: 'Pedestrian', 2: 'Cyclist', 3: 'Van'}
+        label_to_names = {
+            0: 'Pedestrian',
+            1: 'Cyclist',
+            2: 'Car',
+            3: 'Van',
+            4: 'DontCare'
+        }
         return label_to_names
 
     @staticmethod
@@ -172,7 +178,7 @@ class KITTI(BaseDataset):
         elif split in ['test', 'testing']:
             return self.test_files
         elif split in ['val', 'validation']:
-            return val_files
+            return self.val_files
         elif split in ['all']:
             return self.train_files + self.val_files + self.test_files
         else:
@@ -261,11 +267,11 @@ class Object3d(BoundingBox3D):
         get object id from name.
         """
         type_to_id = {
-            'DontCare': 0,
-            'Car': 1,
-            'Pedestrian': 2,
-            'Cyclist': 3,
-            'Van': 4
+            'Pedestrian': 0,
+            'Cyclist': 1,
+            'Car': 2,
+            'Van': 3,
+            'DontCare': 4,
         }
         if cls_type not in type_to_id.keys():
             return 0
