@@ -65,22 +65,26 @@ class Argoverse(BaseDataset):
         if os.path.exists(join(info_path, 'infos_test.pkl')):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
-        
 
     @staticmethod
     def get_label_to_names():
         label_to_names = {
             0: 'ignore',
-            1: 'barrier',
-            2: 'bicycle',
-            3: 'bus',
-            4: 'car',
-            5: 'construction_vehicle',
-            6: 'motorcycle',
-            7: 'pedestrian',
-            8: 'traffic_cone',
-            9: 'trailer',
-            10: 'truck'
+            1: 'VEHICLE',
+            2: 'PEDESTRIAN',
+            3: 'ON_ROAD_OBSTACLE',
+            4: 'LARGE_VEHICLE',
+            5: 'BICYCLE',
+            6: 'BICYCLIST',
+            7: 'BUS',
+            8: 'OTHER_MOVER',
+            9: 'TRAILER',
+            10: 'MOTORCYCLIST',
+            11: 'MOPED',
+            12: 'MOTORCYCLE',
+            13: 'STROLLER',
+            14: 'EMERGENCY_VEHICLE',
+            15: 'ANIMAL'
         }
         return label_to_names
 
@@ -106,7 +110,8 @@ class Argoverse(BaseDataset):
 
             box2d = box['2d_coord']
 
-            ry = np.arctan((box2d[0][0] - box2d[1][0]) / (box2d[0][1] - box2d[1][1]))
+            ry = np.arctan(
+                (box2d[0][0] - box2d[1][0]) / (box2d[0][1] - box2d[1][1]))
 
             front = [np.cos(ry), np.sin(ry), 0]
             up = [0, 0, 1]
@@ -200,8 +205,8 @@ class Object3d(BoundingBox3D):
         self.dis_to_cam = np.linalg.norm(self.center)
         self.occlusion = box['occlusion']
         self.quaternion = box['quaternion']
-        self.3d_coord = box['3d_coord']
-        self.2d_coord = box['2d_coord']
+        self.coords_3d = box['3d_coord']
+        self.coords_2d = box['2d_coord']
 
     @staticmethod
     def cls_type_to_id(cls_type):
@@ -230,7 +235,7 @@ class Object3d(BoundingBox3D):
         generate corners3d representation for this object
         :return corners_3d: (8, 3) corners of box3d in camera coord
         """
-        return self.3d_coord
+        return self.coords_3d
 
 
 DATASET._register_module(Argoverse)

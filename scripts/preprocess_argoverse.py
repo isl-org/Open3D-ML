@@ -14,7 +14,8 @@ from tqdm import tqdm
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Preprocess Argoverse Dataset.')
+    parser = argparse.ArgumentParser(
+        description='Preprocess Argoverse Dataset.')
     parser.add_argument('--dataset_path',
                         help='path to Argoverse root',
                         required=True)
@@ -71,7 +72,9 @@ class ArgoverseProcess():
 
         with open(join(out_path, f'infos_{self.version}.pkl'), 'wb') as f:
             pickle.dump(info, f)
-            print(f"Saved {self.version} info at {join(out_path, f'infos_{self.version}.pkl')}")
+            print(
+                f"Saved {self.version} info at {join(out_path, f'infos_{self.version}.pkl')}"
+            )
 
     def process_scene(self, scene):
         info = {}
@@ -111,7 +114,6 @@ class ArgoverseProcess():
         info['bbox'] = bbox_all
 
         return info
-
 
 
 if __name__ == '__main__':
