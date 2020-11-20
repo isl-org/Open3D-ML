@@ -1,3 +1,4 @@
+import open3d as o3d
 import numpy as np
 import os, argparse, pickle, sys
 from os.path import exists, join, isfile, dirname, abspath, split
@@ -5,7 +6,6 @@ from pathlib import Path
 from glob import glob
 import logging
 import yaml
-import pyntcloud
 
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
@@ -92,12 +92,10 @@ class Argoverse(BaseDataset):
     def read_lidar(path):
         assert Path(path).exists()
 
-        data = pyntcloud.PyntCloud.from_file(path)
-        x = np.array(data.points.x)[:, np.newaxis]
-        y = np.array(data.points.y)[:, np.newaxis]
-        z = np.array(data.points.z)[:, np.newaxis]
+        data = np.asarray(o3d.io.read_point_cloud(path).points).astype(
+            np.float32)
 
-        return np.concatenate((x, y, z), axis=1)
+        return data
 
     @staticmethod
     def read_label(bboxes):
