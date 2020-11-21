@@ -10,7 +10,7 @@ from tqdm import tqdm
 import logging
 
 from .utils import DataProcessing
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(
@@ -360,7 +360,9 @@ class S3DISSplit():
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.ply', '')
 
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
         return attr
 
 

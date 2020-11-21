@@ -130,7 +130,7 @@ class RandLANet(BaseModel):
 
         return loss, labels, scores
 
-    def transform(self, data, attr, min_posbility_idx=None):
+    def transform(self, data, attr, min_possibility_idx=None):
         cfg = self.cfg
         inputs = dict()
 
@@ -139,24 +139,28 @@ class RandLANet(BaseModel):
         feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
-        if min_posbility_idx is None:  # training
-            pick_idx = np.random.choice(len(pc), 1)
+        pc, selected_idxs, center_point = self.trans_point_sampler(
+            pc=pc,
+            feat=feat,
+            label=label,
+            search_tree=tree,
+            num_points=self.cfg.num_points)
+
+        label = label[selected_idxs]
+        if (feat is None):
+            feat = None
         else:
-            pick_idx = min_posbility_idx
+            feat = feat[selected_idxs]
 
-        center_point = pc[pick_idx, :].reshape(1, -1)
-
-        pc, feat, label, selected_idx = \
-            trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
-
-        if min_posbility_idx is not None:
-            dists = np.sum(np.square((pc).astype(np.float32)), axis=1)
+        if attr['split'] == 'test':
+            dists = np.sum(np.square((pc - center_point).astype(np.float32)),
+                           axis=1)
             delta = np.square(1 - dists / np.max(dists))
-            self.possibility[selected_idx] += delta
+            self.possibility[selected_idxs] += delta
             inputs['point_inds'] = selected_idx
 
-        if not cfg.get('recentering', True):
-            pc = pc + center_point
+        if cfg.get('recentering', True):
+            pc = pc - center_point
 
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)
@@ -215,9 +219,9 @@ class RandLANet(BaseModel):
         self.batcher = DefaultBatcher()
 
     def inference_preprocess(self):
-        min_posbility_idx = np.argmin(self.possibility)
+        min_possibility_idx = np.argmin(self.possibility)
         attr = {'split': 'test'}
-        data = self.transform(self.inference_data, attr, min_posbility_idx)
+        data = self.transform(self.inference_data, attr, min_possibility_idx)
         inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs

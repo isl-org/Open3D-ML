@@ -272,12 +272,13 @@ For downloading these datasets visit the respective webpages and have a look at 
 * [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
 
 ## Contribute
-There are many ways to contribute to this project. You can
-* implement a new model
-* add code for reading a new dataset
-* share parameters and weights for an existing model
-* report problems and bugs
+There are many ways to contribute to this project. You can:
+* Implement a new model
+* Add code for reading a new dataset
+* Share parameters and weights for an existing model
+* Report problems and bugs
 
+Please, **make your pull requests to the** [**dev**](https://github.com/intel-isl/Open3D-ML/tree/dev) branch.
 Open3D is a community effort. We welcome and celebrate contributions from the
 community!
 
