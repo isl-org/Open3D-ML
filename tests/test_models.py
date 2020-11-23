@@ -2,6 +2,55 @@ import pytest
 import numpy as np
 
 
+def test_pointnet_torch():
+    import open3d.ml.torch as ml3d
+
+    task = 'segmentation'
+    num_points = 1024
+    num_classes = 16
+    dim_input = 4
+    dim_features = 6
+
+    model = ml3d.models.PointNet(num_points=num_points,
+                                 num_classes=num_classes,
+                                 dim_input=dim_input,
+                                 dim_feature=dim_features,
+                                 task=task)
+    model.device = 'cpu'
+    model.to(model.device)
+    model.eval()
+
+    data = {
+        'point':
+            np.array(np.random.random((num_points, dim_input)),
+                     dtype=np.float32),
+        'feat':
+            np.array(np.random.random((num_points, dim_features)),
+                     dtype=np.float32),
+        'label':
+            np.array(np.random.randint(num_classes))
+            if task == 'classification' else np.array(
+                [np.random.randint(num_classes) for _ in range(num_points)])
+    }
+
+    model.inference_begin(data)
+    inputs = model.inference_preprocess()
+    results = model(inputs['data'])
+    model.inference_end(inputs, results)
+
+    if task == 'classification':
+        assert model.inference_result['predict_scores'].shape == (1,
+                                                                  num_classes)
+    elif task == 'segmentation':
+        assert model.inference_result['predict_scores'].shape == (num_points,
+                                                                  num_classes)
+
+
+def test_pointnet_tf():
+    # TF version not implemented, but can't raise the error due to Ubuntu CI.
+    pass
+
+
 def test_randlanet_torch():
     import torch
     import open3d.ml.torch as ml3d

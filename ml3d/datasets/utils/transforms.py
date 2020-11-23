@@ -88,8 +88,18 @@ def trans_augment(points, t_augment):
     # scale = (scale * (1 - symmetries * 2)).astype(np.float32)
 
     noise_level = t_augment.get('noise_level', 0.001)
-    noise = (np.random.randn(points.shape[0], points.shape[1]) *
-             noise_level).astype(np.float32)
+    noise_type = t_augment.get('noise_type', 'uniform')
+    if noise_type == 'uniform':
+        noise = (np.random.randn(points.shape[0], points.shape[1]) *
+                 noise_level).astype(np.float32)
+    elif noise_type == 'uniform_clip':
+        clip_value = t_augment.get('clip_value', 0.005)
+        noise = (np.random.randn(points.shape[0], points.shape[1]) *
+                 noise_level).astype(np.float32)
+        noise = np.clip(noise, -clip_value, clip_value)
+    elif noise_type == 'gaussian':
+        noise = np.random.normal(0, noise_level,
+                                 (points.shape[0], points.shape[1]))
 
     augmented_points = np.sum(np.expand_dims(points, 2) * R,
                               axis=1) * scale + noise
