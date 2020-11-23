@@ -131,7 +131,6 @@ class PointPillars(BaseModel):
         return data
 
     def transform(self, data, attr):
-        #data = data['data']
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
@@ -359,14 +358,14 @@ class PillarFeatureNet(nn.Module):
         voxel_size (tuple[float], optional): Size of voxels, only utilize x
             and y size. Defaults to (0.2, 0.2, 4).
         point_cloud_range (tuple[float], optional): Point cloud range, only
-            utilizes x and y min. Defaults to (0, -40, -3, 70.4, 40, 1).
+            utilizes x and y min. Defaults to (0, -40, -3, 70.0, 40, 1).
     """
 
     def __init__(self,
                  in_channels=4,
                  feat_channels=(64,),
                  voxel_size=(0.16, 0.16, 4),
-                 point_cloud_range=(0, -39.68, -3, 69.12, 39.68, 1)):
+                 point_cloud_range=(0, -40.0, -3, 70.0, 40.0, 1)):
 
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
@@ -401,7 +400,7 @@ class PillarFeatureNet(nn.Module):
         self.y_offset = self.vy / 2 + point_cloud_range[1]
         self.point_cloud_range = point_cloud_range
 
-    #@force_fp32(out_fp16=True)
+
     def forward(self, features, num_points, coors):
         """Forward function.
 
@@ -623,8 +622,6 @@ class SECONDFPN(nn.Module):
                  out_channels=[128, 128, 128],
                  upsample_strides=[1, 2, 4],
                  use_conv_for_no_stride=False):
-        # if for GroupNorm,
-        # cfg is dict(type='GN', num_groups=num_groups, eps=1e-3, affine=True)
         super(SECONDFPN, self).__init__()
         assert len(out_channels) == len(upsample_strides) == len(in_channels)
         self.in_channels = in_channels
@@ -656,7 +653,7 @@ class SECONDFPN(nn.Module):
             deblocks.append(deblock)
         self.deblocks = nn.ModuleList(deblocks)
 
-    #@auto_fp16()
+
     def forward(self, x):
         """Forward function.
 
@@ -699,7 +696,6 @@ class Anchor3DHead(nn.Module):
         self.nms_pre = 100
         self.score_thr = 0.1
 
-        # In 3D detection, the anchor stride is connected with anchor size
         self.num_anchors = self.anchor_generator.num_base_anchors
 
         # build box coder
