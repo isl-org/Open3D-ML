@@ -80,3 +80,72 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
         return out_voxels, out_coords, out_num_points
 
 
+class PFNLayer(tf.keras.layers.Layer):
+    """Pillar Feature Net Layer.
+
+    The Pillar Feature Net is composed of a series of these layers, but the
+    PointPillars paper results only used a single PFNLayer.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        last_layer (bool): If last_layer, there is no concatenation of
+            features.
+        mode (str): Pooling model to gather features inside voxels.
+            Default to 'max'.
+    """
+
+    def __init__(self, in_channels, out_channels, last_layer=False, mode='max'):
+
+        super().__init__()
+        self.fp16_enabled = False
+        self.name = 'PFNLayer'
+        self.last_vfe = last_layer
+        if not self.last_vfe:
+            out_channels = out_channels // 2
+        self.units = out_channels
+
+        self.norm = tf.keras.layers.BatchNormalization(eps=1e-3, momentum=0.99)  # Pass self.training
+        self.linear = tf.keras.layers.Dense(self.units, use_bias=False)
+
+        self.relu = tf.keras.layers.ReLU()
+
+        assert mode in ['max', 'avg']
+        self.mode = mode
+
+    #@auto_fp16(apply_to=('inputs'), out_fp32=True)
+    def forward(self, inputs, num_voxels=None, aligned_distance=None, training=False):
+        """Forward function.
+
+        Args:
+            inputs (tf.Tensor): Pillar/Voxel inputs with shape (N, M, C).
+                N is the number of voxels, M is the number of points in
+                voxels, C is the number of channels of point features.
+            num_voxels (tf.Tensor, optional): Number of points in each
+                voxel. Defaults to None.
+            aligned_distance (tf.Tensor, optional): The distance of
+                each points to the voxel center. Defaults to None.
+
+        Returns:
+            tf.Tensor: Features of Pillars.
+        """
+        x = self.linear(inputs)
+        x = self.norm(tf.transpose(x, perm=[0, 2, 1]), training=training)
+        x = tf.transpose(x, perm=[0, 2, 1])
+        x = self.relu(x)
+
+        if self.mode == 'max':
+            if aligned_distance is not None:
+                x = tf.matmul(x, tf.expand_dims(aligned_distance, -1))
+            x_max = tf.reduce_max(x, axis=1, keepdims=True)[0]
+        elif self.mode == 'avg':
+            if aligned_distance is not None:
+                x = tf.matmul(x, tf.expand_dims(aligned_distance, -1))
+            x_max = tf.reduce_sum(x, axis=1, keepdims=True) / tf.reshape(tf.cast(num_voxels, inputs.dtype), (-1, 1, 1))
+
+        if self.last_vfe:
+            return x_max
+        else:
+            x_repeat = tf.repeat(x_max, inputs.shape[1], axis=1)
+            x_concatenated = tf.concat([x, x_repeat], axis=2)
+            return x_concatenated
