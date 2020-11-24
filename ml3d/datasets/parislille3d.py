@@ -94,6 +94,7 @@ class ParisLille3D(BaseDataset):
             files = self.test_files
         elif split in ['train', 'training']:
             files = self.train_files
+            files = self.val_files
         elif split in ['val', 'validation']:
             files = self.val_files
         elif split in ['all']:

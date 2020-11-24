@@ -2,7 +2,7 @@ dataset:
   name: ParisLille3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  # class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
+  class_weights: [65075320, 33014819, 656096, 61715, 296523, 4052947, 172132,4212295, 10599237]
   ignored_label_inds:
   - 0
   test_result_folder: ./test
@@ -16,6 +16,8 @@ dataset:
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
+  # ckpt_path: ../dataset/checkpoints/kpconv_parislille3d_tf/kpconv_parislille3d_tf # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/kpconv_parislille3d_torch/wts.pth
   KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
@@ -64,10 +66,11 @@ model:
   ignored_label_inds: [0]
   in_features_dim: 1
   in_points_dim: 3
+  l_relu: 0.2
   in_radius: 4.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-  min_in_points: 5000
-  max_in_points: 10000
+  min_in_points: 10000
+  max_in_points: 17000
   modulated: false
   num_classes: 9
   num_kernel_points: 15
@@ -86,7 +89,7 @@ pipeline:
   max_epoch: 100
   save_ckpt_freq: 5
   scheduler_gamma: 0.95
-  test_batch_size: 2
+  test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 2
+  val_batch_size: 1
   weight_decay: 0.001

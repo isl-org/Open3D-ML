@@ -15,7 +15,7 @@ dataset:
   - '08'
 model:
   name: KPFCNN
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/vis_weights_KPFCNN.pth # path/to/your/checkpoint
   KP_extent: 1.2
   KP_influence: linear
   aggregation_mode: sum
@@ -79,7 +79,7 @@ model:
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
-  batch_size: 8
+  batch_size: 1
   learning_rate: 0.01
   lr_decays: 0.98477
   deform_lr_factor: 0.1
@@ -88,7 +88,7 @@ pipeline:
   momentum: 0.98
   save_ckpt_freq: 3
   scheduler_gamma: 0.98477
-  test_batch_size: 4
+  test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 4
+  val_batch_size: 1
   weight_decay: 0.001

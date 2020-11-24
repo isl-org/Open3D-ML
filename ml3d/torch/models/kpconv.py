@@ -379,7 +379,6 @@ class KPFCNN(BaseModel):
         data['label'] = sub_labels
         data['search_tree'] = search_tree
 
-
         if split in ["test", "testing", "validation", "valid"]:
             proj_inds = np.squeeze(
                 search_tree.query(points, return_distance=False))
@@ -416,7 +415,7 @@ class KPFCNN(BaseModel):
 
         num_merged = 0
 
-        batch_data = {
+        result_data = {
             'p_list': [],
             'f_list': [],
             'l_list': [],
@@ -515,18 +514,17 @@ class KPFCNN(BaseModel):
             if np.random.rand() > self.cfg.augment_color:
                 in_fts[:, 3:] *= 0
 
+            result_data['p_list'] += [in_pts]
+            result_data['f_list'] += [in_fts]
+            result_data['l_list'] += [np.squeeze(in_lbls)]
+            result_data['p0_list'] += [p0]
+            result_data['s_list'] += [scale]
+            result_data['R_list'] += [R]
+            result_data['r_inds_list'] += [proj_inds]
+            result_data['r_mask_list'] += [reproj_mask]
+            result_data['val_labels_list'] += [o_labels]
 
-            batch_data['p_list'] += [in_pts]
-            batch_data['f_list'] += [in_fts]
-            batch_data['l_list'] += [np.squeeze(in_lbls)]
-            batch_data['p0_list'] += [p0]
-            batch_data['s_list'] += [scale]
-            batch_data['R_list'] += [R]
-            batch_data['r_inds_list'] += [proj_inds]
-            batch_data['r_mask_list'] += [reproj_mask]
-            batch_data['val_labels_list'] += [o_labels]
-
-        return batch_data
+        return result_data
 
     def inference_begin(self, data):
         self.test_smooth = 0.98
@@ -1219,6 +1217,7 @@ class BatchNormBlock(nn.Module):
 
     def forward(self, x):
         if self.use_bn:
+
             x = x.unsqueeze(2)
             x = x.transpose(0, 2)
             x = self.batch_norm(x)

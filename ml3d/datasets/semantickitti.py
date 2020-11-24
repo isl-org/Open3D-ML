@@ -200,7 +200,7 @@ class SemanticKITTI(BaseDataset):
             file_list.append(
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
-        file_list = np.concatenate(file_list, axis=0)
+        file_list = np.concatenate(file_list, axis=0)[0:1]
 
         return file_list
 
