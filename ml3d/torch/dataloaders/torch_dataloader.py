@@ -40,7 +40,7 @@ class TorchDataloader(Dataset):
             preprocess: The model's preprocess method.
             transform: The model's transform method.
             use_cache: Indicates if preprocessed data should be cached.
-			steps_per_epoch: The number of steps per epoch that indicates the bactches of samples to train. If it is None, then the step number will be the number of samples in the data.
+            steps_per_epoch: The number of steps per epoch that indicates the bactches of samples to train. If it is None, then the step number will be the number of samples in the data.
         Returns:
             class: The corresponding class.
         """
