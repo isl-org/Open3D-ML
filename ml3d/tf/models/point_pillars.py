@@ -149,3 +149,105 @@ class PFNLayer(tf.keras.layers.Layer):
             x_repeat = tf.repeat(x_max, inputs.shape[1], axis=1)
             x_concatenated = tf.concat([x, x_repeat], axis=2)
             return x_concatenated
+
+
+class PillarFeatureNet(tf.keras.layers.Layer):
+    """Pillar Feature Net.
+
+    The network prepares the pillar features and performs forward pass
+    through PFNLayers.
+
+    Args:
+        in_channels (int, optional): Number of input features,
+            either x, y, z or x, y, z, r. Defaults to 4.
+        feat_channels (tuple, optional): Number of features in each of the
+            N PFNLayers. Defaults to (64, ).
+        voxel_size (tuple[float], optional): Size of voxels, only utilize x
+            and y size. Defaults to (0.2, 0.2, 4).
+        point_cloud_range (tuple[float], optional): Point cloud range, only
+            utilizes x and y min. Defaults to (0, -40, -3, 70.4, 40, 1).
+    """
+
+    def __init__(self,
+                 in_channels=4,
+                 feat_channels=(64,),
+                 voxel_size=(0.16, 0.16, 4),
+                 point_cloud_range=(0, -39.68, -3, 69.12, 39.68, 1)):
+
+        super(PillarFeatureNet, self).__init__()
+        assert len(feat_channels) > 0
+
+        # with cluster center (+3) + with voxel center (+2)
+        in_channels += 5
+
+        # Create PillarFeatureNet layers
+        self.in_channels = in_channels
+        feat_channels = [in_channels] + list(feat_channels)
+        pfn_layers = []
+        for i in range(len(feat_channels) - 1):
+            in_filters = feat_channels[i]
+            out_filters = feat_channels[i + 1]
+            if i < len(feat_channels) - 2:
+                last_layer = False
+            else:
+                last_layer = True
+            pfn_layers.append(
+                PFNLayer(in_filters,
+                         out_filters,
+                         last_layer=last_layer,
+                         mode='max'))
+        self.pfn_layers = pfn_layers
+
+        self.fp16_enabled = False
+
+        # Need pillar (voxel) size and x/y offset in order to calculate offset
+        self.vx = voxel_size[0]
+        self.vy = voxel_size[1]
+        self.x_offset = self.vx / 2 + point_cloud_range[0]
+        self.y_offset = self.vy / 2 + point_cloud_range[1]
+        self.point_cloud_range = point_cloud_range
+
+    #@force_fp32(out_fp16=True)
+    def forward(self, features, num_points, coors, training=False):
+        """Forward function.
+
+        Args:
+            features (tf.Tensor): Point features or raw points in shape
+                (N, M, C).
+            num_points (tf.Tensor): Number of points in each pillar.
+            coors (tf.Tensor): Coordinates of each voxel.
+
+        Returns:
+            tf.Tensor: Features of pillars.
+        """
+        features_ls = [features]
+        # Find distance of x, y, and z from cluster center
+        points_mean = tf.reduce_sum(features[:, :, :3], axis=1, keepdims=True) / tf.reshape(tf.cast(num_points, features.dtype), -1, 1, 1)
+        f_cluster = features[:, :, :3] - points_mean
+        features_ls.append(f_cluster)
+
+        # Find distance of x, y, and z from pillar center
+        dtype = features.dtype
+
+        f_center = features[:, :, :2]
+        f_center[:, :, 0] = f_center[:, :, 0] - (tf.expand_dims(tf.cast(coors[:, 3], dtype), 1) * self.vx + self.x_offset)
+        f_center[:, :, 1] = f_center[:, :, 1] - (tf.expand_dims(tf.cast(coors[:, 2], dtype), 1) * self.vy + self.y_offset)
+
+        features_ls.append(f_center)
+
+        # Combine together feature decorations
+        features = tf.concat(features_ls, axis=-1)
+
+        # The feature decorations were calculated without regard to whether
+        # pillar was empty. Need to ensure that
+        # empty pillars remain set to zeros.
+        voxel_count = features.shape[1]
+        mask = get_paddings_indicator(num_points, voxel_count, axis=0)
+        mask = tf.cast(tf.expand_dims(mask, -1), dtype)
+
+        features *= mask
+
+        for pfn in self.pfn_layers:
+            features = pfn(features, num_points, training)
+
+        return tf.squeeze(features)
