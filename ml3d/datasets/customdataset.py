@@ -66,7 +66,7 @@ class Custom3DSplit():
         name = pc_path.name.replace('.npy', '')
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
 
-    return attr
+        return attr
 
 
 class Custom3D(BaseDataset):
