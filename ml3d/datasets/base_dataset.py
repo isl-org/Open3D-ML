@@ -51,11 +51,10 @@ class BaseDataset(ABC):
         """
 
         if kwargs['dataset_path'] is None:
-            raise KeyError(
-                "Please specify dataset_path to initialize a Dataset")
+            raise KeyError("Provide dataset_path to initialize the dataset")
 
         if kwargs['name'] is None:
-            raise KeyError("Please give a name to the dataset")
+            raise KeyError("Provide dataset name to initialize it")
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
