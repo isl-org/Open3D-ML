@@ -65,7 +65,6 @@ class Custom3DSplit():
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.npy', '')
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
-
         return attr
 
 
@@ -131,18 +130,18 @@ class Custom3D(BaseDataset):
             values are the corresponding names.
     """
 
-    label_to_names = {
-        0: 'Unclassified',
-        1: 'Ground',
-        2: 'Road_markings',
-        3: 'Natural',
-        4: 'Building',
-        5: 'Utility_line',
-        6: 'Pole',
-        7: 'Car',
-        8: 'Fence'
-    }
-    return label_to_names
+        label_to_names = {
+            0: 'Unclassified',
+            1: 'Ground',
+            2: 'Road_markings',
+            3: 'Natural',
+            4: 'Building',
+            5: 'Utility_line',
+            6: 'Pole',
+            7: 'Car',
+            8: 'Fence'
+        }
+        return label_to_names
 
     def get_split(self, split):
         """Returns a dataset split.
@@ -155,7 +154,7 @@ class Custom3D(BaseDataset):
             A dataset split object providing the requested subset of the data.
                 """
 
-    return Custom3DSplit(self, split=split)
+        return Custom3DSplit(self, split=split)
 
     def get_split_list(self, split):
         """Returns a dataset split.
@@ -168,25 +167,25 @@ class Custom3D(BaseDataset):
             A dataset split object providing the requested subset of the data.
                                                 
                                 Raises:
-                                                ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+                                     ValueError: Indicates that the split name passed is incorrect. The split name should be one of
             'training', 'test', 'validation', or 'all'.
-    """
+        """
 
-    if split in ['test', 'testing']:
-        random.shuffle(self.test_files)
-        return self.test_files
-    elif split in ['val', 'validation']:
-        random.shuffle(self.val_files)
-        return self.val_files
-    elif split in ['train', 'training']:
-        random.shuffle(self.train_files)
-        return self.train_files
-    elif split in ['all']:
-        files = self.val_files + self.train_files + self.test_files
-        return files
-    else:
-        raise ValueError("Invalid split {}".format(split))
-    """Checks if a datum in the dataset has been tested.
+        if split in ['test', 'testing']:
+            random.shuffle(self.test_files)
+            return self.test_files
+        elif split in ['val', 'validation']:
+            random.shuffle(self.val_files)
+            return self.val_files
+        elif split in ['train', 'training']:
+            random.shuffle(self.train_files)
+            return self.train_files
+        elif split in ['all']:
+            files = self.val_files + self.train_files + self.test_files
+            return files
+        else:
+            raise ValueError("Invalid split {}".format(split))
+        """Checks if a datum in the dataset has been tested.
         
         Args:
             dataset: The current dataset to which the datum belongs to.
@@ -216,16 +215,16 @@ class Custom3D(BaseDataset):
             attr: The attributes that correspond to the outputs passed in results.
     """
 
-    cfg = self.cfg
-    name = attr['name']
-    path = cfg.test_result_folder
-    make_dir(path)
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
 
-    pred = results['predict_labels']
-    pred = np.array(self.label_to_names[pred])
+        pred = results['predict_labels']
+        pred = np.array(self.label_to_names[pred])
 
-    store_path = join(path, name + '.npy')
-    np.save(store_path, pred)
+        store_path = join(path, name + '.npy')
+        np.save(store_path, pred)
 
 
 DATASET._register_module(Custom3D)
