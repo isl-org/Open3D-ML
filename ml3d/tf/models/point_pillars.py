@@ -114,7 +114,7 @@ class PFNLayer(tf.keras.layers.Layer):
         self.mode = mode
 
     #@auto_fp16(apply_to=('inputs'), out_fp32=True)
-    def forward(self, inputs, num_voxels=None, aligned_distance=None, training=False):
+    def call(self, inputs, num_voxels=None, aligned_distance=None, training=False):
         """Forward function.
 
         Args:
@@ -208,7 +208,7 @@ class PillarFeatureNet(tf.keras.layers.Layer):
         self.point_cloud_range = point_cloud_range
 
     #@force_fp32(out_fp16=True)
-    def forward(self, features, num_points, coors, training=False):
+    def call(self, features, num_points, coors, training=False):
         """Forward function.
 
         Args:
@@ -251,3 +251,90 @@ class PillarFeatureNet(tf.keras.layers.Layer):
             features = pfn(features, num_points, training)
 
         return tf.squeeze(features)
+
+
+class PointPillarsScatter(tf.keras.layers.Layer):
+    """Point Pillar's Scatter.
+
+    Converts learned features from dense tensor to sparse pseudo image.
+
+    Args:
+        in_channels (int): Channels of input features.
+        output_shape (list[int]): Required output shape of features.
+    """
+
+    def __init__(self, in_channels=64, output_shape=[496, 432]):
+        super().__init__()
+        self.output_shape = output_shape
+        self.ny = output_shape[0]
+        self.nx = output_shape[1]
+        self.in_channels = in_channels
+        self.fp16_enabled = False
+
+    #@auto_fp16(apply_to=('voxel_features', ))
+    def call(self, voxel_features, coors, batch_size=None, training=False):
+        """Forward function to scatter features."""
+        if batch_size is not None:
+            return self.forward_batch(voxel_features, coors, batch_size, training)
+        else:
+            return self.forward_single(voxel_features, coors, training)
+
+    def forward_single(self, voxel_features, coors, training=False):
+        """Scatter features of single sample.
+
+        Args:
+            voxel_features (tf.Tensor): Voxel features in shape (N, M, C).
+            coors (tf.Tensor): Coordinates of each voxel.
+                The first column indicates the sample ID.
+        """
+        # Create the canvas for this sample
+        canvas = tf.zeros((self.in_channels, self.nx * self.ny), dtype=voxel_features.dtype)
+
+        indices = coors[:, 1] * self.nx + coors[:, 2]
+        indices = tf.cast(indices, tf.int64)
+        voxels = tf.transpose(voxel_features)
+
+        # Now scatter the blob back to the canvas.
+        canvas[:, indices] = voxels
+
+        # Undo the column stacking to final 4-dim tensor
+        canvas = tf.reshape(canvas, (1, self.in_channels, self.ny, self.nx))
+
+        return [canvas]
+
+    def forward_batch(self, voxel_features, coors, batch_size, training=False):
+        """Scatter features of single sample.
+
+        Args:
+            voxel_features (tf.Tensor): Voxel features in shape (N, M, C).
+            coors (tf.Tensor): Coordinates of each voxel in shape (N, 4).
+                The first column indicates the sample ID.
+            batch_size (int): Number of samples in the current batch.
+        """
+        # batch_canvas will be the final output.
+        batch_canvas = []
+        for batch_itt in range(batch_size):
+            # Create the canvas for this sample
+            canvas = tf.zeros((self.in_channels, self.nx * self.ny), dtype=voxel_features.dtype)
+
+            # Only include non-empty pillars
+            batch_mask = coors[:, 0] == batch_itt
+            this_coors = coors[batch_mask, :]
+            indices = this_coors[:, 2] * self.nx + this_coors[:, 3]
+            indices = tf.cast(indices, tf.int64)
+            voxels = voxel_features[batch_mask, :]
+            voxels = tf.transpose(voxels)
+
+            # Now scatter the blob back to the canvas.
+            canvas[:, indices] = voxels
+
+            # Append to a list for later stacking.
+            batch_canvas.append(canvas)
+
+        # Stack to 3-dim tensor (batch-size, in_channels, nrows*ncols)
+        batch_canvas = tf.stack(batch_canvas, axis=0)
+
+        # Undo the column stacking to final 4-dim tensor
+        batch_canvas = tf.reshape(batch_canvas, (batch_size, self.in_channels, self.ny, self.nx))
+
+        return batch_canvas
