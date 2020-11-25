@@ -13,6 +13,7 @@ from .nuscenes import NuScenes
 from .waymo import Waymo
 from .lyft import Lyft
 from .shapenet import ShapeNet
+from .argoverse import Argoverse
 from .samplers import SemSegRandomSampler
 from . import utils
 
