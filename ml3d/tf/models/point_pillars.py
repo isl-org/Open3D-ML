@@ -67,13 +67,26 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
         # prepend row with zeros which maps to index 0 which maps to void points.
         feats = tf.concat([tf.zeros_like(points_feats[0:1, :]), points_feats], axis=0)
 
-        # create dense matrix of indices. index 0 maps to the zero vector.
-        voxels_point_indices_dense = ml3d.ops.ragged_to_dense(
-            ans.voxel_point_indices, ans.voxel_point_row_splits,
-            self.max_num_points, tf.constant(-1)) + 1
+        # create raggeed tensor from indices and row splits.
+        voxel_point_indices_ragged = tf.RaggedTensor.from_row_splits(
+            values=ans.voxel_point_indices,
+            row_splits=ans.voxel_point_row_splits
+        )
 
-        out_voxels = feats[voxels_point_indices_dense]
-        out_coords = ans.voxel_coords[:, [2, 1, 0]].contiguous()
+        # create dense matrix of indices. index 0 maps to the zero vector.
+        voxels_point_indices_dense = voxel_point_indices_ragged.to_tensor(
+            default_value=-1,
+            shape=(voxel_point_indices_ragged.shape[0], self.max_num_points)
+            ) + 1
+
+        out_voxels = tf.gather(feats, voxels_point_indices_dense)
+
+        out_coords = tf.concat([
+            tf.expand_dims(ans.voxel_coords[:, 2], 1),
+            tf.expand_dims(ans.voxel_coords[:, 1], 1),
+            tf.expand_dims(ans.voxel_coords[:, 0], 1),
+            ], axis=1)
+
         out_num_points = ans.voxel_point_row_splits[
             1:] - ans.voxel_point_row_splits[:-1]
 
@@ -471,3 +484,123 @@ class SECONDFPN(tf.keras.layers.Layer):
 
         return out
 
+
+class Anchor3DHead(tf.keras.layers.Layer):
+
+    def __init__(self, num_classes=3, in_channels=384, feat_channels=384):
+
+        super().__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.feat_channels = feat_channels
+
+        # build anchor generator
+        self.anchor_generator = Anchor3DRangeGenerator(ranges=[
+            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+            [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+        ],
+                                                       sizes=[[0.6, 0.8, 1.73],
+                                                              [0.6, 1.76, 1.73],
+                                                              [1.6, 3.9, 1.56]],
+                                                       rotations=[0, 1.57])
+
+        self.nms_pre = 100
+        self.score_thr = 0.1
+
+        # In 3D detection, the anchor stride is connected with anchor size
+        self.num_anchors = self.anchor_generator.num_base_anchors
+
+        # build box coder
+        self.bbox_coder = BBoxCoder()
+        self.box_code_size = 7
+
+        self.fp16_enabled = False
+
+        #Initialize neural network layers of the head.
+        self.cls_out_channels = self.num_anchors * self.num_classes
+
+        self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels, kernel_size=1, data_format='channels_first')
+        self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors * self.box_code_size, kernel_size=1, data_format='channels_first')
+
+        self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2, kernel_size=1, data_format='channels_first')
+
+    def call(self, x, training=False):
+        """Forward function on a feature map.
+
+        Args:
+            x (tf.Tensor): Input features.
+
+        Returns:
+            tuple[tf.Tensor]: Contain score of each class, bbox \
+                regression and direction classification predictions.
+        """
+        cls_score = self.conv_cls(x, training=training)
+        bbox_pred = self.conv_reg(x, training=training)
+        dir_cls_preds = None
+        dir_cls_preds = self.conv_dir_cls(x, training=training)
+
+        return cls_score, bbox_pred, dir_cls_preds
+
+    def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
+        """Get bboxes of anchor head.
+
+        Args:
+            cls_scores (list[tf.Tensor]): Class scores.
+            bbox_preds (list[tf.Tensor]): Bbox predictions.
+            dir_cls_preds (list[tf.Tensor]): Direction
+                class predictions.
+
+        Returns:
+            tuple[tf.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
+        """
+        assert len(cls_scores) == len(bbox_preds)
+        assert len(cls_scores) == len(dir_preds)
+
+        assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]
+        assert cls_scores.size()[-2:] == dir_preds.size()[-2:]
+
+        anchors = self.anchor_generator.grid_anchors(cls_scores.shape[-2:],
+                                                     device=cls_scores.device)
+        anchors = anchors.reshape(-1, self.box_code_size)
+
+        dir_preds = dir_preds.permute(0, 2, 3, 1).reshape(-1, 2)
+        dir_scores = torch.max(dir_preds, dim=-1)[1]
+
+        cls_scores = cls_scores.permute(0, 2, 3,
+                                        1).reshape(-1, self.num_classes)
+        scores = cls_scores.sigmoid()
+
+        bbox_preds = bbox_preds.permute(0, 2, 3,
+                                        1).reshape(-1, self.box_code_size)
+
+        if scores.shape[0] > self.nms_pre:
+            max_scores, _ = scores.max(dim=1)
+            _, topk_inds = max_scores.topk(self.nms_pre)
+            anchors = anchors[topk_inds, :]
+            bbox_preds = bbox_preds[topk_inds, :]
+            scores = scores[topk_inds, :]
+            dir_scores = dir_scores[topk_inds]
+
+        bboxes = self.bbox_coder.decode(anchors, bbox_preds)
+
+        idxs = multiclass_nms(bboxes, scores, self.score_thr)
+
+        labels = [
+            torch.full((len(idxs[i]),), i, dtype=torch.long)
+            for i in range(self.num_classes)
+        ]
+        labels = torch.cat(labels)
+
+        scores = [scores[idxs[i], i] for i in range(self.num_classes)]
+        scores = torch.cat(scores)
+
+        idxs = torch.cat(idxs)
+        bboxes = bboxes[idxs]
+        dir_scores = dir_scores[idxs]
+
+        if bboxes.shape[0] > 0:
+            dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
+            bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
+        return bboxes, scores, labels
