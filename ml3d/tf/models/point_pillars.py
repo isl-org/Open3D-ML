@@ -338,3 +338,61 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         batch_canvas = tf.reshape(batch_canvas, (batch_size, self.in_channels, self.ny, self.nx))
 
         return batch_canvas
+
+
+class SECOND(tf.keras.layers.Layer):
+    """Backbone network for SECOND/PointPillars/PartA2/MVXNet.
+
+    Args:
+        in_channels (int): Input channels.
+        out_channels (list[int]): Output channels for multi-scale feature maps.
+        layer_nums (list[int]): Number of layers in each stage.
+        layer_strides (list[int]): Strides of each stage.
+    """
+
+    def __init__(self,
+                 in_channels=64,
+                 out_channels=[64, 128, 256],
+                 layer_nums=[3, 5, 5],
+                 layer_strides=[2, 2, 2]):
+        super(SECOND, self).__init__()
+        assert len(layer_strides) == len(layer_nums)
+        assert len(out_channels) == len(layer_nums)
+
+        in_filters = [in_channels, *out_channels[:-1]]
+        # note that when stride > 1, conv2d with same padding isn't
+        # equal to pad-conv2d. we should use pad-conv2d.
+        blocks = []
+        for i, layer_num in enumerate(layer_nums):
+            block = tf.keras.Sequential()
+            block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
+            block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_first', use_bias=False, strides=layer_strides[i]))
+            block.add(tf.keras.layers.BatchNormalization(axis=1, eps=1e-3, momentum=0.99))
+            block.add(tf.keras.layers.ReLU())
+
+            for j in range(layer_num):
+                block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
+                block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_first', use_bias=False))
+                block.add(tf.keras.layers.BatchNormalization(axis=1, eps=1e-3, momentum=0.99))
+                block.add(tf.keras.layers.ReLU())
+
+            blocks.append(block)
+
+        self.blocks = blocks
+
+    def call(self, x, training=False):
+        """Forward function.
+
+        Args:
+            x (tf.Tensor): Input with shape (N, C, H, W).
+
+        Returns:
+            tuple[tf.Tensor]: Multi-scale features.
+        """
+        outs = []
+        for i in range(len(self.blocks)):
+            x = self.blocks[i](x, training)
+            outs.append(x)
+        return tuple(outs)
+
+
