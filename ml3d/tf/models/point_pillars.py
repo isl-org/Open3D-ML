@@ -248,7 +248,7 @@ class PillarFeatureNet(tf.keras.layers.Layer):
         features *= mask
 
         for pfn in self.pfn_layers:
-            features = pfn(features, num_points, training)
+            features = pfn(features, num_points, training=training)
 
         return tf.squeeze(features)
 
@@ -391,8 +391,83 @@ class SECOND(tf.keras.layers.Layer):
         """
         outs = []
         for i in range(len(self.blocks)):
-            x = self.blocks[i](x, training)
+            x = self.blocks[i](x, training=training)
             outs.append(x)
         return tuple(outs)
 
+
+class SECONDFPN(tf.keras.layers.Layer):
+    """FPN used in SECOND/PointPillars/PartA2/MVXNet.
+
+    Args:
+        in_channels (list[int]): Input channels of multi-scale feature maps.
+        out_channels (list[int]): Output channels of feature maps.
+        upsample_strides (list[int]): Strides used to upsample the
+            feature maps.
+        use_conv_for_no_stride (bool): Whether to use conv when stride is 1.
+    """
+
+    def __init__(self,
+                 in_channels=[64, 128, 256],
+                 out_channels=[128, 128, 128],
+                 upsample_strides=[1, 2, 4],
+                 use_conv_for_no_stride=False):
+        # if for GroupNorm,
+        # cfg is dict(type='GN', num_groups=num_groups, eps=1e-3, affine=True)
+        super(SECONDFPN, self).__init__()
+        assert len(out_channels) == len(upsample_strides) == len(in_channels)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.fp16_enabled = False
+
+        deblocks = []
+        for i, out_channel in enumerate(out_channels):
+            stride = upsample_strides[i]
+            if stride > 1 or (stride == 1 and not use_conv_for_no_stride):
+                upsample_layer = tf.keras.layers.Conv2DTranspose(
+                    filters=out_channel,
+                    kernel_size=upsample_strides[i],
+                    strides=upsample_strides[i],
+                    use_bias=False,
+                    data_format='channels_first',
+                )
+            else:
+                stride = np.round(1 / stride).astype(np.int64)
+                upsample_layer = tf.keras.layers.Conv2D(
+                    filters=out_channels[i],
+                    kernel_size=stride,
+                    data_format='channels_first',
+                    use_bias=False,
+                    strides=stride
+                    )
+
+            deblock = tf.keras.Sequential()
+            deblock.add(upsample_layer)
+            deblock.add(tf.keras.layers.BatchNormalization(axis=1, eps=1e-3, momentum=0.99))
+            deblock.add(tf.keras.layers.ReLU())
+
+            deblocks.append(deblock)
+
+        self.deblocks = deblocks
+
+    #@auto_fp16()
+    def call(self, x, training=False):
+        """Forward function.
+
+        Args:
+            x (tf.Tensor): 4D Tensor in (N, C, H, W) shape.
+
+        Returns:
+            tf.Tensor: Feature maps.
+        """
+        assert len(x) == len(self.in_channels)
+
+        ups = [deblock(x[i], training=training) for i, deblock in enumerate(self.deblocks)]
+
+        if len(ups) > 1:
+            out = tf.concat(ups, axis=1)
+        else:
+            out = ups[0]
+
+        return out
 
