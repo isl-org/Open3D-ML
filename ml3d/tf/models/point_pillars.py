@@ -68,33 +68,33 @@ class PointPillars(BaseModel):
         raise NotImplementedError
 
     def inference_end(self, inputs, results):
-        bboxes, scores, labels = self.bbox_head.get_bboxes(*results)
-
-        bboxes = bboxes.numpy()
-        scores = scores.numpy()
-        labels = labels.numpy()
-
-        self.bboxes = bboxes
-        self.scores = scores
-        self.labels = labels
+        bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         self.inference_result = []
-        for i in range(len(bboxes)):
-            yaw = bboxes[i][-1]
-            cos = np.cos(yaw)
-            sin = np.sin(yaw)
 
-            front = np.array((sin, cos, 0))
-            left = np.array((-cos, sin, 0))
-            up = np.array((0, 0, 1))
+        for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
+            bboxes = _bboxes.numpy()
+            scores = _scores.numpy()
+            labels = _labels.numpy()
+            self.inference_result.append([])
 
-            dim = bboxes[i][[3, 5, 4]]
-            pos = bboxes[i][:3] + [0, 0, dim[1] / 2]
+            for bbox, score, label in zip(bboxes, scores, labels):
+                yaw = bbox[-1]
+                cos = np.cos(yaw)
+                sin = np.sin(yaw)
 
-            self.inference_result.append(
-                BoundingBox3D(pos, front, up, left, dim, labels[i], scores[i]))
+                front = np.array((sin, cos, 0))
+                left = np.array((-cos, sin, 0))
+                up = np.array((0, 0, 1))
+
+                dim = bbox[[3, 5, 4]]
+                pos = bbox[:3] + [0, 0, dim[1] / 2]
+
+                self.inference_result[-1].append(
+                    BoundingBox3D(pos, front, up, left, dim, label, score))
 
         return True
+
 
 class PointPillarsVoxelization(tf.keras.layers.Layer):
     def __init__(self,
@@ -539,9 +539,28 @@ class Anchor3DHead(tf.keras.layers.Layer):
             tuple[torch.Tensor]: Prediction results of batches 
                 (bboxes, scores, labels).
         """
-        assert len(cls_scores) == len(bbox_preds)
-        assert len(cls_scores) == len(dir_preds)
+        bboxes, scores, labels = [], [], []
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds, dir_preds):
 
+            b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
+            bboxes.append(b)
+            scores.append(s)
+            labels.append(l)
+        return bboxes, scores, labels
+
+    def get_bboxes_single(self, cls_scores, bbox_preds, dir_preds):
+        """Get bboxes of anchor head.
+
+        Args:
+            cls_scores (list[torch.Tensor]): Class scores.
+            bbox_preds (list[torch.Tensor]): Bbox predictions.
+            dir_cls_preds (list[torch.Tensor]): Direction
+                class predictions.
+
+        Returns:
+            tuple[torch.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
+        """
         assert cls_scores.shape[-2:] == bbox_preds.shape[-2:]
         assert cls_scores.shape[-2:] == dir_preds.shape[-2:]
 
@@ -549,17 +568,17 @@ class Anchor3DHead(tf.keras.layers.Layer):
         anchors = tf.reshape(anchors, (-1, self.box_code_size))
 
         dir_preds = tf.reshape(
-            tf.transpose(dir_preds, perm=(0, 2, 3, 1)),
+            tf.transpose(dir_preds, perm=(1, 2, 0)),
             (-1, 2))
         dir_scores = tf.math.argmax(dir_preds, axis=-1)
 
         cls_scores = tf.reshape(
-            tf.transpose(cls_scores, perm=(0, 2, 3, 1)),
+            tf.transpose(cls_scores, perm=(1, 2, 0)),
             (-1, self.num_classes))
         scores = tf.sigmoid(cls_scores)
 
         bbox_preds = tf.reshape(
-            tf.transpose(bbox_preds, perm=(0, 2, 3, 1)),
+            tf.transpose(bbox_preds, perm=(1, 2, 0)),
             (-1, self.box_code_size))
 
         if scores.shape[0] > self.nms_pre:
