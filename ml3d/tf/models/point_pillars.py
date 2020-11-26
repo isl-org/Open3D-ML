@@ -5,9 +5,96 @@ import open3d.ml.tf as ml3d
 
 from tqdm import tqdm
 
+from ...vis.boundingbox import BoundingBox3D
+
 from .base_model import BaseModel
 from ...utils import MODEL
 
+from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator
+
+class PointPillars(BaseModel):
+    """Object detection model. 
+    Based on the PointPillars architecture 
+    https://github.com/nutonomy/second.pytorch.
+
+    Args:
+        name (string): Name of model.
+            Default to "PointPillars".
+        voxel_size: voxel edge lengths with format [x, y, z].
+        point_cloud_range: The valid range of point coordinates as
+            [x_min, y_min, z_min, x_max, y_max, z_max].
+        voxelize: Config of PointPillarsVoxelization module.
+        voxelize_encoder: Config of PillarFeatureNet module.
+        scatter: Config of PointPillarsScatter module.
+        backbone: Config of backbone module (SECOND).
+        neck: Config of neck module (SECONDFPN).
+        head: Config of anchor head module.
+    """
+
+    def __init__(self,
+                 name="PointPillars",
+                 voxel_size=[0.16, 0.16, 4],
+                 point_cloud_range=[0, -40.0, -3, 70.0, 40.0, 1],
+                 voxelize={},
+                 voxel_encoder={},
+                 scatter={},
+                 backbone={},
+                 neck={},
+                 head={},
+                 **kwargs):
+
+        super().__init__(name=name, **kwargs)
+        self.bbox_head = Anchor3DHead(**head)
+
+    def forward(self, inputs):
+        raise NotImplementedError
+
+    def get_optimizer(self, cfg_pipeline):
+        raise NotImplementedError
+
+    def get_loss(self, Loss, results, inputs):
+        raise NotImplementedError
+
+    def preprocess(self, data, attr):
+        raise NotImplementedError
+
+    def transform(self, data, attr):
+        raise NotImplementedError
+
+    def inference_begin(self, data):
+        raise NotImplementedError
+
+    def inference_preprocess(self):
+        raise NotImplementedError
+
+    def inference_end(self, inputs, results):
+        bboxes, scores, labels = self.bbox_head.get_bboxes(*results)
+
+        bboxes = bboxes.numpy()
+        scores = scores.numpy()
+        labels = labels.numpy()
+
+        self.bboxes = bboxes
+        self.scores = scores
+        self.labels = labels
+
+        self.inference_result = []
+        for i in range(len(bboxes)):
+            yaw = bboxes[i][-1]
+            cos = np.cos(yaw)
+            sin = np.sin(yaw)
+
+            front = np.array((sin, cos, 0))
+            left = np.array((-cos, sin, 0))
+            up = np.array((0, 0, 1))
+
+            dim = bboxes[i][[3, 5, 4]]
+            pos = bboxes[i][:3] + [0, 0, dim[1] / 2]
+
+            self.inference_result.append(
+                BoundingBox3D(pos, front, up, left, dim, labels[i], scores[i]))
+
+        return True
 
 class PointPillarsVoxelization(tf.keras.layers.Layer):
     def __init__(self,
@@ -396,3 +483,115 @@ class SECOND(tf.keras.layers.Layer):
         return tuple(outs)
 
 
+class Anchor3DHead(tf.keras.layers.Layer):
+    def __init__(self, 
+                 num_classes=3, 
+                 in_channels=384, 
+                 feat_channels=384,
+                 nms_pre=100,
+                 score_thr=0.1,
+                 ranges=[
+                    [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                    [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                    [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+                 ],
+                 sizes=[[0.6, 0.8, 1.73],
+                        [0.6, 1.76, 1.73],
+                        [1.6, 3.9, 1.56]],
+                 rotations=[0, 1.57]):
+
+        super().__init__()
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.feat_channels = feat_channels
+        self.nms_pre = nms_pre
+        self.score_thr = score_thr
+
+        # build anchor generator
+        self.anchor_generator = Anchor3DRangeGenerator(
+            ranges=ranges,
+            sizes=sizes,
+            rotations=rotations)
+
+        # In 3D detection, the anchor stride is connected with anchor size
+        self.num_anchors = self.anchor_generator.num_base_anchors
+
+        # build box coder
+        self.bbox_coder = BBoxCoder()
+        self.box_code_size = 7
+
+        #Initialize neural network layers of the head.
+        # TODO
+
+    def call(self, x, training=False):
+        raise NotImplementedError
+
+    def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
+        """Get bboxes of anchor head.
+
+        Args:
+            cls_scores (list[torch.Tensor]): Class scores.
+            bbox_preds (list[torch.Tensor]): Bbox predictions.
+            dir_cls_preds (list[torch.Tensor]): Direction
+                class predictions.
+
+        Returns:
+            tuple[torch.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
+        """
+        assert len(cls_scores) == len(bbox_preds)
+        assert len(cls_scores) == len(dir_preds)
+
+        assert cls_scores.shape[-2:] == bbox_preds.shape[-2:]
+        assert cls_scores.shape[-2:] == dir_preds.shape[-2:]
+
+        anchors = self.anchor_generator.grid_anchors(cls_scores.shape[-2:])
+        anchors = tf.reshape(anchors, (-1, self.box_code_size))
+
+        dir_preds = tf.reshape(
+            tf.transpose(dir_preds, perm=(0, 2, 3, 1)),
+            (-1, 2))
+        dir_scores = tf.math.argmax(dir_preds, axis=-1)
+
+        cls_scores = tf.reshape(
+            tf.transpose(cls_scores, perm=(0, 2, 3, 1)),
+            (-1, self.num_classes))
+        scores = tf.sigmoid(cls_scores)
+
+        bbox_preds = tf.reshape(
+            tf.transpose(bbox_preds, perm=(0, 2, 3, 1)),
+            (-1, self.box_code_size))
+
+        if scores.shape[0] > self.nms_pre:
+            max_scores = tf.reduce_max(scores, axis=1)
+            _, topk_inds = tf.math.top_k(max_scores, self.nms_pre)
+            anchors = tf.gather(anchors, topk_inds)
+            bbox_preds = tf.gather(bbox_preds, topk_inds)
+            scores = tf.gather(scores, topk_inds)
+            dir_scores = tf.gather(dir_scores, topk_inds)
+
+        bboxes = self.bbox_coder.decode(anchors, bbox_preds)
+
+        idxs = multiclass_nms(bboxes, scores, self.score_thr)
+
+        labels = [
+            tf.fill((idxs[i].shape[0],), i)
+            for i in range(self.num_classes)
+        ]
+        labels = tf.concat(labels, axis=0)
+
+        scores = [tf.gather(scores, idxs[i])[:, i] for i in range(self.num_classes)]
+        scores = tf.concat(scores, axis=0)
+
+        idxs = tf.concat(idxs, axis=0)
+        bboxes = tf.gather(bboxes, idxs)
+        dir_scores = tf.gather(dir_scores, idxs)
+
+        if bboxes.shape[0] > 0:
+            dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
+            dir_rot = dir_rot + np.pi * tf.cast(dir_scores, dtype=bboxes.dtype)
+            bboxes = tf.concat([
+                bboxes[:,:-1], 
+                tf.expand_dims(dir_rot, -1)
+            ], axis=-1)
+        return bboxes, scores, labels

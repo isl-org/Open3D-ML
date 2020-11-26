@@ -1,48 +1,27 @@
-#***************************************************************************************/
-#
-#    Based on MMDetection3D Library (Apache 2.0 license):
-#    https://github.com/open-mmlab/mmdetection3d
-#
-#    Copyright 2018-2019 Open-MMLab.
-#
-#    Licensed under the Apache License, Version 2.0 (the "License");
-#    you may not use this file except in compliance with the License.
-#    You may obtain a copy of the License at
-#
-#        http://www.apache.org/licenses/LICENSE-2.0
-#
-#    Unless required by applicable law or agreed to in writing, software
-#    distributed under the License is distributed on an "AS IS" BASIS,
-#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#    See the License for the specific language governing permissions and
-#    limitations under the License.
-#
-#***************************************************************************************/
-
 import numpy as np
-import torch
+import tensorflow as tf
 
 from functools import partial
 
-import open3d.ml.torch as ml3d
+import open3d.ml.tf as ml3d
 
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
     """Create boolean mask by actually number of a padded tensor.
 
     Args:
-        actual_num (torch.Tensor): Actual number of points in each voxel.
+        actual_num (tf.Tensor): Actual number of points in each voxel.
         max_num (int): Max number of points in each voxel
 
     Returns:
-        torch.Tensor: Mask indicates which points are valid inside a voxel.
+        tf.Tensor: Mask indicates which points are valid inside a voxel.
     """
-    actual_num = torch.unsqueeze(actual_num, axis + 1)
+    actual_num = tf.expand_dims(actual_num, axis + 1, axis=-1)
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
-    max_num = torch.arange(max_num, dtype=torch.int,
-                           device=actual_num.device).view(max_num_shape)
+    max_num = rf.reshape(
+        tf.range(max_num, dtype=tf.int64), (max_num_shape))
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num
@@ -54,35 +33,35 @@ def limit_period(val, offset=0.5, period=np.pi):
     """Limit the value into a period for periodic function.
 
     Args:
-        val (torch.Tensor): The value to be converted.
+        val (tf.Tensor): The value to be converted.
         offset (float, optional): Offset to set the value range. \
             Defaults to 0.5.
         period ([type], optional): Period of the value. Defaults to np.pi.
 
     Returns:
-        torch.Tensor: Value in the range of \
+        tf.Tensor: Value in the range of \
             [-offset * period, (1-offset) * period]
     """
-    return val - torch.floor(val / period + offset) * period
+    return val - tf.floor(val / period + offset) * period
 
 
 def xywhr2xyxyr(boxes_xywhr):
     """Convert a rotated boxes in XYWHR format to XYXYR format.
 
     Args:
-        boxes_xywhr (torch.Tensor): Rotated boxes in XYWHR format.
+        boxes_xywhr (tf.Tensor): Rotated boxes in XYWHR format.
 
     Returns:
-        torch.Tensor: Converted boxes in XYXYR format.
+        tf.Tensor: Converted boxes in XYXYR format.
     """
-    transform = torch.tensor([
+    transform = tf.constant([
         [1.0, 0.0, -0.5, 0.0, 0.0],
         [0.0, 1.0, 0.0, -0.5, 0.0],
         [1.0, 0.0, 0.5, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.5, 0.0],
         [0.0, 0.0, 0.0, 0.0, 1.0],
-    ], device=boxes_xywhr.device)
-    return boxes_xywhr @ transform.t()
+    ])
+    return tf.linalg.matvec(transform, boxes_xywhr)
 
 
 class Anchor3DRangeGenerator(object):
@@ -117,21 +96,20 @@ class Anchor3DRangeGenerator(object):
     def num_base_anchors(self):
         """list[int]: Total number of base anchors in a feature grid."""
         num_rot = len(self.rotations)
-        num_size = torch.tensor(self.sizes).reshape(-1, 3).size(0)
+        num_size = tf.reshape(
+            tf.constant(self.sizes), (-1, 3)).shape[0]
         return num_rot * num_size
 
-    def grid_anchors(self, featmap_size, device='cuda'):
+    def grid_anchors(self, featmap_size):
         """Generate grid anchors of a single level feature map.
 
         This function is usually called by method ``self.grid_anchors``.
 
         Args:
             featmap_size (tuple[int]): Size of the feature map.
-            device (str, optional): Device the tensor will be put on.
-                Defaults to 'cuda'.
 
         Returns:
-            torch.Tensor: Anchors in the overall feature map.
+            tf.Tensor: Anchors in the overall feature map.
         """
 
         mr_anchors = []
@@ -140,66 +118,61 @@ class Anchor3DRangeGenerator(object):
                 self.anchors_single_range(featmap_size,
                                           anchor_range,
                                           anchor_size,
-                                          self.rotations,
-                                          device=device))
-        mr_anchors = torch.cat(mr_anchors, dim=-3)
+                                          self.rotations))
+        mr_anchors = tf.concat(mr_anchors, axis=-3)
         return mr_anchors
 
     def anchors_single_range(self,
                              feature_size,
                              anchor_range,
                              sizes=[[1.6, 3.9, 1.56]],
-                             rotations=[0, 1.5707963],
-                             device='cuda'):
+                             rotations=[0, 1.5707963]):
         """Generate anchors in a single range.
 
         Args:
             feature_size (list[float] | tuple[float]): Feature map size. It is
                 either a list of a tuple of [D, H, W](in order of z, y, and x).
-            anchor_range (torch.Tensor | list[float]): Range of anchors with
+            anchor_range (tf.Tensor | list[float]): Range of anchors with
                 shape [6]. The order is consistent with that of anchors, i.e.,
                 (x_min, y_min, z_min, x_max, y_max, z_max).
-            sizes (list[list] | np.ndarray | torch.Tensor): Anchor size with
+            sizes (list[list] | np.ndarray | tf.Tensor): Anchor size with
                 shape [N, 3], in order of x, y, z.
-            rotations (list[float] | np.ndarray | torch.Tensor): Rotations of
+            rotations (list[float] | np.ndarray | tf.Tensor): Rotations of
                 anchors in a single feature grid.
-            device (str): Devices that the anchors will be put on.
 
         Returns:
-            torch.Tensor: Anchors with shape \
+            tf.Tensor: Anchors with shape \
                 [*feature_size, num_sizes, num_rots, 7].
         """
         if len(feature_size) == 2:
             feature_size = [1, feature_size[0], feature_size[1]]
-        anchor_range = torch.tensor(anchor_range, device=device)
-        z_centers = torch.linspace(anchor_range[2],
-                                   anchor_range[5],
-                                   feature_size[0],
-                                   device=device)
-        y_centers = torch.linspace(anchor_range[1],
-                                   anchor_range[4],
-                                   feature_size[1],
-                                   device=device)
-        x_centers = torch.linspace(anchor_range[0],
-                                   anchor_range[3],
-                                   feature_size[2],
-                                   device=device)
-        sizes = torch.tensor(sizes, device=device)
-        rotations = torch.tensor(rotations, device=device)
+        anchor_range = tf.constant(anchor_range)
+        z_centers = tf.linspace(anchor_range[2],
+                                anchor_range[5],
+                                feature_size[0])
+        y_centers = tf.linspace(anchor_range[1],
+                                anchor_range[4],
+                                feature_size[1])
+        x_centers = tf.linspace(anchor_range[0],
+                                anchor_range[3],
+                                feature_size[2])
+        sizes = tf.constant(sizes)
+        rotations = tf.constant(rotations)
 
-        # torch.meshgrid default behavior is 'id', np's default is 'xy'
-        rets = torch.meshgrid(x_centers, y_centers, z_centers, rotations)
-        # torch.meshgrid returns a tuple rather than list
-        rets = list(rets)
+        # torch.meshgrid default behavior is 'id', tf's default is 'xy'
+        rets = tf.meshgrid(x_centers, y_centers, z_centers, rotations, indexing='ij')
         for i in range(len(rets)):
-            rets[i] = rets[i].unsqueeze(-2).unsqueeze(-1)
+            rets[i] = tf.expand_dims(
+                tf.expand_dims(rets[i], -2), -1)
 
         tile_size_shape = list(rets[0].shape)
         tile_size_shape[-1] = sizes.shape[-1]
-        sizes = torch.zeros(tile_size_shape, device=device) + sizes
+        sizes = tf.zeros(tile_size_shape) + sizes
         rets.insert(3, sizes)
 
-        ret = torch.cat(rets, dim=-1).permute([2, 1, 0, 3, 4, 5])
+        ret = tf.transpose(
+            tf.concat(rets, axis=-1), 
+            perm=(2, 1, 0, 3, 4, 5))
         # [1, 200, 176, N, 2, 7] for kitti after permute
         return ret
 
@@ -221,26 +194,26 @@ class BBoxCoder(object):
         `target_boxes`.
 
         Args:
-            src_boxes (torch.Tensor): source boxes, e.g., object proposals.
-            dst_boxes (torch.Tensor): target of the transformation, e.g.,
+            src_boxes (tf.Tensor): source boxes, e.g., object proposals.
+            dst_boxes (tf.Tensor): target of the transformation, e.g.,
                 ground-truth boxes.
 
         Returns:
-            torch.Tensor: Box transformation deltas.
+            tf.Tensor: Box transformation deltas.
         """
-        xa, ya, za, wa, la, ha, ra = torch.split(src_boxes, 1, dim=-1)
-        xg, yg, zg, wg, lg, hg, rg = torch.split(dst_boxes, 1, dim=-1)
+        xa, ya, za, wa, la, ha, ra = tf.split(src_boxes, 7, axis=-1)
+        xg, yg, zg, wg, lg, hg, rg = tf.split(dst_boxes, 7, axis=-1)
         za = za + ha / 2
         zg = zg + hg / 2
-        diagonal = torch.sqrt(la**2 + wa**2)
+        diagonal = tf.sqrt(la**2 + wa**2)
         xt = (xg - xa) / diagonal
         yt = (yg - ya) / diagonal
         zt = (zg - za) / ha
-        lt = torch.log(lg / la)
-        wt = torch.log(wg / wa)
-        ht = torch.log(hg / ha)
+        lt = tf.log(lg / la)
+        wt = tf.log(wg / wa)
+        ht = tf.log(hg / ha)
         rt = rg - ra
-        return torch.cat([xt, yt, zt, wt, lt, ht, rt], dim=-1)
+        return tf.concat([xt, yt, zt, wt, lt, ht, rt], axis=-1)
 
     @staticmethod
     def decode(anchors, deltas):
@@ -248,55 +221,57 @@ class BBoxCoder(object):
         `boxes`.
 
         Args:
-            anchors (torch.Tensor): Parameters of anchors with shape (N, 7).
-            deltas (torch.Tensor): Encoded boxes with shape
+            anchors (tf.Tensor): Parameters of anchors with shape (N, 7).
+            deltas (tf.Tensor): Encoded boxes with shape
                 (N, 7+n) [x, y, z, w, l, h, r, velo*].
 
         Returns:
-            torch.Tensor: Decoded boxes.
+            tf.Tensor: Decoded boxes.
         """
-        xa, ya, za, wa, la, ha, ra = torch.split(anchors, 1, dim=-1)
-        xt, yt, zt, wt, lt, ht, rt = torch.split(deltas, 1, dim=-1)
+        xa, ya, za, wa, la, ha, ra = tf.split(anchors, 7, axis=-1)
+        xt, yt, zt, wt, lt, ht, rt = tf.split(deltas, 7, axis=-1)
 
         za = za + ha / 2
-        diagonal = torch.sqrt(la**2 + wa**2)
+        diagonal = tf.sqrt(la**2 + wa**2)
         xg = xt * diagonal + xa
         yg = yt * diagonal + ya
         zg = zt * ha + za
 
-        lg = torch.exp(lt) * la
-        wg = torch.exp(wt) * wa
-        hg = torch.exp(ht) * ha
+        lg = tf.exp(lt) * la
+        wg = tf.exp(wt) * wa
+        hg = tf.exp(ht) * ha
         rg = rt + ra
         zg = zg - hg / 2
-        return torch.cat([xg, yg, zg, wg, lg, hg, rg], dim=-1)
+        return tf.concat([xg, yg, zg, wg, lg, hg, rg], axis=-1)
 
 
 def multiclass_nms(boxes, scores, score_thr):
     """Multi-class nms for 3D boxes.
 
     Args:
-        boxes (torch.Tensor): Multi-level boxes with shape (N, M).
+        boxes (tf.Tensor): Multi-level boxes with shape (N, M).
             M is the dimensions of boxes.
-        scores (torch.Tensor): Multi-level boxes with shape
+        scores (tf.Tensor): Multi-level boxes with shape
             (N, ). N is the number of boxes.
         score_thr (float): Score threshold to filter boxes with low
             confidence.
 
     Returns:
-        list[torch.Tensor]: Return a list of indices after nms,
+        list[tf.Tensor]: Return a list of indices after nms,
             with an entry for each class.
     """
 
     idxs = []
     for i in range(scores.shape[1]):
-        cls_inds = torch.where(scores[:, i] > score_thr)[0]
-
-        _scores = scores[cls_inds, i]
-        _boxes = boxes[cls_inds, :]
-        _bev = xywhr2xyxyr(_boxes[:, [0, 1, 3, 4, 6]])
+        cls_inds = tf.where(scores[:, i] > score_thr)[:,0]
+        
+        _scores = tf.gather(scores, cls_inds)[:, i]
+        _boxes = tf.gather(boxes, cls_inds)
+        _bev = xywhr2xyxyr(
+            tf.gather(
+                _boxes, [0, 1, 3, 4, 6], axis=1))
 
         idx = ml3d.ops.nms(_bev, _scores, 0.01)
-        idxs.append(cls_inds[idx])
+        idxs.append(tf.gather(cls_inds, idx))
 
     return idxs
