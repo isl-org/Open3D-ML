@@ -11,7 +11,7 @@ from ..dataloaders import TorchDataloader
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord
 
-from ..modules.metrics import box3d_iou, bev_iou
+from ..modules.metrics import mAP
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -90,34 +90,39 @@ class ObjectDetection(BasePipeline):
                                      use_cache=dataset.cfg.use_cache,
                                      shuffle=False)
 
-        pc_path = "/Users/lprantl/Open3D-ML/data/kitti/training/velodyne/000001.bin"
-        label_path = pc_path.replace('velodyne',
-                                        'label_2').replace('.bin', '.txt')
-        calib_path = label_path.replace('label_2', 'calib')
+        _data = []
+        for i in range(1000):
+            pc_path = "/home/prantl/obj_det/mmdetection3d/data/kitti/training/velodyne_reduced/%06d.bin"%(i+1)
+            label_path = pc_path.replace('velodyne_reduced',
+                                            'label_2').replace('.bin', '.txt')
+            calib_path = label_path.replace('label_2', 'calib')
 
-        pc = dataset.read_lidar(pc_path)
-        calib = dataset.read_calib(calib_path)
-        label = dataset.read_label(label_path, calib)
+            pc = dataset.read_lidar(pc_path)
+            calib = dataset.read_calib(calib_path)
+            label = dataset.read_label(label_path, calib)
 
-        data = {
-            'point': pc,
-            'feat': None,
-            'calib': calib,
-            'bounding_boxes': label,
-        }
+            data = {
+                'point': pc,
+                'feat': None,
+                'calib': calib,
+                'bounding_boxes': label,
+            }
 
-        _data = model.transform(data, None)
+            _data.append(model.transform(data, None))
 
         self.load_ckpt(model.cfg.ckpt_path)
 
         log.info("Started testing")
+        self.test_ious = []
 
+        pred = []
+        gt = []
         with torch.no_grad():
-            for idx in tqdm(range(len(test_split)), desc='test'):
-                data = test_split[idx]
+            for idx in tqdm(range(len(_data)), desc='test'):
+                #data = test_split[idx]
                 #if (cfg.get('test_continue', True) and dataset.is_tested(data['attr'])):
                 #    continue
-                results = self.run_inference(_data)#(data['data'])
+                results = self.run_inference(_data[idx])#(data['data'])
 
                 # TODO: replace! temporary solution
                 trans = calib['R0_rect'] @ calib['Tr_velo2cam']
@@ -127,10 +132,22 @@ class ObjectDetection(BasePipeline):
                 def limit_period(val, offset=0.5, period=2*np.pi):
                     return val - np.floor(val / period + offset) * period
 
-                def to_camera(bboxes, trans=None):
+                def get_difficulty(height):
+                    #TODO
+                    if height >= 40:
+                        return 0  # Easy
+                    elif height >= 25:
+                        return 1  # Moderate
+                    elif height >= 25:
+                        return 2  # Hard
+                    else:
+                        return -1
+
+                def to_camera(bboxes, trans=None, diff=False):
                     bbox = np.empty((len(bboxes), 7))
                     label = np.empty((len(bboxes),))
                     score = np.empty((len(bboxes),))
+                    difficulty = np.empty((len(bboxes)))
                     for i, box in enumerate(bboxes):
                         bbox[i, 0:3] = box.center - [0, 0, box.size[1]/2]
                         bbox[i, 3:6] = box.size
@@ -138,28 +155,34 @@ class ObjectDetection(BasePipeline):
                         bbox[i, 6] = limit_period(np.arcsin(box.front[0])-np.pi)
                         label[i] = box.label_class
                         score[i] = box.confidence
-
+                        if diff:
+                            difficulty[i] = box.get_kitti_obj_level()
+                        else:
+                            difficulty[i] = 0#get_difficulty(box.size[1])
                         if trans is not None:
                             bbox[i, 0:3] = (np.array([*bbox[i, 0:3], 1.0]) @ np.transpose(trans))[:3]
 
-                    return {
+                    result =  {
                         'bbox': bbox,
                         'label': label,
-                        'score': score
+                        'score': score,
+                        'difficulty': difficulty
                     }
 
-                pred = to_camera(results, trans)
-                gt = to_camera(label, trans)
+                    return result
+
+                pred.append(to_camera(results, trans))
+                gt.append(to_camera(_data[idx]['bounding_boxes'], trans, True))
                 #
 
-                if cfg.get('test_compute_metric', True):
-                    iou = bev_iou(pred, gt)
-                    self.test_ious.append(iou)
+        if cfg.get('test_compute_metric', True):
+            ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.25, 0.25, 0.5])
+            self.test_mAP.append(ap)
 
-                dataset.save_test_result(results, attr)
+        #dataset.save_test_result(results, attr)
 
         if cfg.get('test_compute_metric', True):
-            log.info("test iou: {}".format(self.test_ious))
+            log.info("test mAP: {}".format(self.test_mAP))
 
     def run_train(self):
         raise NotImplementedError()

@@ -274,7 +274,7 @@ class Object3d(BoundingBox3D):
             'DontCare': 4,
         }
         if cls_type not in type_to_id.keys():
-            return 0
+            return 4
         return type_to_id[cls_type]
 
     def get_kitti_obj_level(self):

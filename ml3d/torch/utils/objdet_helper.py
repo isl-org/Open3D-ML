@@ -295,7 +295,9 @@ def multiclass_nms(boxes, scores, score_thr):
     for i in range(scores.shape[1]):
         cls_inds = scores[:, i] > score_thr
         if not cls_inds.any():
-            idxs.append(torch.tensor([], dtype=torch.long))
+            idxs.append(torch.tensor([], 
+                        dtype=torch.long, 
+                        device=cls_inds.device))
             continue
 
         orig_idx = torch.arange(cls_inds.shape[0],
