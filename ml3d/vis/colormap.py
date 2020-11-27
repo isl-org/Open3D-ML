@@ -1,7 +1,12 @@
 class Colormap:
-    """Color map for visulization of points."""
+    """This class is used to create a color map for visualization of points."""
 
     class Point:
+        """"Initialize the class.
+            **Args:**
+                value: The scalar value index of the point.
+                color: The color associated with the value.
+        """
 
         def __init__(self, value, color):
             assert (value >= 0.0)
@@ -9,6 +14,8 @@ class Colormap:
 
             self.value = value
             self.color = color
+
+        """Represent the color and value in the colormap."""
 
         def __repr__(self):
             return "Colormap.Point(" + str(self.value) + ", " + str(
@@ -18,12 +25,21 @@ class Colormap:
     # (e.g. [0.0, 0.1, 0.4, 1.0], not [0.0, 0.4, 0.1, 1.0]
     def __init__(self, points):
         self.points = points
+        """Generate the basic array based on the minimum and maximum range passed."""
 
     def calc_u_array(self, values, range_min, range_max):
         range_width = (range_max - range_min)
         return [
             min(1.0, max(0.0, (v - range_min) / range_width)) for v in values
         ]
+        """Generate the color array based on the minimum and maximum range passed.
+            **Args:
+                values: The index of values.
+                range_min: The minimum value in the range.
+                range_max: The maximum value in the range.
+            Returns:
+                An array of color index based on the range passed.
+....    """
 
     # (This is done by the shader now)
     def calc_color_array(self, values, range_min, range_max):
@@ -57,6 +73,7 @@ class Colormap:
 
         return [tex[int(u * n)] for u in u_array]
 
+    """Generate a greyscale colormap."""
     # These are factory methods rather than class objects because
     # the user may modify the colormaps that are used.
     @staticmethod
@@ -65,6 +82,8 @@ class Colormap:
             Colormap.Point(0.0, [0.0, 0.0, 0.0]),
             Colormap.Point(1.0, [1.0, 1.0, 1.0])
         ])
+
+    """Generate the rainbow color array."""
 
     @staticmethod
     def make_rainbow():
