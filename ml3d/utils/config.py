@@ -89,7 +89,8 @@ class Config(object):
             cfg.pipeline.main_log_dir = args.main_log_dir
         if args.dataset_path is not None:
             cfg.dataset.dataset_path = args.dataset_path
-        # if args.cfg_model is not None:
+        if args.ckpt_path is not None:
+            cfg.model.ckpt_path = args.ckpt_path
 
         extra_cfg_dict = {'model': {}, 'dataset': {}, 'pipeline': {}}
 
