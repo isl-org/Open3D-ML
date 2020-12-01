@@ -111,9 +111,6 @@ class PointPillars(BaseModel):
         raise NotImplementedError
 
     def preprocess(self, data, attr):
-        return data
-
-    def transform(self, data, attr):
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
@@ -143,6 +140,9 @@ class PointPillars(BaseModel):
         data['calib'] = calib
         data['bounding_boxes'] = labels
 
+        return data
+
+    def transform(self, data, attr):
         return data
 
     def inference_begin(self, data):
@@ -478,14 +478,16 @@ class PointPillarsScatter(tf.keras.layers.Layer):
                 The first column indicates the sample ID.
         """
         # Create the canvas for this sample
-        canvas = tf.zeros((self.in_channels, self.nx * self.ny), dtype=voxel_features.dtype)
+        canvas_shape = (self.in_channels, self.nx * self.ny)
 
         indices = coors[:, 1] * self.nx + coors[:, 2]
         indices = tf.cast(indices, tf.int64)
         voxels = tf.transpose(voxel_features)
 
         # Now scatter the blob back to the canvas.
-        canvas[:, indices] = voxels
+        indices_grid = tf.stack(tf.meshgrid(tf.cast(tf.range(self.in_channels), indices.dtype), indices, indexing='ij'), axis=-1)
+        canvas = tf.scatter_nd(indices_grid, voxels, canvas_shape)
+        # canvas[:, indices] = voxels
 
         # Undo the column stacking to final 4-dim tensor
         canvas = tf.reshape(canvas, (1, self.in_channels, self.ny, self.nx))
@@ -505,7 +507,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         batch_canvas = []
         for batch_itt in range(batch_size):
             # Create the canvas for this sample
-            canvas = tf.zeros((self.in_channels, self.nx * self.ny), dtype=voxel_features.dtype)
+            canvas_shape = (self.in_channels, self.nx * self.ny)
 
             # Only include non-empty pillars
             batch_mask = coors[:, 0] == batch_itt
@@ -518,7 +520,9 @@ class PointPillarsScatter(tf.keras.layers.Layer):
             voxels = tf.transpose(voxels)
 
             # Now scatter the blob back to the canvas.
-            canvas[:, indices] = voxels
+            indices_grid = tf.stack(tf.meshgrid(tf.cast(tf.range(self.in_channels), indices.dtype), indices, indexing='ij'), axis=-1)
+            canvas = tf.scatter_nd(indices_grid, voxels, canvas_shape)
+            # canvas[:, indices] = voxels
 
             # Append to a list for later stacking.
             batch_canvas.append(canvas)
