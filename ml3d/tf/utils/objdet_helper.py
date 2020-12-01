@@ -20,8 +20,7 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
-    max_num = tf.reshape(
-        tf.range(max_num, dtype=tf.int64), (max_num_shape))
+    max_num = tf.reshape(tf.range(max_num, dtype=tf.int64), (max_num_shape))
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = tf.cast(actual_num, tf.int64) > max_num
@@ -96,8 +95,7 @@ class Anchor3DRangeGenerator(object):
     def num_base_anchors(self):
         """list[int]: Total number of base anchors in a feature grid."""
         num_rot = len(self.rotations)
-        num_size = tf.reshape(
-            tf.constant(self.sizes), (-1, 3)).shape[0]
+        num_size = tf.reshape(tf.constant(self.sizes), (-1, 3)).shape[0]
         return num_rot * num_size
 
     def grid_anchors(self, featmap_size):
@@ -115,10 +113,8 @@ class Anchor3DRangeGenerator(object):
         mr_anchors = []
         for anchor_range, anchor_size in zip(self.ranges, self.sizes):
             mr_anchors.append(
-                self.anchors_single_range(featmap_size,
-                                          anchor_range,
-                                          anchor_size,
-                                          self.rotations))
+                self.anchors_single_range(featmap_size, anchor_range,
+                                          anchor_size, self.rotations))
         mr_anchors = tf.concat(mr_anchors, axis=-3)
         return mr_anchors
 
@@ -147,32 +143,30 @@ class Anchor3DRangeGenerator(object):
         if len(feature_size) == 2:
             feature_size = [1, feature_size[0], feature_size[1]]
         anchor_range = tf.constant(anchor_range)
-        z_centers = tf.linspace(anchor_range[2],
-                                anchor_range[5],
+        z_centers = tf.linspace(anchor_range[2], anchor_range[5],
                                 feature_size[0])
-        y_centers = tf.linspace(anchor_range[1],
-                                anchor_range[4],
+        y_centers = tf.linspace(anchor_range[1], anchor_range[4],
                                 feature_size[1])
-        x_centers = tf.linspace(anchor_range[0],
-                                anchor_range[3],
+        x_centers = tf.linspace(anchor_range[0], anchor_range[3],
                                 feature_size[2])
         sizes = tf.constant(sizes)
         rotations = tf.constant(rotations)
 
         # torch.meshgrid default behavior is 'id', tf's default is 'xy'
-        rets = tf.meshgrid(x_centers, y_centers, z_centers, rotations, indexing='ij')
+        rets = tf.meshgrid(x_centers,
+                           y_centers,
+                           z_centers,
+                           rotations,
+                           indexing='ij')
         for i in range(len(rets)):
-            rets[i] = tf.expand_dims(
-                tf.expand_dims(rets[i], -2), -1)
+            rets[i] = tf.expand_dims(tf.expand_dims(rets[i], -2), -1)
 
         tile_size_shape = list(rets[0].shape)
         tile_size_shape[-1] = sizes.shape[-1]
         sizes = tf.zeros(tile_size_shape) + sizes
         rets.insert(3, sizes)
 
-        ret = tf.transpose(
-            tf.concat(rets, axis=-1), 
-            perm=(2, 1, 0, 3, 4, 5))
+        ret = tf.transpose(tf.concat(rets, axis=-1), perm=(2, 1, 0, 3, 4, 5))
         # [1, 200, 176, N, 2, 7] for kitti after permute
         return ret
 
@@ -263,13 +257,11 @@ def multiclass_nms(boxes, scores, score_thr):
 
     idxs = []
     for i in range(scores.shape[1]):
-        cls_inds = tf.where(scores[:, i] > score_thr)[:,0]
-        
+        cls_inds = tf.where(scores[:, i] > score_thr)[:, 0]
+
         _scores = tf.gather(scores, cls_inds)[:, i]
         _boxes = tf.gather(boxes, cls_inds)
-        _bev = xywhr2xyxyr(
-            tf.gather(
-                _boxes, [0, 1, 3, 4, 6], axis=1))
+        _bev = xywhr2xyxyr(tf.gather(_boxes, [0, 1, 3, 4, 6], axis=1))
 
         idx = ml3d.ops.nms(_bev, _scores, 0.01)
         idxs.append(tf.gather(cls_inds, idx))

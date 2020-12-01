@@ -73,9 +73,10 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        test_split = TFDataloader(dataset=dataset.get_split('test'),
-                                     model=model,
-                                     use_cache=False,  # nothing to cache.
+        test_split = TFDataloader(
+            dataset=dataset.get_split('test'),
+            model=model,
+            use_cache=False,  # nothing to cache.
         )
 
         self.load_ckpt(model.cfg.ckpt_path)

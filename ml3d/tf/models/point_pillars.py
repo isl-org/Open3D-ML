@@ -12,6 +12,7 @@ from ...utils import MODEL
 
 from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator
 
+
 class PointPillars(BaseModel):
     """Object detection model. 
     Based on the PointPillars architecture 
@@ -63,11 +64,17 @@ class PointPillars(BaseModel):
     def extract_feats(self, points, training=False):
         """Extract features from points."""
         voxels, num_points, coors = self.voxelize(points)
-        voxel_features = self.voxel_encoder(voxels, num_points, coors, training=training)
+        voxel_features = self.voxel_encoder(voxels,
+                                            num_points,
+                                            coors,
+                                            training=training)
 
         batch_size = int(coors[-1, 0].numpy()) + 1
 
-        x = self.middle_encoder(voxel_features, coors, batch_size, training=training)
+        x = self.middle_encoder(voxel_features,
+                                coors,
+                                batch_size,
+                                training=training)
         x = self.backbone(x, training=training)
         x = self.neck(x, training=training)
 
@@ -89,20 +96,21 @@ class PointPillars(BaseModel):
         for i, coor in enumerate(coors):
             paddings = [[0, 0] for i in range(len(coor.shape))]
             paddings[-1] = [1, 0]
-            coor_pad = tf.pad(coor, paddings, mode='CONSTANT', constant_values=i)
+            coor_pad = tf.pad(coor,
+                              paddings,
+                              mode='CONSTANT',
+                              constant_values=i)
             coors_batch.append(coor_pad)
 
         coors_batch = tf.concat(coors_batch, axis=0)
 
         return voxels, num_points, coors_batch
 
-
     def call(self, inputs, training=True):
         x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
 
         return outs
-
 
     def get_optimizer(self, cfg_pipeline):
         raise NotImplementedError
@@ -149,7 +157,8 @@ class PointPillars(BaseModel):
         self.inference_data = data
 
     def inference_preprocess(self):
-        data = tf.convert_to_tensor([self.inference_data["point"]], dtype=np.float32)
+        data = tf.convert_to_tensor([self.inference_data["point"]],
+                                    dtype=np.float32)
 
         return {"data": data}
 
@@ -186,6 +195,7 @@ MODEL._register_module(PointPillars, 'tf')
 
 
 class PointPillarsVoxelization(tf.keras.layers.Layer):
+
     def __init__(self,
                  voxel_size,
                  point_cloud_range,
@@ -204,8 +214,10 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
         super().__init__()
         self.voxel_size = tf.constant(voxel_size, dtype=tf.float32)
         self.point_cloud_range = point_cloud_range
-        self.points_range_min = tf.constant(point_cloud_range[:3], dtype=tf.float32)
-        self.points_range_max = tf.constant(point_cloud_range[3:], dtype=tf.float32)
+        self.points_range_min = tf.constant(point_cloud_range[:3],
+                                            dtype=tf.float32)
+        self.points_range_max = tf.constant(point_cloud_range[3:],
+                                            dtype=tf.float32)
 
         self.max_num_points = max_num_points
         if isinstance(max_voxels, tuple):
@@ -241,19 +253,19 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
                                 max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.
-        feats = tf.concat([tf.zeros_like(points_feats[0:1, :]), points_feats], axis=0)
+        feats = tf.concat([tf.zeros_like(points_feats[0:1, :]), points_feats],
+                          axis=0)
 
         # create raggeed tensor from indices and row splits.
         voxel_point_indices_ragged = tf.RaggedTensor.from_row_splits(
             values=ans.voxel_point_indices,
-            row_splits=ans.voxel_point_row_splits
-        )
+            row_splits=ans.voxel_point_row_splits)
 
         # create dense matrix of indices. index 0 maps to the zero vector.
         voxels_point_indices_dense = voxel_point_indices_ragged.to_tensor(
             default_value=-1,
-            shape=(voxel_point_indices_ragged.shape[0], self.max_num_points)
-            ) + 1
+            shape=(voxel_point_indices_ragged.shape[0],
+                   self.max_num_points)) + 1
 
         out_voxels = tf.gather(feats, voxels_point_indices_dense)
 
@@ -261,7 +273,8 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
             tf.expand_dims(ans.voxel_coords[:, 2], 1),
             tf.expand_dims(ans.voxel_coords[:, 1], 1),
             tf.expand_dims(ans.voxel_coords[:, 0], 1),
-            ], axis=1)
+        ],
+                               axis=1)
 
         out_num_points = ans.voxel_point_row_splits[
             1:] - ans.voxel_point_row_splits[:-1]
@@ -294,7 +307,8 @@ class PFNLayer(tf.keras.layers.Layer):
             out_channels = out_channels // 2
         self.units = out_channels
 
-        self.norm = tf.keras.layers.BatchNormalization(epsilon=1e-3, momentum=0.99)  # Pass self.training
+        self.norm = tf.keras.layers.BatchNormalization(
+            epsilon=1e-3, momentum=0.99)  # Pass self.training
         self.linear = tf.keras.layers.Dense(self.units, use_bias=False)
 
         self.relu = tf.keras.layers.ReLU()
@@ -303,7 +317,11 @@ class PFNLayer(tf.keras.layers.Layer):
         self.mode = mode
 
     #@auto_fp16(apply_to=('inputs'), out_fp32=True)
-    def call(self, inputs, num_voxels=None, aligned_distance=None, training=False):
+    def call(self,
+             inputs,
+             num_voxels=None,
+             aligned_distance=None,
+             training=False):
         """Forward function.
 
         Args:
@@ -330,7 +348,8 @@ class PFNLayer(tf.keras.layers.Layer):
         elif self.mode == 'avg':
             if aligned_distance is not None:
                 x = tf.matmul(x, tf.expand_dims(aligned_distance, -1))
-            x_max = tf.reduce_sum(x, axis=1, keepdims=True) / tf.reshape(tf.cast(num_voxels, inputs.dtype), (-1, 1, 1))
+            x_max = tf.reduce_sum(x, axis=1, keepdims=True) / tf.reshape(
+                tf.cast(num_voxels, inputs.dtype), (-1, 1, 1))
 
         if self.last_vfe:
             return x_max
@@ -411,15 +430,21 @@ class PillarFeatureNet(tf.keras.layers.Layer):
         """
         features_ls = [features]
         # Find distance of x, y, and z from cluster center
-        points_mean = tf.reduce_sum(features[:, :, :3], axis=1, keepdims=True) / tf.reshape(tf.cast(num_points, features.dtype), (-1, 1, 1))
+        points_mean = tf.reduce_sum(
+            features[:, :, :3], axis=1, keepdims=True) / tf.reshape(
+                tf.cast(num_points, features.dtype), (-1, 1, 1))
         f_cluster = features[:, :, :3] - points_mean
         features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
 
-        f_center_0 = features[:, :, 0] - (tf.expand_dims(tf.cast(coors[:, 3], dtype), 1) * self.vx + self.x_offset)
-        f_center_1 = features[:, :, 1] - (tf.expand_dims(tf.cast(coors[:, 2], dtype), 1) * self.vy + self.y_offset)
+        f_center_0 = features[:, :, 0] - (
+            tf.expand_dims(tf.cast(coors[:, 3], dtype), 1) * self.vx +
+            self.x_offset)
+        f_center_1 = features[:, :, 1] - (
+            tf.expand_dims(tf.cast(coors[:, 2], dtype), 1) * self.vy +
+            self.y_offset)
 
         f_center = tf.stack((f_center_0, f_center_1), axis=2)
 
@@ -465,7 +490,8 @@ class PointPillarsScatter(tf.keras.layers.Layer):
     def call(self, voxel_features, coors, batch_size=None, training=False):
         """Forward function to scatter features."""
         if batch_size is not None:
-            return self.forward_batch(voxel_features, coors, batch_size, training)
+            return self.forward_batch(voxel_features, coors, batch_size,
+                                      training)
         else:
             return self.forward_single(voxel_features, coors, training)
 
@@ -485,7 +511,11 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         voxels = tf.transpose(voxel_features)
 
         # Now scatter the blob back to the canvas.
-        indices_grid = tf.stack(tf.meshgrid(tf.cast(tf.range(self.in_channels), indices.dtype), indices, indexing='ij'), axis=-1)
+        indices_grid = tf.stack(tf.meshgrid(tf.cast(tf.range(self.in_channels),
+                                                    indices.dtype),
+                                            indices,
+                                            indexing='ij'),
+                                axis=-1)
         canvas = tf.scatter_nd(indices_grid, voxels, canvas_shape)
         # canvas[:, indices] = voxels
 
@@ -520,7 +550,11 @@ class PointPillarsScatter(tf.keras.layers.Layer):
             voxels = tf.transpose(voxels)
 
             # Now scatter the blob back to the canvas.
-            indices_grid = tf.stack(tf.meshgrid(tf.cast(tf.range(self.in_channels), indices.dtype), indices, indexing='ij'), axis=-1)
+            indices_grid = tf.stack(tf.meshgrid(tf.cast(
+                tf.range(self.in_channels), indices.dtype),
+                                                indices,
+                                                indexing='ij'),
+                                    axis=-1)
             canvas = tf.scatter_nd(indices_grid, voxels, canvas_shape)
             # canvas[:, indices] = voxels
 
@@ -531,7 +565,8 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         batch_canvas = tf.stack(batch_canvas, axis=0)
 
         # Undo the column stacking to final 4-dim tensor
-        batch_canvas = tf.reshape(batch_canvas, (batch_size, self.in_channels, self.ny, self.nx))
+        batch_canvas = tf.reshape(
+            batch_canvas, (batch_size, self.in_channels, self.ny, self.nx))
 
         return batch_canvas
 
@@ -561,19 +596,38 @@ class SECOND(tf.keras.layers.Layer):
         blocks = []
         for i, layer_num in enumerate(layer_nums):
             block = tf.keras.Sequential()
-            block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
+            block.add(
+                tf.keras.layers.ZeroPadding2D(padding=1,
+                                              data_format='channels_first'))
             block.add(tf.keras.layers.Permute((2, 3, 1)))
-            block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_last', use_bias=False, strides=layer_strides[i]))
+            block.add(
+                tf.keras.layers.Conv2D(filters=out_channels[i],
+                                       kernel_size=3,
+                                       data_format='channels_last',
+                                       use_bias=False,
+                                       strides=layer_strides[i]))
             block.add(tf.keras.layers.Permute((3, 1, 2)))
-            block.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
+            block.add(
+                tf.keras.layers.BatchNormalization(axis=1,
+                                                   epsilon=1e-3,
+                                                   momentum=0.99))
             block.add(tf.keras.layers.ReLU())
 
             for j in range(layer_num):
-                block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
+                block.add(
+                    tf.keras.layers.ZeroPadding2D(padding=1,
+                                                  data_format='channels_first'))
                 block.add(tf.keras.layers.Permute((2, 3, 1)))
-                block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_last', use_bias=False))
+                block.add(
+                    tf.keras.layers.Conv2D(filters=out_channels[i],
+                                           kernel_size=3,
+                                           data_format='channels_last',
+                                           use_bias=False))
                 block.add(tf.keras.layers.Permute((3, 1, 2)))
-                block.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
+                block.add(
+                    tf.keras.layers.BatchNormalization(axis=1,
+                                                       epsilon=1e-3,
+                                                       momentum=0.99))
                 block.add(tf.keras.layers.ReLU())
 
             blocks.append(block)
@@ -638,12 +692,14 @@ class SECONDFPN(tf.keras.layers.Layer):
                     kernel_size=stride,
                     data_format='channels_first',
                     use_bias=False,
-                    strides=stride
-                    )
+                    strides=stride)
 
             deblock = tf.keras.Sequential()
             deblock.add(upsample_layer)
-            deblock.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
+            deblock.add(
+                tf.keras.layers.BatchNormalization(axis=1,
+                                                   epsilon=1e-3,
+                                                   momentum=0.99))
             deblock.add(tf.keras.layers.ReLU())
 
             deblocks.append(deblock)
@@ -662,7 +718,10 @@ class SECONDFPN(tf.keras.layers.Layer):
         """
         assert len(x) == len(self.in_channels)
 
-        ups = [deblock(x[i], training=training) for i, deblock in enumerate(self.deblocks)]
+        ups = [
+            deblock(x[i], training=training)
+            for i, deblock in enumerate(self.deblocks)
+        ]
 
         if len(ups) > 1:
             out = tf.concat(ups, axis=1)
@@ -673,20 +732,19 @@ class SECONDFPN(tf.keras.layers.Layer):
 
 
 class Anchor3DHead(tf.keras.layers.Layer):
-    def __init__(self, 
-                 num_classes=3, 
-                 in_channels=384, 
+
+    def __init__(self,
+                 num_classes=3,
+                 in_channels=384,
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
                  ranges=[
-                    [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                    [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                    [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
                  ],
-                 sizes=[[0.6, 0.8, 1.73],
-                        [0.6, 1.76, 1.73],
-                        [1.6, 3.9, 1.56]],
+                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
                  rotations=[0, 1.57]):
 
         super().__init__()
@@ -697,10 +755,9 @@ class Anchor3DHead(tf.keras.layers.Layer):
         self.score_thr = score_thr
 
         # build anchor generator
-        self.anchor_generator = Anchor3DRangeGenerator(
-            ranges=ranges,
-            sizes=sizes,
-            rotations=rotations)
+        self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
+                                                       sizes=sizes,
+                                                       rotations=rotations)
 
         # In 3D detection, the anchor stride is connected with anchor size
         self.num_anchors = self.anchor_generator.num_base_anchors
@@ -714,11 +771,17 @@ class Anchor3DHead(tf.keras.layers.Layer):
         #Initialize neural network layers of the head.
         self.cls_out_channels = self.num_anchors * self.num_classes
 
-        self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels, kernel_size=1, data_format='channels_last')
-        self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors * self.box_code_size, kernel_size=1, data_format='channels_last')
+        self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels,
+                                               kernel_size=1,
+                                               data_format='channels_last')
+        self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors *
+                                               self.box_code_size,
+                                               kernel_size=1,
+                                               data_format='channels_last')
 
-        self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2, kernel_size=1, data_format='channels_last')
-
+        self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2,
+                                                   kernel_size=1,
+                                                   data_format='channels_last')
 
     def call(self, x, training=False):
         """Forward function on a feature map.
@@ -758,7 +821,8 @@ class Anchor3DHead(tf.keras.layers.Layer):
                 (bboxes, scores, labels).
         """
         bboxes, scores, labels = [], [], []
-        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds, dir_preds):
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds,
+                                                  dir_preds):
 
             b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
             bboxes.append(b)
@@ -785,19 +849,15 @@ class Anchor3DHead(tf.keras.layers.Layer):
         anchors = self.anchor_generator.grid_anchors(cls_scores.shape[-2:])
         anchors = tf.reshape(anchors, (-1, self.box_code_size))
 
-        dir_preds = tf.reshape(
-            tf.transpose(dir_preds, perm=(1, 2, 0)),
-            (-1, 2))
+        dir_preds = tf.reshape(tf.transpose(dir_preds, perm=(1, 2, 0)), (-1, 2))
         dir_scores = tf.math.argmax(dir_preds, axis=-1)
 
-        cls_scores = tf.reshape(
-            tf.transpose(cls_scores, perm=(1, 2, 0)),
-            (-1, self.num_classes))
+        cls_scores = tf.reshape(tf.transpose(cls_scores, perm=(1, 2, 0)),
+                                (-1, self.num_classes))
         scores = tf.sigmoid(cls_scores)
 
-        bbox_preds = tf.reshape(
-            tf.transpose(bbox_preds, perm=(1, 2, 0)),
-            (-1, self.box_code_size))
+        bbox_preds = tf.reshape(tf.transpose(bbox_preds, perm=(1, 2, 0)),
+                                (-1, self.box_code_size))
 
         if scores.shape[0] > self.nms_pre:
             max_scores = tf.reduce_max(scores, axis=1)
@@ -812,12 +872,13 @@ class Anchor3DHead(tf.keras.layers.Layer):
         idxs = multiclass_nms(bboxes, scores, self.score_thr)
 
         labels = [
-            tf.fill((idxs[i].shape[0],), i)
-            for i in range(self.num_classes)
+            tf.fill((idxs[i].shape[0],), i) for i in range(self.num_classes)
         ]
         labels = tf.concat(labels, axis=0)
 
-        scores = [tf.gather(scores, idxs[i])[:, i] for i in range(self.num_classes)]
+        scores = [
+            tf.gather(scores, idxs[i])[:, i] for i in range(self.num_classes)
+        ]
         scores = tf.concat(scores, axis=0)
 
         idxs = tf.concat(idxs, axis=0)
@@ -827,9 +888,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             dir_rot = dir_rot + np.pi * tf.cast(dir_scores, dtype=bboxes.dtype)
-            bboxes = tf.concat([
-                bboxes[:,:-1], 
-                tf.expand_dims(dir_rot, -1)
-            ], axis=-1)
+            bboxes = tf.concat(
+                [bboxes[:, :-1], tf.expand_dims(dir_rot, -1)], axis=-1)
 
         return bboxes, scores, labels
