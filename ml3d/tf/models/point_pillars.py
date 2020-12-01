@@ -44,10 +44,65 @@ class PointPillars(BaseModel):
                  **kwargs):
 
         super().__init__(name=name, **kwargs)
+        self.point_cloud_range = point_cloud_range
+
+        self.voxel_layer = PointPillarsVoxelization(
+            point_cloud_range=point_cloud_range,
+            voxel_size=voxel_size,
+            **voxelize)
+        self.voxel_encoder = PillarFeatureNet(
+            point_cloud_range=point_cloud_range,
+            voxel_size=voxel_size,
+            **voxel_encoder)
+        self.middle_encoder = PointPillarsScatter(**scatter)
+
+        self.backbone = SECOND(**backbone)
+        self.neck = SECONDFPN(**neck)
         self.bbox_head = Anchor3DHead(**head)
 
-    def forward(self, inputs):
-        raise NotImplementedError
+    def extract_feats(self, points, training=False):
+        """Extract features from points."""
+        voxels, num_points, coors = self.voxelize(points)
+        voxel_features = self.voxel_encoder(voxels, num_points, coors, training=training)
+
+        batch_size = int(coors[-1, 0].numpy()) + 1
+
+        x = self.middle_encoder(voxel_features, coors, batch_size, training=training)
+        x = self.backbone(x, training=training)
+        x = self.neck(x, training=training)
+
+        return x
+
+    def voxelize(self, points):
+        """Apply hard voxelization to points."""
+        voxels, coors, num_points = [], [], []
+        for res in points:
+            res_voxels, res_coors, res_num_points = self.voxel_layer(res)
+            voxels.append(res_voxels)
+            coors.append(res_coors)
+            num_points.append(res_num_points)
+
+        voxels = tf.concat(voxels, axis=0)
+        num_points = tf.concat(num_points, axis=0)
+
+        coors_batch = []
+        for i, coor in enumerate(coors):
+            paddings = [[0, 0] for i in range(len(coor.shape))]
+            paddings[-1] = [1, 0]
+            coor_pad = tf.pad(coor, paddings, mode='CONSTANT', constant_values=i)
+            coors_batch.append(coor_pad)
+
+        coors_batch = tf.concat(coors_batch, axis=0)
+
+        return voxels, num_points, coors_batch
+
+
+    def call(self, inputs, training=True):
+        x = self.extract_feats(inputs, training=training)
+        outs = self.bbox_head(x, training=training)
+
+        return outs
+
 
     def get_optimizer(self, cfg_pipeline):
         raise NotImplementedError
@@ -56,7 +111,7 @@ class PointPillars(BaseModel):
         raise NotImplementedError
 
     def preprocess(self, data, attr):
-        raise NotImplementedError
+        return data
 
     def transform(self, data, attr):
         raise NotImplementedError
@@ -94,6 +149,9 @@ class PointPillars(BaseModel):
                     BoundingBox3D(pos, front, up, left, dim, label, score))
 
         return True
+
+
+MODEL._register_module(PointPillars, 'tf')
 
 
 class PointPillarsVoxelization(tf.keras.layers.Layer):
@@ -630,10 +688,10 @@ class Anchor3DHead(tf.keras.layers.Layer):
             tuple[tf.Tensor]: Contain score of each class, bbox \
                 regression and direction classification predictions.
         """
-        cls_score = self.conv_cls(x, training=training)
-        bbox_pred = self.conv_reg(x, training=training)
+        cls_score = self.conv_cls(x)
+        bbox_pred = self.conv_reg(x)
         dir_cls_preds = None
-        dir_cls_preds = self.conv_dir_cls(x, training=training)
+        dir_cls_preds = self.conv_dir_cls(x)
 
         return cls_score, bbox_pred, dir_cls_preds
 
