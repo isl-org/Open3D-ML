@@ -16,15 +16,15 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     Returns:
         tf.Tensor: Mask indicates which points are valid inside a voxel.
     """
-    actual_num = tf.expand_dims(actual_num, axis + 1, axis=-1)
+    actual_num = tf.expand_dims(actual_num, axis + 1)
     # tiled_actual_num: [N, M, 1]
     max_num_shape = [1] * len(actual_num.shape)
     max_num_shape[axis + 1] = -1
-    max_num = rf.reshape(
+    max_num = tf.reshape(
         tf.range(max_num, dtype=tf.int64), (max_num_shape))
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
-    paddings_indicator = actual_num.int() > max_num
+    paddings_indicator = tf.cast(actual_num, tf.int64) > max_num
     # paddings_indicator shape: [batch_size, max_num]
     return paddings_indicator
 

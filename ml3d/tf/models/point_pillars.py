@@ -149,9 +149,8 @@ class PointPillars(BaseModel):
         self.inference_data = data
 
     def inference_preprocess(self):
-        data = torch.tensor([self.inference_data["point"]],
-                            dtype=torch.float32,
-                            device=self.device)
+        data = tf.convert_to_tensor([self.inference_data["point"]], dtype=np.float32)
+
         return {"data": data}
 
     def inference_end(self, inputs, results):
@@ -327,7 +326,7 @@ class PFNLayer(tf.keras.layers.Layer):
         if self.mode == 'max':
             if aligned_distance is not None:
                 x = tf.matmul(x, tf.expand_dims(aligned_distance, -1))
-            x_max = tf.reduce_max(x, axis=1, keepdims=True)[0]
+            x_max = tf.reduce_max(x, axis=1, keepdims=True)
         elif self.mode == 'avg':
             if aligned_distance is not None:
                 x = tf.matmul(x, tf.expand_dims(aligned_distance, -1))
@@ -412,16 +411,17 @@ class PillarFeatureNet(tf.keras.layers.Layer):
         """
         features_ls = [features]
         # Find distance of x, y, and z from cluster center
-        points_mean = tf.reduce_sum(features[:, :, :3], axis=1, keepdims=True) / tf.reshape(tf.cast(num_points, features.dtype), -1, 1, 1)
+        points_mean = tf.reduce_sum(features[:, :, :3], axis=1, keepdims=True) / tf.reshape(tf.cast(num_points, features.dtype), (-1, 1, 1))
         f_cluster = features[:, :, :3] - points_mean
         features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
 
-        f_center = features[:, :, :2]
-        f_center[:, :, 0] = f_center[:, :, 0] - (tf.expand_dims(tf.cast(coors[:, 3], dtype), 1) * self.vx + self.x_offset)
-        f_center[:, :, 1] = f_center[:, :, 1] - (tf.expand_dims(tf.cast(coors[:, 2], dtype), 1) * self.vy + self.y_offset)
+        f_center_0 = features[:, :, 0] - (tf.expand_dims(tf.cast(coors[:, 3], dtype), 1) * self.vx + self.x_offset)
+        f_center_1 = features[:, :, 1] - (tf.expand_dims(tf.cast(coors[:, 2], dtype), 1) * self.vy + self.y_offset)
+
+        f_center = tf.stack((f_center_0, f_center_1), axis=2)
 
         features_ls.append(f_center)
 
@@ -509,10 +509,12 @@ class PointPillarsScatter(tf.keras.layers.Layer):
 
             # Only include non-empty pillars
             batch_mask = coors[:, 0] == batch_itt
-            this_coors = coors[batch_mask, :]
+            this_coors = tf.boolean_mask(coors, batch_mask)
+
             indices = this_coors[:, 2] * self.nx + this_coors[:, 3]
             indices = tf.cast(indices, tf.int64)
-            voxels = voxel_features[batch_mask, :]
+
+            voxels = tf.boolean_mask(voxel_features, batch_mask)
             voxels = tf.transpose(voxels)
 
             # Now scatter the blob back to the canvas.
