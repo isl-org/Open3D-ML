@@ -114,13 +114,45 @@ class PointPillars(BaseModel):
         return data
 
     def transform(self, data, attr):
-        raise NotImplementedError
+        points = np.array(data['point'][:, 0:4], dtype=np.float32)
+
+        min_val = np.array(self.point_cloud_range[:3])
+        max_val = np.array(self.point_cloud_range[3:])
+
+        points = points[np.where(
+            np.all(np.logical_and(points[:, :3] >= min_val,
+                                  points[:, :3] < max_val),
+                   axis=-1))]
+
+        if 'bounding_boxes' not in data.keys(
+        ) or data['bounding_boxes'] is None:
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+        else:
+            labels = data['bounding_boxes']
+
+        if 'feat' not in data.keys() or data['feat'] is None:
+            feat = None
+        else:
+            feat = np.array(data['feat'], dtype=np.float32)
+
+        calib = data['calib']
+
+        data = dict()
+        data['point'] = points
+        data['feat'] = feat
+        data['calib'] = calib
+        data['bounding_boxes'] = labels
+
+        return data
 
     def inference_begin(self, data):
-        raise NotImplementedError
+        self.inference_data = data
 
     def inference_preprocess(self):
-        raise NotImplementedError
+        data = torch.tensor([self.inference_data["point"]],
+                            dtype=torch.float32,
+                            device=self.device)
+        return {"data": data}
 
     def inference_end(self, inputs, results):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
@@ -257,13 +289,13 @@ class PFNLayer(tf.keras.layers.Layer):
 
         super().__init__()
         self.fp16_enabled = False
-        self.name = 'PFNLayer'
+        self._name = 'PFNLayer'
         self.last_vfe = last_layer
         if not self.last_vfe:
             out_channels = out_channels // 2
         self.units = out_channels
 
-        self.norm = tf.keras.layers.BatchNormalization(eps=1e-3, momentum=0.99)  # Pass self.training
+        self.norm = tf.keras.layers.BatchNormalization(epsilon=1e-3, momentum=0.99)  # Pass self.training
         self.linear = tf.keras.layers.Dense(self.units, use_bias=False)
 
         self.relu = tf.keras.layers.ReLU()
@@ -423,7 +455,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
 
     def __init__(self, in_channels=64, output_shape=[496, 432]):
         super().__init__()
-        self.output_shape = output_shape
+        self.out_shape = output_shape
         self.ny = output_shape[0]
         self.nx = output_shape[1]
         self.in_channels = in_channels
@@ -525,13 +557,13 @@ class SECOND(tf.keras.layers.Layer):
             block = tf.keras.Sequential()
             block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
             block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_first', use_bias=False, strides=layer_strides[i]))
-            block.add(tf.keras.layers.BatchNormalization(axis=1, eps=1e-3, momentum=0.99))
+            block.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
             block.add(tf.keras.layers.ReLU())
 
             for j in range(layer_num):
                 block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
                 block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_first', use_bias=False))
-                block.add(tf.keras.layers.BatchNormalization(axis=1, eps=1e-3, momentum=0.99))
+                block.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
                 block.add(tf.keras.layers.ReLU())
 
             blocks.append(block)
@@ -571,7 +603,7 @@ class SECONDFPN(tf.keras.layers.Layer):
                  upsample_strides=[1, 2, 4],
                  use_conv_for_no_stride=False):
         # if for GroupNorm,
-        # cfg is dict(type='GN', num_groups=num_groups, eps=1e-3, affine=True)
+        # cfg is dict(type='GN', num_groups=num_groups, epsilon=1e-3, affine=True)
         super(SECONDFPN, self).__init__()
         assert len(out_channels) == len(upsample_strides) == len(in_channels)
         self.in_channels = in_channels
@@ -601,7 +633,7 @@ class SECONDFPN(tf.keras.layers.Layer):
 
             deblock = tf.keras.Sequential()
             deblock.add(upsample_layer)
-            deblock.add(tf.keras.layers.BatchNormalization(axis=1, eps=1e-3, momentum=0.99))
+            deblock.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
             deblock.add(tf.keras.layers.ReLU())
 
             deblocks.append(deblock)
