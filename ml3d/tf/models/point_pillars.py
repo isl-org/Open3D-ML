@@ -562,13 +562,17 @@ class SECOND(tf.keras.layers.Layer):
         for i, layer_num in enumerate(layer_nums):
             block = tf.keras.Sequential()
             block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
-            block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_first', use_bias=False, strides=layer_strides[i]))
+            block.add(tf.keras.layers.Permute((2, 3, 1)))
+            block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_last', use_bias=False, strides=layer_strides[i]))
+            block.add(tf.keras.layers.Permute((3, 1, 2)))
             block.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
             block.add(tf.keras.layers.ReLU())
 
             for j in range(layer_num):
                 block.add(tf.keras.layers.ZeroPadding2D(padding=1, data_format='channels_first'))
-                block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_first', use_bias=False))
+                block.add(tf.keras.layers.Permute((2, 3, 1)))
+                block.add(tf.keras.layers.Conv2D(filters=out_channels[i], kernel_size=3, data_format='channels_last', use_bias=False))
+                block.add(tf.keras.layers.Permute((3, 1, 2)))
                 block.add(tf.keras.layers.BatchNormalization(axis=1, epsilon=1e-3, momentum=0.99))
                 block.add(tf.keras.layers.ReLU())
 
@@ -629,7 +633,7 @@ class SECONDFPN(tf.keras.layers.Layer):
                 )
             else:
                 stride = np.round(1 / stride).astype(np.int64)
-                upsample_layer = tf.keras.layers.Conv2D(
+                upsample_layer = tf.keras.layers.Conv2D(  # TODO : convert to channels last.
                     filters=out_channels[i],
                     kernel_size=stride,
                     data_format='channels_first',
@@ -710,10 +714,10 @@ class Anchor3DHead(tf.keras.layers.Layer):
         #Initialize neural network layers of the head.
         self.cls_out_channels = self.num_anchors * self.num_classes
 
-        self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels, kernel_size=1, data_format='channels_first')
-        self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors * self.box_code_size, kernel_size=1, data_format='channels_first')
+        self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels, kernel_size=1, data_format='channels_last')
+        self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors * self.box_code_size, kernel_size=1, data_format='channels_last')
 
-        self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2, kernel_size=1, data_format='channels_first')
+        self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2, kernel_size=1, data_format='channels_last')
 
 
     def call(self, x, training=False):
@@ -726,10 +730,17 @@ class Anchor3DHead(tf.keras.layers.Layer):
             tuple[tf.Tensor]: Contain score of each class, bbox \
                 regression and direction classification predictions.
         """
+        x = tf.transpose(x, perm=[0, 2, 3, 1])
+
         cls_score = self.conv_cls(x)
+        cls_score = tf.transpose(cls_score, perm=[0, 3, 1, 2])
+
         bbox_pred = self.conv_reg(x)
+        bbox_pred = tf.transpose(bbox_pred, perm=[0, 3, 1, 2])
+
         dir_cls_preds = None
         dir_cls_preds = self.conv_dir_cls(x)
+        dir_cls_preds = tf.transpose(dir_cls_preds, perm=[0, 3, 1, 2])
 
         return cls_score, bbox_pred, dir_cls_preds
 
