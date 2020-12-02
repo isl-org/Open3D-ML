@@ -153,6 +153,9 @@ class PointPillars(BaseModel):
     def transform(self, data, attr):
         return data
 
+    def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
+        return None
+
     def inference_begin(self, data):
         self.inference_data = data
 
