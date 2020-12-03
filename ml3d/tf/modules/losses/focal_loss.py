@@ -29,7 +29,8 @@ class FocalLoss(tf.Module):
         focal_weight = (self.alpha * target + (1 - self.alpha) *
                         (1 - target)) * tf.pow(pt, self.gamma)
 
-        loss = tf.nn.sigmoid_cross_entropy_with_logits(target, pred) * focal_weight
+        loss = tf.nn.sigmoid_cross_entropy_with_logits(target,
+                                                       pred) * focal_weight
 
         if weight is not None:
             loss = loss * weight

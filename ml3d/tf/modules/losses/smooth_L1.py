@@ -33,7 +33,8 @@ class SmoothL1Loss(tf.Module):
 
         diff = tf.abs(pred - target)
 
-        loss = tf.where(diff < self.beta, 0.5 * diff * diff / self.beta, diff - 0.5 * self.beta)
+        loss = tf.where(diff < self.beta, 0.5 * diff * diff / self.beta,
+                        diff - 0.5 * self.beta)
 
         if weight is not None:
             loss = loss * weight

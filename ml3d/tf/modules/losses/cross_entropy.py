@@ -12,9 +12,15 @@ class CrossEntropyLoss(tf.Module):
         super(CrossEntropyLoss, self).__init__()
         self.loss_weight = loss_weight
 
-        self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
+        self.loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(
+            from_logits=True, reduction=tf.keras.losses.Reduction.NONE)
 
-    def __call__(self, cls_score, label, weight=None, avg_factor=None, **kwargs):
+    def __call__(self,
+                 cls_score,
+                 label,
+                 weight=None,
+                 avg_factor=None,
+                 **kwargs):
         """Forward function.
 
         Args:
