@@ -101,7 +101,8 @@ class ObjectDetection(BasePipeline):
                                             optimizer=self.optimizer,
                                             model=self.model)
         else:
-            self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), model=self.model)
+            self.ckpt = tf.train.Checkpoint(step=tf.Variable(1),
+                                            model=self.model)
 
         self.manager = tf.train.CheckpointManager(self.ckpt,
                                                   train_ckpt_dir,
@@ -119,9 +120,9 @@ class ObjectDetection(BasePipeline):
             else:
                 log.info("Initializing from scratch.")
 
-
     def save_ckpt(self, epoch):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format(save_path))
+
 
 PIPELINE._register_module(ObjectDetection, "tf")
