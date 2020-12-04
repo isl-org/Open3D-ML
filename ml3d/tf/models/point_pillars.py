@@ -311,7 +311,7 @@ class PFNLayer(tf.keras.layers.Layer):
         self.units = out_channels
 
         self.norm = tf.keras.layers.BatchNormalization(
-            epsilon=1e-3, momentum=0.99)  # Pass self.training
+            epsilon=1e-3, momentum=0.99, axis=1)  # Pass self.training
         self.linear = tf.keras.layers.Dense(self.units, use_bias=False)
 
         self.relu = tf.keras.layers.ReLU()
