@@ -56,7 +56,8 @@ class Custom3DSplit():
         else:
             feat = np.array(data[:, 3:],
                             dtype=np.float32) if data.shape[1] > 3 else None
-        labels = np.zeros((points.shape[0],), dtype=np.int32)
+            labels = np.zeros((points.shape[0],), dtype=np.int32)
+
         data = {'point': points, 'feat': feat, 'label': labels}
 
         return data
@@ -64,7 +65,9 @@ class Custom3DSplit():
     def get_attr(self, idx):
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.npy', '')
+
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+
         return attr
 
 

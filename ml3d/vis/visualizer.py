@@ -23,9 +23,9 @@ class Model:
                 boxes: The array of pointcloud that define the bounding box.
         """
 
-    def __init__(self, name, boxes):
-        self.name = name
-        self.boxes = boxes
+        def __init__(self, name, boxes):
+            self.name = name
+            self.boxes = boxes
 
     def __init__(self):
         # Note: the tpointcloud cannot store the actual data arrays, because
