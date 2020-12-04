@@ -93,18 +93,35 @@ class ObjectDetection(BasePipeline):
         raise NotImplementedError()
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
-        raise NotImplementedError()
-        # checkpoint = torch.load(ckpt_path, map_location=self.device)
+        train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
+        make_dir(train_ckpt_dir)
 
-        # if 'state_dict' in checkpoint:
-        #     state_dict = checkpoint['state_dict']
-        # else:
-        #     state_dict = checkpoint
+        if hasattr(self, 'optimizer'):
+            self.ckpt = tf.train.Checkpoint(step=tf.Variable(1),
+                                            optimizer=self.optimizer,
+                                            model=self.model)
+        else:
+            self.ckpt = tf.train.Checkpoint(step=tf.Variable(1), model=self.model)
 
-        # if list(state_dict.keys())[0].startswith('module.'):
-        #     state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
+        self.manager = tf.train.CheckpointManager(self.ckpt,
+                                                  train_ckpt_dir,
+                                                  max_to_keep=100)
 
-        # self.model.load_state_dict(state_dict)
+        if ckpt_path is not None:
+            self.ckpt.restore(ckpt_path).expect_partial()
+            log.info("Restored from {}".format(ckpt_path))
+        else:
+            self.ckpt.restore(self.manager.latest_checkpoint)
+
+            if self.manager.latest_checkpoint:
+                log.info("Restored from {}".format(
+                    self.manager.latest_checkpoint))
+            else:
+                log.info("Initializing from scratch.")
 
 
-PIPELINE._register_module(ObjectDetection, "torch")
+    def save_ckpt(self, epoch):
+        save_path = self.manager.save()
+        log.info("Saved checkpoint at: {}".format(save_path))
+
+PIPELINE._register_module(ObjectDetection, "tf")
