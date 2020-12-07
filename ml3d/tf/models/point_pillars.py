@@ -165,16 +165,16 @@ class PointPillars(BaseModel):
 
         return {"data": data}
 
-    def inference_end(self, inputs, results):
+    def inference_end(self, results):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
-        self.inference_result = []
+        inference_result = []
 
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.numpy()
             scores = _scores.numpy()
             labels = _labels.numpy()
-            self.inference_result.append([])
+            inference_result.append([])
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 yaw = bbox[-1]
@@ -188,10 +188,10 @@ class PointPillars(BaseModel):
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
 
-                self.inference_result[-1].append(
+                inference_result[-1].append(
                     BoundingBox3D(pos, front, up, left, dim, label, score))
 
-        return True
+        return inference_result
 
 
 MODEL._register_module(PointPillars, 'tf')

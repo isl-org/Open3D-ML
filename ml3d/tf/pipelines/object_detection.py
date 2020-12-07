@@ -1,5 +1,6 @@
 import tensorflow as tf
 import logging
+import numpy as np
 from tqdm import tqdm
 
 from datetime import datetime
@@ -51,15 +52,12 @@ class ObjectDetection(BasePipeline):
         model = self.model
         log.info("running inference")
 
-        model.inference_begin(data)
+        inputs = tf.convert_to_tensor([data['point']], dtype=np.float32)
 
-        while True:
-            inputs = model.inference_preprocess()
-            results = model(inputs['data'], training=False)
-            if model.inference_end(inputs, results):
-                break
+        results = model(inputs)
+        boxes = model.inference_end(results)
 
-        return model.inference_result
+        return boxes
 
     def run_test(self):
         model = self.model
@@ -112,7 +110,7 @@ class ObjectDetection(BasePipeline):
             self.ckpt.restore(ckpt_path).expect_partial()
             log.info("Restored from {}".format(ckpt_path))
         else:
-            self.ckpt.restore(self.manager.latest_checkpoint)
+            self.ckpt.restore(self.manager.latest_checkpoint).expect_partial()
 
             if self.manager.latest_checkpoint:
                 log.info("Restored from {}".format(
