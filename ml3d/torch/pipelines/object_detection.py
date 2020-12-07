@@ -12,7 +12,7 @@ from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
-from ...utils import make_dir, PIPELINE, LogRecord, get_runid
+from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -66,7 +66,6 @@ class ObjectDetection(BasePipeline):
                 inputs = model.inference_preprocess()
                 results = model(inputs['data'])
 
-                print(model.get_loss(None, results, inputs['data']))
                 if model.inference_end(inputs, results):
                     break
 
@@ -158,7 +157,6 @@ class ObjectDetection(BasePipeline):
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
-
         for epoch in range(0, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
@@ -168,7 +166,7 @@ class ObjectDetection(BasePipeline):
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
-                loss = model.loss(results, inputs)
+                loss = model.get_loss(None, results, inputs['data'])
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -232,5 +230,17 @@ class ObjectDetection(BasePipeline):
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
+    def save_config(self, writer):
+        '''
+        Save experiment configuration with tensorboard summary
+        '''
+        writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
+        writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
+        writer.add_text('Configuration/Dataset',
+                        code2md(self.cfg_tb['dataset'], language='json'), 0)
+        writer.add_text('Configuration/Model',
+                        code2md(self.cfg_tb['model'], language='json'), 0)
+        writer.add_text('Configuration/Pipeline',
+                        code2md(self.cfg_tb['pipeline'], language='json'), 0)
 
 PIPELINE._register_module(ObjectDetection, "torch")

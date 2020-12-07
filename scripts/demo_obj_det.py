@@ -34,7 +34,21 @@ def parse_args():
 def main(args):
 
     model = PointPillars(voxel_size=[0.16, 0.16, 4],
-                         point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1])
+                         point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1],
+                         loss={
+                            "focal": {
+                                "gamma": 2.0,
+                                "alpha": 0.25,
+                                "loss_weight": 1.0
+                            },
+                            "smooth_l1": {
+                                "beta": 0.11,
+                                "loss_weight": 2.0
+                            },
+                            "cross_entropy": {
+                                "loss_weight": 0.2
+                            }
+                         })
     dataset = KITTI(args.path_kitti)
     pipeline = ObjectDetection(model, dataset, device="gpu")
 

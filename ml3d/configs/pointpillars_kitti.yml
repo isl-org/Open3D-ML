@@ -52,13 +52,15 @@ model:
   
 pipeline:
   name: ObjectDetection
-  batch_size: 2
+  batch_size: 1
+  val_batch_size: 1
   save_ckpt_freq: 5
   max_epoch: 200
   main_log_dir: ./logs
+  train_sum_dir: train_log
   grad_clip_norm: 2
   optimizer:
-    learning_rate: 0.001
+    lr: 0.001
     betas: [0.95, 0.99]
     weight_decay: 0.01
     
