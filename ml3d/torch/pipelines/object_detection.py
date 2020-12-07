@@ -57,7 +57,9 @@ class ObjectDetection(BasePipeline):
         model.eval()
 
         with torch.no_grad():
-            inputs = torch.tensor([data['point']], dtype=torch.float32, device=self.device)
+            inputs = torch.tensor([data['point']],
+                                  dtype=torch.float32,
+                                  device=self.device)
             results = model(inputs)
             boxes = model.inference_end(results)
 

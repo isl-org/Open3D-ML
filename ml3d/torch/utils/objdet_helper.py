@@ -81,7 +81,8 @@ def xywhr2xyxyr(boxes_xywhr):
         [1.0, 0.0, 0.5, 0.0, 0.0],
         [0.0, 1.0, 0.0, 0.5, 0.0],
         [0.0, 0.0, 0.0, 0.0, 1.0],
-    ], device=boxes_xywhr.device)
+    ],
+                             device=boxes_xywhr.device)
     return boxes_xywhr @ transform.t()
 
 

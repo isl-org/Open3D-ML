@@ -248,8 +248,7 @@ class PointPillarsVoxelization(torch.nn.Module):
         points = points_feats[:, :3]
 
         ans = voxelize(points, self.voxel_size, self.points_range_min,
-                                self.points_range_max, self.max_num_points,
-                                max_voxels)
+                       self.points_range_max, self.max_num_points, max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.
         feats = torch.cat(
@@ -672,20 +671,18 @@ class SECONDFPN(nn.Module):
 
 class Anchor3DHead(nn.Module):
 
-    def __init__(self, 
-                 num_classes=3, 
-                 in_channels=384, 
+    def __init__(self,
+                 num_classes=3,
+                 in_channels=384,
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
                  ranges=[
-                    [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                    [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                    [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
                  ],
-                 sizes=[[0.6, 0.8, 1.73],
-                        [0.6, 1.76, 1.73],
-                        [1.6, 3.9, 1.56]],
+                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
                  rotations=[0, 1.57]):
 
         super().__init__()
@@ -696,10 +693,9 @@ class Anchor3DHead(nn.Module):
         self.score_thr = score_thr
 
         # build anchor generator
-        self.anchor_generator = Anchor3DRangeGenerator(
-            ranges=ranges,
-            sizes=sizes,
-            rotations=rotations)
+        self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
+                                                       sizes=sizes,
+                                                       rotations=rotations)
 
         # In 3D detection, the anchor stride is connected with anchor size
         self.num_anchors = self.anchor_generator.num_base_anchors
@@ -748,7 +744,8 @@ class Anchor3DHead(nn.Module):
                 (bboxes, scores, labels).
         """
         bboxes, scores, labels = [], [], []
-        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds, dir_preds):
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds,
+                                                  dir_preds):
 
             b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
             bboxes.append(b)
@@ -812,5 +809,5 @@ class Anchor3DHead(nn.Module):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
-            
+
         return bboxes, scores, labels
