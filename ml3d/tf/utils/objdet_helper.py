@@ -3,7 +3,7 @@ import tensorflow as tf
 
 from functools import partial
 
-import open3d.ml.tf as ml3d
+from open3d.ml.tf.ops import nms
 
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
@@ -263,7 +263,7 @@ def multiclass_nms(boxes, scores, score_thr):
         _boxes = tf.gather(boxes, cls_inds)
         _bev = xywhr2xyxyr(tf.gather(_boxes, [0, 1, 3, 4, 6], axis=1))
 
-        idx = ml3d.ops.nms(_bev, _scores, 0.01)
+        idx = nms(_bev, _scores, 0.01)
         idxs.append(tf.gather(cls_inds, idx))
 
     return idxs

@@ -1,10 +1,10 @@
 import tensorflow as tf
 import numpy as np
 import random
-import open3d.ml.tf as ml3d
 
 from tqdm import tqdm
 
+from open3d.ml.tf.ops import voxelize
 from ...vis.boundingbox import BoundingBox3D
 
 from .base_model import BaseModel
@@ -251,7 +251,7 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
 
         points = points_feats[:, :3]
 
-        ans = ml3d.ops.voxelize(points, self.voxel_size, self.points_range_min,
+        ans = voxelize(points, self.voxel_size, self.points_range_min,
                                 self.points_range_max, self.max_num_points,
                                 max_voxels)
 
