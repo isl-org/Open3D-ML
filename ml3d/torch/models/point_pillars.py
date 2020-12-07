@@ -34,7 +34,7 @@ from ...vis.boundingbox import BoundingBox3D
 from .base_model import BaseModel
 
 from ...utils import MODEL
-from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator
+from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator, bbox_overlaps, box3d_to_bev2d
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
@@ -69,6 +69,7 @@ class PointPillars(BaseModel):
                  backbone={},
                  neck={},
                  head={},
+                 loss={},
                  **kwargs):
 
         super().__init__(name=name, **kwargs)
@@ -87,6 +88,11 @@ class PointPillars(BaseModel):
         self.backbone = SECOND(**backbone)
         self.neck = SECONDFPN(**neck)
         self.bbox_head = Anchor3DHead(**head)
+
+        self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
+        self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
+        self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
+
 
     def extract_feats(self, points):
         """Extract features from points."""
@@ -121,11 +127,46 @@ class PointPillars(BaseModel):
         outs = self.bbox_head(x)
         return outs
 
-    def get_optimizer(self, cfg_pipeline):
-        raise NotImplementedError
+    def get_optimizer(self, cfg):
+        optimizer = torch.optim.AdamW(self.parameters(), **cfg)
+        return optimizer, None
 
     def get_loss(self, Loss, results, inputs):
-        raise NotImplementedError
+        scores = torch.tensor(np.load('scores.npy'))
+        bboxes = torch.tensor(np.load('bbox.npy'))
+        dirs = torch.tensor(np.load('dirs.npy'))
+        gt_bboxes = [torch.tensor(np.load('gt_bboxes%d.npy'%i)) for i in range(6)]
+        gt_labels = [torch.tensor(np.load('gt_labels%d.npy'%i)) for i in range(6)]
+
+        #scores, bboxes, dirs = results
+        #gt_scores, gt_bboxes, gt_dirs = inputs
+
+        # generate and filter bboxes
+        target_bboxes, target_labels, pos_w, neg_w = self.bbox_head.assign_bboxes(bboxes, gt_bboxes, gt_labels)
+
+        avg_factor = pos_w.sum()
+
+        scores = scores.permute((0, 2, 3, 1)).reshape(-1, scores.shape[-1])
+        bboxes = bboxes.permute((0, 2, 3, 1)).reshape(-1, bboxes.shape[-1])
+        dirs = dirs.permute((0, 2, 3, 1)).reshape(-1, 2)
+
+        # classification loss
+        loss_cls = self.loss_cls(
+            scores[(pos_w+neg_w) > 0], target_labels[(pos_w+neg_w) > 0], avg_factor=avg_factor)
+
+        # bbox loss
+
+        loss_bbox = self.loss_bbox(
+            bboxes[pos_w > 0], target_bboxes[pos_w > 0], avg_factor=avg_factor)
+
+        # direction classification loss
+        target_dir = target_bboxes[pos_w > 0][:,-1]
+        loss_dir = self.loss_dir(dirs[os_w > 0], target_dir, avg_factor=avg_factor)
+
+        return loss_cls + loss_bbox + loss_dir
+
+        
+
 
     def preprocess(self, data, attr):
         return data
@@ -716,6 +757,8 @@ class Anchor3DHead(nn.Module):
         self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
                                       1)
 
+        self.iou_thr = [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+
     def forward(self, x):
         """Forward function on a feature map.
 
@@ -731,6 +774,76 @@ class Anchor3DHead(nn.Module):
         dir_cls_preds = None
         dir_cls_preds = self.conv_dir_cls(x)
         return cls_score, bbox_pred, dir_cls_preds
+
+    def assign_bboxes(self, pred_bboxes, target_bboxes, target_labels):
+        """Assigns target bboxes to given anchors.
+
+        Args:
+            pred_bboxes (torch.Tensor): Bbox predictions (anchors).
+            target_bboxes (torch.Tensor): Bbox targets.
+            target_labels (torch.Tensor): Target labels.
+
+        Returns:
+            torch.Tensor: Assigned target bboxes for each given anchor.
+            torch.Tensor: Assigned target labels for each given anchor.
+            torch.Tensor: Weights of positive assignments.
+            torch.Tensor: Weights of negative assignments.
+        """
+
+        assert(len(target_bboxes) == len(target_labels))
+
+        # compute all anchors
+        anchors = [self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:],
+                                                    device=pred_bboxes.device)
+                                                    for _ in range(len(target_bboxes))]
+        
+        # compute size of anchors for each given class
+        anchors_size = torch.tensor(anchors[0].shape[:-3]).prod() * anchors[0].shape[-2]
+        anchors_lvls = anchors[0].shape[-3]
+
+        # init the tensors for the final result
+        assigned_bboxes = torch.zeros((len(target_bboxes), anchors_lvls, anchors_size, self.box_code_size), device=pred_bboxes.device)
+        assigned_labels = torch.zeros((len(target_bboxes), anchors_lvls, anchors_size), device=pred_bboxes.device)
+        pos_w = torch.zeros((len(target_bboxes), anchors_lvls, anchors_size), device=pred_bboxes.device)
+        neg_w = torch.zeros((len(target_bboxes), anchors_lvls, anchors_size), device=pred_bboxes.device)
+
+        for i in range(len(target_bboxes)):
+            for j, (neg_th, pos_th) in enumerate(self.iou_thr):
+                anchors_stride = anchors[i][..., j, :, :].reshape(-1, self.box_code_size)
+
+                # compute a fast approximation of IoU
+                overlaps = bbox_overlaps(
+                    box3d_to_bev2d(target_bboxes[i]), 
+                    box3d_to_bev2d(anchors_stride))
+
+                # for each anchor the gt with max IoU
+                max_overlaps, argmax_overlaps = overlaps.max(dim=0)
+                # for each gt the anchor with max IoU
+                gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)
+
+                pos_idx = max_overlaps >= pos_th
+                neg_idx = (max_overlaps >= 0) & (max_overlaps < neg_th)
+
+                # low-quality matching
+                for k in range(len(target_bboxes[i])):
+                    if gt_max_overlaps[k] >= neg_th:
+                        pos_idx[overlaps[k, :] == gt_max_overlaps[k]] = True
+
+                # encode bbox for positive matches
+                assigned_bboxes[i, j, pos_idx] = self.bbox_coder.encode(
+                    anchors_stride[pos_idx], target_bboxes[i][argmax_overlaps[pos_idx]])
+                # invalidate labels with negative match
+                assigned_labels[i, j, neg_idx] = self.num_classes
+                assigned_labels[i, j, pos_idx] = target_labels[i][argmax_overlaps[pos_idx]]
+                # store matches in weight tensors
+                pos_w[i, j, pos_idx] = 1.0
+                neg_w[i, j, neg_idx] = 1.0
+
+        return (
+            assigned_bboxes.reshape(len(target_bboxes), -1, self.box_code_size), 
+            assigned_labels.reshape(len(target_bboxes), -1), 
+            pos_w.reshape(len(target_bboxes), -1),
+            neg_w.reshape(len(target_bboxes), -1))
 
     def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
         """Get bboxes of anchor head.

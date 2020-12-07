@@ -5,11 +5,14 @@ from tqdm import tqdm
 from datetime import datetime
 
 from os.path import exists, join
+from torch.utils.data import DataLoader
+from pathlib import Path
 
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader
+from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
-from ...utils import make_dir, PIPELINE, LogRecord
+from ...utils import make_dir, PIPELINE, LogRecord, get_runid
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -62,6 +65,8 @@ class ObjectDetection(BasePipeline):
             while True:
                 inputs = model.inference_preprocess()
                 results = model(inputs['data'])
+
+                print(model.get_loss(None, results, inputs['data']))
                 if model.inference_end(inputs, results):
                     break
 
@@ -100,7 +105,96 @@ class ObjectDetection(BasePipeline):
                 results.extend(result)
 
     def run_train(self):
-        raise NotImplementedError()
+        model = self.model
+        device = self.device
+        model.device = device
+        dataset = self.dataset
+
+        cfg = self.cfg
+        model.to(device)
+
+        log.info("DEVICE : {}".format(device))
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
+        train_dataset = dataset.get_split('training')
+        train_split = TorchDataloader(dataset=train_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
+        train_loader = DataLoader(train_split,
+                                  batch_size=cfg.batch_size)
+
+        valid_dataset = dataset.get_split('validation')
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.val_batch_size)
+
+        self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
+
+        is_resume = model.cfg.get('is_resume', True)
+        self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
+
+        dataset_name = dataset.name if dataset is not None else ''
+        tensorboard_dir = join(
+            self.cfg.train_sum_dir,
+            model.__class__.__name__ + '_' + dataset_name + '_torch')
+        runid = get_runid(tensorboard_dir)
+        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+                                    runid + '_' + Path(tensorboard_dir).name)
+
+        writer = SummaryWriter(self.tensorboard_dir)
+        self.save_config(writer)
+        log.info("Writing summary in {}.".format(self.tensorboard_dir))
+
+        log.info("Started training")
+
+        for epoch in range(0, cfg.max_epoch + 1):
+            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            model.train()
+            self.losses = []
+            #self.accs = []
+            #self.ious = []
+
+            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+                results = model(inputs['data'])
+                loss = model.loss(results, inputs)
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                if model.cfg.get('grad_clip_norm', -1) > 0:
+                    torch.nn.utils.clip_grad_value_(model.parameters(),
+                                                    model.cfg.grad_clip_norm)
+                self.optimizer.step()
+
+                #acc = metric.acc(predict_scores, gt_labels)
+                #iou = metric.iou(predict_scores, gt_labels)
+
+                self.losses.append(loss.cpu().item())
+                #self.accs.append(acc)
+                #self.ious.append(iou)
+
+            #self.scheduler.step()
+
+            # --------------------- validation
+            #model.eval()
+            #self.run_valid()
+
+            self.save_logs(writer, epoch)
+
+            if epoch % cfg.save_ckpt_freq == 0:
+                self.save_ckpt(epoch)
+
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
