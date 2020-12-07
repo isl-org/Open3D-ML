@@ -39,7 +39,10 @@ def main(args):
     pipeline = ObjectDetection(model, dataset, device="gpu")
 
     # load the parameters.
-    pipeline.load_ckpt(ckpt_path='/Users/lprantl/Open3D-ML/checkpoints/pointpillars_kitt_3class_mmdet.pth')
+    pipeline.load_ckpt(
+        ckpt_path=
+        '/Users/lprantl/Open3D-ML/checkpoints/pointpillars_kitt_3class_mmdet.pth'
+    )
 
     test_split = TorchDataloader(dataset=dataset.get_split('training'),
                                  preprocess=model.preprocess,
