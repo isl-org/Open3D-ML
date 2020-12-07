@@ -56,16 +56,12 @@ class ObjectDetection(BasePipeline):
         model.device = device
         model.eval()
 
-        model.inference_begin(data)
-
         with torch.no_grad():
-            while True:
-                inputs = model.inference_preprocess()
-                results = model(inputs['data'])
-                if model.inference_end(inputs, results):
-                    break
+            inputs = torch.tensor([data['point']], dtype=torch.float32, device=self.device)
+            results = model(inputs)
+            boxes = model.inference_end(results)
 
-        return model.inference_result
+        return boxes
 
     def run_test(self):
         model = self.model

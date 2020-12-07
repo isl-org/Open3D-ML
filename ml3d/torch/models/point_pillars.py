@@ -31,7 +31,7 @@ import open3d.ml.torch as ml3d
 
 from ...vis.boundingbox import BoundingBox3D
 
-from .base_model import BaseModel
+from .base_model_objdet import BaseModel
 
 from ...utils import MODEL
 from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator
@@ -163,25 +163,16 @@ class PointPillars(BaseModel):
 
         return data
 
-    def inference_begin(self, data):
-        self.inference_data = data
-
-    def inference_preprocess(self):
-        data = torch.tensor([self.inference_data["point"]],
-                            dtype=torch.float32,
-                            device=self.device)
-        return {"data": data}
-
-    def inference_end(self, inputs, results):
+    def inference_end(self, results):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
-        self.inference_result = []
+        inference_result = []
 
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
             labels = _labels.cpu().numpy()
-            self.inference_result.append([])
+            inference_result.append([])
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 yaw = bbox[-1]
@@ -195,10 +186,10 @@ class PointPillars(BaseModel):
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
 
-                self.inference_result[-1].append(
+                inference_result[-1].append(
                     BoundingBox3D(pos, front, up, left, dim, label, score))
 
-        return True
+        return inference_result
 
 
 MODEL._register_module(PointPillars, 'torch')
