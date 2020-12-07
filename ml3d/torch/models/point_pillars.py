@@ -207,7 +207,7 @@ class PointPillarsVoxelization(torch.nn.Module):
                  voxel_size,
                  point_cloud_range,
                  max_num_points=32,
-                 max_voxels=[16000, 40000]):
+                 max_voxels=(16000, 40000)):
         """Voxelization layer for the PointPillars model.
 
         Args:
