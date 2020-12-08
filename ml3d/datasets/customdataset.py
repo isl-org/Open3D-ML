@@ -23,6 +23,15 @@ log = logging.getLogger(__name__)
 
 
 class Custom3DSplit():
+    """This class is used to create a custom dataset split.
+    Initialize the class.
+    Args:
+        dataset: The dataset to split.
+        split: A string identifying the dataset split that is usually one of 'training', 'test', 'validation', or 'all'.
+        **kwargs: The configuration of the model as keyword arguments.
+    Returns:
+        A dataset split object providing the requested subset of the data.
+    """
 
     def __init__(self, dataset, split='training'):
         self.cfg = dataset.cfg
@@ -38,7 +47,6 @@ class Custom3DSplit():
 
     def get_data(self, idx):
         pc_path = self.path_list[idx]
-
         data = np.load(pc_path)
         points = np.array(data[:, :3], dtype=np.float32)
 
@@ -59,12 +67,23 @@ class Custom3DSplit():
         name = pc_path.name.replace('.npy', '')
 
         attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+
         return attr
 
 
 class Custom3D(BaseDataset):
     """
-    A template for customized dataset. Can be modified by users.
+    A template for customized datasetthat you can use with a dataloader to feed data when training a model. This inherits all functions from the base dataset and can be modified by users.
+    Initialize the function by passing the dataset and other details.
+    
+    Args:
+        dataset_path: The path to the dataset to use.
+        name: The name of the dataset.
+        cache_dir: The directory where the cache is stored.
+        use_cache: Indicates if the dataset should be cached.
+        num_points: The maximum number of points to use when splitting the dataset.
+        ignored_label_inds: A list of labels that should be ignored in the dataset.
+        test_result_folder: The folder where the test results should be stored.
     """
 
     def __init__(self,
@@ -106,6 +125,14 @@ class Custom3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
+        """
+                Returns a label to names dictonary object.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            values are the corresponding names.
+    """
+
         label_to_names = {
             0: 'Unclassified',
             1: 'Ground',
@@ -120,9 +147,33 @@ class Custom3D(BaseDataset):
         return label_to_names
 
     def get_split(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+                """
+
         return Custom3DSplit(self, split=split)
 
     def get_split_list(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+                                                
+                                Raises:
+                                     ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+            'training', 'test', 'validation', or 'all'.
+        """
+
         if split in ['test', 'testing']:
             random.shuffle(self.test_files)
             return self.test_files
@@ -137,8 +188,18 @@ class Custom3D(BaseDataset):
             return files
         else:
             raise ValueError("Invalid split {}".format(split))
+        """Checks if a datum in the dataset has been tested.
+        
+        Args:
+            dataset: The current dataset to which the datum belongs to.
+                                                attr: The attribute that needs to be checked.
+
+        Returns:
+            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+    """
 
     def is_tested(self, attr):
+
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -150,6 +211,13 @@ class Custom3D(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
+        """Saves the output of a model.
+
+        Args:
+            results: The output of a model for the datum associated with the attribute passed.
+            attr: The attributes that correspond to the outputs passed in results.
+    """
+
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder

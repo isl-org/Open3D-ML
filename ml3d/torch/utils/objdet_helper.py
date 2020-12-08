@@ -75,15 +75,16 @@ def xywhr2xyxyr(boxes_xywhr):
     Returns:
         torch.Tensor: Converted boxes in XYXYR format.
     """
-    transform = torch.tensor([
-        [1.0, 0.0, -0.5, 0.0, 0.0],
-        [0.0, 1.0, 0.0, -0.5, 0.0],
-        [1.0, 0.0, 0.5, 0.0, 0.0],
-        [0.0, 1.0, 0.0, 0.5, 0.0],
-        [0.0, 0.0, 0.0, 0.0, 1.0],
-    ],
-                             device=boxes_xywhr.device)
-    return boxes_xywhr @ transform.t()
+    boxes = torch.zeros_like(boxes_xywhr)
+    half_w = boxes_xywhr[:, 2] / 2
+    half_h = boxes_xywhr[:, 3] / 2
+
+    boxes[:, 0] = boxes_xywhr[:, 0] - half_w
+    boxes[:, 1] = boxes_xywhr[:, 1] - half_h
+    boxes[:, 2] = boxes_xywhr[:, 0] + half_w
+    boxes[:, 3] = boxes_xywhr[:, 1] + half_h
+    boxes[:, 4] = boxes_xywhr[:, 4]
+    return boxes
 
 
 class Anchor3DRangeGenerator(object):
@@ -185,7 +186,7 @@ class Anchor3DRangeGenerator(object):
                                    anchor_range[3],
                                    feature_size[2],
                                    device=device)
-        sizes = torch.tensor(sizes, device=device)
+        sizes = torch.tensor(sizes, device=device).reshape(-1, 3)
         rotations = torch.tensor(rotations, device=device)
 
         # torch.meshgrid default behavior is 'id', np's default is 'xy'
@@ -195,9 +196,10 @@ class Anchor3DRangeGenerator(object):
         for i in range(len(rets)):
             rets[i] = rets[i].unsqueeze(-2).unsqueeze(-1)
 
+        sizes = sizes.reshape([1, 1, 1, 1, 1, 3])
         tile_size_shape = list(rets[0].shape)
-        tile_size_shape[-1] = sizes.shape[-1]
-        sizes = torch.zeros(tile_size_shape, device=device) + sizes
+        tile_size_shape[3] = 1
+        sizes = sizes.repeat(tile_size_shape)
         rets.insert(3, sizes)
 
         ret = torch.cat(rets, dim=-1).permute([2, 1, 0, 3, 4, 5])
@@ -291,13 +293,20 @@ def multiclass_nms(boxes, scores, score_thr):
 
     idxs = []
     for i in range(scores.shape[1]):
-        cls_inds = torch.where(scores[:, i] > score_thr)[0]
+        cls_inds = scores[:, i] > score_thr
+        if not cls_inds.any():
+            idxs.append(torch.tensor([], dtype=torch.long))
+            continue
 
+        orig_idx = torch.arange(cls_inds.shape[0],
+                                device=cls_inds.device,
+                                dtype=torch.long)[cls_inds]
         _scores = scores[cls_inds, i]
         _boxes = boxes[cls_inds, :]
         _bev = xywhr2xyxyr(_boxes[:, [0, 1, 3, 4, 6]])
 
         idx = nms(_bev, _scores, 0.01)
-        idxs.append(cls_inds[idx])
+
+        idxs.append(orig_idx[idx])
 
     return idxs

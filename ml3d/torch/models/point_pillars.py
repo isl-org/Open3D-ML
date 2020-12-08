@@ -201,7 +201,7 @@ class PointPillarsVoxelization(torch.nn.Module):
                  voxel_size,
                  point_cloud_range,
                  max_num_points=32,
-                 max_voxels=[16000, 40000]):
+                 max_voxels=(16000, 40000)):
         """Voxelization layer for the PointPillars model.
 
         Args:
@@ -671,31 +671,26 @@ class SECONDFPN(nn.Module):
 
 class Anchor3DHead(nn.Module):
 
-    def __init__(self,
-                 num_classes=3,
-                 in_channels=384,
-                 feat_channels=384,
-                 nms_pre=100,
-                 score_thr=0.1,
-                 ranges=[
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-                 ],
-                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
-                 rotations=[0, 1.57]):
+    def __init__(self, num_classes=3, in_channels=384, feat_channels=384):
 
         super().__init__()
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.feat_channels = feat_channels
-        self.nms_pre = nms_pre
-        self.score_thr = score_thr
 
         # build anchor generator
-        self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
-                                                       sizes=sizes,
-                                                       rotations=rotations)
+        self.anchor_generator = Anchor3DRangeGenerator(ranges=[
+            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+            [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+        ],
+                                                       sizes=[[0.6, 0.8, 1.73],
+                                                              [0.6, 1.76, 1.73],
+                                                              [1.6, 3.9, 1.56]],
+                                                       rotations=[0, 1.57])
+
+        self.nms_pre = 100
+        self.score_thr = 0.1
 
         # In 3D detection, the anchor stride is connected with anchor size
         self.num_anchors = self.anchor_generator.num_base_anchors
@@ -743,29 +738,9 @@ class Anchor3DHead(nn.Module):
             tuple[torch.Tensor]: Prediction results of batches 
                 (bboxes, scores, labels).
         """
-        bboxes, scores, labels = [], [], []
-        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds,
-                                                  dir_preds):
+        assert len(cls_scores) == len(bbox_preds)
+        assert len(cls_scores) == len(dir_preds)
 
-            b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
-            bboxes.append(b)
-            scores.append(s)
-            labels.append(l)
-        return bboxes, scores, labels
-
-    def get_bboxes_single(self, cls_scores, bbox_preds, dir_preds):
-        """Get bboxes of anchor head.
-
-        Args:
-            cls_scores (list[torch.Tensor]): Class scores.
-            bbox_preds (list[torch.Tensor]): Bbox predictions.
-            dir_cls_preds (list[torch.Tensor]): Direction
-                class predictions.
-
-        Returns:
-            tuple[torch.Tensor]: Prediction results of batches 
-                (bboxes, scores, labels).
-        """
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]
         assert cls_scores.size()[-2:] == dir_preds.size()[-2:]
 
@@ -773,13 +748,15 @@ class Anchor3DHead(nn.Module):
                                                      device=cls_scores.device)
         anchors = anchors.reshape(-1, self.box_code_size)
 
-        dir_preds = dir_preds.permute(1, 2, 0).reshape(-1, 2)
+        dir_preds = dir_preds.permute(0, 2, 3, 1).reshape(-1, 2)
         dir_scores = torch.max(dir_preds, dim=-1)[1]
 
-        cls_scores = cls_scores.permute(1, 2, 0).reshape(-1, self.num_classes)
+        cls_scores = cls_scores.permute(0, 2, 3,
+                                        1).reshape(-1, self.num_classes)
         scores = cls_scores.sigmoid()
 
-        bbox_preds = bbox_preds.permute(1, 2, 0).reshape(-1, self.box_code_size)
+        bbox_preds = bbox_preds.permute(0, 2, 3,
+                                        1).reshape(-1, self.box_code_size)
 
         if scores.shape[0] > self.nms_pre:
             max_scores, _ = scores.max(dim=1)
@@ -809,5 +786,4 @@ class Anchor3DHead(nn.Module):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
-
         return bboxes, scores, labels
