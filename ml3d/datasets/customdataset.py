@@ -58,7 +58,7 @@ class Custom3DSplit():
                             dtype=np.float32) if data.shape[1] > 3 else None
             labels = np.zeros((points.shape[0],), dtype=np.int32)
 
-        data = {'point': points, 'feat': feat, 'label': labels}
+            data = {'point': points, 'feat': feat, 'label': labels}
 
         return data
 
