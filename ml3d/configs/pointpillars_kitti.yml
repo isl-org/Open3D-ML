@@ -1,0 +1,43 @@
+dataset:
+  name: KITTI
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+
+model:
+  name: PointPillars
+  ckpt_path: # path/to/your/checkpoint
+
+  voxel_size: [0.16, 0.16, 4]
+  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
+
+  voxelize:
+    max_num_points: 32
+    max_voxels: [16000, 40000]
+  
+  voxel_encoder:
+    in_channels: 4
+    feat_channels: [64]
+
+  scatter:
+    in_channels: 64
+    output_shape: [496, 432]
+
+  backbone:
+    in_channels: 64
+    out_channels: [64, 128, 256]
+    layer_nums: [3, 5, 5]
+    layer_strides: [2, 2, 2]
+
+  neck:
+    in_channels: [64, 128, 256]
+    out_channels: [128, 128, 128]
+    upsample_strides: [1, 2, 4]
+    use_conv_for_no_stride: False
+
+  head:
+    num_classes: 3
+    in_channels: 384
+    feat_channels: 384
+  
+pipeline:
+  name: ObjectDetection

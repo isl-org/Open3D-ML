@@ -8,6 +8,9 @@ Users can inspect the prediction results using the visualizer. Run `python examp
 
 First, initialize a `Visualizer` and set up `LabelLUT` as label names to visualize. Here we would like to visualize points from `SemanticKITTI`. The labels can be obtained by `get_label_to_names()`
 ```python
+    import os
+    from os import path
+    from os.path import exists
     from ml3d.vis import Visualizer, LabelLUT
     from ml3d.datasets import SemanticKITTI
     
@@ -54,7 +57,7 @@ Second, we will construct the networks and pipelines, load the pretrained weight
     pcs = get_custom_data(pc_names, data_path)
 ```
 
-Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` visualize is a list of point clouds and their predictions. Each point cloud is a dictionary like, 
+Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` is a list of point clouds and their predictions. Each point cloud is a dictionary like, 
 ```python
     vis_d = {
         "name": name,

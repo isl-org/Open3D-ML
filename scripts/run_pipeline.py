@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument('--cfg_dataset',
                         help='path to the dataset\'s config file')
     parser.add_argument('--dataset_path', help='path to the dataset')
+    parser.add_argument('--ckpt_path', help='path to the checkpoint')
     parser.add_argument('--device',
                         help='device to run the pipeline',
                         default='gpu')
