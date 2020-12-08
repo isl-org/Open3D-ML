@@ -238,9 +238,20 @@ class DatasetModel(Model):
             real_indices = [path2idx[p] for p in sorted(path2idx.keys())]
             indices = [real_indices[idx] for idx in indices]
 
+            # SemanticKITTI names its items <sequence#>_<timeslice#>,
+            # "mm_nnnnnn". We'd like to use the hierarchical feature of the tree
+            # to separate the sequences. We cannot change the name in the dataset
+            # because this format is used to report algorithm results, so do it
+            # here.
+            underscore_to_slash = False
+            if dataset.__class__.__name__ == "SemanticKITTI":
+                underscore_to_slash = True
+
             for i in indices:
                 info = self._dataset.get_attr(i)
                 name = info["name"]
+                if underscore_to_slash:
+                    name = name.replace("_", "/")
                 while name in self._data:  # ensure each name is unique
                     name = name + "_"
 
