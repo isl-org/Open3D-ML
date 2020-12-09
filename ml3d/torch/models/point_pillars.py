@@ -29,12 +29,12 @@ import numpy as np
 
 import open3d.ml.torch as ml3d
 
-from ...vis.boundingbox import BoundingBox3D
+from ...vis.boundingbox import BEVBox3D
 
 from .base_model import BaseModel
 
 from ...utils import MODEL
-from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator
+from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, limit_period_np, get_paddings_indicator
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
@@ -179,20 +179,19 @@ class PointPillars(BaseModel):
         labels = labels.cpu().numpy()
 
         self.inference_result = []
-        for i in range(len(bboxes)):
-            yaw = bboxes[i][-1]
-            cos = np.cos(yaw)
-            sin = np.sin(yaw)
 
-            front = np.array((sin, cos, 0))
-            left = np.array((-cos, sin, 0))
-            up = np.array((0, 0, 1))
+        calib = self.inference_data['calib']
+        world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
+        cam_img = np.transpose(calib['P2'])
+
+        for i in range(len(bboxes)):
+            yaw = limit_period_np(bboxes[i][-1]-np.pi, period=2*np.pi)
 
             dim = bboxes[i][[3, 5, 4]]
             pos = bboxes[i][:3] + [0, 0, dim[1] / 2]
 
             self.inference_result.append(
-                BoundingBox3D(pos, front, up, left, dim, labels[i], scores[i]))
+                BEVBox3D(pos, dim, yaw, labels[i], scores[i], world_cam, cam_img))
 
         return True
 
