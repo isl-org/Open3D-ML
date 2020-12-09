@@ -1,6 +1,7 @@
 import torch
 import logging
 from tqdm import tqdm
+import numpy as np
 
 from datetime import datetime
 
@@ -100,6 +101,53 @@ class ObjectDetection(BasePipeline):
                 result = self.run_inference(data['data'])
                 results.extend(result)
 
+
+    def run_valid(self):
+        model = self.model
+        dataset = self.dataset
+        device = self.device
+        cfg = self.cfg
+
+        model.eval()
+
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+        log.info("DEVICE : {}".format(device))
+        log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
+        valid_dataset = dataset.get_split('validation')
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache)
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.batch_size)
+
+        log.info("Started validation")
+
+        self.valid_losses = {}
+        self.valid_mAP = {}
+
+        with torch.no_grad():
+            for inputs in tqdm(valid_loader, desc='validation'):
+                results = model(inputs['data']['point'])
+                loss = model.loss(results, inputs['data'])
+                for l, v in loss.items():
+                    if not l in self.valid_losses:
+                        self.valid_losses[l] = []
+                    self.valid_losses[l].append(v.cpu().item())
+        
+        sum_loss = 0
+        desc = "validation - "
+        for l, v in self.valid_losses.items():
+            desc += " %s: %.03f" % (l, np.mean(v))
+            sum_loss += np.mean(v)
+        desc += " > loss: %.03f" % sum_loss
+
+        log.info(desc)
+
     def run_train(self):
         model = self.model
         device = self.device
@@ -157,33 +205,31 @@ class ObjectDetection(BasePipeline):
         for epoch in range(0, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
-            self.losses = []
-            #self.accs = []
-            #self.ious = []
 
-            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+            process_bar = tqdm(train_loader, desc='training')        
+            for inputs in process_bar:
                 results = model(inputs['data']['point'])
                 loss = model.loss(results, inputs['data'])
+                loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()
-                loss.backward()
+                loss_sum.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
                     torch.nn.utils.clip_grad_value_(model.parameters(),
                                                     model.cfg.grad_clip_norm)
                 self.optimizer.step()
 
-                #acc = metric.acc(predict_scores, gt_labels)
-                #iou = metric.iou(predict_scores, gt_labels)
-
-                self.losses.append(loss.cpu().item())
-                #self.accs.append(acc)
-                #self.ious.append(iou)
+                desc = "training - "
+                for l, v in loss.items():
+                    desc += " %s: %.03f" % (l, v.cpu().item())
+                desc += " > loss: %.03f" % loss_sum.cpu().item()
+                process_bar.set_description(desc)
+                process_bar.refresh() 
 
             #self.scheduler.step()
 
             # --------------------- validation
-            #model.eval()
-            #self.run_valid()
+            self.run_valid()
 
             self.save_logs(writer, epoch)
 

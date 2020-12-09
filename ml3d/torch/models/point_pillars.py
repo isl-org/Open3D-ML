@@ -182,7 +182,10 @@ class PointPillars(BaseModel):
             loss_bbox = bboxes.sum()
             loss_dir = dirs.sum()
 
-        return loss_cls + loss_bbox + loss_dir
+        return {
+            'loss_cls': loss_cls,
+            'loss_bbox': loss_bbox,
+            'loss_dir': loss_dir }
 
     def preprocess(self, data, attr):
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
@@ -831,8 +834,8 @@ class Anchor3DHead(nn.Module):
                 target_idxs.append(argmax_overlaps[pos_idx]+idx_off)
 
                 # store global indices in list
-                pos_idx = flatten_idx(torch.nonzero(pos_idx).squeeze(-1), j) + i*anchors_cnt
-                neg_idx = flatten_idx(torch.nonzero(neg_idx).squeeze(-1), j) + i*anchors_cnt
+                pos_idx = flatten_idx(pos_idx.nonzero(as_tuple=False).squeeze(-1), j) + i*anchors_cnt
+                neg_idx = flatten_idx(neg_idx.nonzero(as_tuple=False).squeeze(-1), j) + i*anchors_cnt
                 pos_idxs.append(pos_idx)
                 neg_idxs.append(neg_idx)
 
