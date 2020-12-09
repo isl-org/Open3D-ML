@@ -27,11 +27,11 @@ from torch.nn.modules.utils import _pair
 from functools import partial
 import numpy as np
 
-import open3d.ml.torch as ml3d
+from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
 from ...vis.boundingbox import BoundingBox3D
 
-from .base_model import BaseModel
+from .base_model_objdet import BaseModel
 
 from ...utils import MODEL
 from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator, bbox_overlaps, box3d_to_bev2d
@@ -214,39 +214,33 @@ class PointPillars(BaseModel):
             'labels': [labels]
         }
 
-    def inference_begin(self, data):
-        self.inference_data = data
+    def inference_end(self, results):
+        bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
-    def inference_preprocess(self):
-        data = torch.tensor([self.inference_data["point"]],
-                            dtype=torch.float32,
-                            device=self.device)
-        return {"data": data}
+        inference_result = []
 
-    def inference_end(self, inputs, results):
-        bboxes, scores, labels = self.bbox_head.get_bboxes(*results)
+        for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
+            bboxes = _bboxes.cpu().numpy()
+            scores = _scores.cpu().numpy()
+            labels = _labels.cpu().numpy()
+            inference_result.append([])
 
-        bboxes = bboxes.cpu().numpy()
-        scores = scores.cpu().numpy()
-        labels = labels.cpu().numpy()
+            for bbox, score, label in zip(bboxes, scores, labels):
+                yaw = bbox[-1]
+                cos = np.cos(yaw)
+                sin = np.sin(yaw)
 
-        self.inference_result = []
-        for i in range(len(bboxes)):
-            yaw = bboxes[i][-1]
-            cos = np.cos(yaw)
-            sin = np.sin(yaw)
+                front = np.array((sin, cos, 0))
+                left = np.array((-cos, sin, 0))
+                up = np.array((0, 0, 1))
 
-            front = np.array((sin, cos, 0))
-            left = np.array((-cos, sin, 0))
-            up = np.array((0, 0, 1))
+                dim = bbox[[3, 5, 4]]
+                pos = bbox[:3] + [0, 0, dim[1] / 2]
 
-            dim = bboxes[i][[3, 5, 4]]
-            pos = bboxes[i][:3] + [0, 0, dim[1] / 2]
+                inference_result[-1].append(
+                    BoundingBox3D(pos, front, up, left, dim, label, score))
 
-            self.inference_result.append(
-                BoundingBox3D(pos, front, up, left, dim, labels[i], scores[i]))
-
-        return True
+        return inference_result
 
 
 MODEL._register_module(PointPillars, 'torch')
@@ -258,7 +252,7 @@ class PointPillarsVoxelization(torch.nn.Module):
                  voxel_size,
                  point_cloud_range,
                  max_num_points=32,
-                 max_voxels=[16000, 40000]):
+                 max_voxels=(16000, 40000)):
         """Voxelization layer for the PointPillars model.
 
         Args:
@@ -304,16 +298,15 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
-        ans = ml3d.ops.voxelize(points, self.voxel_size, self.points_range_min,
-                                self.points_range_max, self.max_num_points,
-                                max_voxels)
+        ans = voxelize(points, self.voxel_size, self.points_range_min,
+                       self.points_range_max, self.max_num_points, max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.
         feats = torch.cat(
             [torch.zeros_like(points_feats[0:1, :]), points_feats])
 
         # create dense matrix of indices. index 0 maps to the zero vector.
-        voxels_point_indices_dense = ml3d.ops.ragged_to_dense(
+        voxels_point_indices_dense = ragged_to_dense(
             ans.voxel_point_indices, ans.voxel_point_row_splits,
             self.max_num_points, torch.tensor(-1)) + 1
 
@@ -475,7 +468,7 @@ class PillarFeatureNet(nn.Module):
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
 
-        f_center = features[:, :, :2]
+        f_center = features[:, :, :2].clone().detach()
         f_center[:, :, 0] = f_center[:, :, 0] - (
             coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
             self.x_offset)
@@ -874,9 +867,28 @@ class Anchor3DHead(nn.Module):
             tuple[torch.Tensor]: Prediction results of batches 
                 (bboxes, scores, labels).
         """
-        assert len(cls_scores) == len(bbox_preds)
-        assert len(cls_scores) == len(dir_preds)
+        bboxes, scores, labels = [], [], []
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds,
+                                                  dir_preds):
+            b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
+            bboxes.append(b)
+            scores.append(s)
+            labels.append(l)
+        return bboxes, scores, labels
 
+    def get_bboxes_single(self, cls_scores, bbox_preds, dir_preds):
+        """Get bboxes of anchor head.
+
+        Args:
+            cls_scores (list[torch.Tensor]): Class scores.
+            bbox_preds (list[torch.Tensor]): Bbox predictions.
+            dir_cls_preds (list[torch.Tensor]): Direction
+                class predictions.
+
+        Returns:
+            tuple[torch.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
+        """
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]
         assert cls_scores.size()[-2:] == dir_preds.size()[-2:]
 
@@ -884,15 +896,13 @@ class Anchor3DHead(nn.Module):
                                                      device=cls_scores.device)
         anchors = anchors.reshape(-1, self.box_code_size)
 
-        dir_preds = dir_preds.permute(0, 2, 3, 1).reshape(-1, 2)
+        dir_preds = dir_preds.permute(1, 2, 0).reshape(-1, 2)
         dir_scores = torch.max(dir_preds, dim=-1)[1]
 
-        cls_scores = cls_scores.permute(0, 2, 3,
-                                        1).reshape(-1, self.num_classes)
+        cls_scores = cls_scores.permute(1, 2, 0).reshape(-1, self.num_classes)
         scores = cls_scores.sigmoid()
 
-        bbox_preds = bbox_preds.permute(0, 2, 3,
-                                        1).reshape(-1, self.box_code_size)
+        bbox_preds = bbox_preds.permute(1, 2, 0).reshape(-1, self.box_code_size)
 
         if scores.shape[0] > self.nms_pre:
             max_scores, _ = scores.max(dim=1)
@@ -922,4 +932,5 @@ class Anchor3DHead(nn.Module):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
+
         return bboxes, scores, labels

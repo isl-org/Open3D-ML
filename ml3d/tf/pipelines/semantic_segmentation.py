@@ -25,6 +25,58 @@ log = logging.getLogger(__name__)
 
 
 class SemanticSegmentation(BasePipeline):
+    """
+    This class allows you to perform semantic segmentation for both training and inference using the TensorFlow framework. This pipeline has multiple stages: Pre-processing, loading dataset, testing, and inference or training.
+    
+    **Example:** 
+        This example loads the Semantic Segmentation and performs a training using the SemanticKITTI dataset.
+
+            import tensorflow as tf
+
+            from .base_pipeline import BasePipeline
+
+            Mydataset = TFDataloader(dataset=tf.dataset.get_split('training')
+            MyModel = SemanticSegmentation(self,model,dataset=Mydataset, name='SemanticSegmentation',
+            name='SemanticSegmentation',
+            batch_size=4,
+            val_batch_size=4,
+            test_batch_size=3,
+            max_epoch=100,
+            learning_rate=1e-2,
+            lr_decays=0.95,
+            save_ckpt_freq=20,
+            adam_lr=1e-2,
+            scheduler_gamma=0.95,
+            momentum=0.98,
+            main_log_dir='./logs/',
+            device='gpu',
+            split='train',
+            train_sum_dir='train_log')
+            
+    **Args:**
+            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            model: The model to be used for building the pipeline.
+            name: The name of the current training.
+            batch_size: The batch size to be used for training.
+            val_batch_size: The batch size to be used for validation.
+            test_batch_size: The batch size to be used for testing.
+            max_epoch: The maximum size of the epoch to be used for training.
+            leanring_rate: The hyperparameter that controls the weights during training. Also, known as step size.
+            lr_decays: The learning rate decay for the training.
+            save_ckpt_freq: The frequency in which the checkpoint should be saved.
+            adam_lr: The leanring rate to be applied for Adam optimization.
+            scheduler_gamma: The decaying factor associated with the scheduler.
+            momentum: The momentum that accelerates the training rate schedule.
+            main_log_dir: The directory where logs are stored.
+            device: The device to be used for training.
+            split: The dataset split to be used. In this example, we have used "train".
+            train_sum_dir: The directory where the trainig summary is stored.
+            
+    **Returns:**
+            class: The corresponding class.
+        
+        
+    """
 
     def __init__(
             self,
@@ -66,6 +118,11 @@ class SemanticSegmentation(BasePipeline):
                          train_sum_dir=train_sum_dir,
                          **kwargs)
 
+    """
+    Run the inference using the data passed.
+    
+    """
+
     def run_inference(self, data):
         cfg = self.cfg
         model = self.model
@@ -81,6 +138,11 @@ class SemanticSegmentation(BasePipeline):
                 break
 
         return model.inference_result
+
+    """
+    Run the test using the data passed.
+    
+    """
 
     def run_test(self):
         model = self.model
@@ -124,6 +186,11 @@ class SemanticSegmentation(BasePipeline):
         log.info("Per class IOUs : {}".format(ious[:-1]))
         log.info("Overall Accuracy : {:.3f}".format(accs[-1]))
         log.info("Overall IOU : {:.3f}".format(ious[-1]))
+
+    """
+    Run the training on the self model.
+    
+    """
 
     def run_train(self):
         model = self.model
@@ -251,6 +318,11 @@ class SemanticSegmentation(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
+    """
+    Save logs from the training and send results to TensorBoard.
+    
+    """
+
     def save_logs(self, writer, epoch):
 
         with warnings.catch_warnings():  # ignore Mean of empty slice.
@@ -293,6 +365,11 @@ class SemanticSegmentation(BasePipeline):
 
         # print(acc_dicts[-1])
 
+    """
+    Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
+    
+    """
+
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
@@ -320,14 +397,22 @@ class SemanticSegmentation(BasePipeline):
             else:
                 log.info("Initializing from scratch.")
 
+    """
+    Save a checkpoint at the passed epoch.
+    
+    """
+
     def save_ckpt(self, epoch):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format(save_path))
 
+    """
+    Save experiment configuration with TensorBoard summary.
+    
+    """
+
     def save_config(self, writer):
-        '''
-        Save experiment configuration with tensorboard summary
-        '''
+
         with writer.as_default():
             with tf.name_scope("Description"):
                 tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)

@@ -24,7 +24,7 @@ import torch
 
 from functools import partial
 
-import open3d.ml.torch as ml3d
+from open3d.ml.torch.ops import nms
 
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
@@ -342,7 +342,7 @@ def multiclass_nms(boxes, scores, score_thr):
         _boxes = boxes[cls_inds, :]
         _bev = xywhr_to_xyxyr(box3d_to_bev(_boxes))
 
-        idx = ml3d.ops.nms(_bev, _scores, 0.01)
+        idx = nms(_bev, _scores, 0.01)
 
         idxs.append(orig_idx[idx])
 

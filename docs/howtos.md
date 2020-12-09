@@ -8,6 +8,9 @@ Users can inspect the prediction results using the visualizer. Run `python examp
 
 First, initialize a `Visualizer` and set up `LabelLUT` as label names to visualize. Here we would like to visualize points from `SemanticKITTI`. The labels can be obtained by `get_label_to_names()`
 ```python
+    import os
+    from os import path
+    from os.path import exists
     from ml3d.vis import Visualizer, LabelLUT
     from ml3d.datasets import SemanticKITTI
     

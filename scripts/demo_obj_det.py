@@ -53,7 +53,10 @@ def main(args):
     pipeline = ObjectDetection(model, dataset, device="gpu")
 
     # load the parameters.
-    pipeline.load_ckpt(ckpt_path='/Users/lprantl/Open3D-ML/checkpoints/pointpillars_kitt_3class_mmdet.pth')
+    pipeline.load_ckpt(
+        ckpt_path=
+        args.path_ckpt_pointpillars
+    )
 
     test_split = TorchDataloader(dataset=dataset.get_split('training'),
                                  preprocess=model.preprocess,
@@ -63,7 +66,7 @@ def main(args):
     data = test_split[5]['data']
 
     # run inference on a single example.
-    result = pipeline.run_inference(data)
+    result = pipeline.run_inference(data)[0]
 
     boxes = data['bounding_boxes']
     boxes.extend(result)
