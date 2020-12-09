@@ -52,7 +52,7 @@ def main(args):
     data = test_split[5]['data']
 
     # run inference on a single example.
-    result = pipeline.run_inference(data)
+    result = pipeline.run_inference(data)[0]
 
     boxes = data['bounding_boxes']
     boxes.extend(result)

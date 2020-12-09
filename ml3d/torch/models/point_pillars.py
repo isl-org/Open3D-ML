@@ -739,8 +739,8 @@ class Anchor3DHead(nn.Module):
                 (bboxes, scores, labels).
         """
         bboxes, scores, labels = [], [], []
-        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds, dir_preds):
-
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds,
+                                                  dir_preds):
             b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
             bboxes.append(b)
             scores.append(s)
@@ -803,5 +803,5 @@ class Anchor3DHead(nn.Module):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
-            
+
         return bboxes, scores, labels
