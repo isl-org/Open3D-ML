@@ -738,9 +738,28 @@ class Anchor3DHead(nn.Module):
             tuple[torch.Tensor]: Prediction results of batches 
                 (bboxes, scores, labels).
         """
-        assert len(cls_scores) == len(bbox_preds)
-        assert len(cls_scores) == len(dir_preds)
+        bboxes, scores, labels = [], [], []
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds, dir_preds):
 
+            b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
+            bboxes.append(b)
+            scores.append(s)
+            labels.append(l)
+        return bboxes, scores, labels
+
+    def get_bboxes_single(self, cls_scores, bbox_preds, dir_preds):
+        """Get bboxes of anchor head.
+
+        Args:
+            cls_scores (list[torch.Tensor]): Class scores.
+            bbox_preds (list[torch.Tensor]): Bbox predictions.
+            dir_cls_preds (list[torch.Tensor]): Direction
+                class predictions.
+
+        Returns:
+            tuple[torch.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
+        """
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]
         assert cls_scores.size()[-2:] == dir_preds.size()[-2:]
 
@@ -748,15 +767,13 @@ class Anchor3DHead(nn.Module):
                                                      device=cls_scores.device)
         anchors = anchors.reshape(-1, self.box_code_size)
 
-        dir_preds = dir_preds.permute(0, 2, 3, 1).reshape(-1, 2)
+        dir_preds = dir_preds.permute(1, 2, 0).reshape(-1, 2)
         dir_scores = torch.max(dir_preds, dim=-1)[1]
 
-        cls_scores = cls_scores.permute(0, 2, 3,
-                                        1).reshape(-1, self.num_classes)
+        cls_scores = cls_scores.permute(1, 2, 0).reshape(-1, self.num_classes)
         scores = cls_scores.sigmoid()
 
-        bbox_preds = bbox_preds.permute(0, 2, 3,
-                                        1).reshape(-1, self.box_code_size)
+        bbox_preds = bbox_preds.permute(1, 2, 0).reshape(-1, self.box_code_size)
 
         if scores.shape[0] > self.nms_pre:
             max_scores, _ = scores.max(dim=1)
@@ -786,4 +803,5 @@ class Anchor3DHead(nn.Module):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
+            
         return bboxes, scores, labels
