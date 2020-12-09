@@ -433,17 +433,39 @@ class ObjectDetection(BasePipeline):
         raise NotImplementedError()
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
-        checkpoint = torch.load(ckpt_path, map_location=self.device)
+        train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
+        make_dir(train_ckpt_dir)
 
-        if 'state_dict' in checkpoint:
-            state_dict = checkpoint['state_dict']
-        else:
-            state_dict = checkpoint
+        if ckpt_path is None:
+            ckpt_path = latest_torch_ckpt(train_ckpt_dir)
+            if ckpt_path is not None and is_resume:
+                log.info('ckpt_path not given. Restore from the latest ckpt')
+            else:
+                log.info('Initializing from scratch.')
+                return
 
-        if list(state_dict.keys())[0].startswith('module.'):
-            state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
+        if not exists(ckpt_path):
+            raise FileNotFoundError(f' ckpt {ckpt_path} not found')
 
-        self.model.load_state_dict(state_dict)
+        log.info(f'Loading checkpoint {ckpt_path}')
+        ckpt = torch.load(ckpt_path, map_location=self.device)
+        self.model.load_state_dict(ckpt['model_state_dict'])
+        if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
+            log.info(f'Loading checkpoint optimizer_state_dict')
+            self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
+            log.info(f'Loading checkpoint scheduler_state_dict')
+            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+
+    def save_ckpt(self, epoch):
+        path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
+        make_dir(path_ckpt)
+        torch.save(
+            dict(epoch=epoch, model_state_dict=self.model.state_dict()),
+            #optimizer_state_dict=self.optimizer.state_dict(),
+            #scheduler_state_dict=self.scheduler.state_dict()),
+            join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
+        log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
 
 PIPELINE._register_module(ObjectDetection, "torch")

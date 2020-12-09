@@ -27,7 +27,7 @@ from torch.nn.modules.utils import _pair
 from functools import partial
 import numpy as np
 
-import open3d.ml.torch as ml3d
+from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
 from ...vis.boundingbox import BEVBox3D
 
@@ -205,7 +205,7 @@ class PointPillarsVoxelization(torch.nn.Module):
                  voxel_size,
                  point_cloud_range,
                  max_num_points=32,
-                 max_voxels=[16000, 40000]):
+                 max_voxels=(16000, 40000)):
         """Voxelization layer for the PointPillars model.
 
         Args:
@@ -251,16 +251,15 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
-        ans = ml3d.ops.voxelize(points, self.voxel_size, self.points_range_min,
-                                self.points_range_max, self.max_num_points,
-                                max_voxels)
+        ans = voxelize(points, self.voxel_size, self.points_range_min,
+                       self.points_range_max, self.max_num_points, max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.
         feats = torch.cat(
             [torch.zeros_like(points_feats[0:1, :]), points_feats])
 
         # create dense matrix of indices. index 0 maps to the zero vector.
-        voxels_point_indices_dense = ml3d.ops.ragged_to_dense(
+        voxels_point_indices_dense = ragged_to_dense(
             ans.voxel_point_indices, ans.voxel_point_row_splits,
             self.max_num_points, torch.tensor(-1)) + 1
 
