@@ -132,7 +132,7 @@ class ObjectDetection(BasePipeline):
 
         with torch.no_grad():
             for inputs in tqdm(valid_loader, desc='validation'):
-                results = model(inputs['data']['point'])
+                results = model(inputs['data']['point'].to(self.device))
                 loss = model.loss(results, inputs['data'])
                 for l, v in loss.items():
                     if not l in self.valid_losses:
@@ -206,9 +206,10 @@ class ObjectDetection(BasePipeline):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
 
+            self.losses = {}
             process_bar = tqdm(train_loader, desc='training')        
             for inputs in process_bar:
-                results = model(inputs['data']['point'])
+                results = model(inputs['data']['point'].to(self.device))
                 loss = model.loss(results, inputs['data'])
                 loss_sum = sum(loss.values())
 
@@ -218,9 +219,11 @@ class ObjectDetection(BasePipeline):
                     torch.nn.utils.clip_grad_value_(model.parameters(),
                                                     model.cfg.grad_clip_norm)
                 self.optimizer.step()
-
                 desc = "training - "
                 for l, v in loss.items():
+                    if not l in self.losses:
+                        self.losses[l] = []
+                    self.losses[l].append(v.cpu().item())
                     desc += " %s: %.03f" % (l, v.cpu().item())
                 desc += " > loss: %.03f" % loss_sum.cpu().item()
                 process_bar.set_description(desc)
@@ -235,6 +238,14 @@ class ObjectDetection(BasePipeline):
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
+
+
+    def save_logs(self, writer, epoch):
+        for key, val in self.losses.items():
+            writer.add_scalar("train/"+key, val, epoch)
+
+        for key, val in self.valid_losses.items():
+            writer.add_scalar("valid/"+key, val, epoch)
 
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
@@ -268,7 +279,7 @@ class ObjectDetection(BasePipeline):
         torch.save(
             dict(epoch=epoch,
                  model_state_dict=self.model.state_dict()),
-                 #optimizer_state_dict=self.optimizer.state_dict(),
+                 optimizer_state_dict=self.optimizer.state_dict(),
                  #scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
