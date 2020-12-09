@@ -31,10 +31,10 @@ from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
 from ...vis.boundingbox import BEVBox3D
 
-from .base_model import BaseModel
+from .base_model_objdet import BaseModel
 
 from ...utils import MODEL
-from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, limit_period_np, get_paddings_indicator
+from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, limit_period_np, get_paddings_indicator, bbox_overlaps, box3d_to_bev2d
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
@@ -69,6 +69,7 @@ class PointPillars(BaseModel):
                  backbone={},
                  neck={},
                  head={},
+                 loss={},
                  **kwargs):
 
         super().__init__(name=name, **kwargs)
@@ -87,6 +88,11 @@ class PointPillars(BaseModel):
         self.backbone = SECOND(**backbone)
         self.neck = SECONDFPN(**neck)
         self.bbox_head = Anchor3DHead(**head)
+
+        self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
+        self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
+        self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
+
 
     def extract_feats(self, points):
         """Extract features from points."""
@@ -117,15 +123,66 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def forward(self, inputs):
-        x = self.extract_feats(inputs)
+        x = self.extract_feats(inputs['point'])
         outs = self.bbox_head(x)
         return outs
 
-    def get_optimizer(self, cfg_pipeline):
-        raise NotImplementedError
+    def get_optimizer(self, cfg):
+        optimizer = torch.optim.AdamW(self.parameters(), **cfg)
+        return optimizer, None
 
-    def get_loss(self, Loss, results, inputs):
-        raise NotImplementedError
+    def loss(self, results, inputs):
+        scores, bboxes, dirs = results
+        gt_labels = [l[0] for l in inputs['labels']]
+        gt_bboxes = [b[0] for b in inputs['bboxes']]
+
+        # generate and filter bboxes
+        target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
+
+        avg_factor = pos_idx.size(0)
+
+        # classification loss
+        scores = scores.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.num_classes)
+        scores = scores[torch.cat([pos_idx, neg_idx], axis=0)]
+        target_labels = torch.full((scores.size(0),), self.bbox_head.num_classes, device=scores.device, dtype=gt_labels[0].dtype)
+        target_labels[pos_idx] = torch.cat(gt_labels, axis=0)[target_idx]
+
+        loss_cls = self.loss_cls(
+            scores, target_labels, avg_factor=avg_factor)
+
+        # remove invalid labels
+        cond = (target_labels[pos_idx] >= 0) & (target_labels[pos_idx] < self.bbox_head.num_classes)
+        pos_idx = pos_idx[cond]
+        target_idx = target_idx[cond]
+        target_bboxes = target_bboxes[cond]
+
+        if len(pos_idx) > 0:
+            # direction classification loss
+            bboxes = bboxes.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.box_code_size)[pos_idx]
+            dirs = dirs.permute((0, 2, 3, 1)).reshape(-1, 2)[pos_idx]
+
+            # to discrete bins
+            target_dirs = torch.cat(gt_bboxes, axis=0)[target_idx][:, -1]
+            target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
+            target_dirs = (target_dirs / np.pi).long()
+
+            loss_dir = self.loss_dir(dirs, target_dirs, avg_factor=avg_factor)
+
+            # bbox loss
+            # sinus difference transformation
+            r0 = torch.sin(bboxes[:, -1:]) * torch.cos(target_bboxes[:, -1:])
+            r1 = torch.cos(bboxes[:, -1:]) * torch.sin(target_bboxes[:, -1:])
+
+            bboxes = torch.cat([bboxes[:,:-1], r0], axis=-1)
+            target_bboxes = torch.cat([target_bboxes[:,:-1], r1], axis=-1)
+            
+            loss_bbox = self.loss_bbox(
+                bboxes, target_bboxes, avg_factor=avg_factor)
+        else:
+            loss_bbox = bboxes.sum()
+            loss_dir = dirs.sum()
+
+        return loss_cls + loss_bbox + loss_dir
 
     def preprocess(self, data, attr):
         return data
@@ -143,57 +200,45 @@ class PointPillars(BaseModel):
 
         if 'bounding_boxes' not in data.keys(
         ) or data['bounding_boxes'] is None:
-            labels = np.zeros((points.shape[0],), dtype=np.int32)
+            labels = []
+            bboxes = []
         else:
-            labels = data['bounding_boxes']
+            labels = np.array([bb.label_class for bb in data['bounding_boxes']], dtype=np.int64)
+            TODO
+            bboxes = np.array([[*bb.center, bb.size[2], bb.size[0], bb.size[1], 0] for bb in data['bounding_boxes']], dtype=np.float32)
 
-        if 'feat' not in data.keys() or data['feat'] is None:
-            feat = None
-        else:
-            feat = np.array(data['feat'], dtype=np.float32)
-
-        calib = data['calib']
-
-        data = dict()
-        data['point'] = points
-        data['feat'] = feat
-        data['calib'] = calib
-        data['bounding_boxes'] = labels
-
-        return data
-
-    def inference_begin(self, data):
-        self.inference_data = data
-
-    def inference_preprocess(self):
-        data = torch.tensor([self.inference_data["point"]],
-                            dtype=torch.float32,
-                            device=self.device)
-        return {"data": data}
+        data['labels'] = labels
+        return {
+            'point': points,
+            'bboxes': [bboxes], 
+            'labels': [labels]
+        }
 
     def inference_end(self, inputs, results):
-        bboxes, scores, labels = self.bbox_head.get_bboxes(*results)
+        bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
-        bboxes = bboxes.cpu().numpy()
-        scores = scores.cpu().numpy()
-        labels = labels.cpu().numpy()
+        inference_result = []
 
-        self.inference_result = []
-
-        calib = self.inference_data['calib']
+        calib = inputs['calib']
         world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
         cam_img = np.transpose(calib['P2'])
+        
+        for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
+            bboxes = _bboxes.cpu().numpy()
+            scores = _scores.cpu().numpy()
+            labels = _labels.cpu().numpy()
+            inference_result.append([])
 
-        for i in range(len(bboxes)):
-            yaw = limit_period_np(bboxes[i][-1]-np.pi, period=2*np.pi)
+            for bbox, score, label in zip(bboxes, scores, labels):
+                yaw = limit_period_np(bbox[-1]-np.pi, period=2*np.pi)
 
-            dim = bboxes[i][[3, 5, 4]]
-            pos = bboxes[i][:3] + [0, 0, dim[1] / 2]
+                dim = bbox[[3, 5, 4]]
+                pos = bbox[:3] + [0, 0, dim[1] / 2]
 
-            self.inference_result.append(
-                BEVBox3D(pos, dim, yaw, labels[i], scores[i], world_cam, cam_img))
+                inference_result[-1].append(
+                    BEVBox3D(pos, dim, yaw, label, score, world_cam, cam_img))
 
-        return True
+        return inference_result
 
 
 MODEL._register_module(PointPillars, 'torch')
@@ -421,7 +466,7 @@ class PillarFeatureNet(nn.Module):
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
 
-        f_center = features[:, :, :2]
+        f_center = features[:, :, :2].clone().detach()
         f_center[:, :, 0] = f_center[:, :, 0] - (
             coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
             self.x_offset)
@@ -710,6 +755,8 @@ class Anchor3DHead(nn.Module):
         self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
                                       1)
 
+        self.iou_thr = [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+
     def forward(self, x):
         """Forward function on a feature map.
 
@@ -726,6 +773,82 @@ class Anchor3DHead(nn.Module):
         dir_cls_preds = self.conv_dir_cls(x)
         return cls_score, bbox_pred, dir_cls_preds
 
+    def assign_bboxes(self, pred_bboxes, target_bboxes):
+        """Assigns target bboxes to given anchors.
+
+        Args:
+            pred_bboxes (torch.Tensor): Bbox predictions (anchors).
+            target_bboxes (torch.Tensor): Bbox targets.
+
+        Returns:
+            torch.Tensor: Assigned target bboxes for each given anchor.
+            torch.Tensor: Flat index of matched targets.
+            torch.Tensor: Index of positive matches.
+            torch.Tensor: Index of negative matches.
+        """
+
+        # compute all anchors
+        anchors = [self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:],
+                                                    device=pred_bboxes.device)
+                                                    for _ in range(len(target_bboxes))]
+        
+        # compute size of anchors for each given class
+        anchors_cnt = torch.tensor(anchors[0].shape[:-1]).prod()
+        rot_angles = anchors[0].shape[-2]
+
+        # init the tensors for the final result
+        assigned_bboxes, target_idxs, pos_idxs, neg_idxs = [], [], [], []
+
+        def flatten_idx(idx, j):
+            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""       
+            z = idx//rot_angles
+            x = idx%rot_angles
+
+            return z * self.num_classes * rot_angles + j * rot_angles + x
+
+        idx_off = 0
+        for i in range(len(target_bboxes)):
+            for j, (neg_th, pos_th) in enumerate(self.iou_thr):
+                anchors_stride = anchors[i][..., j, :, :].reshape(-1, self.box_code_size)
+
+                # compute a fast approximation of IoU
+                overlaps = bbox_overlaps(
+                    box3d_to_bev2d(target_bboxes[i]), 
+                    box3d_to_bev2d(anchors_stride))
+
+                # for each anchor the gt with max IoU
+                max_overlaps, argmax_overlaps = overlaps.max(dim=0)
+                # for each gt the anchor with max IoU
+                gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)
+
+                pos_idx = max_overlaps >= pos_th
+                neg_idx = (max_overlaps >= 0) & (max_overlaps < neg_th)
+
+                # low-quality matching
+                for k in range(len(target_bboxes[i])):
+                    if gt_max_overlaps[k] >= neg_th:
+                        pos_idx[overlaps[k, :] == gt_max_overlaps[k]] = True
+
+                # encode bbox for positive matches
+                assigned_bboxes.append(self.bbox_coder.encode(
+                    anchors_stride[pos_idx], target_bboxes[i][argmax_overlaps[pos_idx]]))
+                target_idxs.append(argmax_overlaps[pos_idx]+idx_off)
+
+                # store global indices in list
+                pos_idx = flatten_idx(torch.nonzero(pos_idx).squeeze(-1), j) + i*anchors_cnt
+                neg_idx = flatten_idx(torch.nonzero(neg_idx).squeeze(-1), j) + i*anchors_cnt
+                pos_idxs.append(pos_idx)
+                neg_idxs.append(neg_idx)
+
+            # compute offset for index computation
+            idx_off += len(target_bboxes[i])
+
+        return (
+            torch.cat(assigned_bboxes, axis=0), 
+            torch.cat(target_idxs, axis=0), 
+            torch.cat(pos_idxs, axis=0), 
+            torch.cat(neg_idxs, axis=0))
+
     def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
         """Get bboxes of anchor head.
 
@@ -739,9 +862,28 @@ class Anchor3DHead(nn.Module):
             tuple[torch.Tensor]: Prediction results of batches 
                 (bboxes, scores, labels).
         """
-        assert len(cls_scores) == len(bbox_preds)
-        assert len(cls_scores) == len(dir_preds)
+        bboxes, scores, labels = [], [], []
+        for cls_score, bbox_pred, dir_pred in zip(cls_scores, bbox_preds,
+                                                  dir_preds):
+            b, s, l = self.get_bboxes_single(cls_score, bbox_pred, dir_pred)
+            bboxes.append(b)
+            scores.append(s)
+            labels.append(l)
+        return bboxes, scores, labels
 
+    def get_bboxes_single(self, cls_scores, bbox_preds, dir_preds):
+        """Get bboxes of anchor head.
+
+        Args:
+            cls_scores (list[torch.Tensor]): Class scores.
+            bbox_preds (list[torch.Tensor]): Bbox predictions.
+            dir_cls_preds (list[torch.Tensor]): Direction
+                class predictions.
+
+        Returns:
+            tuple[torch.Tensor]: Prediction results of batches 
+                (bboxes, scores, labels).
+        """
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]
         assert cls_scores.size()[-2:] == dir_preds.size()[-2:]
 
@@ -749,15 +891,13 @@ class Anchor3DHead(nn.Module):
                                                      device=cls_scores.device)
         anchors = anchors.reshape(-1, self.box_code_size)
 
-        dir_preds = dir_preds.permute(0, 2, 3, 1).reshape(-1, 2)
+        dir_preds = dir_preds.permute(1, 2, 0).reshape(-1, 2)
         dir_scores = torch.max(dir_preds, dim=-1)[1]
 
-        cls_scores = cls_scores.permute(0, 2, 3,
-                                        1).reshape(-1, self.num_classes)
+        cls_scores = cls_scores.permute(1, 2, 0).reshape(-1, self.num_classes)
         scores = cls_scores.sigmoid()
 
-        bbox_preds = bbox_preds.permute(0, 2, 3,
-                                        1).reshape(-1, self.box_code_size)
+        bbox_preds = bbox_preds.permute(1, 2, 0).reshape(-1, self.box_code_size)
 
         if scores.shape[0] > self.nms_pre:
             max_scores, _ = scores.max(dim=1)
@@ -787,4 +927,5 @@ class Anchor3DHead(nn.Module):
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
             bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
+
         return bboxes, scores, labels
