@@ -29,7 +29,7 @@ import numpy as np
 
 from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
-from ...vis.boundingbox import BoundingBox3D
+from ...vis.boundingbox import BEVBox3D
 
 from .base_model_objdet import BaseModel
 
@@ -123,7 +123,7 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def forward(self, inputs):
-        x = self.extract_feats(inputs['point'])
+        x = self.extract_feats(inputs)
         outs = self.bbox_head(x)
         return outs
 
@@ -131,7 +131,7 @@ class PointPillars(BaseModel):
         optimizer = torch.optim.AdamW(self.parameters(), **cfg)
         return optimizer, None
 
-    def get_loss(self, Loss, results, inputs):
+    def loss(self, results, inputs):
         scores, bboxes, dirs = results
         gt_labels = [l[0] for l in inputs['labels']]
         gt_bboxes = [b[0] for b in inputs['bboxes']]
@@ -185,9 +185,6 @@ class PointPillars(BaseModel):
         return loss_cls + loss_bbox + loss_dir
 
     def preprocess(self, data, attr):
-        return data
-
-    def transform(self, data, attr):
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
@@ -198,27 +195,32 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        if 'bounding_boxes' not in data.keys(
-        ) or data['bounding_boxes'] is None:
-            labels = []
-            bboxes = []
-        else:
-            labels = np.array([bb.label_class for bb in data['bounding_boxes']], dtype=np.int64)
-            TODO
-            bboxes = np.array([[*bb.center, bb.size[2], bb.size[0], bb.size[1], 0] for bb in data['bounding_boxes']], dtype=np.float32)
-
-        data['labels'] = labels
         return {
             'point': points,
-            'bboxes': [bboxes], 
-            'labels': [labels]
+            'bboxes': data['bounding_boxes'],
+            'calib': data['calib']
         }
 
-    def inference_end(self, results):
+    def transform(self, data, attr):
+        labels = np.array([bb.label_class for bb in data['bboxes']], dtype=np.int64)
+        bboxes = np.array([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=np.float32)
+        
+        return {
+            'point': data['point'],
+            'bboxes': [bboxes], 
+            'labels': [labels],
+            'calib': data['calib']
+        }
+
+    def inference_end(self, results, inputs):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
 
+        calib = inputs['calib']
+        world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
+        cam_img = np.transpose(calib['P2'])
+        
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
@@ -226,19 +228,11 @@ class PointPillars(BaseModel):
             inference_result.append([])
 
             for bbox, score, label in zip(bboxes, scores, labels):
-                yaw = bbox[-1]
-                cos = np.cos(yaw)
-                sin = np.sin(yaw)
-
-                front = np.array((sin, cos, 0))
-                left = np.array((-cos, sin, 0))
-                up = np.array((0, 0, 1))
-
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
-
+                yaw = bbox[-1]
                 inference_result[-1].append(
-                    BoundingBox3D(pos, front, up, left, dim, label, score))
+                    BEVBox3D(pos, dim, yaw, label, score, world_cam, cam_img))
 
         return inference_result
 
@@ -403,14 +397,14 @@ class PillarFeatureNet(nn.Module):
         voxel_size (tuple[float], optional): Size of voxels, only utilize x
             and y size. Defaults to (0.2, 0.2, 4).
         point_cloud_range (tuple[float], optional): Point cloud range, only
-            utilizes x and y min. Defaults to (0, -40, -3, 70.4, 40, 1).
+            utilizes x and y min. Defaults to (0, -40, -3, 70.0, 40, 1).
     """
 
     def __init__(self,
                  in_channels=4,
                  feat_channels=(64,),
                  voxel_size=(0.16, 0.16, 4),
-                 point_cloud_range=(0, -39.68, -3, 69.12, 39.68, 1)):
+                 point_cloud_range=(0, -40.0, -3, 70.0, 40.0, 1)):
 
         super(PillarFeatureNet, self).__init__()
         assert len(feat_channels) > 0
@@ -445,7 +439,7 @@ class PillarFeatureNet(nn.Module):
         self.y_offset = self.vy / 2 + point_cloud_range[1]
         self.point_cloud_range = point_cloud_range
 
-    #@force_fp32(out_fp16=True)
+
     def forward(self, features, num_points, coors):
         """Forward function.
 
@@ -667,8 +661,6 @@ class SECONDFPN(nn.Module):
                  out_channels=[128, 128, 128],
                  upsample_strides=[1, 2, 4],
                  use_conv_for_no_stride=False):
-        # if for GroupNorm,
-        # cfg is dict(type='GN', num_groups=num_groups, eps=1e-3, affine=True)
         super(SECONDFPN, self).__init__()
         assert len(out_channels) == len(upsample_strides) == len(in_channels)
         self.in_channels = in_channels
@@ -700,7 +692,7 @@ class SECONDFPN(nn.Module):
             deblocks.append(deblock)
         self.deblocks = nn.ModuleList(deblocks)
 
-    #@auto_fp16()
+
     def forward(self, x):
         """Forward function.
 
@@ -743,7 +735,6 @@ class Anchor3DHead(nn.Module):
         self.nms_pre = 100
         self.score_thr = 0.1
 
-        # In 3D detection, the anchor stride is connected with anchor size
         self.num_anchors = self.anchor_generator.num_base_anchors
 
         # build box coder

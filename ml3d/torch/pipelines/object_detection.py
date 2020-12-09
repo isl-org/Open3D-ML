@@ -64,7 +64,7 @@ class ObjectDetection(BasePipeline):
                                   dtype=torch.float32,
                                   device=self.device)
             results = model(inputs)
-            boxes = model.inference_end(results)
+            boxes = model.inference_end(results, data)
 
         return boxes
 
@@ -85,7 +85,7 @@ class ObjectDetection(BasePipeline):
 
         test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
-                                     transform=model.transform,
+                                     transform=None,
                                      use_cache=dataset.cfg.use_cache,
                                      shuffle=False)
 
@@ -162,8 +162,8 @@ class ObjectDetection(BasePipeline):
             #self.ious = []
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-                results = model(inputs['data'])
-                loss = model.get_loss(None, results, inputs['data'])
+                results = model(inputs['data']['point'])
+                loss = model.loss(results, inputs['data'])
 
                 self.optimizer.zero_grad()
                 loss.backward()

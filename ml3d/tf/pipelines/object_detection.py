@@ -55,7 +55,7 @@ class ObjectDetection(BasePipeline):
         inputs = tf.convert_to_tensor([data['point']], dtype=np.float32)
 
         results = model(inputs, training=False)
-        boxes = model.inference_end(results)
+        boxes = model.inference_end(results, data)
 
         return boxes
 
@@ -84,7 +84,7 @@ class ObjectDetection(BasePipeline):
         results = []
         for idx in tqdm(range(len(test_split)), desc='test'):
             data = test_split.read_data(idx)[0]
-            result = self.run_inference(data)
+            result = self.run_inference(data['data'])
             results.extend(result)
 
     def run_train(self):
