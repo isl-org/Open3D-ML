@@ -63,7 +63,7 @@ class ObjectDetection(BasePipeline):
         model.eval()
 
         with torch.no_grad():
-            inputs = torch.tensor([data['point']],
+            inputs = torch.tensor(data['point'],
                                   dtype=torch.float32,
                                   device=self.device)
             results = model(inputs)
@@ -340,7 +340,7 @@ class ObjectDetection(BasePipeline):
             7420, 7421, 7422, 7423, 7424, 7426, 7430, 7433, 7434, 7435, 7436, 7437, 7439, 7440, 7442, 
             7445, 7447, 7448, 7449, 7450, 7453, 7456, 7458, 7462, 7463, 7464, 7466, 7467, 7468, 7469, 
             7470, 7473, 7475, 7477, 7478, 7480]
-        _idx = _idx
+        _idx = _idx[:10]
         for i in _idx:
             pc_path = "/home/prantl/obj_det/mmdetection3d/data/kitti/training/velodyne_reduced/%06d.bin"%i
             label_path = pc_path.replace('velodyne_reduced',
@@ -351,13 +351,18 @@ class ObjectDetection(BasePipeline):
             calib = dataset.read_calib(calib_path)
             label = dataset.read_label(label_path, calib)
 
+            label = list(filter(lambda x: x.label_class != 5, label))
+            for li in range(len(label)):
+                if label[li].label_class >= 3:
+                    label[li].label_class = -1
+
             data = {
                 'point': pc,
                 'feat': None,
                 'calib': calib,
                 'bounding_boxes': label,
             }
-
+            data = model.preprocess(data, None)
             _data.append(model.transform(data, None))
 
         self.load_ckpt(model.cfg.ckpt_path)
@@ -368,12 +373,13 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for idx in tqdm(range(len(_data)), desc='test'):
+            for inputs in tqdm(_data, desc='test'):
                 #data = test_split[idx]
                 #if (cfg.get('test_continue', True) and dataset.is_tested(data['attr'])):
                 #    continue
-                results = self.run_inference(_data[idx])#(data['data'])
-
+                results = self.run_inference(inputs)#(data['data'])
+                print(model.loss(model(inputs['point']), inputs))
+                continue
                 # TODO: replace! temporary solution
                 import numpy as np
 
@@ -412,7 +418,7 @@ class ObjectDetection(BasePipeline):
                     return result
 
                 pred.append(to_camera(results))
-                gt.append(to_camera(_data[idx]['bounding_boxes'], True))
+                gt.append(to_camera(inputs['bboxes'], True))
                 #
 
         if cfg.get('test_compute_metric', True):
@@ -461,7 +467,7 @@ class ObjectDetection(BasePipeline):
 
         with torch.no_grad():
             for inputs in tqdm(valid_loader, desc='validation'):
-                results = model(inputs['data']['point'].to(self.device))
+                results = model(inputs['data']['point'])
                 loss = model.loss(results, inputs['data'])
                 for l, v in loss.items():
                     if not l in self.valid_losses:

@@ -133,8 +133,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [l[0].to(scores.device) for l in inputs['labels']]
-        gt_bboxes = [b[0].to(scores.device) for b in inputs['bboxes']]
+        gt_labels = inputs['labels']
+        gt_bboxes = inputs['bboxes']
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
@@ -205,11 +205,15 @@ class PointPillars(BaseModel):
         }
 
     def transform(self, data, attr):
-        labels = np.array([bb.label_class for bb in data['bboxes']], dtype=np.int64)
-        bboxes = np.array([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=np.float32)
+        points = torch.tensor([data['point']],
+                               dtype=torch.float32,
+                               device=self.device)
+
+        labels = torch.tensor([bb.label_class for bb in data['bboxes']], dtype=torch.int64, device=self.device)
+        bboxes = torch.tensor([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=torch.float32, device=self.device)
         
         return {
-            'point': data['point'],
+            'point': points,
             'bboxes': [bboxes], 
             'labels': [labels],
             'calib': data['calib']
@@ -465,7 +469,7 @@ class PillarFeatureNet(nn.Module):
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
 
-        f_center = features[:, :, :2].clone().detach()
+        f_center = features[:, :, :2]#.clone().detach()
         f_center[:, :, 0] = f_center[:, :, 0] - (
             coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
             self.x_offset)
