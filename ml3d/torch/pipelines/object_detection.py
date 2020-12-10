@@ -63,9 +63,12 @@ class ObjectDetection(BasePipeline):
         model.eval()
 
         with torch.no_grad():
-            inputs = torch.tensor(data['point'],
-                                  dtype=torch.float32,
-                                  device=self.device)
+            if not isinstance(data['point'], torch.Tensor):
+                inputs = torch.tensor([data['point']],
+                                    dtype=torch.float32,
+                                    device=self.device)
+            else:
+                inputs = data['point'].unsqueeze(0)
             results = model(inputs)
             boxes = model.inference_end(results, data)
 
@@ -88,7 +91,7 @@ class ObjectDetection(BasePipeline):
 
         test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
-                                     transform=model.transform,
+                                     transform=None,
                                      use_cache=dataset.cfg.use_cache,
                                      shuffle=False)
 
@@ -340,7 +343,7 @@ class ObjectDetection(BasePipeline):
             7420, 7421, 7422, 7423, 7424, 7426, 7430, 7433, 7434, 7435, 7436, 7437, 7439, 7440, 7442, 
             7445, 7447, 7448, 7449, 7450, 7453, 7456, 7458, 7462, 7463, 7464, 7466, 7467, 7468, 7469, 
             7470, 7473, 7475, 7477, 7478, 7480]
-        _idx = _idx[:10]
+        _idx = _idx[:100]
         for i in _idx:
             pc_path = "/home/prantl/obj_det/mmdetection3d/data/kitti/training/velodyne_reduced/%06d.bin"%i
             label_path = pc_path.replace('velodyne_reduced',
@@ -351,11 +354,6 @@ class ObjectDetection(BasePipeline):
             calib = dataset.read_calib(calib_path)
             label = dataset.read_label(label_path, calib)
 
-            label = list(filter(lambda x: x.label_class != 5, label))
-            for li in range(len(label)):
-                if label[li].label_class >= 3:
-                    label[li].label_class = -1
-
             data = {
                 'point': pc,
                 'feat': None,
@@ -363,7 +361,7 @@ class ObjectDetection(BasePipeline):
                 'bounding_boxes': label,
             }
             data = model.preprocess(data, None)
-            _data.append(model.transform(data, None))
+            _data.append(data)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -378,8 +376,7 @@ class ObjectDetection(BasePipeline):
                 #if (cfg.get('test_continue', True) and dataset.is_tested(data['attr'])):
                 #    continue
                 results = self.run_inference(inputs)#(data['data'])
-                print(model.loss(model(inputs['point']), inputs))
-                continue
+
                 # TODO: replace! temporary solution
                 import numpy as np
 
@@ -417,7 +414,7 @@ class ObjectDetection(BasePipeline):
 
                     return result
 
-                pred.append(to_camera(results))
+                pred.append(to_camera(results[0]))
                 gt.append(to_camera(inputs['bboxes'], True))
                 #
 
@@ -574,20 +571,7 @@ class ObjectDetection(BasePipeline):
 
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
-        checkpoint = torch.load(ckpt_path, map_location=self.device)
-
-        if 'state_dict' in checkpoint:
-            state_dict = checkpoint['state_dict']
-        else:
-            state_dict = checkpoint
-
-        if list(state_dict.keys())[0].startswith('module.'):
-            state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
-
-        self.model.load_state_dict(state_dict)
-
-
-        """train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
+        train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
 
         if ckpt_path is None:
@@ -609,7 +593,7 @@ class ObjectDetection(BasePipeline):
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
             log.info(f'Loading checkpoint scheduler_state_dict')
-            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])"""
+            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')

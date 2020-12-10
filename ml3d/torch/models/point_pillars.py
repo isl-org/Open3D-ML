@@ -143,12 +143,13 @@ class PointPillars(BaseModel):
 
         # classification loss
         scores = scores.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.num_classes)
-        scores = scores[torch.cat([pos_idx, neg_idx], axis=0)]
         target_labels = torch.full((scores.size(0),), self.bbox_head.num_classes, device=scores.device, dtype=gt_labels[0].dtype)
         target_labels[pos_idx] = torch.cat(gt_labels, axis=0)[target_idx]
 
         loss_cls = self.loss_cls(
-            scores, target_labels, avg_factor=avg_factor)
+            scores[torch.cat([pos_idx, neg_idx], axis=0)], 
+            target_labels[torch.cat([pos_idx, neg_idx], axis=0)], 
+            avg_factor=avg_factor)
 
         # remove invalid labels
         cond = (target_labels[pos_idx] >= 0) & (target_labels[pos_idx] < self.bbox_head.num_classes)
@@ -205,7 +206,7 @@ class PointPillars(BaseModel):
         }
 
     def transform(self, data, attr):
-        points = torch.tensor([data['point']],
+        points = torch.tensor(data['point'],
                                dtype=torch.float32,
                                device=self.device)
 

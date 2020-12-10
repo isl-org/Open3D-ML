@@ -49,7 +49,24 @@ def main(args):
                                  transform=None,
                                  use_cache=False,
                                  shuffle=False)
-    data = test_split[5]['data']
+    data = test_split[0]['data']
+
+    pc_path = "/home/prantl/obj_det/mmdetection3d/data/kitti/training/velodyne_reduced/000001.bin"
+    label_path = pc_path.replace('velodyne_reduced',
+                                    'label_2').replace('.bin', '.txt')
+    calib_path = label_path.replace('label_2', 'calib')
+
+    pc = dataset.read_lidar(pc_path)
+    calib = dataset.read_calib(calib_path)
+    label = dataset.read_label(label_path, calib)
+
+    data = {
+        'point': pc,
+        'feat': None,
+        'calib': calib,
+        'bounding_boxes': label,
+    }
+    data = model.preprocess(data, None)
 
     # run inference on a single example.
     result = pipeline.run_inference(data)[0]
