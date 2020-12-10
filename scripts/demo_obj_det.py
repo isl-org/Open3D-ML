@@ -3,7 +3,7 @@ import numpy as np
 import open3d.ml as ml3d
 import math
 
-from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT
+from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
 from ml3d.datasets import KITTI
 
 from ml3d.torch.pipelines import ObjectDetection
@@ -34,21 +34,7 @@ def parse_args():
 def main(args):
 
     model = PointPillars(voxel_size=[0.16, 0.16, 4],
-                         point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1],
-                         loss={
-                            "focal": {
-                                "gamma": 2.0,
-                                "alpha": 0.25,
-                                "loss_weight": 1.0
-                            },
-                            "smooth_l1": {
-                                "beta": 0.11,
-                                "loss_weight": 2.0
-                            },
-                            "cross_entropy": {
-                                "loss_weight": 0.2
-                            }
-                         })
+                         point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1])
     dataset = KITTI(args.path_kitti)
     pipeline = ObjectDetection(model, dataset, device="gpu")
 
@@ -60,7 +46,7 @@ def main(args):
 
     test_split = TorchDataloader(dataset=dataset.get_split('training'),
                                  preprocess=model.preprocess,
-                                 transform=model.transform,
+                                 transform=None,
                                  use_cache=False,
                                  shuffle=False)
     data = test_split[5]['data']
@@ -68,7 +54,7 @@ def main(args):
     # run inference on a single example.
     result = pipeline.run_inference(data)[0]
 
-    boxes = data['bounding_boxes']
+    boxes = data['bboxes']
     boxes.extend(result)
 
     vis = Visualizer()

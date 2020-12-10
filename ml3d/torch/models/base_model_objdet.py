@@ -81,7 +81,7 @@ class BaseModel(ABC, torch.nn.Module):
         return
 
     @abstractmethod
-    def inference_end(self, inputs, results):
+    def inference_end(self, results, attr=None):
         """This function is called after the inference.
 
         This function can be implemented to apply post-processing on the

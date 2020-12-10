@@ -27,7 +27,7 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     # paddings_indicator shape: [batch_size, max_num]
     return paddings_indicator
 
-
+    
 def limit_period(val, offset=0.5, period=np.pi):
     """Limit the value into a period for periodic function.
 

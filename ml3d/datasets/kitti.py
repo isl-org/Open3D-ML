@@ -241,7 +241,13 @@ class Object3d(BEVBox3D):
         world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
         cam_img = np.transpose(calib['P2'])
 
-        super().__init__(center, size, float(label[14]), label_class, confidence, world_cam, cam_img)
+        # kitti boxes are pointing backwards
+        yaw = float(label[14])-np.pi
+        yaw = yaw - np.floor(yaw / (2 * np.pi) + 0.5) * 2 * np.pi
+
+        super().__init__(center, size, yaw, label_class, confidence, world_cam, cam_img)
+
+        self.yaw = float(label[14])
 
         self.name = label[0]
         self.cls_id = self.cls_type_to_id(self.name)

@@ -181,10 +181,12 @@ class BEVBox3D(BoundingBox3D):
         self.world_cam = world_cam
         self.cam_img = cam_img
 
-        # TODO: make independent of kitti!
-        front = [-1 * np.sin(self.yaw), -1 * np.cos(self.yaw), 0]
+        # x-axis
+        left = [np.cos(self.yaw), -np.sin(self.yaw), 0]
+        # y-axis
+        front = [np.sin(self.yaw), np.cos(self.yaw), 0]
+        # z-axis
         up = [0, 0, 1]
-        left = [-1 * np.cos(self.yaw), np.sin(self.yaw), 0]
 
         super().__init__(center, front, up, left, size, label_class, confidence, **kwargs)
 
@@ -205,6 +207,17 @@ class BEVBox3D(BoundingBox3D):
         corners3d = np.dot(R, corners3d).T
         corners3d = corners3d + self.to_camera()[:3]
         return corners3d
+
+    def to_xyzwhlr(self):
+        """
+        Returns box in the common 7-sized vector representation.
+        :return box: (7,)
+        """
+        bbox = np.zeros((7,))
+        bbox[0:3] = self.center - [0, 0, self.size[1]/2]
+        bbox[3:6] = np.array(self.size)[[0, 2, 1]]
+        bbox[6] = self.yaw
+        return bbox
 
     def to_camera(self):
         """

@@ -34,7 +34,7 @@ from ...vis.boundingbox import BEVBox3D
 from .base_model_objdet import BaseModel
 
 from ...utils import MODEL
-from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, limit_period_np, get_paddings_indicator, bbox_overlaps, box3d_to_bev2d
+from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator, bbox_overlaps, box3d_to_bev2d
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
@@ -123,7 +123,7 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def forward(self, inputs):
-        x = self.extract_feats(inputs['point'])
+        x = self.extract_feats(inputs)
         outs = self.bbox_head(x)
         return outs
 
@@ -133,8 +133,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [l[0] for l in inputs['labels']]
-        gt_bboxes = [b[0] for b in inputs['bboxes']]
+        gt_labels = [l[0].to(scores.device) for l in inputs['labels']]
+        gt_bboxes = [b[0].to(scores.device) for b in inputs['bboxes']]
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
@@ -156,11 +156,11 @@ class PointPillars(BaseModel):
         target_idx = target_idx[cond]
         target_bboxes = target_bboxes[cond]
 
+        bboxes = bboxes.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.box_code_size)[pos_idx]
+        dirs = dirs.permute((0, 2, 3, 1)).reshape(-1, 2)[pos_idx]
+
         if len(pos_idx) > 0:
             # direction classification loss
-            bboxes = bboxes.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.box_code_size)[pos_idx]
-            dirs = dirs.permute((0, 2, 3, 1)).reshape(-1, 2)[pos_idx]
-
             # to discrete bins
             target_dirs = torch.cat(gt_bboxes, axis=0)[target_idx][:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
@@ -182,12 +182,12 @@ class PointPillars(BaseModel):
             loss_bbox = bboxes.sum()
             loss_dir = dirs.sum()
 
-        return loss_cls + loss_bbox + loss_dir
+        return {
+            'loss_cls': loss_cls,
+            'loss_bbox': loss_bbox,
+            'loss_dir': loss_dir }
 
     def preprocess(self, data, attr):
-        return data
-
-    def transform(self, data, attr):
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
@@ -198,23 +198,24 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        if 'bounding_boxes' not in data.keys(
-        ) or data['bounding_boxes'] is None:
-            labels = []
-            bboxes = []
-        else:
-            labels = np.array([bb.label_class for bb in data['bounding_boxes']], dtype=np.int64)
-            TODO
-            bboxes = np.array([[*bb.center, bb.size[2], bb.size[0], bb.size[1], 0] for bb in data['bounding_boxes']], dtype=np.float32)
-
-        data['labels'] = labels
         return {
             'point': points,
-            'bboxes': [bboxes], 
-            'labels': [labels]
+            'bboxes': data['bounding_boxes'],
+            'calib': data['calib']
         }
 
-    def inference_end(self, inputs, results):
+    def transform(self, data, attr):
+        labels = np.array([bb.label_class for bb in data['bboxes']], dtype=np.int64)
+        bboxes = np.array([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=np.float32)
+        
+        return {
+            'point': data['point'],
+            'bboxes': [bboxes], 
+            'labels': [labels],
+            'calib': data['calib']
+        }
+
+    def inference_end(self, results, inputs):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
@@ -230,11 +231,9 @@ class PointPillars(BaseModel):
             inference_result.append([])
 
             for bbox, score, label in zip(bboxes, scores, labels):
-                yaw = limit_period_np(bbox[-1]-np.pi, period=2*np.pi)
-
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
-
+                yaw = bbox[-1]
                 inference_result[-1].append(
                     BEVBox3D(pos, dim, yaw, label, score, world_cam, cam_img))
 
@@ -835,8 +834,8 @@ class Anchor3DHead(nn.Module):
                 target_idxs.append(argmax_overlaps[pos_idx]+idx_off)
 
                 # store global indices in list
-                pos_idx = flatten_idx(torch.nonzero(pos_idx).squeeze(-1), j) + i*anchors_cnt
-                neg_idx = flatten_idx(torch.nonzero(neg_idx).squeeze(-1), j) + i*anchors_cnt
+                pos_idx = flatten_idx(pos_idx.nonzero(as_tuple=False).squeeze(-1), j) + i*anchors_cnt
+                neg_idx = flatten_idx(neg_idx.nonzero(as_tuple=False).squeeze(-1), j) + i*anchors_cnt
                 pos_idxs.append(pos_idx)
                 neg_idxs.append(neg_idx)
 

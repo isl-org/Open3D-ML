@@ -22,7 +22,7 @@ class BaseModel(ABC, tf.keras.Model):
         super().__init__()
         self.cfg = Config(kwargs)
 
-    def get_loss(self, Loss, results, inputs):
+    def loss(self, results, inputs):
         """Computes the loss given the network input and outputs.
 
         Args:
@@ -74,7 +74,7 @@ class BaseModel(ABC, tf.keras.Model):
         return []
 
     @abstractmethod
-    def inference_end(self, results):
+    def inference_end(self, results, attr=None):
         """This function is called after the inference.
 
         This function can be implemented to apply post-processing on the
