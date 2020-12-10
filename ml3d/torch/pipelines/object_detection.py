@@ -278,8 +278,8 @@ class ObjectDetection(BasePipeline):
         make_dir(path_ckpt)
         torch.save(
             dict(epoch=epoch,
-                 model_state_dict=self.model.state_dict()),
-                 optimizer_state_dict=self.optimizer.state_dict(),
+                 model_state_dict=self.model.state_dict(),
+                 optimizer_state_dict=self.optimizer.state_dict()),
                  #scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')

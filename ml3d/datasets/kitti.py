@@ -243,7 +243,7 @@ class Object3d(BEVBox3D):
 
         # kitti boxes are pointing backwards
         yaw = float(label[14])-np.pi
-        yaw = yaw - np.floor(yaw / (2 * np.pi)) * 2 * np.pi
+        yaw = yaw - np.floor(yaw / (2 * np.pi) + 0.5) * 2 * np.pi
 
         super().__init__(center, size, yaw, label_class, confidence, world_cam, cam_img)
 
