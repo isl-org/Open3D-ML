@@ -247,6 +247,8 @@ class Object3d(BEVBox3D):
 
         super().__init__(center, size, yaw, label_class, confidence, world_cam, cam_img)
 
+        self.yaw = float(label[14])
+
         self.name = label[0]
         self.cls_id = self.cls_type_to_id(self.name)
         self.truncation = float(label[1])

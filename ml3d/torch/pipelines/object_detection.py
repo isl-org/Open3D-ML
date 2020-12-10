@@ -174,16 +174,6 @@ class ObjectDetection(BasePipeline):
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size)
 
-        valid_dataset = dataset.get_split('validation')
-        valid_split = TorchDataloader(dataset=valid_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                          'steps_per_epoch_valid', None))
-        valid_loader = DataLoader(valid_split,
-                                  batch_size=cfg.val_batch_size)
-
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
         is_resume = model.cfg.get('is_resume', True)

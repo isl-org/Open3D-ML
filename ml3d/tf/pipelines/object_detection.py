@@ -66,7 +66,7 @@ class ObjectDetection(BasePipeline):
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log.info("DEVICE : {}".format(device))
+        log.info("DEVICE : {}".format(self.device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
