@@ -133,8 +133,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [l[0].to(scores.device) for l in inputs['labels']]
-        gt_bboxes = [b[0].to(scores.device) for b in inputs['bboxes']]
+        gt_labels = [l[0] for l in inputs['labels']]
+        gt_bboxes = [b[0] for b in inputs['bboxes']]
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
@@ -143,12 +143,13 @@ class PointPillars(BaseModel):
 
         # classification loss
         scores = scores.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.num_classes)
-        scores = scores[torch.cat([pos_idx, neg_idx], axis=0)]
         target_labels = torch.full((scores.size(0),), self.bbox_head.num_classes, device=scores.device, dtype=gt_labels[0].dtype)
         target_labels[pos_idx] = torch.cat(gt_labels, axis=0)[target_idx]
 
         loss_cls = self.loss_cls(
-            scores, target_labels, avg_factor=avg_factor)
+            scores[torch.cat([pos_idx, neg_idx], axis=0)], 
+            target_labels[torch.cat([pos_idx, neg_idx], axis=0)], 
+            avg_factor=avg_factor)
 
         # remove invalid labels
         cond = (target_labels[pos_idx] >= 0) & (target_labels[pos_idx] < self.bbox_head.num_classes)
@@ -205,11 +206,15 @@ class PointPillars(BaseModel):
         }
 
     def transform(self, data, attr):
-        labels = np.array([bb.label_class for bb in data['bboxes']], dtype=np.int64)
-        bboxes = np.array([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=np.float32)
+        points = torch.tensor(data['point'],
+                               dtype=torch.float32,
+                               device=self.device)
+
+        labels = torch.tensor([bb.label_class for bb in data['bboxes']], dtype=torch.int64, device=self.device)
+        bboxes = torch.tensor([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=torch.float32, device=self.device)
         
         return {
-            'point': data['point'],
+            'point': points,
             'bboxes': [bboxes], 
             'labels': [labels],
             'calib': data['calib']
@@ -463,8 +468,6 @@ class PillarFeatureNet(nn.Module):
         features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
-        dtype = features.dtype
-
         f_center = features[:, :, :2].clone().detach()
         f_center[:, :, 0] = f_center[:, :, 0] - (
             coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
