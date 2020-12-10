@@ -568,7 +568,20 @@ class ObjectDetection(BasePipeline):
 
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
-        train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
+        checkpoint = torch.load(ckpt_path, map_location=self.device)
+
+        if 'state_dict' in checkpoint:
+            state_dict = checkpoint['state_dict']
+        else:
+            state_dict = checkpoint
+
+        if list(state_dict.keys())[0].startswith('module.'):
+            state_dict = {k[7:]: v for k, v in checkpoint['state_dict'].items()}
+
+        self.model.load_state_dict(state_dict)
+
+
+        """train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
 
         if ckpt_path is None:
@@ -590,7 +603,7 @@ class ObjectDetection(BasePipeline):
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
             log.info(f'Loading checkpoint scheduler_state_dict')
-            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+            self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])"""
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
