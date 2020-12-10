@@ -133,8 +133,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [l[0] for l in inputs['labels']]
-        gt_bboxes = [b[0] for b in inputs['bboxes']]
+        gt_labels = [l[0].to(scores.device) for l in inputs['labels']]
+        gt_bboxes = [b[0].to(scores.device) for b in inputs['bboxes']]
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
