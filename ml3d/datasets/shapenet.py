@@ -123,7 +123,9 @@ class ShapeNet(BaseDataset):
                 15: 'Table'
             }
         elif task == "segmentation":
-            raise NotImplementedError
+            label_to_names = {}
+            for i in range(50):
+                label_to_names[i] = f"Part{i}"
         else:
             raise ValueError(f"Invalid task {task}")
         return label_to_names
