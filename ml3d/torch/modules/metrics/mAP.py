@@ -123,16 +123,16 @@ def precision_3d(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5],
                 # identify all matches (filtered preds vs filtered targets)
                 match_cond = np.any(overlap_label[pred_idx][:, target_idx] >= min_overlap[j], axis=-1)
                 tp = np.zeros((len(pred_idx),))
-                # at least one match
-                if  np.any(match_cond):
-                    # all matches fp
-                    fp[np.where(match_cond)] = 1
 
-                    # only best match may be tp
-                    max_idx = np.argmax(overlap_label[:, target_idx], axis=0)
-                    max_cond = np.where([idx in max_idx for idx in pred_idx])
-                    tp[max_cond] = 1
-                    fp[max_cond] = 0
+                # all matches first fp
+                fp[np.where(match_cond)] = 1
+
+                # only best match can be tp
+                max_idx = np.argmax(overlap_label[:, target_idx], axis=0)
+                max_cond = [idx in max_idx for idx in pred_idx]
+                match_cond = np.all([max_cond, match_cond], axis=0)
+                tp[match_cond] = 1
+                fp[match_cond] = 0
 
                 # no matching pred box (all preds vs filtered targets)
                 fns[i, j] = np.sum(np.all(overlap_label[:, target_idx] < min_overlap[j], axis=0))
