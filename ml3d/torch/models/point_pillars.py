@@ -156,11 +156,11 @@ class PointPillars(BaseModel):
         target_idx = target_idx[cond]
         target_bboxes = target_bboxes[cond]
 
+        bboxes = bboxes.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.box_code_size)[pos_idx]
+        dirs = dirs.permute((0, 2, 3, 1)).reshape(-1, 2)[pos_idx]
+
         if len(pos_idx) > 0:
             # direction classification loss
-            bboxes = bboxes.permute((0, 2, 3, 1)).reshape(-1, self.bbox_head.box_code_size)[pos_idx]
-            dirs = dirs.permute((0, 2, 3, 1)).reshape(-1, 2)[pos_idx]
-
             # to discrete bins
             target_dirs = torch.cat(gt_bboxes, axis=0)[target_idx][:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
