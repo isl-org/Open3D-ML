@@ -131,10 +131,7 @@ class ObjectDetection(BasePipeline):
         self.valid_mAP = {}
 
         with torch.no_grad():
-            i = 0
             for inputs in tqdm(valid_loader, desc='validation'):
-                if i == 5: break
-                i+=1
                 results = model(inputs['data']['point'].to(self.device))
                 loss = model.loss(results, inputs['data'])
                 for l, v in loss.items():
@@ -201,10 +198,7 @@ class ObjectDetection(BasePipeline):
 
             self.losses = {}
             process_bar = tqdm(train_loader, desc='training')        
-            i = 0
             for inputs in process_bar:
-                if i == 5: break
-                i+=1
                 results = model(inputs['data']['point'].to(self.device))
                 loss = model.loss(results, inputs['data'])
                 loss_sum = sum(loss.values())
