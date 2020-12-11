@@ -1,5 +1,7 @@
 import numpy as np
-from . import box3d_iou, bev_iou
+
+from open3d.ml.contrib import iou_bev_cuda as iou_bev
+from open3d.ml.contrib import iou_3d_cuda as iou_3d
 
 def filter_data(data, labels, diffs=None):
     """Filters the data to fit the given labels and difficulties.
@@ -101,8 +103,14 @@ def precision_3d(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5],
     pred = filter_data(pred, classes)[0]
     target = filter_data(target, classes+sim_values)[0]
 
-    f_iou = bev_iou if bev else box3d_iou
-    overlap = f_iou(pred, target)
+    if bev:
+        overlap = iou_bev(
+            pred['bbox'][:, [0, 2, 3, 5, 6]].astype(np.float32), 
+            target['bbox'][:, [0, 2, 3, 5, 6]].astype(np.float32))
+    else:
+        overlap = iou_3d(
+            pred['bbox'].astype(np.float32), 
+            target['bbox'].astype(np.float32))
 
     detection = np.zeros((len(difficulties), len(classes), len(pred['bbox']), 3))
     fns = np.zeros((len(difficulties), len(classes), 1), dtype="int64")
@@ -233,7 +241,7 @@ def mAP(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5], bev=True
                 fp_acc[ti] = np.sum(d[:,2])
 
             prec = tp_acc / (tp_acc + fp_acc)
-            mAP[i, j] = np.sum(prec) / samples * 100
+            mAP[i, j] = np.sum(prec[::4]) / 11 * 100
 
     return mAP
             

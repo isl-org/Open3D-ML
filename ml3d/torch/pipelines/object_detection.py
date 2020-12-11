@@ -343,7 +343,7 @@ class ObjectDetection(BasePipeline):
             7420, 7421, 7422, 7423, 7424, 7426, 7430, 7433, 7434, 7435, 7436, 7437, 7439, 7440, 7442, 
             7445, 7447, 7448, 7449, 7450, 7453, 7456, 7458, 7462, 7463, 7464, 7466, 7467, 7468, 7469, 
             7470, 7473, 7475, 7477, 7478, 7480]
-        #_idx = _idx[:100]
+        _idx = _idx[:100]
         for i in _idx:
             pc_path = "/home/prantl/obj_det/mmdetection3d/data/kitti/training/velodyne_reduced/%06d.bin"%i
             label_path = pc_path.replace('velodyne_reduced',
