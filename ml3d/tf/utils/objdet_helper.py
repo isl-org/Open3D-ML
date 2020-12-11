@@ -44,7 +44,7 @@ def limit_period(val, offset=0.5, period=np.pi):
     return val - tf.floor(val / period + offset) * period
 
 
-def xywhr2xyxyr(boxes_xywhr):
+def xywhr_to_xyxyr(boxes_xywhr):
     """Convert a rotated boxes in XYWHR format to XYXYR format.
 
     Args:
@@ -62,6 +62,42 @@ def xywhr2xyxyr(boxes_xywhr):
     ])
     return tf.linalg.matvec(transform, boxes_xywhr)
 
+def box3d_to_bev(boxes3d):
+    """Convert rotated 3d boxes in XYZWHDR format to BEV in XYWHR format.
+
+    Args:
+        boxes3d (torch.Tensor): Rotated boxes in XYZWHDR format.
+
+    Returns:
+        tf.Tensor: Converted BEV boxes in XYWHR format.
+    """
+    return tf.gather(boxes3d, [0, 1, 3, 4, 6], axis=-1)
+
+def box3d_to_bev2d(boxes3d):
+    """Convert rotated 3d boxes in XYZWHDR format to neareset BEV without rotation.
+
+    Args:
+        boxes3d (torch.Tensor): Rotated boxes in XYZWHDR format.
+
+    Returns:
+        tf.Tensor: Converted BEV boxes in XYWH format.
+    """
+
+    # Obtain BEV boxes with rotation in XYWHR format
+    bev_rotated_boxes = box3d_to_bev(boxes3d)
+    # convert the rotation to a valid range
+    rotations = bev_rotated_boxes[:, -1]
+    normed_rotations = tf.abs(limit_period(rotations, 0.5, np.pi))
+
+    # find the center of boxes
+    conditions = (normed_rotations > np.pi / 4)[..., None]
+    bboxes_xywh = tf.where(conditions, tf.gather(bev_rotated_boxes, [0, 1, 3, 2], axis=-1),
+                                bev_rotated_boxes[:, :4])
+
+    centers = bboxes_xywh[:, :2]
+    dims = bboxes_xywh[:, 2:]
+    bev_boxes = tf.concat([centers - dims / 2, centers + dims / 2], axis=-1)
+    return bev_boxes
 
 class Anchor3DRangeGenerator(object):
     """3D Anchor Generator by range.
@@ -203,9 +239,9 @@ class BBoxCoder(object):
         xt = (xg - xa) / diagonal
         yt = (yg - ya) / diagonal
         zt = (zg - za) / ha
-        lt = tf.log(lg / la)
-        wt = tf.log(wg / wa)
-        ht = tf.log(hg / ha)
+        lt = tf.math.log(lg / la)
+        wt = tf.math.log(wg / wa)
+        ht = tf.math.log(hg / ha)
         rt = rg - ra
         return tf.concat([xt, yt, zt, wt, lt, ht, rt], axis=-1)
 
@@ -261,9 +297,100 @@ def multiclass_nms(boxes, scores, score_thr):
 
         _scores = tf.gather(scores, cls_inds)[:, i]
         _boxes = tf.gather(boxes, cls_inds)
-        _bev = xywhr2xyxyr(tf.gather(_boxes, [0, 1, 3, 4, 6], axis=1))
+        _bev = xywhr_to_xyxyr(tf.gather(_boxes, [0, 1, 3, 4, 6], axis=1))
 
         idx = nms(_bev, _scores, 0.01)
         idxs.append(tf.gather(cls_inds, idx))
 
     return idxs
+
+def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
+    """Calculate overlap between two set of bboxes.
+    If ``is_aligned `` is ``False``, then calculate the overlaps between each
+    bbox of bboxes1 and bboxes2, otherwise the overlaps between each aligned
+    pair of bboxes1 and bboxes2.
+    Args:
+        bboxes1 (Tensor): shape (B, m, 4) in <x1, y1, x2, y2> format or empty.
+        bboxes2 (Tensor): shape (B, n, 4) in <x1, y1, x2, y2> format or empty.
+            B indicates the batch dim, in shape (B1, B2, ..., Bn).
+            If ``is_aligned `` is ``True``, then m and n must be equal.
+        mode (str): "iou" (intersection over union) or "iof" (intersection over
+            foreground).
+        is_aligned (bool, optional): If True, then m and n must be equal.
+            Default False.
+        eps (float, optional): A value added to the denominator for numerical
+            stability. Default 1e-6.
+    Returns:
+        Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
+    """
+
+    assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
+    # Either the boxes are empty or the length of boxes's last dimenstion is 4
+    assert (bboxes1.shape[-1] == 4 or bboxes1.shape[-1] == 0)
+    assert (bboxes2.shape[-1] == 4 or bboxes2.shape[-1] == 0)
+
+    # Batch dim must be the same
+    # Batch dim: (B1, B2, ... Bn)
+    assert bboxes1.shape[:-2] == bboxes2.shape[:-2]
+    batch_shape = bboxes1.shape[:-2]
+
+    rows = bboxes1.shape[-2]
+    cols = bboxes2.shape[-2]
+    if is_aligned:
+        assert rows == cols
+
+    if rows * cols == 0:
+        if is_aligned:
+            return tf.zeros(batch_shape + (rows, ))
+        else:
+            return tf.zeros(batch_shape + (rows, cols))
+
+    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
+        bboxes1[..., 3] - bboxes1[..., 1])
+    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
+        bboxes2[..., 3] - bboxes2[..., 1])
+
+    if is_aligned:
+        lt = tf.maximum(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]
+        rb = tf.minimum(bboxes1[..., 2:], bboxes2[..., 2:])  # [B, rows, 2]
+
+        wh = tf.nn.relu(rb - lt)  # [B, rows, 2] clip to zero
+        overlap = wh[..., 0] * wh[..., 1]
+
+        if mode in ['iou', 'giou']:
+            union = area1 + area2 - overlap
+        else:
+            union = area1
+        if mode == 'giou':
+            enclosed_lt = tf.minimum(bboxes1[..., :2], bboxes2[..., :2])
+            enclosed_rb = tf.maximum(bboxes1[..., 2:], bboxes2[..., 2:])
+    else:
+        lt = tf.maximum(bboxes1[..., :, None, :2],
+                       bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
+        rb = tf.minimum(bboxes1[..., :, None, 2:],
+                       bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
+
+        wh = tf.nn.relu(rb - lt)  # [B, rows, cols, 2]
+        overlap = wh[..., 0] * wh[..., 1]
+
+        if mode in ['iou', 'giou']:
+            union = area1[..., None] + area2[..., None, :] - overlap
+        else:
+            union = area1[..., None]
+        if mode == 'giou':
+            enclosed_lt = tf.minimum(bboxes1[..., :, None, :2],
+                                    bboxes2[..., None, :, :2])
+            enclosed_rb = tf.maximum(bboxes1[..., :, None, 2:],
+                                    bboxes2[..., None, :, 2:])
+
+    eps = tf.constant([eps])
+    union = tf.maximum(union, eps)
+    ious = overlap / union
+    if mode in ['iou', 'iof']:
+        return ious
+    # calculate gious
+    enclose_wh = tf.nn.relu(enclosed_rb - enclosed_lt)
+    enclose_area = enclose_wh[..., 0] * enclose_wh[..., 1]
+    enclose_area = tf.maximum(enclose_area, eps)
+    gious = ious - (enclose_area - union) / enclose_area
+    return gious

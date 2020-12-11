@@ -2,6 +2,7 @@ import torch
 import logging
 from tqdm import tqdm
 import numpy as np
+import re
 
 from datetime import datetime
 
@@ -87,7 +88,7 @@ class ObjectDetection(BasePipeline):
         test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
                                      transform=None,
-                                     use_cache=dataset.cfg.use_cache,
+                                     use_cache=False,
                                      shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path)
@@ -177,7 +178,7 @@ class ObjectDetection(BasePipeline):
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
         is_resume = model.cfg.get('is_resume', True)
-        self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
+        start_ep = self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
 
         dataset_name = dataset.name if dataset is not None else ''
         tensorboard_dir = join(
@@ -192,7 +193,7 @@ class ObjectDetection(BasePipeline):
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
-        for epoch in range(0, cfg.max_epoch + 1):
+        for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
 
@@ -242,13 +243,15 @@ class ObjectDetection(BasePipeline):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
 
+        epoch = 0 
         if ckpt_path is None:
             ckpt_path = latest_torch_ckpt(train_ckpt_dir)
             if ckpt_path is not None and is_resume:
                 log.info('ckpt_path not given. Restore from the latest ckpt')
+                epoch = int(re.findall(r'\d+', ckpt_path)[-1])+1
             else:
                 log.info('Initializing from scratch.')
-                return
+                return epoch
 
         if not exists(ckpt_path):
             raise FileNotFoundError(f' ckpt {ckpt_path} not found')
@@ -262,6 +265,8 @@ class ObjectDetection(BasePipeline):
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
             log.info(f'Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+
+        return epoch
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')

@@ -39,6 +39,9 @@ class TFDataloader():
                  model=None,
                  use_cache=True,
                  steps_per_epoch=None,
+                 preprocess=None,
+                 transform=None,
+                 get_batch_gen=None,
                  **kwargs):
         """
         Initializes the class, and includes the following steps:
@@ -60,10 +63,16 @@ class TFDataloader():
         """
         self.dataset = dataset
         self.model = model
-        self.preprocess = model.preprocess
-        self.transform = model.transform
-        self.get_batch_gen = model.get_batch_gen
-        self.model_cfg = model.cfg
+        if model is not None:
+            self.preprocess = model.preprocess
+            self.transform = model.transform
+            self.get_batch_gen = model.get_batch_gen
+            self.model_cfg = model.cfg
+        else:
+            self.preprocess = preprocess
+            self.transform = transform
+            self.get_batch_gen = get_batch_gen
+
         self.steps_per_epoch = steps_per_epoch
 
         if self.preprocess is not None and use_cache:
@@ -113,6 +122,30 @@ class TFDataloader():
 
         return data, attr
 
+    def __getitem__(self, index):
+        """
+		Returns the item at index position (idx). 	
+		"""
+        dataset = self.dataset
+        index = index % len(dataset)
+
+        data, attr = self.read_data(index)
+
+        if self.transform is not None:
+            data = self.transform(data, attr)
+
+        data = {'data': data, 'attr': attr}
+
+        return data
+
+    def __len__(self):
+        """Returns the number of steps for an epoch."""
+        if self.steps_per_epoch is not None:
+            steps_per_epoch = self.steps_per_epoch
+        else:
+            steps_per_epoch = len(self.dataset)
+        return steps_per_epoch
+
     def get_loader(self, batch_size=1, num_threads=3):
         """
         This constructs the tensorflow dataloader.
@@ -132,7 +165,7 @@ class TFDataloader():
         loader = loader.map(map_func=self.transform,
                             num_parallel_calls=num_threads)
 
-        if ('batcher' not in self.model_cfg.keys() or
+        if (self.model is None or 'batcher' not in self.model_cfg.keys() or
                 self.model_cfg.batcher == 'DefaultBatcher'):
             loader = loader.batch(batch_size)
 

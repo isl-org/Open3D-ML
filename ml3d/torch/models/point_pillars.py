@@ -133,8 +133,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [l[0] for l in inputs['labels']]
-        gt_bboxes = [b[0] for b in inputs['bboxes']]
+        gt_labels = [inputs['labels'][0]]
+        gt_bboxes = [inputs['bboxes'][0]]
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
@@ -215,8 +215,8 @@ class PointPillars(BaseModel):
         
         return {
             'point': points,
-            'bboxes': [bboxes], 
-            'labels': [labels],
+            'labels': labels,
+            'bboxes': bboxes, 
             'calib': data['calib']
         }
 
@@ -254,7 +254,7 @@ class PointPillarsVoxelization(torch.nn.Module):
                  voxel_size,
                  point_cloud_range,
                  max_num_points=32,
-                 max_voxels=(16000, 40000)):
+                 max_voxels=[16000, 40000]):
         """Voxelization layer for the PointPillars model.
 
         Args:
@@ -272,7 +272,7 @@ class PointPillarsVoxelization(torch.nn.Module):
         self.points_range_max = torch.Tensor(point_cloud_range[3:])
 
         self.max_num_points = max_num_points
-        if isinstance(max_voxels, tuple):
+        if isinstance(max_voxels, tuple) or isinstance(max_voxels, list):
             self.max_voxels = max_voxels
         else:
             self.max_voxels = _pair(max_voxels)
@@ -720,26 +720,33 @@ class SECONDFPN(nn.Module):
 
 class Anchor3DHead(nn.Module):
 
-    def __init__(self, num_classes=3, in_channels=384, feat_channels=384):
+    def __init__(self,
+                 num_classes=3,
+                 in_channels=384,
+                 feat_channels=384,
+                 nms_pre=100,
+                 score_thr=0.1,
+                 ranges=[
+                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
+                 ],
+                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
+                 rotations=[0, 1.57],
+                 iou_thr=[[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]):
 
         super().__init__()
         self.in_channels = in_channels
         self.num_classes = num_classes
         self.feat_channels = feat_channels
+        self.nms_pre = nms_pre
+        self.score_thr = score_thr
+        self.iou_thr = iou_thr
 
         # build anchor generator
-        self.anchor_generator = Anchor3DRangeGenerator(ranges=[
-            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-            [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-            [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-        ],
-                                                       sizes=[[0.6, 0.8, 1.73],
-                                                              [0.6, 1.76, 1.73],
-                                                              [1.6, 3.9, 1.56]],
-                                                       rotations=[0, 1.57])
-
-        self.nms_pre = 100
-        self.score_thr = 0.1
+        self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
+                                                       sizes=sizes,
+                                                       rotations=rotations)
 
         self.num_anchors = self.anchor_generator.num_base_anchors
 
@@ -757,7 +764,6 @@ class Anchor3DHead(nn.Module):
         self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
                                       1)
 
-        self.iou_thr = [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
 
     def forward(self, x):
         """Forward function on a feature map.
