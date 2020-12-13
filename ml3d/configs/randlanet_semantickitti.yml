@@ -12,14 +12,12 @@ dataset:
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   validation_split: ['08']
   use_cache: true
-  validation_split:
-  - '08'
   sampler:
     name: 'SemSegSpatiallyRegularSampler'
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/vis_weights_RandLANet.pth # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 3
   dim_output:

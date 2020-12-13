@@ -147,11 +147,12 @@ class SemanticKITTI(BaseDataset):
         make_dir(save_path)
         test_file_name = name_points
 
-        pred = results['predict_labels']
+        pred = results['predict_labels'] + 1
+
+        np.save("pred_label.npy", pred)
 
         store_path = join(save_path, name_points + '.label')
-        for ign in cfg.ignored_label_inds:
-            pred[pred >= ign] += 1
+
         pred = self.remap_lut[pred].astype(np.uint32)
         pred.tofile(store_path)
 
@@ -200,7 +201,7 @@ class SemanticKITTI(BaseDataset):
             file_list.append(
                 [join(pc_path, f) for f in np.sort(os.listdir(pc_path))])
 
-        file_list = np.concatenate(file_list, axis=0)[0:1]
+        file_list = np.concatenate(file_list, axis=0)
 
         return file_list
 
@@ -230,6 +231,8 @@ class SemanticKITTISplit(BaseDatasetSplit):
         else:
             labels = DataProcessing.load_label_kitti(
                 label_path, self.remap_lut_val).astype(np.int32)
+
+        np.save("gt_label.npy", labels)
 
         data = {
             'point': points[:, 0:3],

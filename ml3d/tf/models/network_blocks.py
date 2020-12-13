@@ -205,7 +205,7 @@ class KPConv(tf.keras.layers.Layer):
             self.offset_bias = None
 
         self.reset_parameters()
-        
+
         if deformable:
             self.kernel_points = self.offset_conv.kernel_points
         else:

@@ -109,10 +109,11 @@ class BaseDatasetSplit(ABC):
         self.split = split
         self.dataset = dataset
 
-        if split in ['test', 'validation']:
+        if split in ['test']:
             sampler_cls = get_module('sampler', 'SemSegSpatiallyRegularSampler')
         else:
-            sampler_cfg = self.cfg.get('sampler', {'name': 'SemSegRandomSampler'})
+            sampler_cfg = self.cfg.get('sampler',
+                                       {'name': 'SemSegRandomSampler'})
             sampler_cls = get_module('sampler', sampler_cfg['name'])
         self.sampler = sampler_cls(self)
 

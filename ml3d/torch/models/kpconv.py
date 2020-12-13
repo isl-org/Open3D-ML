@@ -571,7 +571,8 @@ class KPFCNN(BaseModel):
         for b_i, length in enumerate(lengths):
             # Get prediction
             probs = stk_probs[i0:i0 + length]
-            labels = stk_labels[i0:i0 + length]
+            labels = np.argmax(probs, 1)
+
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
             test_probs[proj_mask] = self.test_smooth * test_probs[proj_mask] + (

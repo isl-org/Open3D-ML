@@ -130,25 +130,20 @@ class RandLANet(BaseModel):
 
         return loss, labels, scores
 
-
     def update_probs(self, inputs, results, test_probs, test_labels):
         self.test_smooth = 0.95
 
         for b in range(results.size()[0]):
 
-
             result = torch.reshape(results[b], (-1, self.cfg.num_classes))
             probs = torch.nn.functional.softmax(result, dim=-1)
             probs = result.cpu().data.numpy()
-
-
+            labels = np.argmax(probs, 1)
             inds = inputs['data']['point_inds'][b]
-            labels = inputs['data']['labels'][b]
 
             test_probs[inds] = self.test_smooth * test_probs[inds] + (
                 1 - self.test_smooth) * probs
             test_labels[inds] = labels
-
 
         return test_probs, test_labels
 
@@ -173,8 +168,6 @@ class RandLANet(BaseModel):
             feat = None
         else:
             feat = feat[selected_idxs]
-
-            
 
         if cfg.get('recentering', True):
             pc = pc - center_point

@@ -7,6 +7,7 @@ from ...utils import SAMPLER
 
 class SemSegSpatiallyRegularSampler(object):
     """Spatially regularSampler sampler for semantic segmentation datsets"""
+
     def __init__(self, dataset):
         self.dataset = dataset
         self.length = len(dataset)
@@ -36,6 +37,7 @@ class SemSegSpatiallyRegularSampler(object):
             self.min_possibilities += [float(np.min(self.possibilities[-1]))]
 
     def get_cloud_sampler(self):
+
         def gen_train():
             for i in range(self.length):
                 self.cloud_id = int(np.argmin(self.min_possibilities))
@@ -51,13 +53,14 @@ class SemSegSpatiallyRegularSampler(object):
 
                 yield self.cloud_id
 
-        if self.split == 'train':
+        if self.split in ['train', 'validation', 'valid', 'training']:
             gen = gen_train
         else:
             gen = gen_test
         return gen()
 
     def get_point_sampler(self):
+
         def _random_centered_gen(**kwargs):
             pc = kwargs.get('pc', None)
             num_points = kwargs.get('num_points', None)
