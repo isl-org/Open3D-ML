@@ -781,6 +781,7 @@ class Anchor3DHead(nn.Module):
         dir_cls_preds = self.conv_dir_cls(x)
         return cls_score, bbox_pred, dir_cls_preds
 
+
     def assign_bboxes(self, pred_bboxes, target_bboxes):
         """Assigns target bboxes to given anchors.
 

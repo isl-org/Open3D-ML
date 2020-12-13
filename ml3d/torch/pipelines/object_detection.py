@@ -110,7 +110,7 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for i in tqdm(range(len(test_split)), desc='validation'):
+            for i in tqdm(range(len(test_split)), desc='testing'):
                 results = self.run_inference(test_split[i]['data'])
 
                 pred.append(convert_data_eval(results[0], [40, 25]))
@@ -119,19 +119,18 @@ class ObjectDetection(BasePipeline):
         if cfg.get('test_compute_metric', True):
             ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
             log.info("mAP BEV:")
-            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,0]))
-            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,1]))
-            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,2]))
+            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
+            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
+            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
 
             ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
             log.info("")
-            log.info("mAP BEV:")
-            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,0]))
-            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,1]))
-            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,2]))
-
+            log.info("mAP 3D:")
+            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
+            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
+            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
         #dataset.save_test_result(results, attr)
-        
+
 
     def run_valid(self):
         """
@@ -154,7 +153,7 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         valid_dataset = dataset.get_split('validation')
-        valid_split = TorchDataloader(dataset=valid_dataset,
+        valid_loader = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=None,
                                       use_cache=dataset.cfg.use_cache,
@@ -168,8 +167,8 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for i in tqdm(range(len(valid_split)), desc='validation'):
-                inputs = model.transform(valid_split[i]['data'], None)
+            for i in tqdm(range(len(valid_loader)), desc='validation'):
+                inputs = model.transform(valid_loader[i]['data'], None)
                 results = model(inputs['point'])
                 loss = model.loss(results, inputs)
                 for l, v in loss.items():
@@ -180,7 +179,7 @@ class ObjectDetection(BasePipeline):
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, inputs)
                 pred.append(convert_data_eval(boxes[0], [40, 25]))
-                gt.append(convert_data_eval(valid_split[i]['data']['bboxes']))
+                gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
         
         sum_loss = 0
         desc = "validation - "
@@ -193,16 +192,16 @@ class ObjectDetection(BasePipeline):
 
         ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
         log.info("mAP BEV:")
-        log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,0]))
-        log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,1]))
-        log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,2]))
+        log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
+        log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
+        log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
 
         ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
         log.info("")
-        log.info("mAP BEV:")
-        log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,0]))
-        log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,1]))
-        log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[:,0,2]))
+        log.info("mAP 3D:")
+        log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
+        log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
+        log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
 
 
     def run_train(self):
