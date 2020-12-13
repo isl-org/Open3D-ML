@@ -16,7 +16,7 @@ from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 import numpy as np
 
-from ..modules.metrics import mAP
+from ...metrics.mAP import mAP, convert_data_eval
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -75,42 +75,6 @@ class ObjectDetection(BasePipeline):
 
         return boxes
 
-    def convert_data_eval(self, bboxes, diff=None):
-        """
-        Convert data for evaluation:
-
-        Args:
-            bboxes: List of BEVBox3D bboxes.
-            diff: List of custom heights thresholds for computation of difficulty. 
-                Default: None (use the default difficulty of the dataset class)
-        """
-        bbox = np.empty((len(bboxes), 7))
-        label = np.empty((len(bboxes),))
-        score = np.empty((len(bboxes),))
-        difficulty = np.empty((len(bboxes)))
-        for i, box in enumerate(bboxes):
-            bbox[i] = box.to_camera()
-            label[i] = box.label_class
-            score[i] = box.confidence
-            if diff is not None:
-                height = box.to_img()[3]
-                difficulty[i] = -1
-                for i in range(len(diff)):
-                    if height > diff[i]:
-                        difficulty[i] = i
-                        break
-            else:
-                difficulty[i] = box.get_difficulty()
-
-        result =  {
-            'bbox': bbox,
-            'label': label,
-            'score': score,
-            'difficulty': difficulty
-        }
-
-        return result
-
     def run_test(self):
         """
         Run test with test data split, computes mean average precision of the prediction results.
@@ -148,8 +112,8 @@ class ObjectDetection(BasePipeline):
             for i in tqdm(range(len(test_split)), desc='validation'):
                 results = self.run_inference(test_split[i]['data'])
 
-                pred.append(self.convert_data_eval(results[0], [40, 25]))
-                gt.append(self.convert_data_eval(test_split[i]['data']['bboxes'], True))
+                pred.append(convert_data_eval(results[0], [40, 25]))
+                gt.append(convert_data_eval(test_split[i]['data']['bboxes']))
 
         if cfg.get('test_compute_metric', True):
             ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
@@ -204,8 +168,8 @@ class ObjectDetection(BasePipeline):
         gt = []
         with torch.no_grad():
             for i in tqdm(range(len(valid_split)), desc='validation'):
-                inputs = model.transform(valid_split[i], None)
-                results = model(inputs['point'])
+                inputs = model.transform(valid_split[i]['data'], None)
+                results = model([inputs['point']])
                 loss = model.loss(results, inputs)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
@@ -213,9 +177,9 @@ class ObjectDetection(BasePipeline):
                     self.valid_losses[l].append(v.cpu().item())
 
                 # convert to bboxes for mAP evaluation
-                boxes = model.inference_end(results, data)
-                pred.append(self.convert_data_eval(boxes[0], [40, 25]))
-                gt.append(self.convert_data_eval(valid_split[i]['data']['bboxes'], True))
+                boxes = model.inference_end(results, inputs)
+                pred.append(convert_data_eval(boxes[0], [40, 25]))
+                gt.append(convert_data_eval(valid_split[i]['data']['bboxes']))
         
         sum_loss = 0
         desc = "validation - "
@@ -260,14 +224,12 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         train_dataset = dataset.get_split('training')
-        train_split = TorchDataloader(dataset=train_dataset,
+        train_loader = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -292,10 +254,12 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(train_loader, desc='training')        
-            for inputs in process_bar:
-                results = model(inputs['data']['point'].to(self.device))
-                loss = model.loss(results, inputs['data'])
+            process_bar = tqdm(range(len(train_loader)), desc='training')        
+            for i in process_bar:
+                inputs = train_loader[i]['data']
+
+                results = model([inputs['point'].to(self.device)])
+                loss = model.loss(results, inputs)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()

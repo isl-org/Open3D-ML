@@ -7,7 +7,7 @@ from tqdm import tqdm
 from open3d.ml.tf.ops import voxelize
 from ...vis.boundingbox import BEVBox3D
 
-from .base_model import BaseModel
+from .base_model_objdet import BaseModel
 from ...utils import MODEL
 
 from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator

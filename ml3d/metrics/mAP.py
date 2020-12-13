@@ -1,7 +1,43 @@
 import numpy as np
 
-from open3d.ml.contrib import iou_bev_cuda as iou_bev
-from open3d.ml.contrib import iou_3d_cuda as iou_3d
+from open3d.ml.contrib import iou_bev_cpu as iou_bev
+from open3d.ml.contrib import iou_3d_cpu as iou_3d
+
+def convert_data_eval(bboxes, diff=None):
+    """
+    Convert data for evaluation:
+
+    Args:
+        bboxes: List of BEVBox3D bboxes.
+        diff: List of custom heights thresholds for computation of difficulty. 
+            Default: None (use the default difficulty of the dataset class)
+    """
+    bbox = np.empty((len(bboxes), 7))
+    label = np.empty((len(bboxes),))
+    score = np.empty((len(bboxes),))
+    difficulty = np.empty((len(bboxes)))
+    for i, box in enumerate(bboxes):
+        bbox[i] = box.to_camera()
+        label[i] = box.label_class
+        score[i] = box.confidence
+        if diff is not None:
+            height = box.to_img()[3]
+            difficulty[i] = -1
+            for i in range(len(diff)):
+                if height > diff[i]:
+                    difficulty[i] = i
+                    break
+        else:
+            difficulty[i] = box.get_difficulty()
+
+    result =  {
+        'bbox': bbox,
+        'label': label,
+        'score': score,
+        'difficulty': difficulty
+    }
+
+    return result
 
 def filter_data(data, labels, diffs=None):
     """Filters the data to fit the given labels and difficulties.

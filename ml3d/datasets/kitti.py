@@ -263,7 +263,7 @@ class Object3d(BEVBox3D):
 
         self.dis_to_cam = np.linalg.norm(self.center)
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
-        self.level = self.get_kitti_obj_level()
+        self.level = self.get_difficulty()
 
     @staticmethod
     def cls_type_to_id(cls_type):

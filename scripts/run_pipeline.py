@@ -124,7 +124,7 @@ def main():
     }
 
     if args.split == 'test':
-        pipeline.run_test()
+        pipeline.run_valid()
     else:
         pipeline.run_train()
 

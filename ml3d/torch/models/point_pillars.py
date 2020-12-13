@@ -468,9 +468,7 @@ class PillarFeatureNet(nn.Module):
         features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
-        dtype = features.dtype
-
-        f_center = features[:, :, :2]#.clone().detach()
+        f_center = features[:, :, :2].clone().detach()
         f_center[:, :, 0] = f_center[:, :, 0] - (
             coors[:, 3].type_as(features).unsqueeze(1) * self.vx +
             self.x_offset)
