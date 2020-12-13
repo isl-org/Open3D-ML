@@ -17,8 +17,8 @@ def filter_data(data, labels, diffs=None):
             (optional)
 
     Returns:
-        Dictionary with same as format as input, with only the given labels
-        and difficulties.
+        Tuple wit dictionary with same as format as input, with only the given labels
+        and difficulties and the indices.
     """
     cond = np.any([data['label'] == label for label in labels], axis=0)
     if diffs is not None and 'difficulty' in data:
@@ -77,7 +77,6 @@ def precision_3d(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5],
             {
                 'bbox':       [...],
                 'label':      [...],     
-                'score':      [...],
                 'difficulty': [...],
                 ...
             }
@@ -112,24 +111,24 @@ def precision_3d(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5],
             pred['bbox'].astype(np.float32), 
             target['bbox'].astype(np.float32))
 
-    detection = np.zeros((len(difficulties), len(classes), len(pred['bbox']), 3))
-    fns = np.zeros((len(difficulties), len(classes), 1), dtype="int64")
-    for j, label in enumerate(classes):
+    detection = np.zeros((len(classes), len(difficulties), len(pred['bbox']), 3))
+    fns = np.zeros((len(classes), len(difficulties), 1), dtype="int64")
+    for i, label in enumerate(classes):
         # filter only with label
         pred_label, pred_idx_l = filter_data(pred, [label])
         target_label, target_idx_l = filter_data(target, [label, similar_classes.get(label)])
         overlap_label = overlap[pred_idx_l][:, target_idx_l]
-        for i, diff in enumerate(difficulties):
+        for j, diff in enumerate(difficulties):
             # filter with difficulty
             pred_idx = filter_data(pred_label, [label], [diff])[1]
             target_idx = filter_data(target_label, [label], [diff])[1]
 
             if len(pred_idx) > 0:
                 # no matching gt box (filtered preds vs all targets)
-                fp = np.all(overlap_label[pred_idx] < min_overlap[j], axis=1).astype("float32")
+                fp = np.all(overlap_label[pred_idx] < min_overlap[i], axis=1).astype("float32")
 
                 # identify all matches (filtered preds vs filtered targets)
-                match_cond = np.any(overlap_label[pred_idx][:, target_idx] >= min_overlap[j], axis=-1)
+                match_cond = np.any(overlap_label[pred_idx][:, target_idx] >= min_overlap[i], axis=-1)
                 tp = np.zeros((len(pred_idx),))
 
                 # all matches first fp
@@ -143,7 +142,7 @@ def precision_3d(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5],
                 fp[match_cond] = 0
 
                 # no matching pred box (all preds vs filtered targets)
-                fns[i, j] = np.sum(np.all(overlap_label[:, target_idx] < min_overlap[j], axis=0))
+                fns[i, j] = np.sum(np.all(overlap_label[:, target_idx] < min_overlap[i], axis=0))
                 detection[i, j, [pred_idx]] = np.stack([pred_label['score'][pred_idx], tp, fp], axis=-1)
             else:
                 fns[i, j] = len(target_idx)
@@ -188,8 +187,7 @@ def mAP(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5], bev=True
         target (dict): List of dictionaries with the target data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
-                'score':      [...],
+                'label':      [...],   
                 'difficulty': [...]
             }[]
         classes (number[]): List of classes which should be evaluated.
@@ -212,35 +210,41 @@ def mAP(pred, target, classes=[0], difficulties=[0], min_overlap=[0.5], bev=True
     cnt = 0
     box_cnts = [0]
     for p in pred:
-        cnt += len(p['bbox'])
+        cnt += len(filter_data(p, classes)[1])
         box_cnts.append(cnt)
     
-    detection = np.zeros((len(difficulties), len(classes), box_cnts[-1], 3))
-    fns = np.zeros((len(difficulties), len(classes), 1), dtype='int64')
+    gt_cnt = np.empty((len(classes), len(difficulties)))
+    for i, c in enumerate(classes):
+        for j, d in enumerate(difficulties):
+            for t in target:
+                gt_cnt[i, j] += len(filter_data(t, [c], [d])[1])
+
+    detection = np.zeros((len(classes), len(difficulties), box_cnts[-1], 3))
+    fns = np.zeros((len(classes), len(difficulties), 1), dtype='int64')
     for i in range(len(pred)):
         d, f = precision_3d(
-            pred=pred[i], target=target[i], classes=classes, 
-            difficulties=difficulties, min_overlap=min_overlap, bev=bev)
+            pred=pred[i], target=target[i], classes=classes,
+            difficulties=difficulties, min_overlap=min_overlap, 
+            bev=bev, similar_classes=similar_classes)
         detection[:,:,box_cnts[i]:box_cnts[i+1]] = d
         fns += f
 
-    mAP = np.empty((len(difficulties), len(classes), 1))
-    for j in range(len(classes)):
-        for i in range(len(difficulties)):
+    mAP = np.empty((len(classes), len(difficulties), 1))
+    for i in range(len(classes)):
+        for j in range(len(difficulties)):
             det = detection[i,j,np.argsort(-detection[i,j,:,0])]
 
-            gt_cnt = np.sum(det[:,1]) + fns[i, j]
-            thresholds = sample_thresholds(det[np.where(det[:,1] > 0)[0],0], gt_cnt, samples)
+            #gt_cnt = np.sum(det[:,1]) + fns[i, j]
+            thresholds = sample_thresholds(det[np.where(det[:,1] > 0)[0],0], gt_cnt[i, j], samples)
 
-            tp_acc = np.zeros((len(thresholds),))
-            fp_acc = np.zeros((len(thresholds),))
+            prec = np.zeros((len(thresholds),))
+            for ti in range(len(thresholds))[::-1]:
+                d = det[np.where(det[:,0] >= thresholds[ti])]
+                tp_acc = np.sum(d[:,1])
+                fp_acc = np.sum(d[:,2])
+                prec[ti] = tp_acc / (tp_acc + fp_acc)
+                prec[ti] = np.max(prec[ti:], axis=-1)
 
-            for ti in range(len(thresholds)):
-                d = det[np.where(det[:,0] >= thresholds[ti])[0]]
-                tp_acc[ti] = np.sum(d[:,1])
-                fp_acc[ti] = np.sum(d[:,2])
-
-            prec = tp_acc / (tp_acc + fp_acc)
             mAP[i, j] = np.sum(prec[::4]) / 11 * 100
 
     return mAP

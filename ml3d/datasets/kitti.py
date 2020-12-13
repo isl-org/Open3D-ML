@@ -278,11 +278,9 @@ class Object3d(BEVBox3D):
             'Person_sitting': 4,
             'DontCare': 5
         }
-        if cls_type not in type_to_id.keys():
-            return 4
-        return type_to_id[cls_type]
+        return type_to_id.get(cls_type, 5)
 
-    def get_kitti_obj_level(self):
+    def get_difficulty(self):
         """
         determines the difficulty level of object.
         """

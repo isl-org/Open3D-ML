@@ -249,3 +249,6 @@ class BEVBox3D(BoundingBox3D):
         center = minxy + size/2
 
         return np.concatenate([center, size])
+
+    def get_difficulty(self):
+        return 0
