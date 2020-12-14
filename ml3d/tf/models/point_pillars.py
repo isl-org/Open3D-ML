@@ -121,12 +121,17 @@ class PointPillars(BaseModel):
         return outs
 
     def get_optimizer(self, cfg):
-        import tensorflow_addons as tfa
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
-        return tfa.optimizers.AdamW(weight_decay=cfg['weight_decay'],
-                                    learning_rate=cfg['lr'],
-                                    beta_1=beta1,
-                                    beta_2=beta2)
+        return tf.optimizers.Adam(learning_rate=cfg['lr'],
+                                  beta_1=beta1,
+                                  beta_2=beta2)
+        #used by torch, but doesn't perform well with TF:
+        #import tensorflow_addons as tfa
+        #beta1, beta2 = cfg.get('betas', [0.9, 0.99])
+        #return tfa.optimizers.AdamW(weight_decay=cfg['weight_decay'],
+        #                            learning_rate=cfg['lr'],
+        #                            beta_1=beta1,
+        #                            beta_2=beta2)
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results

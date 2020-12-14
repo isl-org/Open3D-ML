@@ -208,6 +208,13 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
+    def save_logs(self, writer, epoch):
+        for key, val in self.losses.items():
+            writer.add_scalar("train/" + key, np.mean(val), epoch)
+
+        for key, val in self.valid_losses.items():
+            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
