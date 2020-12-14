@@ -8,7 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
-from ..vis.boundingbox import BoundingBox3D
+from ..vis.boundingbox import BEVBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,7 +71,8 @@ class KITTI(BaseDataset):
             1: 'Cyclist',
             2: 'Car',
             3: 'Van',
-            4: 'DontCare'
+            4: 'Person_sitting',
+            5: 'DontCare'
         }
         return label_to_names
 
@@ -106,12 +107,7 @@ class KITTI(BaseDataset):
             size = [float(label[9]), float(label[8]), float(label[10])]  # w,h,l
             center = [points[0], points[1], size[1] / 2 + points[2]]
 
-            ry = float(label[14])
-            front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
-            up = [0, 0, 1]
-            left = [-1 * np.cos(ry), np.sin(ry), 0]
-
-            objects.append(Object3d(center, front, up, left, size, label))
+            objects.append(Object3d(center, size, label, calib))
 
         return objects
 
@@ -232,17 +228,27 @@ class KITTISplit():
         return attr
 
 
-class Object3d(BoundingBox3D):
+class Object3d(BEVBox3D):
     """
     Stores object specific details like bbox coordinates, occlusion etc.
     """
 
-    def __init__(self, center, front, up, left, size, label):
+    def __init__(self, center, size, label, calib=None):
 
         label_class = self.cls_type_to_id(label[0])
         confidence = float(label[15]) if label.__len__() == 16 else -1.0
 
-        super().__init__(center, front, up, left, size, label_class, confidence)
+        world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
+        cam_img = np.transpose(calib['P2'])
+
+        # kitti boxes are pointing backwards
+        yaw = float(label[14]) - np.pi
+        yaw = yaw - np.floor(yaw / (2 * np.pi) + 0.5) * 2 * np.pi
+
+        super().__init__(center, size, yaw, label_class, confidence, world_cam,
+                         cam_img)
+
+        self.yaw = float(label[14])
 
         self.name = label[0]
         self.cls_id = self.cls_type_to_id(self.name)
@@ -257,7 +263,6 @@ class Object3d(BoundingBox3D):
                               dtype=np.float32)
 
         self.dis_to_cam = np.linalg.norm(self.center)
-        self.ry = float(label[14])
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
         self.level = self.get_kitti_obj_level()
 
@@ -271,10 +276,11 @@ class Object3d(BoundingBox3D):
             'Cyclist': 1,
             'Car': 2,
             'Van': 3,
-            'DontCare': 4,
+            'Person_sitting': 4,
+            'DontCare': 5
         }
         if cls_type not in type_to_id.keys():
-            return 0
+            return 5
         return type_to_id[cls_type]
 
     def get_kitti_obj_level(self):
@@ -295,24 +301,6 @@ class Object3d(BoundingBox3D):
         else:
             self.level_str = 'UnKnown'
             return -1
-
-    def generate_corners3d(self):
-        """
-        generate corners3d representation for this object
-        :return corners_3d: (8, 3) corners of box3d in camera coord
-        """
-        l, h, w = self.size[2::-1]
-        x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
-        y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
-        z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
-
-        R = np.array([[np.cos(self.ry), 0, np.sin(self.ry)], [0, 1, 0],
-                      [-np.sin(self.ry), 0,
-                       np.cos(self.ry)]])
-        corners3d = np.vstack([x_corners, y_corners, z_corners])  # (3, 8)
-        corners3d = np.dot(R, corners3d).T
-        corners3d = corners3d + self.center
-        return corners3d
 
     def to_str(self):
         print_str = '%s %.3f %.3f %.3f box2d: %s hwl: [%.3f %.3f %.3f] pos: %s ry: %.3f' \

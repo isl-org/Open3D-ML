@@ -5,7 +5,7 @@ import random
 from tqdm import tqdm
 
 from open3d.ml.tf.ops import voxelize
-from ...vis.boundingbox import BoundingBox3D
+from ...vis.boundingbox import BEVBox3D
 
 from .base_model import BaseModel
 from ...utils import MODEL
@@ -115,7 +115,7 @@ class PointPillars(BaseModel):
     def get_optimizer(self, cfg_pipeline):
         raise NotImplementedError
 
-    def get_loss(self, Loss, results, inputs):
+    def loss(self, results, inputs):
         raise NotImplementedError
 
     def preprocess(self, data, attr):
@@ -156,40 +156,27 @@ class PointPillars(BaseModel):
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
         return None
 
-    def inference_begin(self, data):
-        self.inference_data = data
-
-    def inference_preprocess(self):
-        data = tf.convert_to_tensor([self.inference_data["point"]],
-                                    dtype=np.float32)
-
-        return {"data": data}
-
-    def inference_end(self, results):
+    def inference_end(self, results, inputs):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
 
+        calib = inputs['calib']
+        world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
+        cam_img = np.transpose(calib['P2'])
+
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
-            bboxes = _bboxes.numpy()
-            scores = _scores.numpy()
-            labels = _labels.numpy()
+            bboxes = _bboxes.cpu().numpy()
+            scores = _scores.cpu().numpy()
+            labels = _labels.cpu().numpy()
             inference_result.append([])
 
             for bbox, score, label in zip(bboxes, scores, labels):
-                yaw = bbox[-1]
-                cos = np.cos(yaw)
-                sin = np.sin(yaw)
-
-                front = np.array((sin, cos, 0))
-                left = np.array((-cos, sin, 0))
-                up = np.array((0, 0, 1))
-
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
-
+                yaw = bbox[-1]
                 inference_result[-1].append(
-                    BoundingBox3D(pos, front, up, left, dim, label, score))
+                    BEVBox3D(pos, dim, yaw, label, score, world_cam, cam_img))
 
         return inference_result
 

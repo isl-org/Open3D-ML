@@ -3,7 +3,7 @@ import numpy as np
 import open3d.ml as ml3d
 import math
 
-from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT
+from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
 from ml3d.datasets import KITTI
 
 from ml3d.torch.pipelines import ObjectDetection
@@ -39,22 +39,19 @@ def main(args):
     pipeline = ObjectDetection(model, dataset, device="gpu")
 
     # load the parameters.
-    pipeline.load_ckpt(
-        ckpt_path=
-        '/Users/lprantl/Open3D-ML/checkpoints/pointpillars_kitt_3class_mmdet.pth'
-    )
+    pipeline.load_ckpt(ckpt_path=args.path_ckpt_pointpillars)
 
     test_split = TorchDataloader(dataset=dataset.get_split('training'),
                                  preprocess=model.preprocess,
-                                 transform=model.transform,
+                                 transform=None,
                                  use_cache=False,
                                  shuffle=False)
     data = test_split[5]['data']
 
     # run inference on a single example.
-    result = pipeline.run_inference(data)
+    result = pipeline.run_inference(data)[0]
 
-    boxes = data['bounding_boxes']
+    boxes = data['bboxes']
     boxes.extend(result)
 
     vis = Visualizer()
