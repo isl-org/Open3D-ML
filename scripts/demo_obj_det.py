@@ -32,7 +32,7 @@ def parse_args():
 
 
 def main(args):
-    
+
     framework = _ml3d.utils.convert_framework_name(args.framework)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
@@ -59,7 +59,8 @@ def main(args):
             except RuntimeError as e:
                 print(e)
 
-    ObjectDetection = _ml3d.utils.get_module("pipeline", "ObjectDetection", framework)
+    ObjectDetection = _ml3d.utils.get_module("pipeline", "ObjectDetection",
+                                             framework)
     PointPillars = _ml3d.utils.get_module("model", "PointPillars", framework)
 
     model = PointPillars(voxel_size=[0.16, 0.16, 4],
@@ -68,9 +69,7 @@ def main(args):
     pipeline = ObjectDetection(model, dataset, device=args.device)
 
     # load the parameters.
-    pipeline.load_ckpt(
-        ckpt_path=args.path_ckpt_pointpillars
-    )
+    pipeline.load_ckpt(ckpt_path=args.path_ckpt_pointpillars)
 
     test_split = Dataloader(dataset=dataset.get_split('training'),
                             preprocess=model.preprocess,

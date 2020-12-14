@@ -62,6 +62,7 @@ def xywhr_to_xyxyr(boxes_xywhr):
     ])
     return tf.linalg.matvec(transform, boxes_xywhr)
 
+
 def box3d_to_bev(boxes3d):
     """Convert rotated 3d boxes in XYZWHDR format to BEV in XYWHR format.
 
@@ -72,6 +73,7 @@ def box3d_to_bev(boxes3d):
         tf.Tensor: Converted BEV boxes in XYWHR format.
     """
     return tf.gather(boxes3d, [0, 1, 3, 4, 6], axis=-1)
+
 
 def box3d_to_bev2d(boxes3d):
     """Convert rotated 3d boxes in XYZWHDR format to neareset BEV without rotation.
@@ -91,13 +93,15 @@ def box3d_to_bev2d(boxes3d):
 
     # find the center of boxes
     conditions = (normed_rotations > np.pi / 4)[..., None]
-    bboxes_xywh = tf.where(conditions, tf.gather(bev_rotated_boxes, [0, 1, 3, 2], axis=-1),
-                                bev_rotated_boxes[:, :4])
+    bboxes_xywh = tf.where(conditions,
+                           tf.gather(bev_rotated_boxes, [0, 1, 3, 2], axis=-1),
+                           bev_rotated_boxes[:, :4])
 
     centers = bboxes_xywh[:, :2]
     dims = bboxes_xywh[:, 2:]
     bev_boxes = tf.concat([centers - dims / 2, centers + dims / 2], axis=-1)
     return bev_boxes
+
 
 class Anchor3DRangeGenerator(object):
     """3D Anchor Generator by range.
@@ -304,6 +308,7 @@ def multiclass_nms(boxes, scores, score_thr):
 
     return idxs
 
+
 def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     """Calculate overlap between two set of bboxes.
     If ``is_aligned `` is ``False``, then calculate the overlaps between each
@@ -341,14 +346,14 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
     if rows * cols == 0:
         if is_aligned:
-            return tf.zeros(batch_shape + (rows, ))
+            return tf.zeros(batch_shape + (rows,))
         else:
             return tf.zeros(batch_shape + (rows, cols))
 
-    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
-        bboxes1[..., 3] - bboxes1[..., 1])
-    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
-        bboxes2[..., 3] - bboxes2[..., 1])
+    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (bboxes1[..., 3] -
+                                                   bboxes1[..., 1])
+    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (bboxes2[..., 3] -
+                                                   bboxes2[..., 1])
 
     if is_aligned:
         lt = tf.maximum(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]
@@ -366,9 +371,9 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             enclosed_rb = tf.maximum(bboxes1[..., 2:], bboxes2[..., 2:])
     else:
         lt = tf.maximum(bboxes1[..., :, None, :2],
-                       bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
+                        bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
         rb = tf.minimum(bboxes1[..., :, None, 2:],
-                       bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
+                        bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
 
         wh = tf.nn.relu(rb - lt)  # [B, rows, cols, 2]
         overlap = wh[..., 0] * wh[..., 1]
@@ -379,9 +384,9 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             union = area1[..., None]
         if mode == 'giou':
             enclosed_lt = tf.minimum(bboxes1[..., :, None, :2],
-                                    bboxes2[..., None, :, :2])
+                                     bboxes2[..., None, :, :2])
             enclosed_rb = tf.maximum(bboxes1[..., :, None, 2:],
-                                    bboxes2[..., None, :, 2:])
+                                     bboxes2[..., None, :, 2:])
 
     eps = tf.constant([eps])
     union = tf.maximum(union, eps)

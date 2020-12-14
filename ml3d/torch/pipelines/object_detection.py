@@ -102,7 +102,6 @@ class ObjectDetection(BasePipeline):
                 result = self.run_inference(data['data'])
                 results.extend(result)
 
-
     def run_valid(self):
         model = self.model
         dataset = self.dataset
@@ -123,8 +122,7 @@ class ObjectDetection(BasePipeline):
                                       preprocess=model.preprocess,
                                       transform=model.transform,
                                       use_cache=dataset.cfg.use_cache)
-        valid_loader = DataLoader(valid_split,
-                                  batch_size=cfg.batch_size)
+        valid_loader = DataLoader(valid_split, batch_size=cfg.batch_size)
 
         log.info("Started validation")
 
@@ -139,7 +137,7 @@ class ObjectDetection(BasePipeline):
                     if not l in self.valid_losses:
                         self.valid_losses[l] = []
                     self.valid_losses[l].append(v.cpu().item())
-        
+
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -172,8 +170,7 @@ class ObjectDetection(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size)
+        train_loader = DataLoader(train_split, batch_size=cfg.batch_size)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -198,7 +195,7 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(train_loader, desc='training')        
+            process_bar = tqdm(train_loader, desc='training')
             for inputs in process_bar:
                 results = model(inputs['data']['point'].to(self.device))
                 loss = model.loss(results, inputs['data'])
@@ -218,7 +215,7 @@ class ObjectDetection(BasePipeline):
                     desc += " %s: %.03f" % (l, v.cpu().item())
                 desc += " > loss: %.03f" % loss_sum.cpu().item()
                 process_bar.set_description(desc)
-                process_bar.refresh() 
+                process_bar.refresh()
 
             #self.scheduler.step()
 
@@ -230,25 +227,23 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
-
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():
-            writer.add_scalar("train/"+key, np.mean(val), epoch)
+            writer.add_scalar("train/" + key, np.mean(val), epoch)
 
         for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/"+key, np.mean(val), epoch)
-
+            writer.add_scalar("valid/" + key, np.mean(val), epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
 
-        epoch = 0 
+        epoch = 0
         if ckpt_path is None:
             ckpt_path = latest_torch_ckpt(train_ckpt_dir)
             if ckpt_path is not None and is_resume:
                 log.info('ckpt_path not given. Restore from the latest ckpt')
-                epoch = int(re.findall(r'\d+', ckpt_path)[-1])+1
+                epoch = int(re.findall(r'\d+', ckpt_path)[-1]) + 1
             else:
                 log.info('Initializing from scratch.')
                 return epoch
@@ -275,7 +270,7 @@ class ObjectDetection(BasePipeline):
             dict(epoch=epoch,
                  model_state_dict=self.model.state_dict(),
                  optimizer_state_dict=self.optimizer.state_dict()),
-                 #scheduler_state_dict=self.scheduler.state_dict()),
+            #scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
@@ -291,5 +286,6 @@ class ObjectDetection(BasePipeline):
                         code2md(self.cfg_tb['model'], language='json'), 0)
         writer.add_text('Configuration/Pipeline',
                         code2md(self.cfg_tb['pipeline'], language='json'), 0)
+
 
 PIPELINE._register_module(ObjectDetection, "torch")

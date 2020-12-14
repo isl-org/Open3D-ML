@@ -107,8 +107,8 @@ class ObjectDetection(BasePipeline):
 
         valid_dataset = dataset.get_split('validation')
         valid_loader = TFDataloader(dataset=valid_dataset,
-                                   model=model,
-                                   use_cache=dataset.cfg.use_cache)
+                                    model=model,
+                                    use_cache=dataset.cfg.use_cache)
 
         log.info("Started validation")
 
@@ -122,7 +122,7 @@ class ObjectDetection(BasePipeline):
                 if not l in self.valid_losses:
                     self.valid_losses[l] = []
                 self.valid_losses[l].append(v.cpu().item())
-        
+
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -145,10 +145,10 @@ class ObjectDetection(BasePipeline):
 
         train_dataset = dataset.get_split('training')
         train_loader = TFDataloader(dataset=train_dataset,
-                                   model=model,
-                                   use_cache=dataset.cfg.use_cache,
-                                   steps_per_epoch=dataset.cfg.get(
-                                      'steps_per_epoch_train', None))
+                                    model=model,
+                                    use_cache=dataset.cfg.use_cache,
+                                    steps_per_epoch=dataset.cfg.get(
+                                        'steps_per_epoch_train', None))
 
         self.optimizer = model.get_optimizer(cfg.optimizer)
 
@@ -172,7 +172,7 @@ class ObjectDetection(BasePipeline):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
 
             self.losses = {}
-            process_bar = tqdm(train_loader, desc='training')        
+            process_bar = tqdm(train_loader, desc='training')
             for inputs in process_bar:
                 with tf.GradientTape(persistent=True) as tape:
                     results = model(inputs['data']['point'])
@@ -180,12 +180,13 @@ class ObjectDetection(BasePipeline):
                     loss_sum = sum(loss.values())
 
                 grads = tape.gradient(loss, model.trainable_weights)
-                
+
                 norm = cfg.get('grad_clip_norm', -1)
                 if model.cfg.get('grad_clip_norm', -1) > 0:
                     grads = [tf.clip_by_norm(g, norm) for g in grads]
-                
-                self.optimizer.apply_gradients(zip(grads, model.trainable_weights))
+
+                self.optimizer.apply_gradients(
+                    zip(grads, model.trainable_weights))
 
                 desc = "training - "
                 for l, v in loss.items():
@@ -195,7 +196,7 @@ class ObjectDetection(BasePipeline):
                     desc += " %s: %.03f" % (l, v.numpy())
                 desc += " > loss: %.03f" % loss_sum.numpy()
                 process_bar.set_description(desc)
-                process_bar.refresh() 
+                process_bar.refresh()
 
             #self.scheduler.step()
 
@@ -206,7 +207,6 @@ class ObjectDetection(BasePipeline):
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
-
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -224,11 +224,11 @@ class ObjectDetection(BasePipeline):
                                                   train_ckpt_dir,
                                                   max_to_keep=100)
 
-        epoch = 0 
+        epoch = 0
         if ckpt_path is not None:
             self.ckpt.restore(ckpt_path).expect_partial()
             log.info("Restored from {}".format(ckpt_path))
-            epoch = int(re.findall(r'\d+', ckpt_path)[-1])+1
+            epoch = int(re.findall(r'\d+', ckpt_path)[-1]) + 1
         else:
             self.ckpt.restore(self.manager.latest_checkpoint).expect_partial()
 
@@ -239,11 +239,9 @@ class ObjectDetection(BasePipeline):
                 log.info("Initializing from scratch.")
         return epoch
 
-
     def save_ckpt(self, epoch):
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format(save_path))
-
 
     def save_config(self, writer):
         '''
@@ -257,6 +255,6 @@ class ObjectDetection(BasePipeline):
                         code2md(self.cfg_tb['model'], language='json'), 0)
         writer.add_text('Configuration/Pipeline',
                         code2md(self.cfg_tb['pipeline'], language='json'), 0)
-                                
+
 
 PIPELINE._register_module(ObjectDetection, "tf")
