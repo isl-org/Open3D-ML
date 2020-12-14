@@ -227,8 +227,8 @@ class PointPillars(BaseModel):
 
         return {
             'point': points,
-            'labels': labels,
-            'bboxes': bboxes,
+            'bboxes': [bboxes],
+            'labels': [labels],
             'calib': data['calib']
         }
 
