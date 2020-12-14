@@ -218,7 +218,6 @@ class ObjectDetection(BasePipeline):
         log.info("Started training")
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-            self.run_valid()
             self.losses = {}
             process_bar = tqdm(train_loader, desc='training')        
             for inputs in process_bar:
