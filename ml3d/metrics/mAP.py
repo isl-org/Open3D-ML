@@ -1,7 +1,7 @@
 import numpy as np
 
-from open3d.ml.contrib import iou_bev_cpu as iou_bev
-from open3d.ml.contrib import iou_3d_cpu as iou_3d
+from open3d.ml.contrib import iou_bev_cuda as iou_bev
+from open3d.ml.contrib import iou_3d_cuda as iou_3d
 
 def convert_data_eval(bboxes, diff=None):
     """
@@ -23,9 +23,9 @@ def convert_data_eval(bboxes, diff=None):
         if diff is not None:
             height = box.to_img()[3]
             difficulty[i] = -1
-            for i in range(len(diff)):
-                if height > diff[i]:
-                    difficulty[i] = i
+            for j in range(len(diff)):
+                if height > diff[j]:
+                    difficulty[i] = j
                     break
         else:
             difficulty[i] = box.get_difficulty()
