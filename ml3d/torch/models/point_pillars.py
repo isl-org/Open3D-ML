@@ -524,37 +524,7 @@ class PointPillarsScatter(nn.Module):
         self.fp16_enabled = False
 
     #@auto_fp16(apply_to=('voxel_features', ))
-    def forward(self, voxel_features, coors, batch_size=None):
-        """Forward function to scatter features."""
-        if batch_size is not None:
-            return self.forward_batch(voxel_features, coors, batch_size)
-        else:
-            return self.forward_single(voxel_features, coors)
-
-    def forward_single(self, voxel_features, coors):
-        """Scatter features of single sample.
-
-        Args:
-            voxel_features (torch.Tensor): Voxel features in shape (N, M, C).
-            coors (torch.Tensor): Coordinates of each voxel.
-                The first column indicates the sample ID.
-        """
-        # Create the canvas for this sample
-        canvas = torch.zeros(self.in_channels,
-                             self.nx * self.ny,
-                             dtype=voxel_features.dtype,
-                             device=voxel_features.device)
-
-        indices = coors[:, 1] * self.nx + coors[:, 2]
-        indices = indices.long()
-        voxels = voxel_features.t()
-        # Now scatter the blob back to the canvas.
-        canvas[:, indices] = voxels
-        # Undo the column stacking to final 4-dim tensor
-        canvas = canvas.view(1, self.in_channels, self.ny, self.nx)
-        return [canvas]
-
-    def forward_batch(self, voxel_features, coors, batch_size):
+    def forward(self, voxel_features, coors, batch_size):
         """Scatter features of single sample.
 
         Args:

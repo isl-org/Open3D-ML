@@ -111,27 +111,11 @@ class ObjectDetection(BasePipeline):
         self.test_ious = []
 
         pred = []
-        gt = []
         with torch.no_grad():
             for i in tqdm(range(len(test_split)), desc='testing'):
                 results = self.run_inference(test_split[i]['data'])
-
                 pred.append(convert_data_eval(results[0], [40, 25]))
-                gt.append(convert_data_eval(test_split[i]['data']['bboxes']))
 
-        if cfg.get('test_compute_metric', True):
-            ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
-            log.info("mAP BEV:")
-            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
-
-            ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
-            log.info("")
-            log.info("mAP 3D:")
-            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
         #dataset.save_test_result(results, attr)
 
     def run_valid(self):

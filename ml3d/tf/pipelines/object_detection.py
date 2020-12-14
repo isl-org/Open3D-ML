@@ -99,9 +99,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         for i in tqdm(range(len(test_split)), desc='testing'):
             results = self.run_inference(test_split[i]['data'])
-
             pred.append(convert_data_eval(results[0], [40, 25]))
-            gt.append(convert_data_eval(test_split[i]['data']['bboxes']))
 
         #dataset.save_test_result(results, attr)
 
