@@ -774,7 +774,6 @@ class Anchor3DHead(nn.Module):
         self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
                                       1)
 
-
     def forward(self, x):
         """Forward function on a feature map.
 

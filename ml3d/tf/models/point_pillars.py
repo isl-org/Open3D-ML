@@ -15,6 +15,7 @@ from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 
+
 class PointPillars(BaseModel):
     """Object detection model. 
     Based on the PointPillars architecture 
@@ -122,11 +123,10 @@ class PointPillars(BaseModel):
     def get_optimizer(self, cfg):
         import tensorflow_addons as tfa
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
-        return tfa.optimizers.AdamW(
-            weight_decay=cfg['weight_decay'],
-            learning_rate=cfg['lr'],
-            beta_1=beta1,
-            beta_2=beta2)
+        return tfa.optimizers.AdamW(weight_decay=cfg['weight_decay'],
+                                    learning_rate=cfg['lr'],
+                                    beta_1=beta1,
+                                    beta_2=beta2)
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
@@ -134,28 +134,35 @@ class PointPillars(BaseModel):
         gt_bboxes = [inputs['bboxes']]
 
         # generate and filter bboxes
-        target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(bboxes, gt_bboxes)
+        target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
+            bboxes, gt_bboxes)
 
         avg_factor = pos_idx.shape[0]
 
         # classification loss
-        scores = tf.reshape(tf.transpose(scores, (0, 2, 3, 1)), (-1, self.bbox_head.num_classes))
-        target_labels = tf.fill((scores.shape[0],), tf.constant(self.bbox_head.num_classes, dtype=gt_labels[0].dtype))
+        scores = tf.reshape(tf.transpose(scores, (0, 2, 3, 1)),
+                            (-1, self.bbox_head.num_classes))
+        target_labels = tf.fill((scores.shape[0],),
+                                tf.constant(self.bbox_head.num_classes,
+                                            dtype=gt_labels[0].dtype))
         gt_label = tf.gather(tf.concat(gt_labels, axis=0), target_idx)
-        target_labels = tf.tensor_scatter_nd_update(target_labels, tf.expand_dims(pos_idx, axis=-1), gt_label)
+        target_labels = tf.tensor_scatter_nd_update(
+            target_labels, tf.expand_dims(pos_idx, axis=-1), gt_label)
 
         loss_cls = self.loss_cls(
-            tf.gather(scores, tf.concat([pos_idx, neg_idx], axis=0)), 
-            tf.gather(target_labels, tf.concat([pos_idx, neg_idx], axis=0)), 
+            tf.gather(scores, tf.concat([pos_idx, neg_idx], axis=0)),
+            tf.gather(target_labels, tf.concat([pos_idx, neg_idx], axis=0)),
             avg_factor=avg_factor)
 
         # remove invalid labels
-        valid_lbl_idx = tf.where((gt_label >= 0) & (gt_label < self.bbox_head.num_classes))[:, 0]
+        valid_lbl_idx = tf.where((gt_label >= 0) &
+                                 (gt_label < self.bbox_head.num_classes))[:, 0]
         pos_idx = tf.gather(pos_idx, valid_lbl_idx)
         target_idx = tf.gather(target_idx, valid_lbl_idx)
         target_bboxes = tf.gather(target_bboxes, valid_lbl_idx)
 
-        bboxes = tf.reshape(tf.transpose(bboxes, (0, 2, 3, 1)), (-1, self.bbox_head.box_code_size))
+        bboxes = tf.reshape(tf.transpose(bboxes, (0, 2, 3, 1)),
+                            (-1, self.bbox_head.box_code_size))
         bboxes = tf.gather(bboxes, pos_idx)
         dirs = tf.reshape(tf.transpose(dirs, (0, 2, 3, 1)), (-1, 2))
         dirs = tf.gather(dirs, pos_idx)
@@ -163,7 +170,8 @@ class PointPillars(BaseModel):
         if len(pos_idx) > 0:
             # direction classification loss
             # to discrete bins
-            target_dirs = tf.gather(tf.concat(gt_bboxes, axis=0), target_idx)[:, -1]
+            target_dirs = tf.gather(tf.concat(gt_bboxes, axis=0),
+                                    target_idx)[:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
             target_dirs = tf.cast(target_dirs / np.pi, tf.int32)
 
@@ -174,11 +182,12 @@ class PointPillars(BaseModel):
             r0 = tf.sin(bboxes[:, -1:]) * tf.cos(target_bboxes[:, -1:])
             r1 = tf.cos(bboxes[:, -1:]) * tf.sin(target_bboxes[:, -1:])
 
-            bboxes = tf.concat([bboxes[:,:-1], r0], axis=-1)
-            target_bboxes = tf.concat([target_bboxes[:,:-1], r1], axis=-1)
-            
-            loss_bbox = self.loss_bbox(
-                bboxes, target_bboxes, avg_factor=avg_factor)
+            bboxes = tf.concat([bboxes[:, :-1], r0], axis=-1)
+            target_bboxes = tf.concat([target_bboxes[:, :-1], r1], axis=-1)
+
+            loss_bbox = self.loss_bbox(bboxes,
+                                       target_bboxes,
+                                       avg_factor=avg_factor)
         else:
             loss_bbox = tf.reduce_sum(bboxes)
             loss_dir = tf.reduce_sum(dirs)
@@ -186,7 +195,8 @@ class PointPillars(BaseModel):
         return {
             'loss_cls': loss_cls,
             'loss_bbox': loss_bbox,
-            'loss_dir': loss_dir }
+            'loss_dir': loss_dir
+        }
 
     def preprocess(self, data, attr):
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
@@ -207,12 +217,14 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         points = tf.constant([data['point']], dtype=tf.float32)
-        labels = tf.constant([bb.label_class for bb in data['bboxes']], dtype=tf.int32)
-        bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bboxes']], dtype=tf.float32)
-        
+        labels = tf.constant([bb.label_class for bb in data['bboxes']],
+                             dtype=tf.int32)
+        bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bboxes']],
+                             dtype=tf.float32)
+
         return {
             'point': points,
-            'bboxes': bboxes, 
+            'bboxes': bboxes,
             'labels': labels,
             'calib': data['calib']
         }
@@ -836,7 +848,6 @@ class Anchor3DHead(tf.keras.layers.Layer):
                                                    kernel_size=1,
                                                    data_format='channels_last')
 
-
     def call(self, x, training=False):
         """Forward function on a feature map.
 
@@ -876,32 +887,35 @@ class Anchor3DHead(tf.keras.layers.Layer):
         """
 
         # compute all anchors
-        anchors = [self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:])
-                                                    for _ in range(len(target_bboxes))]
-        
+        anchors = [
+            self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:])
+            for _ in range(len(target_bboxes))
+        ]
+
         # compute size of anchors for each given class
-        anchors_cnt = tf.cast(tf.reduce_prod(anchors[0].shape[:-1]), dtype=tf.int64)
+        anchors_cnt = tf.cast(tf.reduce_prod(anchors[0].shape[:-1]),
+                              dtype=tf.int64)
         rot_angles = anchors[0].shape[-2]
 
         # init the tensors for the final result
         assigned_bboxes, target_idxs, pos_idxs, neg_idxs = [], [], [], []
 
         def flatten_idx(idx, j):
-            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""       
-            z = idx//rot_angles
-            x = idx%rot_angles
+            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""
+            z = idx // rot_angles
+            x = idx % rot_angles
 
             return z * self.num_classes * rot_angles + j * rot_angles + x
 
         idx_off = 0
         for i in range(len(target_bboxes)):
             for j, (neg_th, pos_th) in enumerate(self.iou_thr):
-                anchors_stride = tf.reshape(anchors[i][..., j, :, :], (-1, self.box_code_size))
+                anchors_stride = tf.reshape(anchors[i][..., j, :, :],
+                                            (-1, self.box_code_size))
 
                 # compute a fast approximation of IoU
-                overlaps = bbox_overlaps(
-                    box3d_to_bev2d(target_bboxes[i]), 
-                    box3d_to_bev2d(anchors_stride))
+                overlaps = bbox_overlaps(box3d_to_bev2d(target_bboxes[i]),
+                                         box3d_to_bev2d(anchors_stride))
 
                 # for each anchor the gt with max IoU
                 argmax_overlaps = tf.argmax(overlaps, axis=0)
@@ -915,33 +929,33 @@ class Anchor3DHead(tf.keras.layers.Layer):
                 # low-quality matching
                 for k in range(len(target_bboxes[i])):
                     if gt_max_overlaps[k] >= neg_th:
-                        pos_idx = tf.where(overlaps[k, :] == gt_max_overlaps[k], True, pos_idx)
+                        pos_idx = tf.where(overlaps[k, :] == gt_max_overlaps[k],
+                                           True, pos_idx)
 
                 pos_idx = tf.where(pos_idx)[:, 0]
                 neg_idx = tf.where(neg_idx)[:, 0]
                 max_idx = tf.gather(argmax_overlaps, pos_idx)
 
                 # encode bbox for positive matches
-                assigned_bboxes.append(self.bbox_coder.encode(
-                    tf.gather(anchors_stride, pos_idx), tf.gather(target_bboxes[i], max_idx)))
-                target_idxs.append(max_idx+idx_off)
+                assigned_bboxes.append(
+                    self.bbox_coder.encode(tf.gather(anchors_stride, pos_idx),
+                                           tf.gather(target_bboxes[i],
+                                                     max_idx)))
+                target_idxs.append(max_idx + idx_off)
 
                 # store global indices in list
-                pos_idx = flatten_idx(pos_idx, j) + i*anchors_cnt
-                neg_idx = flatten_idx(neg_idx, j) + i*anchors_cnt
+                pos_idx = flatten_idx(pos_idx, j) + i * anchors_cnt
+                neg_idx = flatten_idx(neg_idx, j) + i * anchors_cnt
                 pos_idxs.append(pos_idx)
                 neg_idxs.append(neg_idx)
 
             # compute offset for index computation
             idx_off += len(target_bboxes[i])
 
-        return (
-            tf.concat(assigned_bboxes, axis=0), 
-            tf.concat(target_idxs, axis=0), 
-            tf.concat(pos_idxs, axis=0), 
-            tf.concat(neg_idxs, axis=0))
+        return (tf.concat(assigned_bboxes,
+                          axis=0), tf.concat(target_idxs, axis=0),
+                tf.concat(pos_idxs, axis=0), tf.concat(neg_idxs, axis=0))
 
-            
     def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
         """Get bboxes of anchor head.
 
