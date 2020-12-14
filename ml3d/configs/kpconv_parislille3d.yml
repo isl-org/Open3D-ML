@@ -16,8 +16,6 @@ dataset:
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
-  # # ckpt_path: ../dataset/checkpoints/kpconv_parislille3d_tf/kpconv_parislille3d_tf # path/to/your/checkpoint
-  ckpt_path: ../dataset/checkpoints/kpconv_parislille3d_torch/kpconv_parislille3d_202011241550utc.pth
   KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum

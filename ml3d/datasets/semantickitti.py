@@ -232,8 +232,6 @@ class SemanticKITTISplit(BaseDatasetSplit):
             labels = DataProcessing.load_label_kitti(
                 label_path, self.remap_lut_val).astype(np.int32)
 
-        np.save("gt_label.npy", labels)
-
         data = {
             'point': points[:, 0:3],
             'feat': None,
