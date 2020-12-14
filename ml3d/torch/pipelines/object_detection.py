@@ -110,7 +110,6 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-<<<<<<< HEAD
             for i in tqdm(range(len(test_split)), desc='testing'):
                 results = self.run_inference(test_split[i]['data'])
 
@@ -131,12 +130,6 @@ class ObjectDetection(BasePipeline):
             log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
             log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
         #dataset.save_test_result(results, attr)
-=======
-            for idx in tqdm(range(len(test_split)), desc='test'):
-                data = test_split[idx]
-                result = self.run_inference(data['data'])
-                results.extend(result)
->>>>>>> prantl/point_pillars_train_tf
 
     def run_valid(self):
         """
@@ -161,15 +154,9 @@ class ObjectDetection(BasePipeline):
         valid_dataset = dataset.get_split('validation')
         valid_loader = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
-<<<<<<< HEAD
                                       transform=None,
                                       use_cache=dataset.cfg.use_cache,
                                       shuffle=False)
-=======
-                                      transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache)
-        valid_loader = DataLoader(valid_split, batch_size=cfg.batch_size)
->>>>>>> prantl/point_pillars_train_tf
 
         log.info("Started validation")
 
@@ -188,14 +175,11 @@ class ObjectDetection(BasePipeline):
                         self.valid_losses[l] = []
                     self.valid_losses[l].append(v.cpu().item())
 
-<<<<<<< HEAD
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, inputs)
                 pred.append(convert_data_eval(boxes[0], [40, 25]))
                 gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
         
-=======
->>>>>>> prantl/point_pillars_train_tf
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():

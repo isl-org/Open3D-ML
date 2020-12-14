@@ -1,7 +1,5 @@
 import numpy as np
-
-from open3d.ml.contrib import iou_bev_cuda as iou_bev
-from open3d.ml.contrib import iou_3d_cuda as iou_3d
+from . import iou_bev, iou_3d
 
 def convert_data_eval(bboxes, diff=None):
     """
