@@ -498,16 +498,13 @@ class PillarFeatureNet(tf.keras.layers.Layer):
         Returns:
             tf.Tensor: Features of pillars.
         """
-        legacy = False
-        if not legacy:
-            features_ls = [features]
+        features_ls = [features]
         # Find distance of x, y, and z from cluster center
         points_mean = tf.reduce_sum(
             features[:, :, :3], axis=1, keepdims=True) / tf.reshape(
                 tf.cast(num_points, features.dtype), (-1, 1, 1))
         f_cluster = features[:, :, :3] - points_mean
-        if not legacy:
-            features_ls.append(f_cluster)
+        features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
@@ -520,10 +517,6 @@ class PillarFeatureNet(tf.keras.layers.Layer):
             self.y_offset)
 
         f_center = tf.stack((f_center_0, f_center_1), axis=2)
-
-        if legacy:
-            features_ls = [tf.concat([f_center, features[:, :, 2:]], axis=2)]
-            features_ls.append(f_cluster)
 
         features_ls.append(f_center)
 
