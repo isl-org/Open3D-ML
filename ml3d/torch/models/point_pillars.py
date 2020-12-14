@@ -757,7 +757,6 @@ class Anchor3DHead(nn.Module):
         self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
                                                        sizes=sizes,
                                                        rotations=rotations)
-
         self.num_anchors = self.anchor_generator.num_base_anchors
 
         # build box coder
@@ -773,6 +772,8 @@ class Anchor3DHead(nn.Module):
                                   self.num_anchors * self.box_code_size, 1)
         self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
                                       1)
+
+        self.iou_thr = [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
 
     def forward(self, x):
         """Forward function on a feature map.
