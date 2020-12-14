@@ -39,10 +39,7 @@ def main(args):
     pipeline = ObjectDetection(model, dataset, device="gpu")
 
     # load the parameters.
-    pipeline.load_ckpt(
-        ckpt_path=
-        args.path_ckpt_pointpillars
-    )
+    pipeline.load_ckpt(ckpt_path=args.path_ckpt_pointpillars)
 
     test_split = TorchDataloader(dataset=dataset.get_split('training'),
                                  preprocess=model.preprocess,

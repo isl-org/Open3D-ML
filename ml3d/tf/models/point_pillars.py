@@ -164,7 +164,7 @@ class PointPillars(BaseModel):
         calib = inputs['calib']
         world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
         cam_img = np.transpose(calib['P2'])
-        
+
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
