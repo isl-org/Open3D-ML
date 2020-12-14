@@ -731,19 +731,15 @@ class SECONDFPN(nn.Module):
 class Anchor3DHead(nn.Module):
 
     def __init__(self,
-                 num_classes=3,
+                 num_classes=1,
                  in_channels=384,
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
-                 ranges=[
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-                 ],
-                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
+                 ranges=[[0, -40.0, -3, 70.0, 40.0, 1]],
+                 sizes=[[0.6, 1.0, 1.5]],
                  rotations=[0, 1.57],
-                 iou_thr=[[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]):
+                 iou_thr=[[0.35, 0.5]]):
 
         super().__init__()
         self.in_channels = in_channels

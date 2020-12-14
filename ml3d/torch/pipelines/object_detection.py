@@ -104,6 +104,9 @@ class ObjectDetection(BasePipeline):
 
         self.load_ckpt(model.cfg.ckpt_path)
 
+        if cfg.get('test_compute_metric', True):
+            self.run_valid()
+
         log.info("Started testing")
         self.test_ious = []
 

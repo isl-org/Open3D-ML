@@ -89,9 +89,12 @@ class ObjectDetection(BasePipeline):
 
         self.load_ckpt(model.cfg.ckpt_path)
 
+        if cfg.get('test_compute_metric', True):
+            self.run_valid()
+
         log.info("Started testing")
         self.test_ious = []
-
+        
         pred = []
         gt = []
         for i in tqdm(range(len(test_split)), desc='testing'):
@@ -99,20 +102,6 @@ class ObjectDetection(BasePipeline):
 
             pred.append(convert_data_eval(results[0], [40, 25]))
             gt.append(convert_data_eval(test_split[i]['data']['bboxes']))
-
-        if cfg.get('test_compute_metric', True):
-            ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
-            log.info("mAP BEV:")
-            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
-
-            ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
-            log.info("")
-            log.info("mAP 3D:")
-            log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-            log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-            log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
 
         #dataset.save_test_result(results, attr)
 
@@ -145,7 +134,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         for i in tqdm(range(len(valid_loader)), desc='validation'):
             inputs = model.transform(valid_loader[i]['data'], None)
-            results = model(inputs['point'])
+            results = model(inputs['point'], training=False)
             loss = model.loss(results, inputs)
             for l, v in loss.items():
                 if not l in self.valid_losses:
@@ -225,9 +214,9 @@ class ObjectDetection(BasePipeline):
                 with tf.GradientTape(persistent=True) as tape:
                     results = model(inputs['point'])
                     loss = model.loss(results, inputs)
-                    loss_sum = sum(loss.values())
+                    loss_sum = tf.add_n(loss.values())
 
-                grads = tape.gradient(loss, model.trainable_weights)
+                grads = tape.gradient(loss_sum, model.trainable_weights)
 
                 norm = cfg.get('grad_clip_norm', -1)
                 if model.cfg.get('grad_clip_norm', -1) > 0:
@@ -256,6 +245,13 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
+    def save_logs(self, writer, epoch):
+        for key, val in self.losses.items():
+            writer.add_scalar("train/" + key, np.mean(val), epoch)
+
+        for key, val in self.valid_losses.items():
+            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+            
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)

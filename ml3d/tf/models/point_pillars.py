@@ -121,17 +121,22 @@ class PointPillars(BaseModel):
         return outs
 
     def get_optimizer(self, cfg):
-        import tensorflow_addons as tfa
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
-        return tfa.optimizers.AdamW(weight_decay=cfg['weight_decay'],
-                                    learning_rate=cfg['lr'],
-                                    beta_1=beta1,
-                                    beta_2=beta2)
+        return tf.optimizers.Adam(learning_rate=cfg['lr'],
+                                  beta_1=beta1,
+                                  beta_2=beta2)
+
+        #import tensorflow_addons as tfa
+        #beta1, beta2 = cfg.get('betas', [0.9, 0.99])
+        #return tfa.optimizers.AdamW(weight_decay=cfg['weight_decay'],
+        #                            learning_rate=cfg['lr'],
+        #                            beta_1=beta1,
+        #                            beta_2=beta2)
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [inputs['labels']]
-        gt_bboxes = [inputs['bboxes']]
+        gt_labels = inputs['labels']
+        gt_bboxes = inputs['bboxes']
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -224,8 +229,8 @@ class PointPillars(BaseModel):
 
         return {
             'point': points,
-            'bboxes': bboxes,
-            'labels': labels,
+            'bboxes': [bboxes],
+            'labels': [labels],
             'calib': data['calib']
         }
 
@@ -493,13 +498,16 @@ class PillarFeatureNet(tf.keras.layers.Layer):
         Returns:
             tf.Tensor: Features of pillars.
         """
-        features_ls = [features]
+        legacy = False
+        if not legacy:
+            features_ls = [features]
         # Find distance of x, y, and z from cluster center
         points_mean = tf.reduce_sum(
             features[:, :, :3], axis=1, keepdims=True) / tf.reshape(
                 tf.cast(num_points, features.dtype), (-1, 1, 1))
         f_cluster = features[:, :, :3] - points_mean
-        features_ls.append(f_cluster)
+        if not legacy:
+            features_ls.append(f_cluster)
 
         # Find distance of x, y, and z from pillar center
         dtype = features.dtype
@@ -512,6 +520,10 @@ class PillarFeatureNet(tf.keras.layers.Layer):
             self.y_offset)
 
         f_center = tf.stack((f_center_0, f_center_1), axis=2)
+
+        if legacy:
+            features_ls = [tf.concat([f_center, features[:, :, 2:]], axis=2)]
+            features_ls.append(f_cluster)
 
         features_ls.append(f_center)
 
@@ -799,19 +811,15 @@ class SECONDFPN(tf.keras.layers.Layer):
 class Anchor3DHead(tf.keras.layers.Layer):
 
     def __init__(self,
-                 num_classes=3,
+                 num_classes=1,
                  in_channels=384,
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
-                 ranges=[
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-                 ],
-                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
+                 ranges=[[0, -40.0, -3, 70.0, 40.0, 1]],
+                 sizes=[[0.6, 1.0, 1.5]],
                  rotations=[0, 1.57],
-                 iou_thr=[[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]):
+                 iou_thr=[[0.35, 0.5]]):
 
         super().__init__()
         self.in_channels = in_channels
