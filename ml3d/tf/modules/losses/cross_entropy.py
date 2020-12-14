@@ -38,6 +38,8 @@ class CrossEntropyLoss(tf.Module):
         else:
             loss = self.loss_fn(label, cls_score)
 
+        loss = loss * self.loss_weight
+
         if avg_factor:
             return tf.reduce_sum(loss) / avg_factor
         else:
