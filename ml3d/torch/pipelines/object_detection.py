@@ -131,7 +131,6 @@ class ObjectDetection(BasePipeline):
             log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
         #dataset.save_test_result(results, attr)
 
-
     def run_valid(self):
         """
         Run validation with validation data split, computes mean average precision and the loss of the prediction results.
@@ -276,7 +275,7 @@ class ObjectDetection(BasePipeline):
                     desc += " %s: %.03f" % (l, v.cpu().item())
                 desc += " > loss: %.03f" % loss_sum.cpu().item()
                 process_bar.set_description(desc)
-                process_bar.refresh() 
+                process_bar.refresh()
 
             #self.scheduler.step()
 
@@ -288,14 +287,12 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
-
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():
-            writer.add_scalar("train/"+key, np.mean(val), epoch)
+            writer.add_scalar("train/" + key, np.mean(val), epoch)
 
         for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/"+key, np.mean(val), epoch)
-
+            writer.add_scalar("valid/" + key, np.mean(val), epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -333,7 +330,7 @@ class ObjectDetection(BasePipeline):
             dict(epoch=epoch,
                  model_state_dict=self.model.state_dict(),
                  optimizer_state_dict=self.optimizer.state_dict()),
-                 #scheduler_state_dict=self.scheduler.state_dict()),
+            #scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
@@ -349,5 +346,6 @@ class ObjectDetection(BasePipeline):
                         code2md(self.cfg_tb['model'], language='json'), 0)
         writer.add_text('Configuration/Pipeline',
                         code2md(self.cfg_tb['pipeline'], language='json'), 0)
+
 
 PIPELINE._register_module(ObjectDetection, "torch")

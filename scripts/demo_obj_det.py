@@ -68,9 +68,7 @@ def main(args):
     pipeline = ObjectDetection(model, dataset, device=args.device)
 
     # load the parameters.
-    pipeline.load_ckpt(
-        ckpt_path=args.path_ckpt_pointpillars
-    )
+    pipeline.load_ckpt(ckpt_path=args.path_ckpt_pointpillars)
 
     test_split = Dataloader(dataset=dataset.get_split('training'),
                             preprocess=model.preprocess,

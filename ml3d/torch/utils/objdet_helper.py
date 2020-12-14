@@ -102,6 +102,7 @@ def xywhr_to_xyxyr(boxes_xywhr):
     boxes[:, 4] = boxes_xywhr[:, 4]
     return boxes
 
+
 def box3d_to_bev(boxes3d):
     """Convert rotated 3d boxes in XYZWHDR format to BEV in XYWHR format.
 
@@ -112,6 +113,7 @@ def box3d_to_bev(boxes3d):
         torch.Tensor: Converted BEV boxes in XYWHR format.
     """
     return boxes3d[:, [0, 1, 3, 4, 6]]
+
 
 def box3d_to_bev2d(boxes3d):
     """Convert rotated 3d boxes in XYZWHDR format to neareset BEV without rotation.
@@ -131,14 +133,14 @@ def box3d_to_bev2d(boxes3d):
 
     # find the center of boxes
     conditions = (normed_rotations > np.pi / 4)[..., None]
-    bboxes_xywh = torch.where(conditions, bev_rotated_boxes[:,
-                                                            [0, 1, 3, 2]],
-                                bev_rotated_boxes[:, :4])
+    bboxes_xywh = torch.where(conditions, bev_rotated_boxes[:, [0, 1, 3, 2]],
+                              bev_rotated_boxes[:, :4])
 
     centers = bboxes_xywh[:, :2]
     dims = bboxes_xywh[:, 2:]
     bev_boxes = torch.cat([centers - dims / 2, centers + dims / 2], dim=-1)
     return bev_boxes
+
 
 class Anchor3DRangeGenerator(object):
     """3D Anchor Generator by range.
@@ -348,9 +350,8 @@ def multiclass_nms(boxes, scores, score_thr):
     for i in range(scores.shape[1]):
         cls_inds = scores[:, i] > score_thr
         if not cls_inds.any():
-            idxs.append(torch.tensor([], 
-                        dtype=torch.long, 
-                        device=cls_inds.device))
+            idxs.append(
+                torch.tensor([], dtype=torch.long, device=cls_inds.device))
             continue
 
         orig_idx = torch.arange(cls_inds.shape[0],
@@ -425,14 +426,14 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
 
     if rows * cols == 0:
         if is_aligned:
-            return bboxes1.new(batch_shape + (rows, ))
+            return bboxes1.new(batch_shape + (rows,))
         else:
             return bboxes1.new(batch_shape + (rows, cols))
 
-    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (
-        bboxes1[..., 3] - bboxes1[..., 1])
-    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (
-        bboxes2[..., 3] - bboxes2[..., 1])
+    area1 = (bboxes1[..., 2] - bboxes1[..., 0]) * (bboxes1[..., 3] -
+                                                   bboxes1[..., 1])
+    area2 = (bboxes2[..., 2] - bboxes2[..., 0]) * (bboxes2[..., 3] -
+                                                   bboxes2[..., 1])
 
     if is_aligned:
         lt = torch.max(bboxes1[..., :2], bboxes2[..., :2])  # [B, rows, 2]

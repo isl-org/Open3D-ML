@@ -154,6 +154,7 @@ class BoundingBox3D:
 
 class BEVBox3D(BoundingBox3D):
     """Class that defines a special bounding box for object detection, with only one rotation axis (yaw)."""
+
     def __init__(self,
                  center,
                  size,
@@ -188,7 +189,8 @@ class BEVBox3D(BoundingBox3D):
         # z-axis
         up = [0, 0, 1]
 
-        super().__init__(center, front, up, left, size, label_class, confidence, **kwargs)
+        super().__init__(center, front, up, left, size, label_class, confidence,
+                         **kwargs)
 
     def generate_corners3d(self):
         """
@@ -200,7 +202,8 @@ class BEVBox3D(BoundingBox3D):
         y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
         z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
 
-        R = np.array([[np.cos(self.yaw), 0, np.sin(self.yaw)], [0, 1, 0],
+        R = np.array([[np.cos(self.yaw), 0,
+                       np.sin(self.yaw)], [0, 1, 0],
                       [-np.sin(self.yaw), 0,
                        np.cos(self.yaw)]])
         corners3d = np.vstack([x_corners, y_corners, z_corners])  # (3, 8)
@@ -214,7 +217,7 @@ class BEVBox3D(BoundingBox3D):
         :return box: (7,)
         """
         bbox = np.zeros((7,))
-        bbox[0:3] = self.center - [0, 0, self.size[1]/2]
+        bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
         bbox[3:6] = np.array(self.size)[[0, 2, 1]]
         bbox[6] = self.yaw
         return bbox
@@ -225,7 +228,7 @@ class BEVBox3D(BoundingBox3D):
         :return transformed box: (7,)
         """
         bbox = np.zeros((7,))
-        bbox[0:3] = self.center - [0, 0, self.size[1]/2]
+        bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
         bbox[0:3] = (np.array([*bbox[0:3], 1.0]) @ self.world_cam)[:3]
         bbox[3:6] = self.size[2::-1]
         bbox[6] = self.yaw
@@ -237,16 +240,17 @@ class BEVBox3D(BoundingBox3D):
         :return transformed box: (4,)
         """
         corners = self.generate_corners3d()
-        corners = np.concatenate([corners, np.ones((corners.shape[0], 1))], axis=-1)
+        corners = np.concatenate(
+            [corners, np.ones((corners.shape[0], 1))], axis=-1)
 
         bbox_img = np.matmul(corners, self.cam_img)
-        bbox_img = bbox_img[:,:2]/bbox_img[:,2:3]
+        bbox_img = bbox_img[:, :2] / bbox_img[:, 2:3]
 
         minxy = np.min(bbox_img, axis=0)
         maxxy = np.max(bbox_img, axis=0)
 
-        size = maxxy-minxy
-        center = minxy + size/2
+        size = maxxy - minxy
+        center = minxy + size / 2
 
         return np.concatenate([center, size])
 
