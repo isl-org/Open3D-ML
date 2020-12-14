@@ -5,18 +5,17 @@ dataset:
     78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
     476491114, 9833174, 129609852, 4506626, 1168181]
   test_result_folder: ./test
-  test_split: ['08']
-  # test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
+  test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
   all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   validation_split: ['08']
-  use_cache: false
+  use_cache: true
   validation_split:
   - '08'
 model:
   name: KPFCNN
-  ckpt_path: ../dataset/checkpoints/vis_weights_KPFCNN.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   KP_extent: 1.2
   KP_influence: linear
   aggregation_mode: sum

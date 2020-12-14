@@ -10,7 +10,6 @@ class SemSegRandomSampler(object):
     def __init__(self, dataset):
         self.dataset = dataset
         self.length = len(dataset)
-        self.dataset = dataset
         self.split = self.dataset.split
 
     def __len__(self):

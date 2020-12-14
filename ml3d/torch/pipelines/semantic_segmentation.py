@@ -125,6 +125,7 @@ class SemanticSegmentation(BasePipeline):
         cfg = self.cfg
         model.device = device
         model.to(device)
+        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
         metric = SemSegMetric(self, model, dataset, device)
@@ -192,28 +193,28 @@ class SemanticSegmentation(BasePipeline):
             self.test_labels.append(np.zeros(shape=[num_points],
                                              dtype=np.int16))
             self.complete_infer = False
-        else:
-            this_possiblility = sampler.possibilities[sampler.cloud_id]
-            self.pbar.update(this_possiblility[this_possiblility > end_threshold].shape[0] \
-                - self.pbar_update)
-            self.pbar_update = this_possiblility[
-                this_possiblility > end_threshold].shape[0]
-            self.test_probs[self.curr_cloud_id], self.test_labels[self.curr_cloud_id] \
-                = self.model.update_probs(inputs, results,
-                    self.test_probs[self.curr_cloud_id],
-                    self.test_labels[self.curr_cloud_id])
 
-            if split in ['test'] and this_possiblility[this_possiblility > end_threshold].shape[0] \
-              == this_possiblility.shape[0]:
+        this_possiblility = sampler.possibilities[sampler.cloud_id]
+        self.pbar.update(this_possiblility[this_possiblility > end_threshold].shape[0] \
+            - self.pbar_update)
+        self.pbar_update = this_possiblility[
+            this_possiblility > end_threshold].shape[0]
+        self.test_probs[self.curr_cloud_id], self.test_labels[self.curr_cloud_id] \
+            = self.model.update_probs(inputs, results,
+                self.test_probs[self.curr_cloud_id],
+                self.test_labels[self.curr_cloud_id])
 
-                proj_inds = self.model.preprocess(
-                    self.dataset_split.get_data(self.curr_cloud_id),
-                    {'split': split})['proj_inds']
-                self.ori_test_probs.append(
-                    self.test_probs[self.curr_cloud_id][proj_inds])
-                self.ori_test_labels.append(
-                    self.test_labels[self.curr_cloud_id][proj_inds])
-                self.complete_infer = True
+        if split in ['test'] and this_possiblility[this_possiblility > end_threshold].shape[0] \
+          == this_possiblility.shape[0]:
+
+            proj_inds = self.model.preprocess(
+                self.dataset_split.get_data(self.curr_cloud_id),
+                {'split': split})['proj_inds']
+            self.ori_test_probs.append(
+                self.test_probs[self.curr_cloud_id][proj_inds])
+            self.ori_test_labels.append(
+                self.test_labels[self.curr_cloud_id][proj_inds])
+            self.complete_infer = True
 
     def run_train(self):
         model = self.model
@@ -340,6 +341,7 @@ class SemanticSegmentation(BasePipeline):
                     conf_m = metric.confusion_matrix(predict_scores, gt_labels)
                     acc = metric.acc(predict_scores, gt_labels)
                     iou = metric.iou(predict_scores, gt_labels)
+                    print(acc[-1], iou[-1])
 
                     self.valid_losses.append(loss.cpu().item())
                     self.valid_accs.append(acc)

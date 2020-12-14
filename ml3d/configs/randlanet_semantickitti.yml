@@ -13,11 +13,11 @@ dataset:
   validation_split: ['08']
   use_cache: true
   sampler:
-    name: 'SemSegSpatiallyRegularSampler'
+    name: 'SemSegRandomSampler'
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ../dataset/checkpoints/vis_weights_RandLANet.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 3
   dim_output:
