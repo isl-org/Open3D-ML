@@ -17,7 +17,6 @@ class SemSegSpatiallyRegularSampler(object):
         return self.length
 
     def initialize_with_dataloader(self, dataloader):
-
         self.min_possibilities = []
         self.possibilities = []
 
@@ -47,14 +46,14 @@ class SemSegSpatiallyRegularSampler(object):
         def gen_test():
             curr_could_id = 0
             while curr_could_id < self.length:
-                if self.min_possibilities[curr_could_id] > 1e-8:
+                if self.min_possibilities[curr_could_id] > 0.5:
                     curr_could_id = curr_could_id + 1
                     continue
                 self.cloud_id = curr_could_id
 
                 yield self.cloud_id
 
-        if self.split == 'train':
+        if self.split in ['train', 'validation', 'valid', 'training']:
             gen = gen_train
         else:
             gen = gen_test
