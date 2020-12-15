@@ -11,7 +11,6 @@ from pathlib import Path
 
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
-from torch.utils.tensorboard import SummaryWriter
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 
 from ...metrics.mAP import mAP, convert_data_eval
@@ -193,7 +192,7 @@ class ObjectDetection(BasePipeline):
         dataset_name = dataset.name if dataset is not None else ''
         tensorboard_dir = join(
             self.cfg.train_sum_dir,
-            model.__class__.__name__ + '_' + dataset_name + '_torch')
+            model.__class__.__name__ + '_' + dataset_name + '_tf')
         runid = get_runid(tensorboard_dir)
         self.tensorboard_dir = join(self.cfg.train_sum_dir,
                                     runid + '_' + Path(tensorboard_dir).name)
