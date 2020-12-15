@@ -762,7 +762,8 @@ class SECONDFPN(tf.keras.layers.Layer):
                     kernel_size=stride,
                     data_format='channels_first',
                     use_bias=False,
-                    strides=stride)
+                    strides=stride,
+                    kernel_initializer='he_normal')
 
             deblock = tf.keras.Sequential()
             deblock.add(upsample_layer)
@@ -841,17 +842,32 @@ class Anchor3DHead(tf.keras.layers.Layer):
         #Initialize neural network layers of the head.
         self.cls_out_channels = self.num_anchors * self.num_classes
 
+        kernel_init = tf.keras.initializers.RandomNormal(stddev=0.01)
+        bias_init = tf.keras.initializers.Constant(
+            value=self.bias_init_with_prob(0.01))
+
         self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels,
                                                kernel_size=1,
-                                               data_format='channels_last')
+                                               data_format='channels_last',
+                                               kernel_initializer=kernel_init,
+                                               bias_initializer=bias_init)
+
         self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors *
                                                self.box_code_size,
                                                kernel_size=1,
-                                               data_format='channels_last')
+                                               data_format='channels_last',
+                                               kernel_initializer=kernel_init)
 
         self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2,
                                                    kernel_size=1,
                                                    data_format='channels_last')
+
+    @staticmethod
+    def bias_init_with_prob(prior_prob):
+        """initialize conv/fc bias value according to giving probablity."""
+        bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+
+        return bias_init
 
     def call(self, x, training=False):
         """Forward function on a feature map.
