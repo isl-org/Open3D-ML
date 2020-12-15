@@ -14,7 +14,23 @@ from sklearn.neighbors import KDTree
 
 class TFDataloader():
     """
-    Data loader for tf framework.
+    This class allows you to load datasets for a TensorFlow framework.
+	
+	**Example:** 
+        This example loads the SemanticKITTI dataset using the   a point cloud to the visualizer::
+			
+			
+            import tensorflow as tf
+			
+			from ..dataloaders import TFDataloader
+					
+            train_split = TFDataloader(dataset=tf.dataset.get_split('training'),
+							model=model,
+                            use_cache=tf.dataset.cfg.use_cache,
+                            steps_per_epoch=tf.dataset.cfg.get(
+                            'steps_per_epoch_train', None))
+			
+			
     """
 
     def __init__(self,
@@ -23,27 +39,40 @@ class TFDataloader():
                  model=None,
                  use_cache=True,
                  steps_per_epoch=None,
+                 preprocess=None,
+                 transform=None,
+                 get_batch_gen=None,
                  **kwargs):
         """
-        Initialize
-
-        Args:
-            dataset: ml3d dataset class.
-            dataset: model's preprocess method.
-            devce: model's transform mthod.
-            use_cache: whether to use cached preprocessed data.
-            steps_per_epoch: steps per epoch. The step number will be the
-                number of samples in the data if steps_per_epoch=None
-            kwargs:
-        Returns:
+        Initializes the class, and includes the following steps:
+		 Checks if preprocess is available. If yes, then uses the preprocessed data.
+		 Checks if cache is used. If not, then uses data from the cache.
+		
+		**Args:**
+            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            preprocess: The model's preprocess method.
+            transform: The model's transform method.
+            use_cache: Indicates if preprocessed data should be cached.
+			get_batch_gen: <NTD>
+			model_cfg: The configuration file of the model.
+            steps_per_epoch: The number of steps per epoch that indicates the bactches of samples to train. If it is None, then the step number will be the number of samples in the data.
+            
+		**Returns:**
             class: The corresponding class.
+		
         """
         self.dataset = dataset
         self.model = model
-        self.preprocess = model.preprocess
-        self.transform = model.transform
-        self.get_batch_gen = model.get_batch_gen
-        self.model_cfg = model.cfg
+        if model is not None:
+            self.preprocess = model.preprocess
+            self.transform = model.transform
+            self.get_batch_gen = model.get_batch_gen
+            self.model_cfg = model.cfg
+        else:
+            self.preprocess = preprocess
+            self.transform = transform
+            self.get_batch_gen = get_batch_gen
+
         self.steps_per_epoch = steps_per_epoch
 
         if self.preprocess is not None and use_cache:
@@ -76,7 +105,13 @@ class TFDataloader():
         self.num_pc = len(self.pc_list)
 
     def read_data(self, index):
-        """Returns the data at index idx. """
+        """Returns the data at the index. 
+		
+		This does one of the following:
+		 - If cache is available, then gets the data from the cache.
+		 - If preprocess is available, then gets the preprocessed dataset and then the data.
+		 - If cache or preprocess is not available, then get the data from the dataset.
+		"""
         attr = self.dataset.get_attr(index)
         if self.cache_convert:
             data = self.cache_convert(attr['name'])
@@ -87,16 +122,39 @@ class TFDataloader():
 
         return data, attr
 
+    def __getitem__(self, index):
+        """
+		Returns the item at index position (idx). 	
+		"""
+        dataset = self.dataset
+        index = index % len(dataset)
+
+        data, attr = self.read_data(index)
+
+        if self.transform is not None:
+            data = self.transform(data, attr)
+
+        data = {'data': data, 'attr': attr}
+
+        return data
+
+    def __len__(self):
+        """Returns the number of steps for an epoch."""
+        if self.steps_per_epoch is not None:
+            steps_per_epoch = self.steps_per_epoch
+        else:
+            steps_per_epoch = len(self.dataset)
+        return steps_per_epoch
+
     def get_loader(self, batch_size=1, num_threads=3):
         """
-        Construct the origianl tensorflow dataloader.
+        This constructs the tensorflow dataloader.
 
         Args:
-            batch_size: batch size.
-            num_threads: number of threads for data loading.
-            kwargs:
+            batch_size: The batch size to be used for data loading.
+            num_threads: The number of parallel threads to be used to data loading.
         Returns:
-            the tensorflow dataloader and the number of steps in one epoch
+            The tensorflow dataloader and the number of steps in one epoch.
         """
 
         gen_func, gen_types, gen_shapes = self.get_batch_gen(
@@ -107,7 +165,7 @@ class TFDataloader():
         loader = loader.map(map_func=self.transform,
                             num_parallel_calls=num_threads)
 
-        if ('batcher' not in self.model_cfg.keys() or
+        if (self.model is None or 'batcher' not in self.model_cfg.keys() or
                 self.model_cfg.batcher == 'DefaultBatcher'):
             loader = loader.batch(batch_size)
 
