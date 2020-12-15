@@ -244,10 +244,10 @@ class ObjectDetection(BasePipeline):
 
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():
-            writer.add_scalar("train/" + key, np.mean(val), epoch)
+            tf.summary.scalar("train/" + key, np.mean(val), epoch)
 
         for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+            tf.summary.scalar("valid/" + key, np.mean(val), epoch)
             
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -285,17 +285,22 @@ class ObjectDetection(BasePipeline):
         log.info("Saved checkpoint at: {}".format(save_path))
 
     def save_config(self, writer):
-        '''
-        Save experiment configuration with tensorboard summary
-        '''
-        writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
-        writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
-        writer.add_text('Configuration/Dataset',
-                        code2md(self.cfg_tb['dataset'], language='json'), 0)
-        writer.add_text('Configuration/Model',
-                        code2md(self.cfg_tb['model'], language='json'), 0)
-        writer.add_text('Configuration/Pipeline',
-                        code2md(self.cfg_tb['pipeline'], language='json'), 0)
+        with writer.as_default():
+            with tf.name_scope("Description"):
+                tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)
+                tf.summary.text("Command line", self.cfg_tb['cmd_line'], step=0)
+            with tf.name_scope("Configuration"):
+                tf.summary.text('Dataset',
+                                code2md(self.cfg_tb['dataset'],
+                                        language='json'),
+                                step=0)
+                tf.summary.text('Model',
+                                code2md(self.cfg_tb['model'], language='json'),
+                                step=0)
+                tf.summary.text('Pipeline',
+                                code2md(self.cfg_tb['pipeline'],
+                                        language='json'),
+                                step=0)
 
 
 PIPELINE._register_module(ObjectDetection, "tf")
