@@ -708,6 +708,13 @@ class SECONDFPN(nn.Module):
                 nn.ReLU(inplace=True))
             deblocks.append(deblock)
         self.deblocks = nn.ModuleList(deblocks)
+        self.init_weights()
+
+    def init_weights(self):
+        """Initialize weights of FPN"""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
 
     def forward(self, x):
         """Forward function.
@@ -774,6 +781,26 @@ class Anchor3DHead(nn.Module):
                                       1)
 
         self.iou_thr = [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+        self.init_weights()
+
+    @staticmethod
+    def bias_init_with_prob(prior_prob):
+        """initialize conv/fc bias value according to giving probablity."""
+        bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+
+        return bias_init
+
+    @staticmethod
+    def normal_init(module, mean=0, std=1, bias=0):
+        nn.init.normal_(module.weight, mean, std)
+        if hasattr(module, 'bias') and module.bias is not None:
+            nn.init.constant_(module.bias, bias)
+
+    def init_weights(self):
+        """Initialize the weights of head."""
+        bias_cls = self.bias_init_with_prob(0.01)
+        self.normal_init(self.conv_cls, std=0.01, bias=bias_cls)
+        self.normal_init(self.conv_reg, std=0.01)
 
     def forward(self, x):
         """Forward function on a feature map.
