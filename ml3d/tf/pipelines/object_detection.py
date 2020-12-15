@@ -54,7 +54,6 @@ class ObjectDetection(BasePipeline):
             Returns the inference results.
         """
         model = self.model
-        log.info("running inference")
 
         inputs = tf.convert_to_tensor([data['point']], dtype=np.float32)
 
@@ -247,11 +246,12 @@ class ObjectDetection(BasePipeline):
                 self.save_ckpt(epoch)
 
     def save_logs(self, writer, epoch):
-        for key, val in self.losses.items():
-            tf.summary.scalar("train/" + key, np.mean(val), epoch)
+        with writer.as_default():
+            for key, val in self.losses.items():
+                tf.summary.scalar("train/" + key, np.mean(val), epoch)
 
-        for key, val in self.valid_losses.items():
-            tf.summary.scalar("valid/" + key, np.mean(val), epoch)
+            for key, val in self.valid_losses.items():
+                tf.summary.scalar("valid/" + key, np.mean(val), epoch)
             
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
