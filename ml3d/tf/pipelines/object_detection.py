@@ -197,7 +197,7 @@ class ObjectDetection(BasePipeline):
         self.tensorboard_dir = join(self.cfg.train_sum_dir,
                                     runid + '_' + Path(tensorboard_dir).name)
 
-        writer = SummaryWriter(self.tensorboard_dir)
+        writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
