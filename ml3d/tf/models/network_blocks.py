@@ -518,7 +518,7 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
-        self.leaky_relu = tf.keras.layers.LeakyReLU(cfg.get('l_relu', 0.1))
+        self.leaky_relu = tf.keras.layers.LeakyReLU(cfg.get('l_relu', 0.2))
 
     def call(self, x, batch, training=False):
 
