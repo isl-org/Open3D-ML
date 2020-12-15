@@ -148,7 +148,6 @@ class ObjectDetection(BasePipeline):
         log.info("Started validation")
 
         self.valid_losses = {}
-        self.valid_mAP = {}
 
         pred = []
         gt = []
@@ -178,16 +177,20 @@ class ObjectDetection(BasePipeline):
 
         ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
         log.info("mAP BEV:")
-        log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-        log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-        log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
+        log.info("Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
+        log.info("Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
+        log.info("Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
+        log.info("Overall:      {}".format(np.mean(ap[:,2])))
+        self.valid_losses["mAP BEV"] = np.mean(ap[:,2])
 
         ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
         log.info("")
         log.info("mAP 3D:")
-        log.info("Pedestrian: {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-        log.info("Bicycle: {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-        log.info("Car: {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
+        log.info("Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
+        log.info("Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
+        log.info("Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
+        log.info("Overall:      {}".format(np.mean(ap[:,2])))
+        self.valid_losses["mAP 3D"] = np.mean(ap[:,2])
 
 
     def run_train(self):
