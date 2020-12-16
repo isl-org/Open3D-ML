@@ -2,8 +2,8 @@ import numpy as np
 import open3d.ml as _ml3d
 import math
 
-from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
-from ml3d.datasets import KITTI
+from open3d.ml.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
+from open3d.ml.datasets import KITTI
 
 import argparse
 

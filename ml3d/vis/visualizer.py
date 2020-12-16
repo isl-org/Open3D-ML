@@ -201,7 +201,7 @@ class Model:
             tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
-            pts = tcloud.point["points"].as_tensor().numpy()
+            pts = tcloud.point["points"].numpy()
             min_val = (pts[:, 0].min(), pts[:, 1].min(), pts[:, 2].min())
             max_val = (pts[:, 0].max(), pts[:, 1].max(), pts[:, 2].max())
             return [min_val, max_val]
@@ -351,7 +351,7 @@ class DatasetModel(Model):
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
-        pcloud_size += pcloud.point["points"].size * 64
+        pcloud_size += pcloud.point["points"].num_elements() * 64
         return pcloud_size
 
     """Unload the data (only if you have loaded it earlier)."""
@@ -1086,7 +1086,7 @@ class Visualizer:
                 channel = max(0, self._colormap_channel.selected_index)
                 scalar = attr[:, channel]
         else:
-            shape = [len(tcloud.point["points"].as_tensor().numpy())]
+            shape = [len(tcloud.point["points"].numpy())]
             scalar = np.zeros(shape, dtype='float32')
         tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(
             scalar)
@@ -1463,10 +1463,9 @@ class Visualizer:
     @staticmethod
     def _make_tcloud_array(np_array, copy=False):
         if copy or not np_array.data.c_contiguous:
-            t = o3d.core.Tensor(np_array)
+            return o3d.core.Tensor(np_array)
         else:
-            t = o3d.core.Tensor.from_numpy(np_array)
-        return o3d.core.TensorList.from_tensor(t, inplace=True)
+            return o3d.core.Tensor.from_numpy(np_array)
 
     def visualize_dataset(self,
                           dataset,
