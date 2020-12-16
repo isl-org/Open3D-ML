@@ -290,16 +290,19 @@ class ObjectDetection(BasePipeline):
                                                   max_to_keep=100)
 
         epoch = 0
+        log.info(ckpt_path)
         if ckpt_path is not None:
             self.ckpt.restore(ckpt_path).expect_partial()
             log.info("Restored from {}".format(ckpt_path))
-            epoch = int(re.findall(r'\d+', ckpt_path)[-1]) + 1
         else:
             self.ckpt.restore(self.manager.latest_checkpoint).expect_partial()
 
             if self.manager.latest_checkpoint:
                 log.info("Restored from {}".format(
                     self.manager.latest_checkpoint))
+                epoch = int(re.findall(r'\d+', 
+                    self.manager.latest_checkpoint)[-1])
+                epoch = epoch * self.cfg.save_ckpt_freq + 1
             else:
                 log.info("Initializing from scratch.")
         return epoch
