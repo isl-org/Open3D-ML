@@ -125,6 +125,7 @@ class PointPillars(BaseModel):
         return tf.optimizers.Adam(learning_rate=cfg['lr'],
                                   beta_1=beta1,
                                   beta_2=beta2)
+
         #used by torch, but doesn't perform well with TF:
         #import tensorflow_addons as tfa
         #beta1, beta2 = cfg.get('betas', [0.9, 0.99])
@@ -135,8 +136,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [inputs['labels']]
-        gt_bboxes = [inputs['bboxes']]
+        gt_labels = inputs['labels']
+        gt_bboxes = inputs['bboxes']
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -160,11 +161,10 @@ class PointPillars(BaseModel):
             avg_factor=avg_factor)
 
         # remove invalid labels
-        valid_lbl_idx = tf.where((gt_label >= 0) &
-                                 (gt_label < self.bbox_head.num_classes))[:, 0]
-        pos_idx = tf.gather(pos_idx, valid_lbl_idx)
-        target_idx = tf.gather(target_idx, valid_lbl_idx)
-        target_bboxes = tf.gather(target_bboxes, valid_lbl_idx)
+        cond = (gt_label >= 0) & (gt_label < self.bbox_head.num_classes)
+        pos_idx = tf.boolean_mask(pos_idx, cond)
+        target_idx = tf.boolean_mask(target_idx, cond)
+        target_bboxes = tf.boolean_mask(target_bboxes, cond)
 
         bboxes = tf.reshape(tf.transpose(bboxes, (0, 2, 3, 1)),
                             (-1, self.bbox_head.box_code_size))
@@ -229,8 +229,8 @@ class PointPillars(BaseModel):
 
         return {
             'point': points,
-            'bboxes': bboxes,
-            'labels': labels,
+            'bboxes': [bboxes],
+            'labels': [labels],
             'calib': data['calib']
         }
 
@@ -557,44 +557,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         self.fp16_enabled = False
 
     #@auto_fp16(apply_to=('voxel_features', ))
-    def call(self, voxel_features, coors, batch_size=None, training=False):
-        """Forward function to scatter features."""
-        if batch_size is not None:
-            return self.forward_batch(voxel_features, coors, batch_size,
-                                      training)
-        else:
-            return self.forward_single(voxel_features, coors, training)
-
-    def forward_single(self, voxel_features, coors, training=False):
-        """Scatter features of single sample.
-
-        Args:
-            voxel_features (tf.Tensor): Voxel features in shape (N, M, C).
-            coors (tf.Tensor): Coordinates of each voxel.
-                The first column indicates the sample ID.
-        """
-        # Create the canvas for this sample
-        canvas_shape = (self.in_channels, self.nx * self.ny)
-
-        indices = coors[:, 1] * self.nx + coors[:, 2]
-        indices = tf.cast(indices, tf.int64)
-        voxels = tf.transpose(voxel_features)
-
-        # Now scatter the blob back to the canvas.
-        indices_grid = tf.stack(tf.meshgrid(tf.cast(tf.range(self.in_channels),
-                                                    indices.dtype),
-                                            indices,
-                                            indexing='ij'),
-                                axis=-1)
-        canvas = tf.scatter_nd(indices_grid, voxels, canvas_shape)
-        # canvas[:, indices] = voxels
-
-        # Undo the column stacking to final 4-dim tensor
-        canvas = tf.reshape(canvas, (1, self.in_channels, self.ny, self.nx))
-
-        return [canvas]
-
-    def forward_batch(self, voxel_features, coors, batch_size, training=False):
+    def call(self, voxel_features, coors, batch_size, training=False):
         """Scatter features of single sample.
 
         Args:
@@ -607,7 +570,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         batch_canvas = []
         for batch_itt in range(batch_size):
             # Create the canvas for this sample
-            canvas_shape = (self.in_channels, self.nx * self.ny)
+            canvas_shape = (self.nx * self.ny, self.in_channels)
 
             # Only include non-empty pillars
             batch_mask = coors[:, 0] == batch_itt
@@ -615,18 +578,16 @@ class PointPillarsScatter(tf.keras.layers.Layer):
 
             indices = this_coors[:, 2] * self.nx + this_coors[:, 3]
             indices = tf.cast(indices, tf.int64)
+            indices = tf.expand_dims(indices, axis=-1)
 
             voxels = tf.boolean_mask(voxel_features, batch_mask)
-            voxels = tf.transpose(voxels)
 
             # Now scatter the blob back to the canvas.
-            indices_grid = tf.stack(tf.meshgrid(tf.cast(
-                tf.range(self.in_channels), indices.dtype),
-                                                indices,
-                                                indexing='ij'),
-                                    axis=-1)
-            canvas = tf.scatter_nd(indices_grid, voxels, canvas_shape)
-            # canvas[:, indices] = voxels
+            accum = tf.maximum(
+                tf.scatter_nd(indices, tf.ones_like(voxels), canvas_shape),
+                tf.constant(1.0))
+            canvas = tf.scatter_nd(indices, voxels, canvas_shape) / accum
+            canvas = tf.transpose(canvas)
 
             # Append to a list for later stacking.
             batch_canvas.append(canvas)
@@ -762,7 +723,8 @@ class SECONDFPN(tf.keras.layers.Layer):
                     kernel_size=stride,
                     data_format='channels_first',
                     use_bias=False,
-                    strides=stride)
+                    strides=stride,
+                    kernel_initializer='he_normal')
 
             deblock = tf.keras.Sequential()
             deblock.add(upsample_layer)
@@ -804,19 +766,15 @@ class SECONDFPN(tf.keras.layers.Layer):
 class Anchor3DHead(tf.keras.layers.Layer):
 
     def __init__(self,
-                 num_classes=3,
+                 num_classes=1,
                  in_channels=384,
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
-                 ranges=[
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-                 ],
-                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
+                 ranges=[[0, -40.0, -3, 70.0, 40.0, 1]],
+                 sizes=[[0.6, 1.0, 1.5]],
                  rotations=[0, 1.57],
-                 iou_thr=[[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]):
+                 iou_thr=[[0.35, 0.5]]):
 
         super().__init__()
         self.in_channels = in_channels
@@ -841,17 +799,32 @@ class Anchor3DHead(tf.keras.layers.Layer):
         #Initialize neural network layers of the head.
         self.cls_out_channels = self.num_anchors * self.num_classes
 
+        kernel_init = tf.keras.initializers.RandomNormal(stddev=0.01)
+        bias_init = tf.keras.initializers.Constant(
+            value=self.bias_init_with_prob(0.01))
+
         self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels,
                                                kernel_size=1,
-                                               data_format='channels_last')
+                                               data_format='channels_last',
+                                               kernel_initializer=kernel_init,
+                                               bias_initializer=bias_init)
+
         self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors *
                                                self.box_code_size,
                                                kernel_size=1,
-                                               data_format='channels_last')
+                                               data_format='channels_last',
+                                               kernel_initializer=kernel_init)
 
         self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2,
                                                    kernel_size=1,
                                                    data_format='channels_last')
+
+    @staticmethod
+    def bias_init_with_prob(prior_prob):
+        """initialize conv/fc bias value according to giving probablity."""
+        bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+
+        return bias_init
 
     def call(self, x, training=False):
         """Forward function on a feature map.

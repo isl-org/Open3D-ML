@@ -43,15 +43,26 @@ model:
     in_channels: [64, 128, 256]
     out_channels: [128, 128, 128]
     upsample_strides: [1, 2, 4]
-    use_conv_for_no_stride: False
+    use_conv_for_no_stride: false
 
   head:
     num_classes: 3
     in_channels: 384
     feat_channels: 384
+    nms_pre: 100
+    score_thr: 0.1
+    ranges: [
+      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+      [0, -39.68, -1.78, 70.4, 39.68, -1.78]
+    ]
+    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
+    rotations: [0, 1.57]
+    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
   
 pipeline:
   name: ObjectDetection
+  test_compute_metric: true
   batch_size: 1
   val_batch_size: 1
   save_ckpt_freq: 5
