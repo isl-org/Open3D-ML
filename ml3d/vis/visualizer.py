@@ -43,8 +43,7 @@ class Model:
         self._attr_rename = {"label": "labels", "feat": "feature"}
 
     def _init_data(self, name):
-        tcloud = o3d.t.geometry.PointCloud(o3d.core.Dtype.Float32,
-                                           o3d.core.Device("CPU:0"))
+        tcloud = o3d.t.geometry.PointCloud(o3d.core.Device("CPU:0"))
         self.tclouds[name] = tcloud
         self._data[name] = {}
         self.data_names.append(name)
@@ -75,8 +74,7 @@ class Model:
 
         name = data["name"]
         pts = self._convert_to_numpy(data["points"])
-        tcloud = o3d.t.geometry.PointCloud(o3d.core.Dtype.Float32,
-                                           o3d.core.Device("CPU:0"))
+        tcloud = o3d.t.geometry.PointCloud(o3d.core.Device("CPU:0"))
         known_attrs = set()
         if pts.shape[1] >= 4:
             # We can't use inplace Tensor creation (e.g. from_numpy())
@@ -362,8 +360,7 @@ class DatasetModel(Model):
         # Only unload if this was loadable; we might have an in-memory,
         # user-specified data created directly through create_point_cloud().
         if name in self._name2datasetidx:
-            tcloud = o3d.t.geometry.PointCloud(o3d.core.Dtype.Float32,
-                                               o3d.core.Device("CPU:0"))
+            tcloud = o3d.t.geometry.PointCloud(o3d.core.Device("CPU:0"))
             self.tclouds[name] = tcloud
             self._data[name] = {}
 
@@ -1146,7 +1143,8 @@ class Visualizer:
             lut = None
 
         mat = rendering.Material()
-        mat.shader = "defaultUnlit"
+        mat.shader = "unlitLine"
+        mat.line_width = 70
 
         if self._consolidate_bounding_boxes:
             name = Model.bounding_box_prefix.split("/")[0]

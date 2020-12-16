@@ -186,12 +186,11 @@ class SemanticKITTI(BaseDataset):
         save_path = join(test_path, name_seq, 'predictions')
         make_dir(save_path)
         test_file_name = name_points
-
-        pred = results['predict_labels']
-
-        store_path = join(save_path, name_points + '.label')
         for ign in cfg.ignored_label_inds:
             pred[pred >= ign] += 1
+
+        store_path = join(save_path, name_points + '.label')
+
         pred = self.remap_lut[pred].astype(np.uint32)
         pred.tofile(store_path)
 
@@ -299,8 +298,7 @@ class SemanticKITTISplit(BaseDatasetSplit):
         name = '{}_{}'.format(seq, file[:-4])
 
         pc_path = str(pc_path)
-        split = self.split
-        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': self.split}
         return attr
 
 

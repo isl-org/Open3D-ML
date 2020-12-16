@@ -67,8 +67,8 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             if not isinstance(data['point'], torch.Tensor):
                 inputs = torch.tensor([data['point']],
-                                    dtype=torch.float32,
-                                    device=self.device)
+                                      dtype=torch.float32,
+                                      device=self.device)
             else:
                 inputs = data['point'].unsqueeze(0)
             results = model(inputs)
@@ -140,10 +140,10 @@ class ObjectDetection(BasePipeline):
 
         valid_dataset = dataset.get_split('validation')
         valid_loader = TorchDataloader(dataset=valid_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=None,
-                                      use_cache=dataset.cfg.use_cache,
-                                      shuffle=False)
+                                       preprocess=model.preprocess,
+                                       transform=None,
+                                       use_cache=dataset.cfg.use_cache,
+                                       shuffle=False)
 
         log.info("Started validation")
 
@@ -165,7 +165,7 @@ class ObjectDetection(BasePipeline):
                 boxes = model.inference_end(results, inputs)
                 pred.append(convert_data_eval(boxes[0], [40, 25]))
                 gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
-        
+
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -175,23 +175,45 @@ class ObjectDetection(BasePipeline):
 
         log.info(desc)
 
-        ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
         log.info("mAP BEV:")
-        log.info("Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-        log.info("Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-        log.info("Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
-        log.info("Overall:      {}".format(np.mean(ap[:,2])))
-        self.valid_losses["mAP BEV"] = np.mean(ap[:,2])
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP BEV"] = np.mean(ap[:, 2])
 
-        ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 bev=False,
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
         log.info("")
         log.info("mAP 3D:")
-        log.info("Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-        log.info("Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-        log.info("Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
-        log.info("Overall:      {}".format(np.mean(ap[:,2])))
-        self.valid_losses["mAP 3D"] = np.mean(ap[:,2])
-
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP 3D"] = np.mean(ap[:, 2])
 
     def run_train(self):
         """
@@ -214,11 +236,11 @@ class ObjectDetection(BasePipeline):
 
         train_dataset = dataset.get_split('training')
         train_loader = TorchDataloader(dataset=train_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                          'steps_per_epoch_train', None))
+                                       preprocess=model.preprocess,
+                                       transform=model.transform,
+                                       use_cache=dataset.cfg.use_cache,
+                                       steps_per_epoch=dataset.cfg.get(
+                                           'steps_per_epoch_train', None))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -243,7 +265,7 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')        
+            process_bar = tqdm(range(len(train_loader)), desc='training')
             for i in process_bar:
                 inputs = train_loader[i]['data']
 

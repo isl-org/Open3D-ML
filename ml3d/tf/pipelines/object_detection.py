@@ -62,7 +62,6 @@ class ObjectDetection(BasePipeline):
 
         return boxes
 
-
     def run_test(self):
         """
         Run test with test data split, computes mean average precision of the prediction results.
@@ -92,7 +91,7 @@ class ObjectDetection(BasePipeline):
 
         log.info("Started testing")
         self.test_ious = []
-        
+
         pred = []
         gt = []
         for i in tqdm(range(len(test_split)), desc='testing'):
@@ -100,7 +99,6 @@ class ObjectDetection(BasePipeline):
             pred.append(convert_data_eval(results[0], [40, 25]))
 
         #dataset.save_test_result(results, attr)
-
 
     def run_valid(self):
         model = self.model
@@ -115,11 +113,11 @@ class ObjectDetection(BasePipeline):
 
         valid_dataset = dataset.get_split('validation')
         valid_loader = TFDataloader(dataset=valid_dataset,
-                                   preprocess=model.preprocess,
-                                   transform=None,
-                                   use_cache=False,
-                                   get_batch_gen=model.get_batch_gen,
-                                   shuffle=False)
+                                    preprocess=model.preprocess,
+                                    transform=None,
+                                    use_cache=False,
+                                    get_batch_gen=model.get_batch_gen,
+                                    shuffle=False)
 
         log.info("Started validation")
 
@@ -141,7 +139,7 @@ class ObjectDetection(BasePipeline):
             boxes = model.inference_end(results, inputs)
             pred.append(convert_data_eval(boxes[0], [40, 25]))
             gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
-        
+
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -151,23 +149,45 @@ class ObjectDetection(BasePipeline):
 
         log.info(desc)
 
-        ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], similar_classes={0:4, 2:3})
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
         log.info("mAP BEV:")
-        log.info("Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-        log.info("Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-        log.info("Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
-        log.info("Overall:      {}".format(np.mean(ap[:,2])))
-        self.valid_losses["mAP BEV"] = np.mean(ap[:,2])
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP BEV"] = np.mean(ap[:, 2])
 
-        ap = mAP(pred, gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7], bev=False, similar_classes={0:4, 2:3})
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 bev=False,
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
         log.info("")
         log.info("mAP 3D:")
-        log.info("Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0,:,0]))
-        log.info("Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1,:,0]))
-        log.info("Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2,:,0]))
-        log.info("Overall:      {}".format(np.mean(ap[:,2])))
-        self.valid_losses["mAP 3D"] = np.mean(ap[:,2])
-
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP 3D"] = np.mean(ap[:, 2])
 
     def run_train(self):
         model = self.model
@@ -208,7 +228,7 @@ class ObjectDetection(BasePipeline):
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')        
+            process_bar = tqdm(range(len(train_loader)), desc='training')
             for i in process_bar:
                 inputs = train_loader[i]['data']
                 with tf.GradientTape(persistent=True) as tape:
@@ -252,7 +272,7 @@ class ObjectDetection(BasePipeline):
 
             for key, val in self.valid_losses.items():
                 tf.summary.scalar("valid/" + key, np.mean(val), epoch)
-            
+
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)

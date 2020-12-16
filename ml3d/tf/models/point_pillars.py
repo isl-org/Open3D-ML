@@ -125,7 +125,7 @@ class PointPillars(BaseModel):
         return tf.optimizers.Adam(learning_rate=cfg['lr'],
                                   beta_1=beta1,
                                   beta_2=beta2)
-                                  
+
         #used by torch, but doesn't perform well with TF:
         #import tensorflow_addons as tfa
         #beta1, beta2 = cfg.get('betas', [0.9, 0.99])
@@ -583,7 +583,9 @@ class PointPillarsScatter(tf.keras.layers.Layer):
             voxels = tf.boolean_mask(voxel_features, batch_mask)
 
             # Now scatter the blob back to the canvas.
-            accum = tf.maximum(tf.scatter_nd(indices, tf.ones_like(voxels), canvas_shape), tf.constant(1.0))
+            accum = tf.maximum(
+                tf.scatter_nd(indices, tf.ones_like(voxels), canvas_shape),
+                tf.constant(1.0))
             canvas = tf.scatter_nd(indices, voxels, canvas_shape) / accum
             canvas = tf.transpose(canvas)
 
@@ -721,7 +723,8 @@ class SECONDFPN(tf.keras.layers.Layer):
                     kernel_size=stride,
                     data_format='channels_first',
                     use_bias=False,
-                    strides=stride)
+                    strides=stride,
+                    kernel_initializer='he_normal')
 
             deblock = tf.keras.Sequential()
             deblock.add(upsample_layer)
@@ -796,17 +799,32 @@ class Anchor3DHead(tf.keras.layers.Layer):
         #Initialize neural network layers of the head.
         self.cls_out_channels = self.num_anchors * self.num_classes
 
+        kernel_init = tf.keras.initializers.RandomNormal(stddev=0.01)
+        bias_init = tf.keras.initializers.Constant(
+            value=self.bias_init_with_prob(0.01))
+
         self.conv_cls = tf.keras.layers.Conv2D(self.cls_out_channels,
                                                kernel_size=1,
-                                               data_format='channels_last')
+                                               data_format='channels_last',
+                                               kernel_initializer=kernel_init,
+                                               bias_initializer=bias_init)
+
         self.conv_reg = tf.keras.layers.Conv2D(self.num_anchors *
                                                self.box_code_size,
                                                kernel_size=1,
-                                               data_format='channels_last')
+                                               data_format='channels_last',
+                                               kernel_initializer=kernel_init)
 
         self.conv_dir_cls = tf.keras.layers.Conv2D(self.num_anchors * 2,
                                                    kernel_size=1,
                                                    data_format='channels_last')
+
+    @staticmethod
+    def bias_init_with_prob(prior_prob):
+        """initialize conv/fc bias value according to giving probablity."""
+        bias_init = float(-np.log((1 - prior_prob) / prior_prob))
+
+        return bias_init
 
     def call(self, x, training=False):
         """Forward function on a feature map.

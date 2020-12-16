@@ -13,6 +13,33 @@ class SemSegMetric(object):
         self.dataset = dataset
         self.device = device
 
+    def confusion_matrix(self, scores, labels):
+        r"""
+            Compute the confusion matrix of one batch
+
+            Parameters
+            ----------
+            scores: torch.FloatTensor, shape (B?, C, N)
+                raw scores for each class
+            labels: torch.LongTensor, shape (B?, N)
+                ground truth labels
+
+            Returns
+            -------
+            confusion matrix of this batch
+        """
+        num_classes = scores.size(-2)
+        predictions = torch.max(scores, dim=-2).indices.cpu().data.numpy()
+        labels = labels.cpu().data.numpy()
+
+        conf_m = np.zeros((num_classes, num_classes), dtype=np.int32)
+
+        for label in range(num_classes):
+            for pred in range(num_classes):
+                conf_m[label][pred] = np.sum(
+                    np.logical_and(labels == label, predictions == pred))
+        return conf_m
+
     def acc(self, scores, labels):
         r"""
             Compute the per-class accuracies and the overall accuracy 
