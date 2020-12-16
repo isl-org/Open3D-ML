@@ -132,8 +132,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = [inputs['labels'][0]]
-        gt_bboxes = [inputs['bboxes'][0]]
+        gt_labels = inputs['labels']
+        gt_bboxes = inputs['bboxes']
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -214,7 +214,7 @@ class PointPillars(BaseModel):
         }
 
     def transform(self, data, attr):
-        points = torch.tensor(data['point'],
+        points = torch.tensor([data['point']],
                               dtype=torch.float32,
                               device=self.device)
 
@@ -227,8 +227,8 @@ class PointPillars(BaseModel):
 
         return {
             'point': points,
-            'bboxes': [bboxes],
             'labels': [labels],
+            'bboxes': [bboxes],
             'calib': data['calib']
         }
 
@@ -524,37 +524,7 @@ class PointPillarsScatter(nn.Module):
         self.fp16_enabled = False
 
     #@auto_fp16(apply_to=('voxel_features', ))
-    def forward(self, voxel_features, coors, batch_size=None):
-        """Forward function to scatter features."""
-        if batch_size is not None:
-            return self.forward_batch(voxel_features, coors, batch_size)
-        else:
-            return self.forward_single(voxel_features, coors)
-
-    def forward_single(self, voxel_features, coors):
-        """Scatter features of single sample.
-
-        Args:
-            voxel_features (torch.Tensor): Voxel features in shape (N, M, C).
-            coors (torch.Tensor): Coordinates of each voxel.
-                The first column indicates the sample ID.
-        """
-        # Create the canvas for this sample
-        canvas = torch.zeros(self.in_channels,
-                             self.nx * self.ny,
-                             dtype=voxel_features.dtype,
-                             device=voxel_features.device)
-
-        indices = coors[:, 1] * self.nx + coors[:, 2]
-        indices = indices.long()
-        voxels = voxel_features.t()
-        # Now scatter the blob back to the canvas.
-        canvas[:, indices] = voxels
-        # Undo the column stacking to final 4-dim tensor
-        canvas = canvas.view(1, self.in_channels, self.ny, self.nx)
-        return [canvas]
-
-    def forward_batch(self, voxel_features, coors, batch_size):
+    def forward(self, voxel_features, coors, batch_size):
         """Scatter features of single sample.
 
         Args:
@@ -738,19 +708,15 @@ class SECONDFPN(nn.Module):
 class Anchor3DHead(nn.Module):
 
     def __init__(self,
-                 num_classes=3,
+                 num_classes=1,
                  in_channels=384,
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
-                 ranges=[
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-                     [0, -39.68, -1.78, 70.4, 39.68, -1.78],
-                 ],
-                 sizes=[[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]],
+                 ranges=[[0, -40.0, -3, 70.0, 40.0, 1]],
+                 sizes=[[0.6, 1.0, 1.5]],
                  rotations=[0, 1.57],
-                 iou_thr=[[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]):
+                 iou_thr=[[0.35, 0.5]]):
 
         super().__init__()
         self.in_channels = in_channels
@@ -780,7 +746,6 @@ class Anchor3DHead(nn.Module):
         self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
                                       1)
 
-        self.iou_thr = [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
         self.init_weights()
 
     @staticmethod

@@ -11,8 +11,9 @@ from pathlib import Path
 
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
-from torch.utils.tensorboard import SummaryWriter
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
+
+from ...metrics.mAP import mAP, convert_data_eval
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -53,7 +54,6 @@ class ObjectDetection(BasePipeline):
             Returns the inference results.
         """
         model = self.model
-        log.info("running inference")
 
         inputs = tf.convert_to_tensor([data['point']], dtype=np.float32)
 
@@ -63,65 +63,82 @@ class ObjectDetection(BasePipeline):
         return boxes
 
     def run_test(self):
+        """
+        Run test with test data split, computes mean average precision of the prediction results.
+        """
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log.info("DEVICE : {}".format(self.device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        test_split = TFDataloader(
-            dataset=dataset.get_split('test'),
-            preprocess=model.preprocess,
-            transform=None,
-            get_batch_gen=model.get_batch_gen,
-            use_cache=False,  # nothing to cache.
-        )
+        test_dataset = dataset.get_split('test')
+        test_split = TFDataloader(dataset=test_dataset,
+                                  preprocess=model.preprocess,
+                                  transform=None,
+                                  use_cache=False,
+                                  get_batch_gen=model.get_batch_gen,
+                                  shuffle=False)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
-        log.info("Started testing")
+        if cfg.get('test_compute_metric', True):
+            self.run_valid()
 
-        results = []
-        for idx in tqdm(range(len(test_split)), desc='test'):
-            data = test_split.read_data(idx)[0]
-            result = self.run_inference(data['data'])
-            results.extend(result)
+        log.info("Started testing")
+        self.test_ious = []
+
+        pred = []
+        gt = []
+        for i in tqdm(range(len(test_split)), desc='testing'):
+            results = self.run_inference(test_split[i]['data'])
+            pred.append(convert_data_eval(results[0], [40, 25]))
+
+        #dataset.save_test_result(results, attr)
 
     def run_valid(self):
         model = self.model
         dataset = self.dataset
-        device = self.device
         cfg = self.cfg
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
         valid_dataset = dataset.get_split('validation')
         valid_loader = TFDataloader(dataset=valid_dataset,
-                                    model=model,
-                                    use_cache=dataset.cfg.use_cache)
+                                    preprocess=model.preprocess,
+                                    transform=None,
+                                    use_cache=False,
+                                    get_batch_gen=model.get_batch_gen,
+                                    shuffle=False)
 
         log.info("Started validation")
 
         self.valid_losses = {}
         self.valid_mAP = {}
 
-        for inputs in tqdm(valid_loader, desc='validation'):
-            results = model(inputs['data']['point'])
-            loss = model.loss(results, inputs['data'])
+        pred = []
+        gt = []
+        for i in tqdm(range(len(valid_loader)), desc='validation'):
+            inputs = model.transform(valid_loader[i]['data'], None)
+            results = model(inputs['point'], training=False)
+            loss = model.loss(results, inputs)
             for l, v in loss.items():
                 if not l in self.valid_losses:
                     self.valid_losses[l] = []
-                self.valid_losses[l].append(v.cpu().item())
+                self.valid_losses[l].append(v.numpy())
+
+            # convert to bboxes for mAP evaluation
+            boxes = model.inference_end(results, inputs)
+            pred.append(convert_data_eval(boxes[0], [40, 25]))
+            gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
 
         sum_loss = 0
         desc = "validation - "
@@ -131,6 +148,46 @@ class ObjectDetection(BasePipeline):
         desc += " > loss: %.03f" % sum_loss
 
         log.info(desc)
+
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
+        log.info("mAP BEV:")
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP BEV"] = np.mean(ap[:, 2])
+
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 bev=False,
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
+        log.info("")
+        log.info("mAP 3D:")
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP 3D"] = np.mean(ap[:, 2])
 
     def run_train(self):
         model = self.model
@@ -158,28 +215,28 @@ class ObjectDetection(BasePipeline):
         dataset_name = dataset.name if dataset is not None else ''
         tensorboard_dir = join(
             self.cfg.train_sum_dir,
-            model.__class__.__name__ + '_' + dataset_name + '_torch')
+            model.__class__.__name__ + '_' + dataset_name + '_tf')
         runid = get_runid(tensorboard_dir)
         self.tensorboard_dir = join(self.cfg.train_sum_dir,
                                     runid + '_' + Path(tensorboard_dir).name)
 
-        writer = SummaryWriter(self.tensorboard_dir)
+        writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-
             self.losses = {}
-            process_bar = tqdm(train_loader, desc='training')
-            for inputs in process_bar:
+            process_bar = tqdm(range(len(train_loader)), desc='training')
+            for i in process_bar:
+                inputs = train_loader[i]['data']
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(inputs['data']['point'])
-                    loss = model.loss(results, inputs['data'])
-                    loss_sum = sum(loss.values())
+                    results = model(inputs['point'])
+                    loss = model.loss(results, inputs)
+                    loss_sum = tf.add_n(loss.values())
 
-                grads = tape.gradient(loss, model.trainable_weights)
+                grads = tape.gradient(loss_sum, model.trainable_weights)
 
                 norm = cfg.get('grad_clip_norm', -1)
                 if model.cfg.get('grad_clip_norm', -1) > 0:
@@ -209,11 +266,12 @@ class ObjectDetection(BasePipeline):
                 self.save_ckpt(epoch)
 
     def save_logs(self, writer, epoch):
-        for key, val in self.losses.items():
-            writer.add_scalar("train/" + key, np.mean(val), epoch)
+        with writer.as_default():
+            for key, val in self.losses.items():
+                tf.summary.scalar("train/" + key, np.mean(val), epoch)
 
-        for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+            for key, val in self.valid_losses.items():
+                tf.summary.scalar("valid/" + key, np.mean(val), epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -251,17 +309,22 @@ class ObjectDetection(BasePipeline):
         log.info("Saved checkpoint at: {}".format(save_path))
 
     def save_config(self, writer):
-        '''
-        Save experiment configuration with tensorboard summary
-        '''
-        writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
-        writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
-        writer.add_text('Configuration/Dataset',
-                        code2md(self.cfg_tb['dataset'], language='json'), 0)
-        writer.add_text('Configuration/Model',
-                        code2md(self.cfg_tb['model'], language='json'), 0)
-        writer.add_text('Configuration/Pipeline',
-                        code2md(self.cfg_tb['pipeline'], language='json'), 0)
+        with writer.as_default():
+            with tf.name_scope("Description"):
+                tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)
+                tf.summary.text("Command line", self.cfg_tb['cmd_line'], step=0)
+            with tf.name_scope("Configuration"):
+                tf.summary.text('Dataset',
+                                code2md(self.cfg_tb['dataset'],
+                                        language='json'),
+                                step=0)
+                tf.summary.text('Model',
+                                code2md(self.cfg_tb['model'], language='json'),
+                                step=0)
+                tf.summary.text('Pipeline',
+                                code2md(self.cfg_tb['pipeline'],
+                                        language='json'),
+                                step=0)
 
 
 PIPELINE._register_module(ObjectDetection, "tf")
