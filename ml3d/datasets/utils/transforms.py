@@ -120,3 +120,18 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     select_points = select_points - center_point
 
     return select_points, select_feat, select_labels, select_idx
+
+
+class ObjdetAugmentation():
+    """Class consisting different augmentation for Object Detection"""
+
+    @staticmethod
+    def PointShuffle(input):
+        np.random.shuffle(input['point'])
+
+        return input
+
+    @staticmethod
+    def ObjectRangeFilter(input, pcd_range):
+        bev_range = pcd_range[[0, 1, 3, 4]]
+
