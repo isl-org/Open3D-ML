@@ -290,7 +290,6 @@ class ObjectDetection(BasePipeline):
                                                   max_to_keep=100)
 
         epoch = 0
-        log.info(ckpt_path)
         if ckpt_path is not None:
             self.ckpt.restore(ckpt_path).expect_partial()
             log.info("Restored from {}".format(ckpt_path))
