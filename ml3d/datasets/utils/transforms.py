@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import pickle
 from .operations import *
 
 
@@ -200,15 +201,20 @@ class ObjdetAugmentation():
 
             avoid_coll_boxes += sampled
 
-        sampled_points = sampled[0].points_inside_box.copy()
-        for box in sampled[1:]:
-            sampled_points = np.concatenate([sampled_points, box.points_inside_box], axis=0)
+        if len(sampled) != 0:
+            sampled_points = sampled[0].points_inside_box.copy()
+            for box in sampled[1:]:
+                sampled_points = np.concatenate([sampled_points, box.points_inside_box], axis=0)
 
-        points = remove_points_in_boxes(points, sampled)
-        points = np.concatenate([sampled_points, points], axis=0)
-        bboxes = data['bboxes'] + sampled
+            points = remove_points_in_boxes(points, sampled)
+            points = np.concatenate([sampled_points, points], axis=0)
+            bboxes = data['bboxes'] + sampled
 
-        return points, bboxes
+        return {
+            'point': points,
+            'bboxes': bboxes,
+            'calib': data['calib']
+        }
 
     
     @staticmethod

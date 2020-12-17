@@ -387,13 +387,13 @@ def box_collision_test(boxes, qboxes, clockwise=True):
 
 
 def sample_class(class_name, num, gt_boxes, db_boxes):
-    sampled = random_sample(db_boxes, sampled_num)
+    sampled = random_sample(db_boxes, num)
     sampled = copy.deepcopy(sampled)
 
     num_gt = len(gt_boxes)
     num_sampled = len(sampled)
 
-    gt_boxes_bev = center_to_corner_box2d([box.to_xyzwhlr() for box in gt_boxes])
+    gt_boxes_bev = center_to_corner_box2d(gt_boxes)
 
     boxes = (gt_boxes + sampled).copy()
     

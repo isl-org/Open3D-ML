@@ -38,6 +38,7 @@ from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
+from ...datasets.utils import ObjdetAugmentation
 
 
 class PointPillars(BaseModel):
@@ -214,6 +215,9 @@ class PointPillars(BaseModel):
         }
 
     def transform(self, data, attr):
+        #Augment data
+        data = ObjdetAugmentation.ObjectSample(data, **self.cfg.augment['ObjectSample'])
+
         points = torch.tensor([data['point']],
                               dtype=torch.float32,
                               device=self.device)
