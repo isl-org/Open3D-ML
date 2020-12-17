@@ -64,6 +64,7 @@ class PointPillars(BaseModel):
 
     def __init__(self,
                  name="PointPillars",
+                 device="cpu",
                  voxel_size=[0.16, 0.16, 4],
                  point_cloud_range=[0, -40.0, -3, 70.0, 40.0, 1],
                  voxelize={},
@@ -77,6 +78,7 @@ class PointPillars(BaseModel):
 
         super().__init__(name=name,
                          point_cloud_range=point_cloud_range,
+                         device=device,
                          **kwargs)
         self.point_cloud_range = point_cloud_range
 
@@ -97,6 +99,9 @@ class PointPillars(BaseModel):
         self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
         self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
+
+        self.device = device
+        self.to(device)
 
     def extract_feats(self, points):
         """Extract features from points."""

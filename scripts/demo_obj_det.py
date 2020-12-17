@@ -34,6 +34,7 @@ def parse_args():
 def main(args):
 
     framework = _ml3d.utils.convert_framework_name(args.framework)
+    args.device = _ml3d.utils.convert_device_name(args.device)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
         from ml3d.torch.dataloaders import TorchDataloader as Dataloader

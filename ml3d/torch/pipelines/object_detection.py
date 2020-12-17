@@ -58,10 +58,7 @@ class ObjectDetection(BasePipeline):
             Returns the inference results.
         """
         model = self.model
-        device = self.device
 
-        model.to(device)
-        model.device = device
         model.eval()
 
         with torch.no_grad():
@@ -84,8 +81,6 @@ class ObjectDetection(BasePipeline):
         dataset = self.dataset
         device = self.device
         cfg = self.cfg
-        model.device = device
-        model.to(device)
 
         model.eval()
 
@@ -126,8 +121,6 @@ class ObjectDetection(BasePipeline):
         dataset = self.dataset
         device = self.device
         cfg = self.cfg
-        model.device = device
-        model.to(device)
 
         model.eval()
 
@@ -221,11 +214,9 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
         device = self.device
-        model.device = device
         dataset = self.dataset
 
         cfg = self.cfg
-        model.to(device)
 
         log.info("DEVICE : {}".format(device))
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
