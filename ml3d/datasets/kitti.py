@@ -8,6 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
+from .utils import DataProcessing
 from ..vis.boundingbox import BEVBox3D
 
 logging.basicConfig(
@@ -211,8 +212,11 @@ class KITTISplit():
         calib = self.dataset.read_calib(calib_path)
         label = self.dataset.read_label(label_path, calib)
 
+        reduced_pc = DataProcessing.remove_outside_points(pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'], [1000, 1000])
+
         data = {
-            'point': pc,
+            'point': reduced_pc,
+            'full_point': pc,
             'feat': None,
             'calib': calib,
             'bounding_boxes': label,
