@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import pickle
 import random
 
 from tqdm import tqdm
@@ -15,6 +16,7 @@ from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 from ...datasets.utils import ObjdetAugmentation
+from ...datasets.utils.operations import filter_by_min_points
 
 
 class PointPillars(BaseModel):
@@ -49,7 +51,7 @@ class PointPillars(BaseModel):
                  loss={},
                  **kwargs):
 
-        super().__init__(name=name, **kwargs)
+        super().__init__(name=name, point_cloud_range=point_cloud_range, **kwargs)
         self.point_cloud_range = point_cloud_range
 
         self.voxel_layer = PointPillarsVoxelization(
@@ -221,10 +223,42 @@ class PointPillars(BaseModel):
             'calib': data['calib']
         }
 
+    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
+        db_boxes = pickle.load(open(pickle_path, 'rb'))
+
+        if min_points_dict is not None:
+            bboxes = filter_by_min_points(db_boxes, min_points_dict)
+
+        db_boxes_dict = {}
+        for key in sample_dict.keys():
+            db_boxes_dict[key] = []
+
+        for db_box in db_boxes:
+            if db_box.name in sample_dict.keys():
+                db_boxes_dict[db_box.name].append(db_box)
+
+        self.db_boxes_dict = db_boxes_dict
+
+    def augment_data(self, data):
+        cfg = self.cfg.augment
+
+        if 'ObjectSample' in cfg.keys():
+            if not hasattr(self, 'db_boxes_dict'):
+                self.load_gt_database(**cfg['ObjectSample'])
+
+            data = ObjdetAugmentation.ObjectSample(data, db_boxes_dict=self.db_boxes_dict, sample_dict=cfg['ObjectSample']['sample_dict'])
+
+        if cfg.get('ObjectRangeFilter', False):
+            data = ObjdetAugmentation.ObjectRangeFilter(data, self.cfg.point_cloud_range)
+
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        return data
+
     def transform(self, data, attr):
         # Augment data
-        data = ObjdetAugmentation.ObjectSample(
-            data, **self.cfg.augment['ObjectSample'])
+        data = self.augment_data(data)
 
         points = tf.constant([data['point']], dtype=tf.float32)
         labels = tf.constant([bb.label_class for bb in data['bboxes']],

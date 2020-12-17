@@ -251,7 +251,7 @@ class PointPillars(BaseModel):
     def transform(self, data, attr):
         #Augment data
         data = self.augment_data(data)
-        return data
+
         points = torch.tensor([data['point']],
                               dtype=torch.float32,
                               device=self.device)
