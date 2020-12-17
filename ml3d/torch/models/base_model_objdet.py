@@ -29,14 +29,13 @@ class BaseModel(ABC, torch.nn.Module):
         self.cfg = Config(kwargs)
 
     @abstractmethod
-    def loss(self, results, inputs, device):
+    def loss(self, results, inputs):
         """Computes the loss given the network input and outputs.
 
         Args:
             Loss: A loss object.
             results: This is the output of the model.
             inputs: This is the input to the model.
-            device: The torch device to be used.
 
         Returns:
             Returns the loss value.
