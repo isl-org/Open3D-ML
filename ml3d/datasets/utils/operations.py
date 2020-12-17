@@ -327,16 +327,16 @@ def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
     return indices
 
 
-def filter_by_min_points(pc, bboxes, min_points_dict):
+def filter_by_min_points(bboxes, min_points_dict):
     """Filter ground truths by number of points in the bbox."""
     filtered_boxes = []
-    flat_boxes = np.array([box.to_xyzwhlr() for box in bboxes])
-    num_points_in_box = points_in_box(points[:, :3], flat_boxes).sum(0)
 
-    for i, box in enumerate(bboxes):
+    for box in bboxes:
         if box.name in min_points_dict.keys():
-            if num_points_in_box > min_points_dict[box.name]:
+            if box.points_inside_box.shape[0] > min_points_dict[box.name]:
                 filtered_boxes.append(box)
+        else:
+            filtered_boxes.append(box)
 
     return filtered_boxes
 

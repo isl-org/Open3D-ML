@@ -170,11 +170,11 @@ class ObjdetAugmentation():
         gt_boxes_3d = [box.to_xyzwhlr() for box in data['bboxes']]
         gt_labels_3d = [box.label_class for box in data['bboxes']]
 
-        # TODO: filter by min points in separate script.
-        # if min_points_dict is not None:
-        #     bboxes = filter_by_min_points(points, bboxes, min_points_dict)
-
         db_boxes = pickle.load(open(pickle_path, 'rb'))
+
+        if min_points_dict is not None:
+            bboxes = filter_by_min_points(db_boxes, min_points_dict)
+
         db_boxes_dict = {}
         for key in sample_dict.keys():
             db_boxes_dict[key] = []
