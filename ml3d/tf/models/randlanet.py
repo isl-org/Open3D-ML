@@ -382,9 +382,6 @@ class RandLANet(BaseModel):
                                                    pick_idx,
                                                    self.cfg.num_points)
 
-                if not cfg.get('recentering', True):
-                    pc = pc + center_point
-
                 t_normalize = cfg.get('t_normalize', None)
                 pc, feat = trans_normalize(pc, feat, t_normalize)
 
@@ -428,9 +425,6 @@ class RandLANet(BaseModel):
         delta = np.square(1 - dists / np.max(dists))
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx
-
-        if not cfg.get('recentering', True):
-            pc = pc + center_point
 
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)

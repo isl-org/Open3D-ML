@@ -169,9 +169,6 @@ class RandLANet(BaseModel):
         else:
             feat = feat[selected_idxs]
 
-        if cfg.get('recentering', True):
-            pc = pc - center_point
-
         t_normalize = cfg.get('t_normalize', None)
         pc, feat = trans_normalize(pc, feat, t_normalize)
 

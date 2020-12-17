@@ -4,22 +4,26 @@ from .operations import create_3D_rotations
 
 
 def trans_normalize(pc, feat, t_normalize):
-    if t_normalize is None or t_normalize.get('method', None) is None:
+    if t_normalize is None:
         return pc, feat
 
-    method = t_normalize['method']
-    if method == 'linear':
-        if t_normalize.get('normalize_points', False):
-            pc -= pc.mean()
-            pc /= (pc.max(0) - pc.min(0)).max()
+    dim = t_normalize.get('recentering', [0, 1, 2])   
+    pc[:,dim] = pc[:,dim] - pc.mean(0)[dim]
 
-        if feat is not None:
-            feat_bias = t_normalize.get('feat_bias', 0)
-            feat_scale = t_normalize.get('feat_scale', 1)
-            feat -= feat_bias
-            feat /= feat_scale
-    elif method == 'coords_only':
-        feat = None
+    if t_normalize.get('method', None):
+        method = t_normalize['method']
+        if method == 'linear':
+            if t_normalize.get('normalize_points', False):
+                pc -= pc.mean()
+                pc /= (pc.max(0) - pc.min(0)).max()
+
+            if feat is not None:
+                feat_bias = t_normalize.get('feat_bias', 0)
+                feat_scale = t_normalize.get('feat_scale', 1)
+                feat -= feat_bias
+                feat /= feat_scale
+        elif method == 'coords_only':
+            feat = None
 
     return pc, feat
 

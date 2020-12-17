@@ -18,8 +18,7 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: ../dataset/checkpoints/randlanet_paris_2015/ckpt-2 # path/to/your/checkpoint
-  # ckpt_path: ../dataset/checkpoints/randlanet_parislille3d.pth # path/to/your/checkpoint
+  ckpt_path: # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 3
   dim_output:
@@ -28,7 +27,7 @@ model:
   - 128
   - 256
   - 512
-  grid_size: 0.06
+  grid_size: 0.08
   ignored_label_inds:
   - 0
   k_n: 16
@@ -43,6 +42,8 @@ model:
   - 2
   weight_decay: 0.001
   t_align: true
+  t_normalize:
+    recentering: [0, 1]
   t_augment:
     turn_on: false
     rotation_method: vertical
@@ -51,7 +52,6 @@ model:
     noise_level: 0.01
     min_s: 0.9
     max_s: 1.1
-  recentering: false
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.004
