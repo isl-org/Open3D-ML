@@ -1,6 +1,7 @@
 import numpy as np
 import random
-from .operations import create_3D_rotations
+import pickle
+from .operations import *
 
 
 def trans_normalize(pc, feat, t_normalize):
@@ -124,3 +125,92 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     select_points = select_points - center_point
 
     return select_points, select_feat, select_labels, select_idx
+
+
+def in_range_bev(box_range, box):
+    return (box[0] > box_range[0]) & (box[1] > box_range[1]) & (
+        box[0] < box_range[2]) & (box[1] < box_range[3])
+
+
+class ObjdetAugmentation():
+    """Class consisting different augmentation for Object Detection"""
+
+    @staticmethod
+    def PointShuffle(data):
+        np.random.shuffle(data['point'])
+
+        return data
+
+    @staticmethod
+    def ObjectRangeFilter(data, pcd_range):
+        pcd_range = np.array(pcd_range)
+        bev_range = pcd_range[[0, 1, 3, 4]]
+
+        filtered_boxes = []
+        for box in data['bboxes']:
+            if in_range_bev(bev_range, box.to_xyzwhlr()):
+                filtered_boxes.append(box)
+
+        return {
+            'point': data['point'],
+            'bboxes': filtered_boxes,
+            'calib': data['calib']
+        }
+
+    @staticmethod
+    def ObjectSample(data, db_boxes_dict, sample_dict):
+        rate = 1.0
+        points = data['point']
+        bboxes = data['bboxes']
+
+        if len(bboxes) == 0:
+            return []
+
+        cat2label = bboxes[0].cat2label
+        label2cat = bboxes[0].label2cat
+
+        gt_labels_3d = [box.label_class for box in data['bboxes']]
+
+        sampled_num_dict = {}
+
+        for class_name in sample_dict.keys():
+            max_sample_num = sample_dict[class_name]
+            class_label = cat2label[class_name]
+
+            existing = np.sum([n == class_label for n in gt_labels_3d])
+            sampled_num = int(max_sample_num - existing)
+            sampled_num = np.round(rate * sampled_num).astype(np.int64)
+            sampled_num_dict[class_name] = sampled_num
+
+        sampled = []
+        avoid_coll_boxes = data['bboxes']
+        for class_name in sampled_num_dict.keys():
+            sampled_num = sampled_num_dict[class_name]
+            if sampled_num < 0:
+                continue
+
+            sampled_cls = sample_class(class_name, sampled_num,
+                                       avoid_coll_boxes,
+                                       db_boxes_dict[class_name])
+            sampled += sampled_cls
+
+            avoid_coll_boxes += sampled
+
+        if len(sampled) != 0:
+            sampled_points = sampled[0].points_inside_box.copy()
+            for box in sampled[1:]:
+                sampled_points = np.concatenate(
+                    [sampled_points, box.points_inside_box], axis=0)
+
+            points = remove_points_in_boxes(points, sampled)
+            points = np.concatenate([sampled_points, points], axis=0)
+            bboxes = data['bboxes'] + sampled
+
+        return {'point': points, 'bboxes': bboxes, 'calib': data['calib']}
+
+    @staticmethod
+    def ObjectNoise(input,
+                    trans_std=[0.25, 0.25, 0.25],
+                    rot_range=[-0.15707963267, 0.15707963267],
+                    num_try=100):
+        raise NotImplementedError

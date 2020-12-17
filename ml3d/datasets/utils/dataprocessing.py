@@ -6,6 +6,8 @@ from os.path import exists, join, isfile, dirname, abspath, split
 from open3d.ml.contrib import subsample
 from open3d.ml.contrib import knn_search
 
+from .operations import *
+
 
 class DataProcessing:
 
@@ -162,3 +164,29 @@ class DataProcessing:
         ce_label_weight = 1 / (weight + 0.02)
 
         return np.expand_dims(ce_label_weight, axis=0)
+
+    @staticmethod
+    def remove_outside_points(points, rect, Trv2c, P2, image_shape):
+        """Remove points which are outside of image.
+        Args:
+            points (np.ndarray, shape=[N, 3+dims]): Total points.
+            rect (np.ndarray, shape=[4, 4]): Matrix to project points in
+                specific camera coordinate (e.g. CAM2) to CAM0.
+            Trv2c (np.ndarray, shape=[4, 4]): Matrix to project points in
+                camera coordinate to lidar coordinate.
+            P2 (p.array, shape=[4, 4]): Intrinsics of Camera2.
+            image_shape (list[int]): Shape of image.
+        Returns:
+            np.ndarray, shape=[N, 3+dims]: Filtered points.
+        """
+        C, R, T = projection_matrix_to_CRT_kitti(P2)
+        image_bbox = [0, 0, image_shape[1], image_shape[0]]
+        frustum = get_frustum(image_bbox, C)
+        frustum -= T
+        frustum = np.linalg.inv(R) @ frustum.T
+        frustum = camera_to_lidar(frustum.T, rect, Trv2c)
+        frustum_surfaces = corner_to_surfaces_3d(frustum[np.newaxis, ...])
+        indices = points_in_convex_polygon_3d(points[:, :3], frustum_surfaces)
+        points = points[indices.reshape([-1])]
+
+        return points

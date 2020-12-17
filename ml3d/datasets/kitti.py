@@ -8,6 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
+from .utils import DataProcessing
 from ..vis.boundingbox import BEVBox3D
 
 logging.basicConfig(
@@ -211,8 +212,13 @@ class KITTISplit():
         calib = self.dataset.read_calib(calib_path)
         label = self.dataset.read_label(label_path, calib)
 
+        reduced_pc = DataProcessing.remove_outside_points(
+            pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'],
+            [370, 1224])
+
         data = {
-            'point': pc,
+            'point': reduced_pc,
+            'full_point': pc,
             'feat': None,
             'calib': calib,
             'bounding_boxes': label,
@@ -264,7 +270,14 @@ class Object3d(BEVBox3D):
 
         self.dis_to_cam = np.linalg.norm(self.center)
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
-        self.level = self.get_kitti_obj_level()
+        self.level = self.get_difficulty()
+
+        classes = {
+            'Pedestrian', 'Cyclist', 'Car', 'Van', 'Person_sitting', 'DontCare'
+        }
+        self.cat2label = {name: i for i, name in enumerate(classes)}
+        self.label2cat = {i: name for i, name in enumerate(classes)}
+        self.points_inside_box = np.array([])
 
     @staticmethod
     def cls_type_to_id(cls_type):
@@ -279,11 +292,9 @@ class Object3d(BEVBox3D):
             'Person_sitting': 4,
             'DontCare': 5
         }
-        if cls_type not in type_to_id.keys():
-            return 5
-        return type_to_id[cls_type]
+        return type_to_id.get(cls_type, 5)
 
-    def get_kitti_obj_level(self):
+    def get_difficulty(self):
         """
         determines the difficulty level of object.
         """

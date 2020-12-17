@@ -83,6 +83,7 @@ class Config(object):
         # merge args to cfg
         if args.device is not None:
             cfg.pipeline.device = args.device
+            cfg.model.device = args.device
         if args.split is not None:
             cfg.pipeline.split = args.split
         if args.main_log_dir is not None:

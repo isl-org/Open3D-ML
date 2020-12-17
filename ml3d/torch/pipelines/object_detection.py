@@ -15,6 +15,9 @@ from ..dataloaders import TorchDataloader
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
+import numpy as np
+
+from ...metrics.mAP import mAP, convert_data_eval
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -47,7 +50,7 @@ class ObjectDetection(BasePipeline):
 
     def run_inference(self, data):
         """
-        Run inference on a given data.
+        Run inference on given data.
 
         Args:
             data: A raw data.
@@ -55,28 +58,31 @@ class ObjectDetection(BasePipeline):
             Returns the inference results.
         """
         model = self.model
-        device = self.device
 
-        model.to(device)
-        model.device = device
         model.eval()
 
         with torch.no_grad():
-            inputs = torch.tensor([data['point']],
-                                  dtype=torch.float32,
-                                  device=self.device)
+            if not isinstance(data['point'], torch.Tensor):
+                inputs = torch.tensor([data['point']],
+                                      dtype=torch.float32,
+                                      device=self.device)
+            else:
+                inputs = data['point'].unsqueeze(0)
             results = model(inputs)
             boxes = model.inference_end(results, data)
 
         return boxes
 
     def run_test(self):
+        """
+        Run test with test data split, computes mean average precision of the prediction results.
+        """
         model = self.model
         dataset = self.dataset
         device = self.device
         cfg = self.cfg
-        model.device = device
-        model.to(device)
+
+        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
@@ -93,16 +99,24 @@ class ObjectDetection(BasePipeline):
 
         self.load_ckpt(model.cfg.ckpt_path)
 
-        log.info("Started testing")
+        if cfg.get('test_compute_metric', True):
+            self.run_valid()
 
-        results = []
+        log.info("Started testing")
+        self.test_ious = []
+
+        pred = []
         with torch.no_grad():
-            for idx in tqdm(range(len(test_split)), desc='test'):
-                data = test_split[idx]
-                result = self.run_inference(data['data'])
-                results.extend(result)
+            for i in tqdm(range(len(test_split)), desc='testing'):
+                results = self.run_inference(test_split[i]['data'])
+                pred.append(convert_data_eval(results[0], [40, 25]))
+
+        #dataset.save_test_result(results, attr)
 
     def run_valid(self):
+        """
+        Run validation with validation data split, computes mean average precision and the loss of the prediction results.
+        """
         model = self.model
         dataset = self.dataset
         device = self.device
@@ -118,25 +132,33 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         valid_dataset = dataset.get_split('validation')
-        valid_split = TorchDataloader(dataset=valid_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache)
-        valid_loader = DataLoader(valid_split, batch_size=cfg.batch_size)
+        valid_loader = TorchDataloader(dataset=valid_dataset,
+                                       preprocess=model.preprocess,
+                                       transform=None,
+                                       use_cache=dataset.cfg.use_cache,
+                                       shuffle=False)
 
         log.info("Started validation")
 
         self.valid_losses = {}
-        self.valid_mAP = {}
 
+        pred = []
+        gt = []
         with torch.no_grad():
-            for inputs in tqdm(valid_loader, desc='validation'):
-                results = model(inputs['data']['point'].to(self.device))
-                loss = model.loss(results, inputs['data'])
+            for i in tqdm(range(len(valid_loader)), desc='validation'):
+                inputs = model.transform(valid_loader[i]['data'],
+                                         valid_loader[i]['attr'])
+                results = model(inputs['point'])
+                loss = model.loss(results, inputs)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
                         self.valid_losses[l] = []
                     self.valid_losses[l].append(v.cpu().item())
+
+                # convert to bboxes for mAP evaluation
+                boxes = model.inference_end(results, inputs)
+                pred.append(convert_data_eval(boxes[0], [40, 25]))
+                gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
 
         sum_loss = 0
         desc = "validation - "
@@ -147,14 +169,55 @@ class ObjectDetection(BasePipeline):
 
         log.info(desc)
 
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
+        log.info("mAP BEV:")
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP BEV"] = np.mean(ap[:, 2])
+
+        ap = mAP(pred,
+                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
+                 bev=False,
+                 similar_classes={
+                     0: 4,
+                     2: 3
+                 })
+        log.info("")
+        log.info("mAP 3D:")
+        log.info(
+            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
+                                                                       0]))
+        log.info(
+            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
+                                                                       0]))
+        log.info(
+            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
+                                                                       0]))
+        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
+        self.valid_losses["mAP 3D"] = np.mean(ap[:, 2])
+
     def run_train(self):
+        """
+        Run training with train data split.
+        """
         model = self.model
         device = self.device
-        model.device = device
         dataset = self.dataset
 
         cfg = self.cfg
-        model.to(device)
 
         log.info("DEVICE : {}".format(device))
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -164,13 +227,12 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         train_dataset = dataset.get_split('training')
-        train_split = TorchDataloader(dataset=train_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                          'steps_per_epoch_train', None))
-        train_loader = DataLoader(train_split, batch_size=cfg.batch_size)
+        train_loader = TorchDataloader(dataset=train_dataset,
+                                       preprocess=model.preprocess,
+                                       transform=model.transform,
+                                       use_cache=dataset.cfg.use_cache,
+                                       steps_per_epoch=dataset.cfg.get(
+                                           'steps_per_epoch_train', None))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -195,10 +257,12 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(train_loader, desc='training')
-            for inputs in process_bar:
-                results = model(inputs['data']['point'].to(self.device))
-                loss = model.loss(results, inputs['data'])
+            process_bar = tqdm(range(len(train_loader)), desc='training')
+            for i in process_bar:
+                inputs = train_loader[i]['data']
+
+                results = model(inputs['point'])
+                loss = model.loss(results, inputs)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()

@@ -2,8 +2,8 @@ import numpy as np
 import open3d.ml as _ml3d
 import math
 
-from ml3d.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
-from ml3d.datasets import KITTI
+from open3d.ml.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
+from open3d.ml.datasets import KITTI
 
 import argparse
 
@@ -34,6 +34,7 @@ def parse_args():
 def main(args):
 
     framework = _ml3d.utils.convert_framework_name(args.framework)
+    args.device = _ml3d.utils.convert_device_name(args.device)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
         from ml3d.torch.dataloaders import TorchDataloader as Dataloader
@@ -62,9 +63,10 @@ def main(args):
     ObjectDetection = _ml3d.utils.get_module("pipeline", "ObjectDetection",
                                              framework)
     PointPillars = _ml3d.utils.get_module("model", "PointPillars", framework)
+    cfg = _ml3d.utils.Config.load_from_file(
+        "ml3d/configs/pointpillars_kitti.yml")
 
-    model = PointPillars(voxel_size=[0.16, 0.16, 4],
-                         point_cloud_range=[0, -39.68, -3, 69.12, 39.68, 1])
+    model = PointPillars(**cfg.model)
     dataset = KITTI(args.path_kitti)
     pipeline = ObjectDetection(model, dataset, device=args.device)
 
@@ -92,7 +94,7 @@ def main(args):
 
     vis.visualize([{
         "name": "KITTI",
-        'points': data['point'][:, :3]
+        'points': data['point']
     }],
                   lut,
                   bounding_boxes=boxes)

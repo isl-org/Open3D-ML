@@ -14,6 +14,19 @@ def build_network(cfg):
     return build(cfg, NETWORK)
 
 
+def convert_device_name(framework):
+    """Convert device to either cpu or cuda"""
+    gpu_names = ["gpu", "cuda"]
+    cpu_names = ["cpu"]
+    if framework not in cpu_names + gpu_names:
+        raise KeyError("the device shoule either "
+                       "be cuda or cpu but got {}".format(framework))
+    if framework in gpu_names:
+        return "cuda"
+    else:
+        return "cpu"
+
+
 def convert_framework_name(framework):
     """Convert framework to either tf or torch"""
     tf_names = ["tf", "tensorflow", "TF"]
