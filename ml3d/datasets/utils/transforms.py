@@ -225,4 +225,4 @@ class ObjdetAugmentation():
                     trans_std=[0.25, 0.25, 0.25],
                     rot_range=[-0.15707963267, 0.15707963267],
                     num_try=100):
-        pass
+        raise NotImplementedError

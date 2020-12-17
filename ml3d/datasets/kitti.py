@@ -214,7 +214,7 @@ class KITTISplit():
 
         reduced_pc = DataProcessing.remove_outside_points(
             pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'],
-            [1000, 1000])
+            [370, 1224])
 
         data = {
             'point': reduced_pc,
