@@ -4,6 +4,7 @@ import pickle
 import random
 
 from tqdm import tqdm
+import os
 
 from open3d.ml.tf.ops import voxelize
 from ...vis.boundingbox import BEVBox3D
@@ -241,12 +242,15 @@ class PointPillars(BaseModel):
 
         self.db_boxes_dict = db_boxes_dict
 
-    def augment_data(self, data):
+    def augment_data(self, data, attr):
         cfg = self.cfg.augment
 
         if 'ObjectSample' in cfg.keys():
             if not hasattr(self, 'db_boxes_dict'):
-                self.load_gt_database(**cfg['ObjectSample'])
+                data_path = os.path.normpath(attr['path'])
+                pickle_path = os.path.join(*data_path.split(os.sep)[:-3],
+                                           'bboxes.pkl')
+                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
 
             data = ObjdetAugmentation.ObjectSample(
                 data,
@@ -264,7 +268,7 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         # Augment data
-        data = self.augment_data(data)
+        data = self.augment_data(data, attr)
 
         points = tf.constant([data['point']], dtype=tf.float32)
         labels = tf.constant([bb.label_class for bb in data['bboxes']],

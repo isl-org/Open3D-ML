@@ -27,6 +27,7 @@ from torch.nn.modules.utils import _pair
 
 from functools import partial
 import numpy as np
+import os
 
 from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
@@ -239,12 +240,15 @@ class PointPillars(BaseModel):
 
         self.db_boxes_dict = db_boxes_dict
 
-    def augment_data(self, data):
+    def augment_data(self, data, attr):
         cfg = self.cfg.augment
 
         if 'ObjectSample' in cfg.keys():
             if not hasattr(self, 'db_boxes_dict'):
-                self.load_gt_database(**cfg['ObjectSample'])
+                data_path = os.path.normpath(attr['path'])
+                pickle_path = os.path.join(*data_path.split(os.sep)[:-3],
+                                           'bboxes.pkl')
+                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
 
             data = ObjdetAugmentation.ObjectSample(
                 data,
@@ -262,7 +266,7 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         #Augment data
-        data = self.augment_data(data)
+        data = self.augment_data(data, attr)
 
         points = torch.tensor([data['point']],
                               dtype=torch.float32,

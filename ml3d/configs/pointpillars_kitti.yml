@@ -64,7 +64,6 @@ model:
     PointShuffle: True
     ObjectRangeFilter: True
     ObjectSample:
-      pickle_path: './scripts/bboxes.pkl'
       min_points_dict:
         Car: 5
         Pedestrian: 10

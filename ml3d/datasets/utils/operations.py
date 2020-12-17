@@ -263,9 +263,7 @@ def surface_equ_3d(polygon_surfaces):
     return normal_vec, -d
 
 
-def points_in_convex_polygon_3d_jit(points,
-                                    polygon_surfaces,
-                                    num_surfaces=None):
+def points_in_convex_polygon_3d(points, polygon_surfaces, num_surfaces=None):
     """Check points is in 3d convex polygons.
     Args:
         points (np.ndarray): Input points with shape of (num_points, 3).
@@ -289,19 +287,17 @@ def points_in_convex_polygon_3d_jit(points,
     max_num_surfaces, max_num_points_of_surface = polygon_surfaces.shape[1:3]
     num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
-    ret = np.ones((num_points, num_polygons), dtype=np.bool_)
-    sign = 0.0
-    for i in range(num_points):
-        for j in range(num_polygons):
-            for k in range(max_num_surfaces):
-                if k > num_surfaces[j]:
-                    break
-                sign = (points[i, 0] * normal_vec[j, k, 0] +
-                        points[i, 1] * normal_vec[j, k, 1] +
-                        points[i, 2] * normal_vec[j, k, 2] + d[j, k])
-                if sign >= 0:
-                    ret[i, j] = False
-                    break
+
+    # expand dims for broadcasting
+    points = np.reshape(points, (num_points, 1, 1, 3))
+    normal_vec = np.reshape(normal_vec, (1, num_polygons, max_num_surfaces, 3))
+    num_surfaces = np.reshape(num_surfaces, (num_polygons, 1))
+
+    sign = np.sum(points * normal_vec, axis=-1) + d
+
+    out_range = np.arange(max_num_surfaces) >= num_surfaces
+    out_range = np.reshape(out_range, (1, num_polygons, max_num_surfaces))
+    ret = np.all(sign < 0 | out_range, axis=-1)
     return ret
 
 
@@ -323,7 +319,7 @@ def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
                                            rbbox[:, 6],
                                            origin=origin)
     surfaces = corner_to_surfaces_3d(rbbox_corners)
-    indices = points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
+    indices = points_in_convex_polygon_3d(points[:, :3], surfaces)
     return indices
 
 
@@ -456,6 +452,9 @@ def box_collision_test(boxes, qboxes, clockwise=True):
 
 
 def sample_class(class_name, num, gt_boxes, db_boxes):
+    if num == 0:
+        return []
+
     sampled = random_sample(db_boxes, num)
     sampled = copy.deepcopy(sampled)
 
