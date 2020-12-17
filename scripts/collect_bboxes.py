@@ -231,7 +231,8 @@ if __name__ == '__main__':
         indices = points_in_box(data['point'], flat_bbox)
         for i, box in enumerate(bbox):
             pts = data['point'][indices[:, i]]
-            bboxes.append((box, pts))
+            box.points_inside_box = pts
+            bboxes.append(box)
 
     file = open(join(args.out_path, 'bboxes.pkl'), 'wb')
     pickle.dump(bboxes, file)

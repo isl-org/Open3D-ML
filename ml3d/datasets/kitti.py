@@ -269,6 +269,7 @@ class Object3d(BEVBox3D):
         classes = {'Pedestrian', 'Cyclist', 'Car', 'Van', 'Person_sitting', 'DontCare'}
         self.cat2label = {name: i for i, name in enumerate(classes)}
         self.label2cat = {i: name for i, name in enumerate(classes)}
+        self.points_inside_box = []
 
     @staticmethod
     def cls_type_to_id(cls_type):
