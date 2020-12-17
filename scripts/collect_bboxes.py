@@ -10,6 +10,7 @@ import pickle
 from tqdm import tqdm
 from open3d.ml.datasets import KITTI, utils
 
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description='Collect bounding boxes for augmentation.')

@@ -8,6 +8,7 @@ from open3d.ml.contrib import knn_search
 
 from .operations import *
 
+
 class DataProcessing:
 
     @staticmethod
@@ -184,10 +185,9 @@ class DataProcessing:
         frustum -= T
         frustum = np.linalg.inv(R) @ frustum.T
         frustum = camera_to_lidar(frustum.T, rect, Trv2c)
-        frustum_surfaces = corner_to_surfaces_3d(
-            frustum[np.newaxis, ...])
-        indices = points_in_convex_polygon_3d_jit(
-            points[:, :3], frustum_surfaces)
+        frustum_surfaces = corner_to_surfaces_3d(frustum[np.newaxis, ...])
+        indices = points_in_convex_polygon_3d_jit(points[:, :3],
+                                                  frustum_surfaces)
         points = points[indices.reshape([-1])]
 
         return points

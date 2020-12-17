@@ -53,6 +53,7 @@ def projection_matrix_to_CRT_kitti(proj):
     T = Cinv @ CT
     return C, R, T
 
+
 def get_frustum(bbox_image, C, near_clip=0.001, far_clip=100):
     """Get frustum corners in camera coordinates.
     Args:
@@ -70,8 +71,7 @@ def get_frustum(bbox_image, C, near_clip=0.001, far_clip=100):
                         dtype=C.dtype)[:, np.newaxis]
     b = bbox_image
     box_corners = np.array(
-        [[b[0], b[1]], [b[0], b[3]], [b[2], b[3]], [b[2], b[1]]],
-        dtype=C.dtype)
+        [[b[0], b[1]], [b[0], b[3]], [b[2], b[3]], [b[2], b[1]]], dtype=C.dtype)
     near_box_corners = (box_corners - u0v0) / np.array(
         [fku / near_clip, -fkv / near_clip], dtype=C.dtype)
     far_box_corners = (box_corners - u0v0) / np.array(
@@ -80,6 +80,7 @@ def get_frustum(bbox_image, C, near_clip=0.001, far_clip=100):
                             axis=0)  # [8, 2]
     ret_xyz = np.concatenate([ret_xy, z_points], axis=1)
     return ret_xyz
+
 
 def camera_to_lidar(points, r_rect, velo2cam):
     """Convert points in camera coordinate to lidar coordinate.
@@ -94,8 +95,7 @@ def camera_to_lidar(points, r_rect, velo2cam):
     """
     points_shape = list(points.shape[0:-1])
     if points.shape[-1] == 3:
-        points = np.concatenate(
-            [points, np.ones(points_shape + [1])], axis=-1)
+        points = np.concatenate([points, np.ones(points_shape + [1])], axis=-1)
     lidar_points = points @ np.linalg.inv((r_rect @ velo2cam).T)
     return lidar_points[..., :3]
 
