@@ -1,6 +1,6 @@
 import numpy as np
 import random
-from .operations import create_3D_rotations
+from .operations import *
 
 
 def trans_normalize(pc, feat, t_normalize):
@@ -146,9 +146,28 @@ class ObjdetAugmentation():
         }
 
     @staticmethod
-    def ObjectSample(input):
+    def ObjectSample(data, min_points_dict=None, sample_dict=None):
+        points = data['point']
+        bboxes = data['bboxes']
+
+        if len(bboxes) == 0:
+            return []
+        
+        
+
+        gt_boxes_3d = [box.to_xyzwhlr() for box in data['bboxes']]
+        gt_labels_3d = [box.label_class for box in data['bboxes']]
+
+        if min_points_dict is not None:
+            bboxes = filter_by_min_points(points, bboxes, min_points_dict)
+        
+        for class_name in sample_dict.keys():
+            max_sample_num = sample_dict[class_name]
+            class_label = 
+
+
         pass
     
     @staticmethod
     def ObjectNoise(input, trans_std=[0.25, 0.25, 0.25], rot_range=[-0.15707963267, 0.15707963267], num_try=100):
-        
+        pass
