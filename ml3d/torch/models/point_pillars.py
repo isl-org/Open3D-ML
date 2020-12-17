@@ -20,12 +20,14 @@
 #***************************************************************************************/
 
 import torch
+import pickle
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
 
 from functools import partial
 import numpy as np
+import os
 
 from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
@@ -38,6 +40,8 @@ from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
+from ...datasets.utils import ObjdetAugmentation
+from ...datasets.utils.operations import filter_by_min_points
 
 
 class PointPillars(BaseModel):
@@ -73,7 +77,10 @@ class PointPillars(BaseModel):
                  loss={},
                  **kwargs):
 
-        super().__init__(name=name, device=device, **kwargs)
+        super().__init__(name=name,
+                         point_cloud_range=point_cloud_range,
+                         device=device,
+                         **kwargs)
         self.point_cloud_range = point_cloud_range
 
         self.voxel_layer = PointPillarsVoxelization(
@@ -217,7 +224,50 @@ class PointPillars(BaseModel):
             'calib': data['calib']
         }
 
+    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
+        db_boxes = pickle.load(open(pickle_path, 'rb'))
+
+        if min_points_dict is not None:
+            bboxes = filter_by_min_points(db_boxes, min_points_dict)
+
+        db_boxes_dict = {}
+        for key in sample_dict.keys():
+            db_boxes_dict[key] = []
+
+        for db_box in db_boxes:
+            if db_box.name in sample_dict.keys():
+                db_boxes_dict[db_box.name].append(db_box)
+
+        self.db_boxes_dict = db_boxes_dict
+
+    def augment_data(self, data, attr):
+        cfg = self.cfg.augment
+
+        if 'ObjectSample' in cfg.keys():
+            if not hasattr(self, 'db_boxes_dict'):
+                data_path = os.path.normpath(attr['path'])
+                pickle_path = os.path.join(*data_path.split(os.sep)[:-3],
+                                           'bboxes.pkl')
+                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
+
+            data = ObjdetAugmentation.ObjectSample(
+                data,
+                db_boxes_dict=self.db_boxes_dict,
+                sample_dict=cfg['ObjectSample']['sample_dict'])
+
+        if cfg.get('ObjectRangeFilter', False):
+            data = ObjdetAugmentation.ObjectRangeFilter(
+                data, self.cfg.point_cloud_range)
+
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        return data
+
     def transform(self, data, attr):
+        #Augment data
+        data = self.augment_data(data, attr)
+
         points = torch.tensor([data['point']],
                               dtype=torch.float32,
                               device=self.device)

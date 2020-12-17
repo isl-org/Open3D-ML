@@ -127,7 +127,8 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         for i in tqdm(range(len(valid_loader)), desc='validation'):
-            inputs = model.transform(valid_loader[i]['data'], None)
+            inputs = model.transform(valid_loader[i]['data'],
+                                     valid_loader[i]['attr'])
             results = model(inputs['point'], training=False)
             loss = model.loss(results, inputs)
             for l, v in loss.items():

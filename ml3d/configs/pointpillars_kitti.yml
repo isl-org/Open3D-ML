@@ -60,6 +60,20 @@ model:
     rotations: [0, 1.57]
     iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
   
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: True
+    ObjectSample:
+      min_points_dict:
+        Car: 5
+        Pedestrian: 10
+        Cyclist: 10
+      sample_dict:
+        Car: 15
+        Pedestrian: 10
+        Cyclist: 10
+
+
 pipeline:
   name: ObjectDetection
   test_compute_metric: true

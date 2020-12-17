@@ -214,7 +214,7 @@ class KITTISplit():
 
         reduced_pc = DataProcessing.remove_outside_points(
             pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'],
-            [1000, 1000])
+            [370, 1224])
 
         data = {
             'point': reduced_pc,
@@ -271,6 +271,13 @@ class Object3d(BEVBox3D):
         self.dis_to_cam = np.linalg.norm(self.center)
         self.score = float(label[15]) if label.__len__() == 16 else -1.0
         self.level = self.get_difficulty()
+
+        classes = {
+            'Pedestrian', 'Cyclist', 'Car', 'Van', 'Person_sitting', 'DontCare'
+        }
+        self.cat2label = {name: i for i, name in enumerate(classes)}
+        self.label2cat = {i: name for i, name in enumerate(classes)}
+        self.points_inside_box = np.array([])
 
     @staticmethod
     def cls_type_to_id(cls_type):
