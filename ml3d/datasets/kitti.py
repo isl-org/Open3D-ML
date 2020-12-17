@@ -212,7 +212,9 @@ class KITTISplit():
         calib = self.dataset.read_calib(calib_path)
         label = self.dataset.read_label(label_path, calib)
 
-        reduced_pc = DataProcessing.remove_outside_points(pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'], [1000, 1000])
+        reduced_pc = DataProcessing.remove_outside_points(
+            pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'],
+            [1000, 1000])
 
         data = {
             'point': reduced_pc,

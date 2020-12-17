@@ -163,7 +163,6 @@ class DataProcessing:
 
         return np.expand_dims(ce_label_weight, axis=0)
 
-
     @staticmethod
     def projection_matrix_to_CRT_kitti(proj):
         """Split projection matrix of kitti.
@@ -199,8 +198,8 @@ class DataProcessing:
         fku = C[0, 0]
         fkv = -C[1, 1]
         u0v0 = C[0:2, 2]
-        z_points = np.array(
-            [near_clip] * 4 + [far_clip] * 4, dtype=C.dtype)[:, np.newaxis]
+        z_points = np.array([near_clip] * 4 + [far_clip] * 4,
+                            dtype=C.dtype)[:, np.newaxis]
         b = bbox_image
         box_corners = np.array(
             [[b[0], b[1]], [b[0], b[3]], [b[2], b[3]], [b[2], b[1]]],
@@ -228,7 +227,8 @@ class DataProcessing:
         """
         points_shape = list(points.shape[0:-1])
         if points.shape[-1] == 3:
-            points = np.concatenate([points, np.ones(points_shape + [1])], axis=-1)
+            points = np.concatenate(
+                [points, np.ones(points_shape + [1])], axis=-1)
         lidar_points = points @ np.linalg.inv((r_rect @ velo2cam).T)
         return lidar_points[..., :3]
 
@@ -245,7 +245,8 @@ class DataProcessing:
         num_boxes = corners.shape[0]
         surfaces = np.zeros((num_boxes, 6, 4, 3), dtype=corners.dtype)
         corner_idxes = np.array([
-            0, 1, 2, 3, 7, 6, 5, 4, 0, 3, 7, 4, 1, 5, 6, 2, 0, 4, 5, 1, 3, 2, 6, 7
+            0, 1, 2, 3, 7, 6, 5, 4, 0, 3, 7, 4, 1, 5, 6, 2, 0, 4, 5, 1, 3, 2, 6,
+            7
         ]).reshape(6, 4)
         for i in range(num_boxes):
             for j in range(6):
@@ -291,15 +292,18 @@ class DataProcessing:
         Returns:
             np.ndarray: Result matrix with the shape of [num_points, num_polygon].
         """
-        max_num_surfaces, max_num_points_of_surface = polygon_surfaces.shape[1:3]
+        max_num_surfaces, max_num_points_of_surface = polygon_surfaces.shape[
+            1:3]
         # num_points = points.shape[0]
         num_polygons = polygon_surfaces.shape[0]
         if num_surfaces is None:
-            num_surfaces = np.full((num_polygons, ), 9999999, dtype=np.int64)
-        normal_vec, d = DataProcessing.surface_equ_3d(polygon_surfaces[:, :, :3, :])
+            num_surfaces = np.full((num_polygons,), 9999999, dtype=np.int64)
+        normal_vec, d = DataProcessing.surface_equ_3d(
+            polygon_surfaces[:, :, :3, :])
         # normal_vec: [num_polygon, max_num_surfaces, 3]
         # d: [num_polygon, max_num_surfaces]
-        max_num_surfaces, max_num_points_of_surface = polygon_surfaces.shape[1:3]
+        max_num_surfaces, max_num_points_of_surface = polygon_surfaces.shape[
+            1:3]
         num_points = points.shape[0]
         num_polygons = polygon_surfaces.shape[0]
         ret = np.ones((num_points, num_polygons), dtype=np.bool_)
@@ -309,10 +313,9 @@ class DataProcessing:
                 for k in range(max_num_surfaces):
                     if k > num_surfaces[j]:
                         break
-                    sign = (
-                        points[i, 0] * normal_vec[j, k, 0] +
-                        points[i, 1] * normal_vec[j, k, 1] +
-                        points[i, 2] * normal_vec[j, k, 2] + d[j, k])
+                    sign = (points[i, 0] * normal_vec[j, k, 0] +
+                            points[i, 1] * normal_vec[j, k, 1] +
+                            points[i, 2] * normal_vec[j, k, 2] + d[j, k])
                     if sign >= 0:
                         ret[i, j] = False
                         break
@@ -338,7 +341,9 @@ class DataProcessing:
         frustum -= T
         frustum = np.linalg.inv(R) @ frustum.T
         frustum = DataProcessing.camera_to_lidar(frustum.T, rect, Trv2c)
-        frustum_surfaces = DataProcessing.corner_to_surfaces_3d(frustum[np.newaxis, ...])
-        indices = DataProcessing.points_in_convex_polygon_3d(points[:, :3], frustum_surfaces)
+        frustum_surfaces = DataProcessing.corner_to_surfaces_3d(
+            frustum[np.newaxis, ...])
+        indices = DataProcessing.points_in_convex_polygon_3d(
+            points[:, :3], frustum_surfaces)
         points = points[indices.reshape([-1])]
         return points
