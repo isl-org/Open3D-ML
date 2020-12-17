@@ -289,8 +289,12 @@ class RandLANet(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
-        split = attr['split']
+        if cfg.get('t_align', False):
+            points_min = np.expand_dims(points.min(0), 0)
+            points_min[0,:2] = 0
+            points = points - points_min
 
+        split = attr['split']
         data = dict()
 
         if (feat is None):

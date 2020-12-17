@@ -245,49 +245,49 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             step = 0
 
-            for idx, inputs in enumerate(
-                    tqdm(train_loader, total=len_train, desc='training')):
-                with tf.GradientTape(persistent=True) as tape:
-                    results = model(inputs, training=True)
+            # for idx, inputs in enumerate(
+            #         tqdm(train_loader, total=len_train, desc='training')):
+            #     with tf.GradientTape(persistent=True) as tape:
+            #         results = model(inputs, training=True)
 
-                    loss, gt_labels, predict_scores = model.get_loss(
-                        Loss, results, inputs)
+            #         loss, gt_labels, predict_scores = model.get_loss(
+            #             Loss, results, inputs)
 
-                if len(predict_scores.shape) < 2:
-                    continue
+            #     if len(predict_scores.shape) < 2:
+            #         continue
 
-                if predict_scores.shape[0] == 0:
-                    continue
-                scaled_params = []
-                params = []
-                for val in model.trainable_weights:
-                    if 'deform' in val.name:
-                        scaled_params.append(val)
-                    else:
-                        params.append(val)
+            #     if predict_scores.shape[0] == 0:
+            #         continue
+            #     scaled_params = []
+            #     params = []
+            #     for val in model.trainable_weights:
+            #         if 'deform' in val.name:
+            #             scaled_params.append(val)
+            #         else:
+            #             params.append(val)
 
-                grads = tape.gradient(loss, params)
-                scaled_grads = tape.gradient(loss, scaled_params)
-                for i in range(len(scaled_grads)):
-                    scaled_grads[i] *= 0.1
+            #     grads = tape.gradient(loss, params)
+            #     scaled_grads = tape.gradient(loss, scaled_params)
+            #     for i in range(len(scaled_grads)):
+            #         scaled_grads[i] *= 0.1
 
-                norm = cfg.get('grad_clip_norm', 100.0)
-                grads = [tf.clip_by_norm(g, norm) for g in grads]
-                scaled_grads = [tf.clip_by_norm(g, norm) for g in scaled_grads]
+            #     norm = cfg.get('grad_clip_norm', 100.0)
+            #     grads = [tf.clip_by_norm(g, norm) for g in grads]
+            #     scaled_grads = [tf.clip_by_norm(g, norm) for g in scaled_grads]
 
-                self.optimizer.apply_gradients(zip(grads, params))
+            #     self.optimizer.apply_gradients(zip(grads, params))
 
-                if len(scaled_grads) > 0:
-                    self.optimizer.apply_gradients(
-                        zip(scaled_grads, scaled_params))
+            #     if len(scaled_grads) > 0:
+            #         self.optimizer.apply_gradients(
+            #             zip(scaled_grads, scaled_params))
 
-                acc = Metric.acc(predict_scores, gt_labels)
-                iou = Metric.iou(predict_scores, gt_labels)
+            #     acc = Metric.acc(predict_scores, gt_labels)
+            #     iou = Metric.iou(predict_scores, gt_labels)
 
-                self.losses.append(loss.numpy())
-                self.accs.append(acc)
-                self.ious.append(iou)
-                step = step + 1
+            #     self.losses.append(loss.numpy())
+            #     self.accs.append(acc)
+            #     self.ious.append(iou)
+            #     step = step + 1
 
             # --------------------- validation
             self.valid_accs = []
@@ -307,6 +307,7 @@ class SemanticSegmentation(BasePipeline):
 
                 acc = Metric.acc(predict_scores, gt_labels)
                 iou = Metric.iou(predict_scores, gt_labels)
+                print(acc[-1], iou[-1])
 
                 self.valid_losses.append(loss.numpy())
                 self.valid_accs.append(acc)

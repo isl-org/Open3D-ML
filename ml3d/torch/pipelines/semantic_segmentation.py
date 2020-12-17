@@ -364,33 +364,33 @@ class SemanticSegmentation(BasePipeline):
             self.accs = []
             self.ious = []
             self.train_conf_m = []
-            model.trans_point_sampler = train_sampler.get_point_sampler()
+            # model.trans_point_sampler = train_sampler.get_point_sampler()
 
-            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-                results = model(inputs['data'])
-                loss, gt_labels, predict_scores = model.get_loss(
-                    Loss, results, inputs, device)
+            # for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+            #     results = model(inputs['data'])
+            #     loss, gt_labels, predict_scores = model.get_loss(
+            #         Loss, results, inputs, device)
 
-                if predict_scores.size()[-1] == 0:
-                    continue
+            #     if predict_scores.size()[-1] == 0:
+            #         continue
 
-                self.optimizer.zero_grad()
-                # loss.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
-                self.optimizer.step()
+            #     self.optimizer.zero_grad()
+            #     # loss.backward()
+            #     if model.cfg.get('grad_clip_norm', -1) > 0:
+            #         torch.nn.utils.clip_grad_value_(model.parameters(),
+            #                                         model.cfg.grad_clip_norm)
+            #     self.optimizer.step()
 
-                conf_m = metric.confusion_matrix(predict_scores, gt_labels)
-                acc = metric.acc(predict_scores, gt_labels)
-                iou = metric.iou(predict_scores, gt_labels)
+            #     conf_m = metric.confusion_matrix(predict_scores, gt_labels)
+            #     acc = metric.acc(predict_scores, gt_labels)
+            #     iou = metric.iou(predict_scores, gt_labels)
 
-                self.losses.append(loss.cpu().item())
-                self.accs.append(acc)
-                self.ious.append(iou)
-                self.train_conf_m.append(conf_m)
+            #     self.losses.append(loss.cpu().item())
+            #     self.accs.append(acc)
+            #     self.ious.append(iou)
+            #     self.train_conf_m.append(conf_m)
 
-            self.scheduler.step()
+            # self.scheduler.step()
 
             # --------------------- validation
             model.eval()

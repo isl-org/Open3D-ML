@@ -18,7 +18,8 @@ dataset:
 model:
   name: RandLANet
   batcher: DefaultBatcher
-  ckpt_path: # path/to/your/checkpoint
+  ckpt_path: ../dataset/checkpoints/randlanet_paris_2015/ckpt-2 # path/to/your/checkpoint
+  # ckpt_path: ../dataset/checkpoints/randlanet_parislille3d.pth # path/to/your/checkpoint
   dim_feature: 8
   dim_input: 3
   dim_output:
@@ -41,6 +42,7 @@ model:
   - 4
   - 2
   weight_decay: 0.001
+  t_align: true
   t_augment:
     turn_on: false
     rotation_method: vertical
