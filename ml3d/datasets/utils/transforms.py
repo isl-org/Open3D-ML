@@ -132,31 +132,31 @@ class ObjdetAugmentation():
     """Class consisting different augmentation for Object Detection"""
 
     @staticmethod
-    def PointShuffle(input):
-        np.random.shuffle(input['point'])
+    def PointShuffle(data):
+        np.random.shuffle(data['point'])
 
-        return input
+        return data
 
     @staticmethod
-    def ObjectRangeFilter(input, pcd_range):
+    def ObjectRangeFilter(data, pcd_range):
+        pcd_range = np.array(pcd_range)
         bev_range = pcd_range[[0, 1, 3, 4]]
 
         filtered_boxes = []
-        for box in input['bboxes']:
+        for box in data['bboxes']:
             if in_range_bev(bev_range, box.to_xyzwhlr()):
                 filtered_boxes.append(box)
 
         return {
-            'point': input['point'],
+            'point': data['point'],
             'bboxes': filtered_boxes,
-            'calib': input['calib']
+            'calib': data['calib']
         }
 
     @staticmethod
     def ObjectSample(data,
-                     pickle_path=None,
-                     min_points_dict=None,
-                     sample_dict=None):
+                     db_boxes_dict,
+                     sample_dict):
         rate = 1.0
         points = data['point']
         bboxes = data['bboxes']
@@ -167,21 +167,7 @@ class ObjdetAugmentation():
         cat2label = bboxes[0].cat2label
         label2cat = bboxes[0].label2cat
 
-        gt_boxes_3d = [box.to_xyzwhlr() for box in data['bboxes']]
         gt_labels_3d = [box.label_class for box in data['bboxes']]
-
-        db_boxes = pickle.load(open(pickle_path, 'rb'))
-
-        if min_points_dict is not None:
-            bboxes = filter_by_min_points(db_boxes, min_points_dict)
-
-        db_boxes_dict = {}
-        for key in sample_dict.keys():
-            db_boxes_dict[key] = []
-
-        for db_box in db_boxes:
-            if db_box.name in sample_dict.keys():
-                db_boxes_dict[db_box.name].append(db_box)
 
         sampled_num_dict = {}
 
