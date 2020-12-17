@@ -300,8 +300,8 @@ class ObjectDetection(BasePipeline):
             if self.manager.latest_checkpoint:
                 log.info("Restored from {}".format(
                     self.manager.latest_checkpoint))
-                epoch = int(re.findall(r'\d+', 
-                    self.manager.latest_checkpoint)[-1]) - 1
+                epoch = int(
+                    re.findall(r'\d+', self.manager.latest_checkpoint)[-1]) - 1
                 epoch = epoch * self.cfg.save_ckpt_freq + 1
             else:
                 log.info("Initializing from scratch.")
