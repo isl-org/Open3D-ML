@@ -17,9 +17,11 @@ def parse_args():
     parser.add_argument('--dataset_path',
                         help='path to Dataset root',
                         required=True)
-    parser.add_argument('--out_path',
-                        help='Output path to store pickle',
-                        required=True)
+    parser.add_argument(
+        '--out_path',
+        help='Output path to store pickle (default to dataet_path)',
+        default=None,
+        required=False)
 
     args = parser.parse_args()
 
@@ -34,6 +36,9 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
+    out_path = args.out_path
+    if out_path is None:
+        out_path = args.dataset_path
 
     dataset = KITTI(args.dataset_path)
     train = dataset.get_split('train')
@@ -50,5 +55,5 @@ if __name__ == '__main__':
             box.points_inside_box = pts
             bboxes.append(box)
 
-    file = open(join(args.out_path, 'bboxes.pkl'), 'wb')
+    file = open(join(out_path, 'bboxes.pkl'), 'wb')
     pickle.dump(bboxes, file)
