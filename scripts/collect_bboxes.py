@@ -12,7 +12,8 @@ from ml3d.datasets import KITTI
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Collect bounding boxes for augmentation.')
+    parser = argparse.ArgumentParser(
+        description='Collect bounding boxes for augmentation.')
     parser.add_argument('--dataset_path',
                         help='path to Dataset root',
                         required=True)
@@ -30,6 +31,7 @@ def parse_args():
 
     return args
 
+
 def corners_nd(dims, origin=0.5):
     """Generate relative box corners based on length per dim and origin point.
     Args:
@@ -42,9 +44,8 @@ def corners_nd(dims, origin=0.5):
             where x0 < x1, y0 < y1, z0 < z1.
     """
     ndim = int(dims.shape[1])
-    corners_norm = np.stack(
-        np.unravel_index(np.arange(2**ndim), [2] * ndim),
-        axis=1).astype(dims.dtype)
+    corners_norm = np.stack(np.unravel_index(np.arange(2**ndim), [2] * ndim),
+                            axis=1).astype(dims.dtype)
     # now corners_norm has format: (2d) x0y0, x0y1, x1y0, x1y1
     # (3d) x0y0z0, x0y0z1, x0y1z0, x0y1z1, x1y0z0, x1y0z1, x1y1z0, x1y1z1
     # so need to convert to a format which is convenient to do other computing.
@@ -59,6 +60,7 @@ def corners_nd(dims, origin=0.5):
     corners = dims.reshape([-1, 1, ndim]) * corners_norm.reshape(
         [1, 2**ndim, ndim])
     return corners
+
 
 def rotation_3d_in_axis(points, angles, axis=2):
     """Rotate points in specific axis.
@@ -89,10 +91,7 @@ def rotation_3d_in_axis(points, angles, axis=2):
     return np.einsum('aij,jka->aik', points, rot_mat_T)
 
 
-def center_to_corner_box3d(centers,
-                           dims,
-                           angles=None,
-                           origin=(0.5, 1.0, 0.5)):
+def center_to_corner_box3d(centers, dims, angles=None, origin=(0.5, 1.0, 0.5)):
     """Convert kitti locations, dimensions and angles to corners.
     Args:
         centers (np.ndarray): Locations in kitti label file with shape (N, 3).
@@ -133,6 +132,7 @@ def corner_to_surfaces_3d(corners):
     ]).transpose([2, 0, 1, 3])
     return surfaces
 
+
 def surface_equ_3d(polygon_surfaces):
     """
     Args:
@@ -154,6 +154,7 @@ def surface_equ_3d(polygon_surfaces):
     d = np.einsum('aij, aij->ai', normal_vec, polygon_surfaces[:, :, 0, :])
     return normal_vec, -d
 
+
 def points_in_convex_polygon_3d_jit(points,
                                     polygon_surfaces,
                                     num_surfaces=None):
@@ -173,7 +174,7 @@ def points_in_convex_polygon_3d_jit(points,
     # num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
     if num_surfaces is None:
-        num_surfaces = np.full((num_polygons, ), 9999999, dtype=np.int64)
+        num_surfaces = np.full((num_polygons,), 9999999, dtype=np.int64)
     normal_vec, d = surface_equ_3d(polygon_surfaces[:, :, :3, :])
     # normal_vec: [num_polygon, max_num_surfaces, 3]
     # d: [num_polygon, max_num_surfaces]
@@ -187,14 +188,14 @@ def points_in_convex_polygon_3d_jit(points,
             for k in range(max_num_surfaces):
                 if k > num_surfaces[j]:
                     break
-                sign = (
-                    points[i, 0] * normal_vec[j, k, 0] +
-                    points[i, 1] * normal_vec[j, k, 1] +
-                    points[i, 2] * normal_vec[j, k, 2] + d[j, k])
+                sign = (points[i, 0] * normal_vec[j, k, 0] +
+                        points[i, 1] * normal_vec[j, k, 1] +
+                        points[i, 2] * normal_vec[j, k, 2] + d[j, k])
                 if sign >= 0:
                     ret[i, j] = False
                     break
     return ret
+
 
 def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
     """Check points in rotated bbox and return indicces.
@@ -209,8 +210,10 @@ def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
     # TODO: this function is different from PointCloud3D, be careful
     # when start to use nuscene, check the input
     rbbox = np.array(rbbox)
-    rbbox_corners = center_to_corner_box3d(
-        rbbox[:, :3], rbbox[:, 3:6], rbbox[:, 6], origin=origin)
+    rbbox_corners = center_to_corner_box3d(rbbox[:, :3],
+                                           rbbox[:, 3:6],
+                                           rbbox[:, 6],
+                                           origin=origin)
     surfaces = corner_to_surfaces_3d(rbbox_corners)
     indices = points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
     return indices

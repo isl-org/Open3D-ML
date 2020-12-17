@@ -2,6 +2,7 @@ import numpy as np
 import random
 import copy
 
+
 def create_3D_rotations(axis, angle):
     """
     Create rotation matrices from a list of axes and angles. Code from wikipedia on quaternions
@@ -44,9 +45,8 @@ def corners_nd(dims, origin=0.5):
             where x0 < x1, y0 < y1, z0 < z1.
     """
     ndim = int(dims.shape[1])
-    corners_norm = np.stack(
-        np.unravel_index(np.arange(2**ndim), [2] * ndim),
-        axis=1).astype(dims.dtype)
+    corners_norm = np.stack(np.unravel_index(np.arange(2**ndim), [2] * ndim),
+                            axis=1).astype(dims.dtype)
     # now corners_norm has format: (2d) x0y0, x0y1, x1y0, x1y1
     # (3d) x0y0z0, x0y0z1, x0y1z0, x0y1z1, x1y0z0, x1y0z1, x1y1z0, x1y1z1
     # so need to convert to a format which is convenient to do other computing.
@@ -61,6 +61,7 @@ def corners_nd(dims, origin=0.5):
     corners = dims.reshape([-1, 1, ndim]) * corners_norm.reshape(
         [1, 2**ndim, ndim])
     return corners
+
 
 def rotation_3d_in_axis(points, angles, axis=2):
     """Rotate points in specific axis.
@@ -90,6 +91,7 @@ def rotation_3d_in_axis(points, angles, axis=2):
 
     return np.einsum('aij,jka->aik', points, rot_mat_T)
 
+
 def rotation_2d(points, angles):
     """Rotation 2d points based on origin point clockwise when angle positive.
     Args:
@@ -104,10 +106,8 @@ def rotation_2d(points, angles):
     rot_mat_T = np.stack([[rot_cos, -rot_sin], [rot_sin, rot_cos]])
     return np.einsum('aij,jka->aik', points, rot_mat_T)
 
-def center_to_corner_box3d(centers,
-                           dims,
-                           angles=None,
-                           origin=(0.5, 1.0, 0.5)):
+
+def center_to_corner_box3d(centers, dims, angles=None, origin=(0.5, 1.0, 0.5)):
     """Convert kitti locations, dimensions and angles to corners.
     Args:
         centers (np.ndarray): Locations in kitti label file with shape (N, 3).
@@ -128,6 +128,7 @@ def center_to_corner_box3d(centers,
     corners += centers.reshape([-1, 1, 3])
     return corners
 
+
 def center_to_corner_box2d(boxes, origin=0.5):
     """Convert kitti locations, dimensions and angles to corners.
     format: center(xy), dims(xy), angles(clockwise when positive)
@@ -140,7 +141,7 @@ def center_to_corner_box2d(boxes, origin=0.5):
     """
     flat_boxes = np.array([box.to_xyzwhlr() for box in boxes])
     centers = flat_boxes[:, 0:2]
-    dims =  flat_boxes[:, 3:5]
+    dims = flat_boxes[:, 3:5]
     angles = flat_boxes[:, 6]
     # 'length' in kitti format is in x axis.
     # xyz(hwl)(kitti label file)<->xyz(lhw)(camera)<->z(-x)(-y)(wlh)(lidar)
@@ -151,6 +152,7 @@ def center_to_corner_box2d(boxes, origin=0.5):
         corners = rotation_2d(corners, angles)
     corners += centers.reshape([-1, 1, 2])
     return corners
+
 
 def corner_to_surfaces_3d(corners):
     """convert 3d box corners from corner function above to surfaces that
@@ -170,6 +172,7 @@ def corner_to_surfaces_3d(corners):
         [corners[:, 3], corners[:, 2], corners[:, 6], corners[:, 7]],
     ]).transpose([2, 0, 1, 3])
     return surfaces
+
 
 def surface_equ_3d(polygon_surfaces):
     """
@@ -192,6 +195,7 @@ def surface_equ_3d(polygon_surfaces):
     d = np.einsum('aij, aij->ai', normal_vec, polygon_surfaces[:, :, 0, :])
     return normal_vec, -d
 
+
 def points_in_convex_polygon_3d_jit(points,
                                     polygon_surfaces,
                                     num_surfaces=None):
@@ -211,7 +215,7 @@ def points_in_convex_polygon_3d_jit(points,
     # num_points = points.shape[0]
     num_polygons = polygon_surfaces.shape[0]
     if num_surfaces is None:
-        num_surfaces = np.full((num_polygons, ), 9999999, dtype=np.int64)
+        num_surfaces = np.full((num_polygons,), 9999999, dtype=np.int64)
     normal_vec, d = surface_equ_3d(polygon_surfaces[:, :, :3, :])
     # normal_vec: [num_polygon, max_num_surfaces, 3]
     # d: [num_polygon, max_num_surfaces]
@@ -225,10 +229,9 @@ def points_in_convex_polygon_3d_jit(points,
             for k in range(max_num_surfaces):
                 if k > num_surfaces[j]:
                     break
-                sign = (
-                    points[i, 0] * normal_vec[j, k, 0] +
-                    points[i, 1] * normal_vec[j, k, 1] +
-                    points[i, 2] * normal_vec[j, k, 2] + d[j, k])
+                sign = (points[i, 0] * normal_vec[j, k, 0] +
+                        points[i, 1] * normal_vec[j, k, 1] +
+                        points[i, 2] * normal_vec[j, k, 2] + d[j, k])
                 if sign >= 0:
                     ret[i, j] = False
                     break
@@ -248,8 +251,10 @@ def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
     # TODO: this function is different from PointCloud3D, be careful
     # when start to use nuscene, check the input
     rbbox = np.array(rbbox)
-    rbbox_corners = center_to_corner_box3d(
-        rbbox[:, :3], rbbox[:, 3:6], rbbox[:, 6], origin=origin)
+    rbbox_corners = center_to_corner_box3d(rbbox[:, :3],
+                                           rbbox[:, 3:6],
+                                           rbbox[:, 6],
+                                           origin=origin)
     surfaces = corner_to_surfaces_3d(rbbox_corners)
     indices = points_in_convex_polygon_3d_jit(points[:, :3], surfaces)
     return indices
@@ -265,15 +270,17 @@ def filter_by_min_points(pc, bboxes, min_points_dict):
         if box.name in min_points_dict.keys():
             if num_points_in_box > min_points_dict[box.name]:
                 filtered_boxes.append(box)
-    
+
     return filtered_boxes
+
 
 def random_sample(files, num):
     if len(files) <= num:
         return files
-    
+
     return random.sample(files, num)
-    
+
+
 def corner_to_standup_nd_jit(boxes_corner):
     """Convert boxes_corner to aligned (min-max) boxes.
     Args:
@@ -290,6 +297,7 @@ def corner_to_standup_nd_jit(boxes_corner):
         for j in range(ndim):
             result[i, j + ndim] = np.max(boxes_corner[i, :, j])
     return result
+
 
 def box_collision_test(boxes, qboxes, clockwise=True):
     """Box collision test.
@@ -312,13 +320,11 @@ def box_collision_test(boxes, qboxes, clockwise=True):
     for i in range(N):
         for j in range(K):
             # calculate standup first
-            iw = (
-                min(boxes_standup[i, 2], qboxes_standup[j, 2]) -
-                max(boxes_standup[i, 0], qboxes_standup[j, 0]))
+            iw = (min(boxes_standup[i, 2], qboxes_standup[j, 2]) -
+                  max(boxes_standup[i, 0], qboxes_standup[j, 0]))
             if iw > 0:
-                ih = (
-                    min(boxes_standup[i, 3], qboxes_standup[j, 3]) -
-                    max(boxes_standup[i, 1], qboxes_standup[j, 1]))
+                ih = (min(boxes_standup[i, 3], qboxes_standup[j, 3]) -
+                      max(boxes_standup[i, 1], qboxes_standup[j, 1]))
                 if ih > 0:
                     for k in range(4):
                         for box_l in range(4):
@@ -326,19 +332,15 @@ def box_collision_test(boxes, qboxes, clockwise=True):
                             B = lines_boxes[i, k, 1]
                             C = lines_qboxes[j, box_l, 0]
                             D = lines_qboxes[j, box_l, 1]
-                            acd = (D[1] - A[1]) * (C[0] -
-                                                   A[0]) > (C[1] - A[1]) * (
-                                                       D[0] - A[0])
-                            bcd = (D[1] - B[1]) * (C[0] -
-                                                   B[0]) > (C[1] - B[1]) * (
-                                                       D[0] - B[0])
+                            acd = (D[1] - A[1]) * (C[0] - A[0]) > (
+                                C[1] - A[1]) * (D[0] - A[0])
+                            bcd = (D[1] - B[1]) * (C[0] - B[0]) > (
+                                C[1] - B[1]) * (D[0] - B[0])
                             if acd != bcd:
                                 abc = (C[1] - A[1]) * (B[0] - A[0]) > (
-                                    B[1] - A[1]) * (
-                                        C[0] - A[0])
+                                    B[1] - A[1]) * (C[0] - A[0])
                                 abd = (D[1] - A[1]) * (B[0] - A[0]) > (
-                                    B[1] - A[1]) * (
-                                        D[0] - A[0])
+                                    B[1] - A[1]) * (D[0] - A[0])
                                 if abc != abd:
                                     ret[i, j] = True  # collision.
                                     break
@@ -353,10 +355,10 @@ def box_collision_test(boxes, qboxes, clockwise=True):
                                 vec = boxes[i, k] - boxes[i, (k + 1) % 4]
                                 if clockwise:
                                     vec = -vec
-                                cross = vec[1] * (
-                                    boxes[i, k, 0] - qboxes[j, box_l, 0])
-                                cross -= vec[0] * (
-                                    boxes[i, k, 1] - qboxes[j, box_l, 1])
+                                cross = vec[1] * (boxes[i, k, 0] -
+                                                  qboxes[j, box_l, 0])
+                                cross -= vec[0] * (boxes[i, k, 1] -
+                                                   qboxes[j, box_l, 1])
                                 if cross >= 0:
                                     box_overlap_qbox = False
                                     break
@@ -370,10 +372,10 @@ def box_collision_test(boxes, qboxes, clockwise=True):
                                     vec = qboxes[j, k] - qboxes[j, (k + 1) % 4]
                                     if clockwise:
                                         vec = -vec
-                                    cross = vec[1] * (
-                                        qboxes[j, k, 0] - boxes[i, box_l, 0])
-                                    cross -= vec[0] * (
-                                        qboxes[j, k, 1] - boxes[i, box_l, 1])
+                                    cross = vec[1] * (qboxes[j, k, 0] -
+                                                      boxes[i, box_l, 0])
+                                    cross -= vec[0] * (qboxes[j, k, 1] -
+                                                       boxes[i, box_l, 1])
                                     if cross >= 0:  #
                                         qbox_overlap_box = False
                                         break
@@ -396,7 +398,7 @@ def sample_class(class_name, num, gt_boxes, db_boxes):
     gt_boxes_bev = center_to_corner_box2d(gt_boxes)
 
     boxes = (gt_boxes + sampled).copy()
-    
+
     sp_boxes_new = boxes[num_gt:]
     sp_boxes_bev = center_to_corner_box2d(sp_boxes_new)
 
@@ -412,7 +414,7 @@ def sample_class(class_name, num, gt_boxes, db_boxes):
             coll_mat[:, i] = False
         else:
             valid_samples.append(sampled[i - num_gt])
-    
+
     return valid_samples
 
 

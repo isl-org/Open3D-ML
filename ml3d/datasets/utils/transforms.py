@@ -124,7 +124,9 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
 
 
 def in_range_bev(box_range, box):
-    return (box[0] > box_range[0]) & (box[1] > box_range[1]) & (box[0] < box_range[2]) & (box[1] < box_range[3])
+    return (box[0] > box_range[0]) & (box[1] > box_range[1]) & (
+        box[0] < box_range[2]) & (box[1] < box_range[3])
+
 
 class ObjdetAugmentation():
     """Class consisting different augmentation for Object Detection"""
@@ -151,7 +153,10 @@ class ObjdetAugmentation():
         }
 
     @staticmethod
-    def ObjectSample(data, pickle_path=None, min_points_dict=None, sample_dict=None):
+    def ObjectSample(data,
+                     pickle_path=None,
+                     min_points_dict=None,
+                     sample_dict=None):
         rate = 1.0
         points = data['point']
         bboxes = data['bboxes']
@@ -166,14 +171,14 @@ class ObjdetAugmentation():
         gt_labels_3d = [box.label_class for box in data['bboxes']]
 
         # TODO: filter by min points in separate script.
-        # if min_points_dict is not None: 
+        # if min_points_dict is not None:
         #     bboxes = filter_by_min_points(points, bboxes, min_points_dict)
 
         db_boxes = pickle.load(open(pickle_path, 'rb'))
         db_boxes_dict = {}
         for key in sample_dict.keys():
             db_boxes_dict[key] = []
-        
+
         for db_box in db_boxes:
             if db_box.name in sample_dict.keys():
                 db_boxes_dict[db_box.name].append(db_box)
@@ -188,15 +193,17 @@ class ObjdetAugmentation():
             sampled_num = int(max_sample_num - existing)
             sampled_num = np.round(rate * sampled_num).astype(np.int64)
             sampled_num_dict[class_name] = sampled_num
-    
+
         sampled = []
         avoid_coll_boxes = data['bboxes']
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
             if sampled_num < 0:
                 continue
-            
-            sampled_cls = sample_class(class_name, sampled_num, avoid_coll_boxes, db_boxes_dict[class_name])
+
+            sampled_cls = sample_class(class_name, sampled_num,
+                                       avoid_coll_boxes,
+                                       db_boxes_dict[class_name])
             sampled += sampled_cls
 
             avoid_coll_boxes += sampled
@@ -204,19 +211,18 @@ class ObjdetAugmentation():
         if len(sampled) != 0:
             sampled_points = sampled[0].points_inside_box.copy()
             for box in sampled[1:]:
-                sampled_points = np.concatenate([sampled_points, box.points_inside_box], axis=0)
+                sampled_points = np.concatenate(
+                    [sampled_points, box.points_inside_box], axis=0)
 
             points = remove_points_in_boxes(points, sampled)
             points = np.concatenate([sampled_points, points], axis=0)
             bboxes = data['bboxes'] + sampled
 
-        return {
-            'point': points,
-            'bboxes': bboxes,
-            'calib': data['calib']
-        }
+        return {'point': points, 'bboxes': bboxes, 'calib': data['calib']}
 
-    
     @staticmethod
-    def ObjectNoise(input, trans_std=[0.25, 0.25, 0.25], rot_range=[-0.15707963267, 0.15707963267], num_try=100):
+    def ObjectNoise(input,
+                    trans_std=[0.25, 0.25, 0.25],
+                    rot_range=[-0.15707963267, 0.15707963267],
+                    num_try=100):
         pass

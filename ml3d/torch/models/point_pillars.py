@@ -216,7 +216,8 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         #Augment data
-        data = ObjdetAugmentation.ObjectSample(data, **self.cfg.augment['ObjectSample'])
+        data = ObjdetAugmentation.ObjectSample(
+            data, **self.cfg.augment['ObjectSample'])
 
         points = torch.tensor([data['point']],
                               dtype=torch.float32,
