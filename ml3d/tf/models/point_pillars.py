@@ -51,7 +51,9 @@ class PointPillars(BaseModel):
                  loss={},
                  **kwargs):
 
-        super().__init__(name=name, point_cloud_range=point_cloud_range, **kwargs)
+        super().__init__(name=name,
+                         point_cloud_range=point_cloud_range,
+                         **kwargs)
         self.point_cloud_range = point_cloud_range
 
         self.voxel_layer = PointPillarsVoxelization(
@@ -246,10 +248,14 @@ class PointPillars(BaseModel):
             if not hasattr(self, 'db_boxes_dict'):
                 self.load_gt_database(**cfg['ObjectSample'])
 
-            data = ObjdetAugmentation.ObjectSample(data, db_boxes_dict=self.db_boxes_dict, sample_dict=cfg['ObjectSample']['sample_dict'])
+            data = ObjdetAugmentation.ObjectSample(
+                data,
+                db_boxes_dict=self.db_boxes_dict,
+                sample_dict=cfg['ObjectSample']['sample_dict'])
 
         if cfg.get('ObjectRangeFilter', False):
-            data = ObjdetAugmentation.ObjectRangeFilter(data, self.cfg.point_cloud_range)
+            data = ObjdetAugmentation.ObjectRangeFilter(
+                data, self.cfg.point_cloud_range)
 
         if cfg.get('PointShuffle', False):
             data = ObjdetAugmentation.PointShuffle(data)

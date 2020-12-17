@@ -154,9 +154,7 @@ class ObjdetAugmentation():
         }
 
     @staticmethod
-    def ObjectSample(data,
-                     db_boxes_dict,
-                     sample_dict):
+    def ObjectSample(data, db_boxes_dict, sample_dict):
         rate = 1.0
         points = data['point']
         bboxes = data['bboxes']
