@@ -221,6 +221,8 @@ class PointPillars(BaseModel):
         }
 
     def transform(self, data, attr):
+        # Augment data
+
         points = tf.constant([data['point']], dtype=tf.float32)
         labels = tf.constant([bb.label_class for bb in data['bboxes']],
                              dtype=tf.int32)

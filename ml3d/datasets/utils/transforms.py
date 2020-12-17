@@ -122,6 +122,9 @@ def trans_crop_pc(points, feat, labels, search_tree, pick_idx, num_points):
     return select_points, select_feat, select_labels, select_idx
 
 
+def in_range_bev(box_range, box):
+    return (box[0] > box_range[0]) & (box[1] > box_range[1]) & (box[0] < box_range[2]) & (box[1] < box_range[3])
+
 class ObjdetAugmentation():
     """Class consisting different augmentation for Object Detection"""
 
@@ -134,4 +137,18 @@ class ObjdetAugmentation():
     @staticmethod
     def ObjectRangeFilter(input, pcd_range):
         bev_range = pcd_range[[0, 1, 3, 4]]
+        filtered_boxes = [box if in_range_bev(bev_range, box.to_xyzwhlr()) for box in input['bboxes']]
 
+        return {
+            'point': input['point'],
+            'bboxes': filtered_boxes,
+            'calib': input['calib']
+        }
+
+    @staticmethod
+    def ObjectSample(input):
+        pass
+    
+    @staticmethod
+    def ObjectNoise(input, trans_std=[0.25, 0.25, 0.25], rot_range=[-0.15707963267, 0.15707963267], num_try=100):
+        
