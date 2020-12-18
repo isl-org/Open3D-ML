@@ -247,9 +247,11 @@ class PointPillars(BaseModel):
 
         if 'ObjectSample' in cfg.keys():
             if not hasattr(self, 'db_boxes_dict'):
-                data_path = os.path.normpath(attr['path'])
-                pickle_path = os.path.join(*data_path.split(os.sep)[:-3],
-                                           'bboxes.pkl')
+                data_path = attr['path']
+                # remove tail of path to get root data path
+                for _ in range(3):
+                    data_path = os.path.split(data_path)[0]
+                pickle_path = os.path.join(data_path, 'bboxes.pkl')
                 self.load_gt_database(pickle_path, **cfg['ObjectSample'])
 
             data = ObjdetAugmentation.ObjectSample(
