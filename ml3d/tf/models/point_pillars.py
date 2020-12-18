@@ -233,8 +233,8 @@ class PointPillars(BaseModel):
 
             points = points[np.where(
                 np.all(np.logical_and(points[:, :3] >= min_val,
-                                    points[:, :3] < max_val),
-                    axis=-1))]
+                                      points[:, :3] < max_val),
+                       axis=-1))]
 
             new_data['full_point'] = points
 
