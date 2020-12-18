@@ -267,8 +267,9 @@ class PointPillars(BaseModel):
         return data
 
     def transform(self, data, attr):
-        # Augment data
-        data = self.augment_data(data, attr)
+        #Augment data
+        if attr['split'] not in ['test', 'testing']:
+            data = self.augment_data(data, attr)
 
         points = tf.constant([data['point']], dtype=tf.float32)
         labels = tf.constant([bb.label_class for bb in data['bboxes']],

@@ -266,7 +266,8 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         #Augment data
-        data = self.augment_data(data, attr)
+        if attr['split'] not in ['test', 'testing']:
+            data = self.augment_data(data, attr)
 
         points = torch.tensor([data['point']],
                               dtype=torch.float32,
