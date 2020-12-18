@@ -382,7 +382,7 @@ class RandLANet(BaseModel):
                                                    pick_idx,
                                                    self.cfg.num_points)
 
-                t_normalize = cfg.get('t_normalize', None)
+                t_normalize = cfg.get('t_normalize', {})
                 pc, feat = trans_normalize(pc, feat, t_normalize)
 
                 if attr['split'] in ['training', 'train']:
@@ -426,7 +426,7 @@ class RandLANet(BaseModel):
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx
 
-        t_normalize = cfg.get('t_normalize', None)
+        t_normalize = cfg.get('t_normalize', {})
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if feat is None:

@@ -454,7 +454,7 @@ class KPFCNN(BaseModel):
             #     o_labels = sem_labels.astype(np.int32)
 
             curr_new_points = curr_new_points - p0
-            t_normalize = self.cfg.get('t_normalize', None)
+            t_normalize = self.cfg.get('t_normalize', {})
             curr_new_points, curr_feat = trans_normalize(
                 curr_new_points, feat, t_normalize)
 

@@ -169,7 +169,7 @@ class RandLANet(BaseModel):
         else:
             feat = feat[selected_idxs]
 
-        t_normalize = cfg.get('t_normalize', None)
+        t_normalize = cfg.get('t_normalize', {})
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if attr['split'] in ['training', 'train']:
