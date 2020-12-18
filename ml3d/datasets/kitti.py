@@ -86,7 +86,7 @@ class KITTI(BaseDataset):
     @staticmethod
     def read_label(path, calib):
         if not Path(path).exists():
-            return None
+            return []
 
         with open(path, 'r') as f:
             lines = f.readlines()

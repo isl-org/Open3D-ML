@@ -143,13 +143,13 @@ class ObjdetAugmentation():
         bev_range = pcd_range[[0, 1, 3, 4]]
 
         filtered_boxes = []
-        for box in data['bboxes']:
+        for box in data['bbox_objs']:
             if in_range_bev(bev_range, box.to_xyzwhlr()):
                 filtered_boxes.append(box)
 
         return {
             'point': data['point'],
-            'bboxes': filtered_boxes,
+            'bbox_objs': filtered_boxes,
             'calib': data['calib']
         }
 
@@ -157,7 +157,7 @@ class ObjdetAugmentation():
     def ObjectSample(data, db_boxes_dict, sample_dict):
         rate = 1.0
         points = data['point']
-        bboxes = data['bboxes']
+        bboxes = data['bbox_objs']
 
         if len(bboxes) == 0:
             return []
@@ -165,7 +165,7 @@ class ObjdetAugmentation():
         cat2label = bboxes[0].cat2label
         label2cat = bboxes[0].label2cat
 
-        gt_labels_3d = [box.label_class for box in data['bboxes']]
+        gt_labels_3d = [box.label_class for box in data['bbox_objs']]
 
         sampled_num_dict = {}
 
@@ -179,7 +179,7 @@ class ObjdetAugmentation():
             sampled_num_dict[class_name] = sampled_num
 
         sampled = []
-        avoid_coll_boxes = data['bboxes']
+        avoid_coll_boxes = data['bbox_objs']
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
             if sampled_num < 0:
@@ -200,9 +200,9 @@ class ObjdetAugmentation():
 
             points = remove_points_in_boxes(points, sampled)
             points = np.concatenate([sampled_points, points], axis=0)
-            bboxes = data['bboxes'] + sampled
+            bboxes = data['bbox_objs'] + sampled
 
-        return {'point': points, 'bboxes': bboxes, 'calib': data['calib']}
+        return {'point': points, 'bbox_objs': bboxes, 'calib': data['calib']}
 
     @staticmethod
     def ObjectNoise(input,
