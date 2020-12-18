@@ -464,8 +464,6 @@ class KPFCNN(BaseModel):
                 curr_new_coords = np.hstack(
                     (curr_new_points, curr_feat[mask_inds, :]))
 
-            curr_new_coords[:, 2] += p0[:, 2]
-
             in_pts = curr_new_points
             in_fts = curr_new_coords
             in_lbls = curr_sem_labels
