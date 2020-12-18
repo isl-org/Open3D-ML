@@ -1,40 +1,44 @@
 # Scripts
 
-## `semseg.py`
+## `run_pipeline.py`
 
-This script creates and trains a pipeline (SemanticSegmentation by default).
+This script creates and trains a pipeline (SemanticSegmentation or ObjectDetection).
 To define the dataset you can pass the path to the dataset or the path to a
 config file as shown below.
+
 ```shell
 # Initialize a dataset using its path
-python scripts/semseg.py {tf|torch} -p PIPELINE_NAME -m MODEL_NAME \
+python scripts/run_pipeline.py {tf|torch} -p PIPELINE_NAME -m MODEL_NAME \
 -d DATASET_NAME --dataset_path DATASET_PATH [optional arguments]
 
 # Initialize a dataset using its config file
-python scripts/semseg.py {tf|torch} -p PIPELINE_NAME -m MODEL_NAME \
+python scripts/run_pipeline.py {tf|torch} -p PIPELINE_NAME -m MODEL_NAME \
 -d DATASET_NAME --cfg_dataset DATASET_CONFIG_FILE  [optional arguments]
-```
 
+```
 Alternatively, you can run the script using one single config file, which 
 contains configs for dataset, model, and pipeline.
 ```shell
-python scripts/semseg.py {tf|torch} -c CONFIG_FILE [optional arguments]
+python scripts/run_pipeline.py {tf|torch} -c CONFIG_FILE [optional arguments]
 ```
-
+For further help, run `python scripts/run_pipeline.py --help`.
 ### Examples
-```shell
-# Train RandLANet on SemanticKITTI for segmantic segmentation 
-python scripts/semseg.py torch -m RandLANet \
--d SemanticKITTI --cfg_dataset ml3d/configs/default_cfgs/semantickitti.yml \
---dataset_path ../dataset/SemanticKITTI 
 
+```shell
+# Training on RandLANet and SemanticKITTI with torch.
+python scripts/run_pipeline.py torch -c ml3d/configs/randlanet_semantickitti.yml --dataset.dataset_path <path-to-dataset> --pipeline SemanticSegmentation --dataset.use_cache True
+
+# Training on PointPillars and KITTI with torch.
+python scripts/run_pipeline.py torch -c ml3d/configs/pointpillars_kitti.yml --split test --dataset.dataset_path <path-to-dataset> --pipeline ObjectDetection --dataset.use_cache True
 
 # Use a config file to train this model with tensorflow
-python scripts/semseg.py tf -c ml3d/configs/kpconv_semantickitti.yml \
+python scripts/run_pipeline.py tf -c ml3d/configs/kpconv_semantickitti.yml \
 --dataset_path ../--pipeline.batch_size 2
+
 ```
+
 Arguments can be
-- `-p, --pipeline`: pipeline name, SemanticSegmentation by default
+- `-p, --pipeline`: pipeline name, SemanticSegmentation or ObjectDetection
 - `-m, --model`: model name (RnadLANet, KPConv)
 - `-d, --dataset`: dataset name (SemanticKITTI, Toronto3D, S3DIS, ParisLille3D, Semantic3D)
 - `-c, --c`: config file path (example config files are in in `ml3d/configs/`)
