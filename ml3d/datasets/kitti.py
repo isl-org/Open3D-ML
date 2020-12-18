@@ -181,10 +181,10 @@ class KITTI(BaseDataset):
         else:
             raise ValueError("Invalid split {}".format(split))
 
-    def is_tested():
+    def is_tested(self):
         pass
 
-    def save_test_result():
+    def save_test_result(self):
         pass
 
 

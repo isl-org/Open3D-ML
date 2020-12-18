@@ -62,12 +62,10 @@ class ObjectDetection(BasePipeline):
         model.eval()
 
         with torch.no_grad():
-            if not isinstance(data['point'], torch.Tensor):
-                inputs = torch.tensor([data['point']],
-                                      dtype=torch.float32,
-                                      device=self.device)
-            else:
-                inputs = data['point'].unsqueeze(0)
+            inputs = torch.tensor(data['point'],
+                                    dtype=torch.float32,
+                                    device=self.device)
+            inputs = torch.reshape(inputs, (1, -1, inputs.shape[-1]))
             results = model(inputs)
             boxes = model.inference_end(results, data)
 

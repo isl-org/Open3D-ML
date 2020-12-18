@@ -219,11 +219,26 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        return {
+        new_data = {
             'point': points,
             'bbox_objs': data['bounding_boxes'],
             'calib': data['calib']
         }
+
+        if 'full_point' in data:
+            points = np.array(data['full_point'][:, 0:4], dtype=np.float32)
+
+            min_val = np.array(self.point_cloud_range[:3])
+            max_val = np.array(self.point_cloud_range[3:])
+
+            points = points[np.where(
+                np.all(np.logical_and(points[:, :3] >= min_val,
+                                    points[:, :3] < max_val),
+                    axis=-1))]
+
+            new_data['full_point'] = points
+
+        return new_data
 
     def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
         db_boxes = pickle.load(open(pickle_path, 'rb'))

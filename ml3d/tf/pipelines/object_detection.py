@@ -55,7 +55,8 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs = tf.convert_to_tensor([data['point']], dtype=np.float32)
+        inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
+        inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
 
         results = model(inputs, training=False)
         boxes = model.inference_end(results, data)
