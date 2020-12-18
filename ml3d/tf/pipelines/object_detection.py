@@ -55,7 +55,8 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs = tf.convert_to_tensor([data['point']], dtype=np.float32)
+        inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
+        inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
 
         results = model(inputs, training=False)
         boxes = model.inference_end(results, data)
@@ -93,8 +94,8 @@ class ObjectDetection(BasePipeline):
         self.test_ious = []
 
         pred = []
-        for inputs in tqdm(test_split, desc='testing'):
-            results = self.run_inference(inputs['data'])
+        for i in tqdm(range(len(test_split)), desc='testing'):
+            results = self.run_inference(test_split[i]['data'])
             pred.append(convert_data_eval(results[0], [40, 25]))
 
         #dataset.save_test_result(pred, attr)
@@ -125,8 +126,8 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         gt = []
-        for inputs in tqdm(valid_loader, desc='validation'):
-            data = inputs['data']
+        for i in tqdm(range(len(valid_loader)), desc='validation'):
+            data = valid_loader[i]['data']
             results = model(data['point'], training=False)
             loss = model.loss(results, data)
             for l, v in loss.items():
@@ -227,9 +228,9 @@ class ObjectDetection(BasePipeline):
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             self.losses = {}
-            process_bar = tqdm(train_loader, desc='training')
-            for inputs in process_bar:
-                data = inputs['data']
+            process_bar = tqdm(range(len(train_loader)), desc='training')
+            for i in process_bar:
+                data = train_loader[i]['data']
                 with tf.GradientTape(persistent=True) as tape:
                     results = model(data['point'])
                     loss = model.loss(results, data)

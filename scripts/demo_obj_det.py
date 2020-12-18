@@ -66,7 +66,7 @@ def main(args):
     cfg = _ml3d.utils.Config.load_from_file(
         "ml3d/configs/pointpillars_kitti.yml")
 
-    model = PointPillars(**cfg.model)
+    model = PointPillars(device=args.device, **cfg.model)
     dataset = KITTI(args.path_kitti)
     pipeline = ObjectDetection(model, dataset, device=args.device)
 
@@ -83,7 +83,7 @@ def main(args):
     # run inference on a single example.
     result = pipeline.run_inference(data)[0]
 
-    boxes = data['bboxes']
+    boxes = data['bbox_objs']
     boxes.extend(result)
 
     vis = Visualizer()
