@@ -382,10 +382,7 @@ class RandLANet(BaseModel):
                                                    pick_idx,
                                                    self.cfg.num_points)
 
-                if not cfg.get('recentering', True):
-                    pc = pc + center_point
-
-                t_normalize = cfg.get('t_normalize', None)
+                t_normalize = cfg.get('t_normalize', {})
                 pc, feat = trans_normalize(pc, feat, t_normalize)
 
                 if attr['split'] in ['training', 'train']:
@@ -429,10 +426,7 @@ class RandLANet(BaseModel):
         self.possibility[selected_idx] += delta
         inputs['point_inds'] = selected_idx
 
-        if not cfg.get('recentering', True):
-            pc = pc + center_point
-
-        t_normalize = cfg.get('t_normalize', None)
+        t_normalize = cfg.get('t_normalize', {})
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if feat is None:
@@ -574,8 +568,11 @@ class RandLANet(BaseModel):
             feat = np.array(data['feat'], dtype=np.float32)
 
         split = attr['split']
-
         data = dict()
+        if cfg.get('t_align', False):
+            points_min = np.expand_dims(points.min(0), 0)
+            points_min[0, :2] = 0
+            points = points - points_min
 
         if (feat is None):
             sub_points, sub_labels = DataProcessing.grid_subsampling(

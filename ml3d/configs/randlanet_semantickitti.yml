@@ -37,7 +37,8 @@ model:
   - 4
   - 4
   - 4
-  recentering: False
+  t_normalize:
+    recentering: []
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

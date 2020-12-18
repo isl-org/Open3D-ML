@@ -413,7 +413,6 @@ class SemanticSegmentation(BasePipeline):
                     conf_m = metric.confusion_matrix(predict_scores, gt_labels)
                     acc = metric.acc(predict_scores, gt_labels)
                     iou = metric.iou(predict_scores, gt_labels)
-                    print(acc[-1], iou[-1])
 
                     self.valid_losses.append(loss.cpu().item())
                     self.valid_accs.append(acc)

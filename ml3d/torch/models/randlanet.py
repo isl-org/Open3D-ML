@@ -169,10 +169,7 @@ class RandLANet(BaseModel):
         else:
             feat = feat[selected_idxs]
 
-        if cfg.get('recentering', True):
-            pc = pc - center_point
-
-        t_normalize = cfg.get('t_normalize', None)
+        t_normalize = cfg.get('t_normalize', {})
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if attr['split'] in ['training', 'train']:
@@ -289,8 +286,12 @@ class RandLANet(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
-        split = attr['split']
+        if cfg.get('t_align', False):
+            points_min = np.expand_dims(points.min(0), 0)
+            points_min[0, :2] = 0
+            points = points - points_min
 
+        split = attr['split']
         data = dict()
 
         if (feat is None):
