@@ -5,9 +5,6 @@ from .operations import *
 
 
 def trans_normalize(pc, feat, t_normalize):
-    if t_normalize is None:
-        return pc, feat
-
     dim = t_normalize.get('recentering', [0, 1, 2])
     pc[:, dim] = pc[:, dim] - pc.mean(0)[dim]
 
