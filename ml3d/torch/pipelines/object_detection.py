@@ -37,7 +37,7 @@ class ObjectDetection(BasePipeline):
                  dataset=None,
                  name='ObjectDetection',
                  main_log_dir='./logs/',
-                 device='gpu',
+                 device='cuda',
                  split='train',
                  **kwargs):
         super().__init__(model=model,
@@ -107,8 +107,8 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         with torch.no_grad():
-            for i in tqdm(range(len(test_split)), desc='testing'):
-                results = self.run_inference(test_split[i]['data'])
+            for inputs in tqdm(test_split, desc='testing'):
+                results = self.run_inference(inputs['data'])
                 pred.append(convert_data_eval(results[0], [40, 25]))
 
         #dataset.save_test_result(results, attr)
@@ -134,7 +134,7 @@ class ObjectDetection(BasePipeline):
         valid_dataset = dataset.get_split('validation')
         valid_loader = TorchDataloader(dataset=valid_dataset,
                                        preprocess=model.preprocess,
-                                       transform=None,
+                                       transform=model.transform,
                                        use_cache=dataset.cfg.use_cache,
                                        shuffle=False)
 
@@ -145,20 +145,19 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for i in tqdm(range(len(valid_loader)), desc='validation'):
-                inputs = model.transform(valid_loader[i]['data'],
-                                         valid_loader[i]['attr'])
-                results = model(inputs['point'])
-                loss = model.loss(results, inputs)
+            for inputs in tqdm(valid_loader, desc='validation'):
+                data = inputs['data']
+                results = model(data['point'])
+                loss = model.loss(results, data)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
                         self.valid_losses[l] = []
                     self.valid_losses[l].append(v.cpu().item())
 
                 # convert to bboxes for mAP evaluation
-                boxes = model.inference_end(results, inputs)
+                boxes = model.inference_end(results, data)
                 pred.append(convert_data_eval(boxes[0], [40, 25]))
-                gt.append(convert_data_eval(valid_loader[i]['data']['bboxes']))
+                gt.append(convert_data_eval(data['bbox_objs']))
 
         sum_loss = 0
         desc = "validation - "
@@ -257,12 +256,12 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                inputs = train_loader[i]['data']
+            process_bar = tqdm(train_loader, desc='training')
+            for inputs in process_bar:
+                data = inputs['data']
 
-                results = model(inputs['point'])
-                loss = model.loss(results, inputs)
+                results = model(data['point'])
+                loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()
