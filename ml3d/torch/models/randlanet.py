@@ -130,6 +130,23 @@ class RandLANet(BaseModel):
 
         return loss, labels, scores
 
+    def update_probs(self, inputs, results, test_probs, test_labels):
+        self.test_smooth = 0.95
+
+        for b in range(results.size()[0]):
+
+            result = torch.reshape(results[b], (-1, self.cfg.num_classes))
+            probs = torch.nn.functional.softmax(result, dim=-1)
+            probs = result.cpu().data.numpy()
+            labels = np.argmax(probs, 1)
+            inds = inputs['data']['point_inds'][b]
+
+            test_probs[inds] = self.test_smooth * test_probs[inds] + (
+                1 - self.test_smooth) * probs
+            test_labels[inds] = labels
+
+        return test_probs, test_labels
+
     def transform(self, data, attr, min_possibility_idx=None):
         cfg = self.cfg
         inputs = dict()
@@ -152,17 +169,7 @@ class RandLANet(BaseModel):
         else:
             feat = feat[selected_idxs]
 
-        if attr['split'] == 'test':
-            dists = np.sum(np.square((pc - center_point).astype(np.float32)),
-                           axis=1)
-            delta = np.square(1 - dists / np.max(dists))
-            self.possibility[selected_idxs] += delta
-            inputs['point_inds'] = selected_idx
-
-        if cfg.get('recentering', True):
-            pc = pc - center_point
-
-        t_normalize = cfg.get('t_normalize', None)
+        t_normalize = cfg.get('t_normalize', {})
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if attr['split'] in ['training', 'train']:
@@ -200,6 +207,7 @@ class RandLANet(BaseModel):
         inputs['sub_idx'] = input_pools
         inputs['interp_idx'] = input_up_samples
         inputs['features'] = features
+        inputs['point_inds'] = selected_idxs
 
         inputs['labels'] = label.astype(np.int64)
         return inputs
@@ -278,8 +286,12 @@ class RandLANet(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
-        split = attr['split']
+        if cfg.get('t_align', False):
+            points_min = np.expand_dims(points.min(0), 0)
+            points_min[0, :2] = 0
+            points = points - points_min
 
+        split = attr['split']
         data = dict()
 
         if (feat is None):

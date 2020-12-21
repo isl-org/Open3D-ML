@@ -415,7 +415,7 @@ class KPFCNN(BaseModel):
 
         num_merged = 0
 
-        data = {
+        result_data = {
             'p_list': [],
             'f_list': [],
             'l_list': [],
@@ -454,7 +454,7 @@ class KPFCNN(BaseModel):
             #     o_labels = sem_labels.astype(np.int32)
 
             curr_new_points = curr_new_points - p0
-            t_normalize = self.cfg.get('t_normalize', None)
+            t_normalize = self.cfg.get('t_normalize', {})
             curr_new_points, curr_feat = trans_normalize(
                 curr_new_points, feat, t_normalize)
 
@@ -463,8 +463,6 @@ class KPFCNN(BaseModel):
             else:
                 curr_new_coords = np.hstack(
                     (curr_new_points, curr_feat[mask_inds, :]))
-
-            curr_new_coords[:, 2] += p0[:, 2]
 
             in_pts = curr_new_points
             in_fts = curr_new_coords
@@ -514,17 +512,17 @@ class KPFCNN(BaseModel):
             if np.random.rand() > self.cfg.augment_color:
                 in_fts[:, 3:] *= 0
 
-            data['p_list'] += [in_pts]
-            data['f_list'] += [in_fts]
-            data['l_list'] += [np.squeeze(in_lbls)]
-            data['p0_list'] += [p0]
-            data['s_list'] += [scale]
-            data['R_list'] += [R]
-            data['r_inds_list'] += [proj_inds]
-            data['r_mask_list'] += [reproj_mask]
-            data['val_labels_list'] += [o_labels]
+            result_data['p_list'] += [in_pts]
+            result_data['f_list'] += [in_fts]
+            result_data['l_list'] += [np.squeeze(in_lbls)]
+            result_data['p0_list'] += [p0]
+            result_data['s_list'] += [scale]
+            result_data['R_list'] += [R]
+            result_data['r_inds_list'] += [proj_inds]
+            result_data['r_mask_list'] += [reproj_mask]
+            result_data['val_labels_list'] += [o_labels]
 
-        return data
+        return result_data
 
     def inference_begin(self, data):
         self.test_smooth = 0.98
@@ -571,7 +569,8 @@ class KPFCNN(BaseModel):
         for b_i, length in enumerate(lengths):
             # Get prediction
             probs = stk_probs[i0:i0 + length]
-            labels = stk_labels[i0:i0 + length]
+            labels = np.argmax(probs, 1)
+
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
             test_probs[proj_mask] = self.test_smooth * test_probs[proj_mask] + (

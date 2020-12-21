@@ -83,13 +83,15 @@ class Config(object):
         # merge args to cfg
         if args.device is not None:
             cfg.pipeline.device = args.device
+            cfg.model.device = args.device
         if args.split is not None:
             cfg.pipeline.split = args.split
         if args.main_log_dir is not None:
             cfg.pipeline.main_log_dir = args.main_log_dir
         if args.dataset_path is not None:
             cfg.dataset.dataset_path = args.dataset_path
-        # if args.cfg_model is not None:
+        if args.ckpt_path is not None:
+            cfg.model.ckpt_path = args.ckpt_path
 
         extra_cfg_dict = {'model': {}, 'dataset': {}, 'pipeline': {}}
 

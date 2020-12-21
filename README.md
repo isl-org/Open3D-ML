@@ -1,4 +1,5 @@
 
+
 <p align="center">
 <img src="https://raw.githubusercontent.com/intel-isl/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
 <span style="font-size: 220%"><b>ML</b></span>
@@ -325,8 +326,6 @@ The table shows the available models and datasets for the object detection task 
 | KITTI (torch) | [54.3](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)        |     [43.5](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)  | 
 
 
-
-
 ## Model Zoo
 
 For a full list of all weight files see [model_weights.txt](https://storage.googleapis.com/open3d-releases/model-zoo/model_weights.txt)
@@ -361,12 +360,13 @@ For downloading these datasets visit the respective webpages and have a look at 
 * [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
 
 ## Contribute
-There are many ways to contribute to this project. You can
-* implement a new model
-* add code for reading a new dataset
-* share parameters and weights for an existing model
-* report problems and bugs
+There are many ways to contribute to this project. You can:
+* Implement a new model
+* Add code for reading a new dataset
+* Share parameters and weights for an existing model
+* Report problems and bugs
 
+Please, **make your pull requests to the** [**dev**](https://github.com/intel-isl/Open3D-ML/tree/dev) branch.
 Open3D is a community effort. We welcome and celebrate contributions from the
 community!
 
