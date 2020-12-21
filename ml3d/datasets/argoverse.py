@@ -25,7 +25,7 @@ class Argoverse(BaseDataset):
 
     def __init__(self,
                  dataset_path,
-                 info_path,
+                 info_path=None,
                  name='Argoverse',
                  cache_dir='./logs/cache',
                  use_cache=False,

@@ -199,6 +199,11 @@ def mAP(pred,
         Returns the mAP for each class and difficulty specified.
     """
 
+    if len(min_overlap) != len(classes):
+        assert len(min_overlap) == 1
+        min_overlap = min_overlap * len(classes)
+    assert len(min_overlap) == len(classes)
+
     cnt = 0
     box_cnts = [0]
     for p in pred:

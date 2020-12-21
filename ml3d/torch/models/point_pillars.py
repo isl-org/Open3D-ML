@@ -314,8 +314,8 @@ class PointPillars(BaseModel):
         world_cam, cam_img = None, None
         if 'calib' in inputs:
             calib = inputs['calib']
-            world_cam = calib['world_cam']
-            cam_img = calib['cam_img']
+            world_cam = calib.get('world_cam', None)
+            cam_img = calib.get('cam_img', None)
 
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
@@ -790,6 +790,7 @@ class Anchor3DHead(nn.Module):
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
+                 dir_offset=0,
                  ranges=[[0, -40.0, -3, 70.0, 40.0, 1]],
                  sizes=[[0.6, 1.0, 1.5]],
                  rotations=[0, 1.57],
@@ -801,7 +802,13 @@ class Anchor3DHead(nn.Module):
         self.feat_channels = feat_channels
         self.nms_pre = nms_pre
         self.score_thr = score_thr
+        self.dir_offset = dir_offset
         self.iou_thr = iou_thr
+
+        if len(self.iou_thr) != num_classes:
+            assert len(self.iou_thr) == 1
+            self.iou_thr = self.iou_thr * num_classes
+        assert len(self.iou_thr) == num_classes
 
         # build anchor generator
         self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
@@ -1005,7 +1012,7 @@ class Anchor3DHead(nn.Module):
         dir_scores = dir_scores[idxs]
 
         if bboxes.shape[0] > 0:
-            dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
-            bboxes[..., 6] = (dir_rot + np.pi * dir_scores.to(bboxes.dtype))
+            dir_rot = limit_period(bboxes[..., 6] - self.dir_offset, 1, np.pi)
+            bboxes[..., 6] = (dir_rot + self.dir_offset + np.pi * dir_scores.to(bboxes.dtype))
 
         return bboxes, scores, labels

@@ -855,8 +855,13 @@ class Anchor3DHead(tf.keras.layers.Layer):
         self.feat_channels = feat_channels
         self.nms_pre = nms_pre
         self.score_thr = score_thr
-        self.iou_thr = iou_thr
         self.dir_offset = dir_offset
+        self.iou_thr = iou_thr
+
+        if len(self.iou_thr) != num_classes:
+            assert len(self.iou_thr) == 1
+            self.iou_thr = self.iou_thr * num_classes
+        assert len(self.iou_thr) == num_classes
 
         # build anchor generator
         self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,

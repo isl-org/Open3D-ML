@@ -107,7 +107,7 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             for i in tqdm(range(len(test_split)), desc='testing'):
                 results = self.run_inference(test_split[i]['data'])
-                pred.append(convert_data_eval(results[0], [40, 25]))
+                pred.append(results[0])
 
         #dataset.save_test_result(results, attr)
 
@@ -169,28 +169,28 @@ class ObjectDetection(BasePipeline):
         log.info(desc)
 
         overlaps = cfg.get("overlaps", [0.5])
-        similar_classes = cfg.get("similar_classes", None)
+        similar_classes = cfg.get("similar_classes", {})
         difficulties = cfg.get("difficulties", [0])
 
         ap = mAP(pred, gt, model.classes, difficulties,
                 overlaps, similar_classes=similar_classes)
 
         log.info("")
-        log.info("================== mAP BEV ==================")
+        log.info("=============== mAP BEV ===============")
         log.info(("class \\ difficulty  " + "{:>5} " * len(difficulties)).format(*difficulties))
         for i, c in enumerate(model.classes):
-            log.info(("{:<20} " + "{:>5} " * len(difficulties)).format(c+":", *ap[i, :, 0]))
-        log.info("Overall: {}".format(np.mean(ap[:, -1])))
+            log.info(("{:<20} " + "{:>5.2f} " * len(difficulties)).format(c+":", *ap[i, :, 0]))
+        log.info("Overall: {:.2f}".format(np.mean(ap[:, -1])))
         self.valid_losses["mAP BEV"] = np.mean(ap[:, -1])
 
         ap = mAP(pred, gt, model.classes, difficulties, overlaps,
                 similar_classes=similar_classes, bev=False)
         log.info("")
-        log.info("================== mAP  3D ==================")
+        log.info("=============== mAP  3D ===============")
         log.info(("class \\ difficulty  " + "{:>5} " * len(difficulties)).format(*difficulties))
         for i, c in enumerate(model.classes):
-            log.info(("{:<20} " + "{:>5} " * len(difficulties)).format(c+":", *ap[i, :, 0]))
-        log.info("Overall: {}".format(np.mean(ap[:, -1])))
+            log.info(("{:<20} " + "{:>5.2f} " * len(difficulties)).format(c+":", *ap[i, :, 0]))
+        log.info("Overall: {:.2f}".format(np.mean(ap[:, -1])))
         self.valid_losses["mAP 3D"] = np.mean(ap[:, -1])
         
 

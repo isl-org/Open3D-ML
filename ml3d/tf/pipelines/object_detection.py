@@ -14,7 +14,7 @@ from ..dataloaders import TFDataloader
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 from ...datasets.utils import BEVBox3D
 
-from ...metrics.mAP import mAP, convert_data_eval
+from ...metrics.mAP import mAP
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -152,7 +152,7 @@ class ObjectDetection(BasePipeline):
         log.info(desc)
 
         overlaps = cfg.get("overlaps", [0.5])
-        similar_classes = cfg.get("similar_classes", None)
+        similar_classes = cfg.get("similar_classes", {})
         difficulties = cfg.get("difficulties", [0])
 
         ap = mAP(pred, gt, model.classes, difficulties,

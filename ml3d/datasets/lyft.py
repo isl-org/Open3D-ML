@@ -25,7 +25,7 @@ class Lyft(BaseDataset):
 
     def __init__(self,
                  dataset_path,
-                 info_path,
+                 info_path=None,
                  name='Lyft',
                  cache_dir='./logs/cache',
                  use_cache=False,
@@ -157,7 +157,7 @@ class LyftSplit():
         lidar_path = info['lidar_path']        
 
         world_cam = np.eye(4)
-        world_cam[:3, :3] = R.from_rot(info['lidar2ego_rot']).as_matrix()
+        world_cam[:3, :3] = R.from_quat(info['lidar2ego_rot']).as_matrix()
         world_cam[:, -1] = info['lidar2ego_tr']
         calib = {'world_cam': world_cam.T}
 

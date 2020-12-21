@@ -58,12 +58,12 @@ model:
       [-74.88, -74.88, -0.0345, 74.88, 74.88, -0.0345],
       [-74.88, -74.88, -0.1188, 74.88, 74.88, -0.1188],
       [-74.88, -74.88, 0, 74.88, 74.88, 0],
-    ],
+    ]
     sizes: [
       [2.08, 4.73, 1.77],  # car
       [0.84, 1.81, 1.77],  # cyclist
       [0.84, 0.91, 1.74]   # pedestrian
-    ],
+    ]
     dir_offset: 0.7854
     rotations: [0, 1.57]
     iou_thr: [[0.4, 0.55], [0.3, 0.5], [0.3, 0.5]]
@@ -71,6 +71,15 @@ model:
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
+    ObjectSample:
+      min_points_dict:
+        Car: 5
+        Pedestrian: 10
+        Cyclist: 10
+      sample_dict:
+        Car: 15
+        Pedestrian: 10
+        Cyclist: 10
 
 
 pipeline:
