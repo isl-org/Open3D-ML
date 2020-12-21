@@ -1,5 +1,5 @@
 dataset:
-  name: KITTI
+  name: Waymo
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
   steps_per_epoch_train: 5000
@@ -8,8 +8,8 @@ model:
   name: PointPillars
   ckpt_path: # path/to/your/checkpoint
 
-  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
-  classes: ['Pedestrian', 'Cyclist', 'Car']
+  point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
+  classes: ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
 
   loss:
     focal:
@@ -23,19 +23,19 @@ model:
       loss_weight: 0.2
 
   voxelize:
-    max_num_points: 32
+    max_num_points: 20
     voxel_size: &vsize
-      [0.16, 0.16, 4]
-    max_voxels: [16000, 40000]
+      [0.32, 0.32, 6]
+    max_voxels: [32000, 32000]
   
   voxel_encoder:
-    in_channels: 4
+    in_channels: 5
     feat_channels: [64]
     voxel_size: *vsize
 
   scatter:
     in_channels: 64
-    output_shape: [496, 432]
+    output_shape: [468, 468]
 
   backbone:
     in_channels: 64
@@ -52,29 +52,25 @@ model:
   head:
     in_channels: 384
     feat_channels: 384
-    nms_pre: 100
+    nms_pre: 4096
     score_thr: 0.1
     ranges: [
-      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-      [0, -39.68, -1.78, 70.4, 39.68, -1.78]
-    ]
-    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
+      [-74.88, -74.88, -0.0345, 74.88, 74.88, -0.0345],
+      [-74.88, -74.88, -0.1188, 74.88, 74.88, -0.1188],
+      [-74.88, -74.88, 0, 74.88, 74.88, 0],
+    ],
+    sizes: [
+      [2.08, 4.73, 1.77],  # car
+      [0.84, 1.81, 1.77],  # cyclist
+      [0.84, 0.91, 1.74]   # pedestrian
+    ],
+    dir_offset: 0.7854
     rotations: [0, 1.57]
-    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+    iou_thr: [[0.4, 0.55], [0.3, 0.5], [0.3, 0.5]]
   
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
-    ObjectSample:
-      min_points_dict:
-        Car: 5
-        Pedestrian: 10
-        Cyclist: 10
-      sample_dict:
-        Car: 15
-        Pedestrian: 10
-        Cyclist: 10
 
 
 pipeline:
@@ -95,9 +91,5 @@ pipeline:
 
   # evaluation properties
   overlaps: [0.5, 0.5, 0.7]
-  similar_classes: {
-    Van: Car,
-    Person_sitting: Pedestrian
-  }
   difficulties: [0, 1, 2]
     

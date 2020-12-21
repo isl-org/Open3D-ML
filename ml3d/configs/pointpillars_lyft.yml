@@ -1,5 +1,5 @@
 dataset:
-  name: KITTI
+  name: Lyft
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
   steps_per_epoch_train: 5000
@@ -8,8 +8,11 @@ model:
   name: PointPillars
   ckpt_path: # path/to/your/checkpoint
 
-  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
-  classes: ['Pedestrian', 'Cyclist', 'Car']
+  point_cloud_range: [-80, -80, -5, 80, 80, 3.0]
+  classes: [
+    'car', 'truck', 'bus', 'emergency_vehicle', 'other_vehicle', 'motorcycle',
+    'bicycle', 'pedestrian', 'animal'
+  ]
 
   loss:
     focal:
@@ -23,10 +26,10 @@ model:
       loss_weight: 0.2
 
   voxelize:
-    max_num_points: 32
+    max_num_points: 20
     voxel_size: &vsize
-      [0.16, 0.16, 4]
-    max_voxels: [16000, 40000]
+      [0.25, 0.25, 8]
+    max_voxels: [60000, 60000]
   
   voxel_encoder:
     in_channels: 4
@@ -35,7 +38,7 @@ model:
 
   scatter:
     in_channels: 64
-    output_shape: [496, 432]
+    output_shape: [640, 640]
 
   backbone:
     in_channels: 64
@@ -52,29 +55,37 @@ model:
   head:
     in_channels: 384
     feat_channels: 384
-    nms_pre: 100
-    score_thr: 0.1
+    nms_pre: 1000
+    score_thr: 0.05
     ranges: [
-      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-      [0, -39.68, -1.78, 70.4, 39.68, -1.78]
-    ]
-    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
+      [-80, -80, -1.0715024, 80, 80, -1.0715024],
+      [-80, -80, -0.3033737, 80, 80, -0.3033737],
+      [-80, -80, -0.3519405, 80, 80, -0.3519405],
+      [-80, -80, -0.8871424, 80, 80, -0.8871424],
+      [-80, -80, -0.6276341, 80, 80, -0.6276341],
+      [-80, -80, -1.3220503, 80, 80, -1.3220503],
+      [-80, -80, -1.0709302, 80, 80, -1.0709302],
+      [-80, -80, -0.9122268, 80, 80, -0.9122268],
+      [-80, -80, -1.8012227, 80, 80, -1.8012227]
+    ],
+    sizes: [
+        [1.92, 4.75, 1.71],   # car
+        [2.84, 10.24, 3.44],  # truck
+        [2.92, 12.70, 3.42],  # bus
+        [2.42, 6.52, 2.34],   # emergency vehicle
+        [2.75, 8.17, 3.20],   # other vehicle
+        [0.96, 2.35, 1.59],   # motorcycle
+        [0.63, 1.76, 1.44],   # bicycle
+        [0.76, 0.80, 1.76],   # pedestrian
+        [0.35, 0.73, 0.50]    # animal
+    ],
     rotations: [0, 1.57]
-    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+    iou_thr: [[0.3, 0.6]]
+    dir_offset: 0.7854
   
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
-    ObjectSample:
-      min_points_dict:
-        Car: 5
-        Pedestrian: 10
-        Cyclist: 10
-      sample_dict:
-        Car: 15
-        Pedestrian: 10
-        Cyclist: 10
 
 
 pipeline:
@@ -95,9 +106,5 @@ pipeline:
 
   # evaluation properties
   overlaps: [0.5, 0.5, 0.7]
-  similar_classes: {
-    Van: Car,
-    Person_sitting: Pedestrian
-  }
-  difficulties: [0, 1, 2]
+  difficulties: [0]
     
