@@ -180,11 +180,6 @@ class SemanticSegmentation(BasePipeline):
     
     """
 
-    """
-    Run the test using the data passed.
-    
-    """
-
     def run_test(self):
         model = self.model
         dataset = self.dataset
@@ -218,9 +213,7 @@ class SemanticSegmentation(BasePipeline):
 
         self.dataset_split = test_dataset
 
-
         self.load_ckpt(model.cfg.ckpt_path)
-
 
         model.trans_point_sampler = test_sampler.get_point_sampler()
         self.curr_cloud_id = -1
@@ -245,11 +238,6 @@ class SemanticSegmentation(BasePipeline):
                     dataset.save_test_result(inference_result, attr)
 
         log.info("Finshed testing")
-
-    """
-    Update tests using sampler, inputs, and results.
-    
-    """
 
     """
     Update tests using sampler, inputs, and results.
@@ -294,11 +282,6 @@ class SemanticSegmentation(BasePipeline):
             self.ori_test_labels.append(
                 self.test_labels[self.curr_cloud_id][proj_inds])
             self.complete_infer = True
-
-    """
-    Run the training on the self model.
-    
-    """
 
     """
     Run the training on the self model.
@@ -520,11 +503,6 @@ class SemanticSegmentation(BasePipeline):
                  f" eval: {valid_total_iou:.3f}")
         log.info(f"total acc train: {valid_total_acc:.3f} "
                  f" eval: {valid_total_acc:.3f}")
-
-    """
-    Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
-    
-    """
 
     """
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
