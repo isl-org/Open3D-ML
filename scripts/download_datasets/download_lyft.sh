@@ -23,3 +23,12 @@ tar -xvf test.tar
 mkdir tar_files
 mv train.tar tar_files
 mv test.tar tar_files
+
+mkdir train-v1.01
+mkdir test-v1.01
+
+mv train_data train-v1.01/data
+mv train_map train-v1.01/map
+
+mv test_data test-v1.01/data
+mv test_map test-v1.01/map

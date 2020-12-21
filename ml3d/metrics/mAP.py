@@ -2,43 +2,6 @@ import numpy as np
 from . import iou_bev, iou_3d
 
 
-def convert_data_eval(bboxes, diff=None):
-    """
-    Convert data for evaluation:
-
-    Args:
-        bboxes: List of BEVBox3D bboxes.
-        diff: List of custom heights thresholds for computation of difficulty. 
-            Default: None (use the default difficulty of the dataset class)
-    """
-    bbox = np.empty((len(bboxes), 7))
-    label = np.empty((len(bboxes),))
-    score = np.empty((len(bboxes),))
-    difficulty = np.empty((len(bboxes)))
-    for i, box in enumerate(bboxes):
-        bbox[i] = box.to_camera()
-        label[i] = box.label_class
-        score[i] = box.confidence
-        if diff is not None:
-            height = box.to_img()[3]
-            difficulty[i] = -1
-            for j in range(len(diff)):
-                if height > diff[j]:
-                    difficulty[i] = j
-                    break
-        else:
-            difficulty[i] = box.get_difficulty()
-
-    result = {
-        'bbox': bbox,
-        'label': label,
-        'score': score,
-        'difficulty': difficulty
-    }
-
-    return result
-
-
 def filter_data(data, labels, diffs=None):
     """Filters the data to fit the given labels and difficulties.
     Args:
@@ -70,37 +33,6 @@ def filter_data(data, labels, diffs=None):
     for k in data:
         result[k] = data[k][idx]
     return result, idx
-
-
-def flatten_data(data):
-    """Converts a list of dictionaries into one dictionary.
-    Args:
-        data (dict): List of dictionaries with the data (as numpy arrays).
-            {
-                ...: [...]
-            }[]
-
-    Returns:
-        Single dictionary with merged lists and additional entry 
-        for the original indices.
-            {
-                ...: [...],
-                idx: number[]
-            }[]
-    """
-    res = {}
-    res['idx'] = []
-    for i, d in enumerate(data):
-        l = 0
-        for k in d:
-            if k not in res:
-                res[k] = []
-            res[k].extend(d[k])
-            l = len(d[k])
-        res['idx'].extend([i] * l)
-    for k in res:
-        res[k] = np.array(res[k])
-    return res
 
 
 def precision_3d(pred,

@@ -2,13 +2,14 @@ dataset:
   name: KITTI
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
+  steps_per_epoch_train: 50
 
 model:
   name: PointPillars
   ckpt_path: # path/to/your/checkpoint
 
-  voxel_size: [0.16, 0.16, 4]
   point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
+  classes: ['Pedestrian', 'Cyclist', 'Car']
 
   loss:
     focal:
@@ -23,11 +24,14 @@ model:
 
   voxelize:
     max_num_points: 32
+    voxel_size: &vsize
+      [0.16, 0.16, 4]
     max_voxels: [16000, 40000]
   
   voxel_encoder:
     in_channels: 4
     feat_channels: [64]
+    voxel_size: *vsize
 
   scatter:
     in_channels: 64
@@ -46,7 +50,6 @@ model:
     use_conv_for_no_stride: false
 
   head:
-    num_classes: 3
     in_channels: 384
     feat_channels: 384
     nms_pre: 100
@@ -84,8 +87,17 @@ pipeline:
   main_log_dir: ./logs
   train_sum_dir: train_log
   grad_clip_norm: 2
+
   optimizer:
     lr: 0.001
     betas: [0.95, 0.99]
     weight_decay: 0.01
+
+  # evaluation properties
+  overlaps: [0.5, 0.5, 0.7]
+  similar_classes: {
+    Van: Car,
+    Person_sitting: Pedestrian
+  }
+  difficulties: [0, 1, 2]
     
