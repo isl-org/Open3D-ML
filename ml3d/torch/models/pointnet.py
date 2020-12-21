@@ -18,7 +18,7 @@ class PointNet(BaseModel):
                  dim_input=3,
                  dim_feature=0,
                  normalize=True,
-                 augment='uniform',
+                 jitter='uniform',
                  feature_transform_regularization=0.001,
                  batcher='DefaultBatcher',
                  ckpt_path=None,
@@ -32,7 +32,7 @@ class PointNet(BaseModel):
             dim_input=dim_input,
             dim_feature=dim_feature,
             normalize=normalize,
-            augment=augment,
+            augment=jitter,
             feature_transform_regularization=feature_transform_regularization,
             batcher=batcher,
             ckpt_path=ckpt_path,
@@ -45,14 +45,17 @@ class PointNet(BaseModel):
         elif task == 'segmentation':
             self.net = SceneSegmenter(num_points, num_classes, dim_input,
                                       dim_feature)
+        elif task == 'part_segmentation':
+            self.net = PartSegmenter(num_points, num_classes, dim_input,
+                                     dim_feature)
         else:
             raise ValueError(f"Invalid task {task}")
-        assert augment in ['gaussian',
-                           'uniform'], f"Invalid augmentation {augment}"
+        assert jitter in ['gaussian',
+                          'uniform'], f"Invalid augmentation {jitter}"
 
         self.num_points = num_points
         self.normalize = normalize
-        self.augment = augment
+        self.augment = jitter
         self.inference_data = None
         self.inference_result = None
         self.feature_transform_regularization = feature_transform_regularization
@@ -66,13 +69,17 @@ class PointNet(BaseModel):
         cfg = self.cfg
         labels = inputs['data']['labels']
 
-        # Todo: Is this valid for classification?
-        scores, labels = filter_valid_label(results[0], labels, cfg.num_classes,
-                                            cfg.ignored_label_inds, device)
+        if self.task != 'classification':
+            scores, labels = filter_valid_label(results[0], labels, cfg.num_classes,
+                                                cfg.ignored_label_inds, device)
 
-        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+            loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        else:
+            scores = results[0].reshape(-1, cfg.num_classes).unsqueeze(0).transpose(-2, -1)
+            labels = labels.reshape(-1).to(device).unsqueeze(0)
+            loss = Loss.weighted_CrossEntropyLoss(scores, labels, ignore_index=cfg.ignored_label_inds)
 
-        if self.net.feat.feature_transform:
+        if self.net.feature_transform:
             loss += transform_regularizer(
                 results[2], reg_weight=self.feature_transform_regularization)
 
@@ -124,7 +131,7 @@ class PointNet(BaseModel):
                     })
 
         if data.get('feat') is not None:
-            point = np.concatenate([point, data['feat'][choice].copy()], axis=1)
+            point = np.concatenate([point, data['feat'][choice]], axis=1)
 
         label = data['label'] if self.task == 'classification' else data[
             'label'][choice]
@@ -291,12 +298,11 @@ class Feature(torch.nn.Module):
         x = self.relu(self.bn4(self.conv4(x)))
         x = self.relu(self.bn5(self.conv5(x)))
         x = self.mp(x)
-        x = x.view(-1, 1024)
 
         if self.global_feature:
-            return x, t_in, t_feat
+            return x.view(-1, 1024), t_in, t_feat
         else:
-            x = x.view(-1, 1024, 1).repeat(1, 1, self.num_points)
+            x = x.repeat(1, 1, self.num_points)
             x = torch.cat([x, point_feature], dim=1)
             return x, t_in, t_feat
 
@@ -325,10 +331,13 @@ class Classifier(torch.nn.Module):
         self.feat = Feature(num_points, dim_input, dim_feature)
 
         self.num_points = num_points
+        self.input_transform = self.feat.input_transform
+        self.feature_transform = self.feat.feature_transform
 
     def forward(self, x):
         x, t_in, t_feat = self.feat(x)
         x = self.relu(self.bn1(self.fc1(x)))
+        # Following the original implementation even though the paper says "[...] on the last fully connected layer"
         x = self.dropout(x)
         x = self.relu(self.bn2(self.fc2(x)))
         x = self.dropout(x)
@@ -366,6 +375,8 @@ class SceneSegmenter(torch.nn.Module):
 
         self.num_points = num_points
         self.num_classes = num_classes
+        self.input_transform = self.feat.input_transform
+        self.feature_transform = self.feat.feature_transform
 
     def forward(self, x):
         x, t_in, t_feat = self.feat(x)
@@ -374,16 +385,102 @@ class SceneSegmenter(torch.nn.Module):
         x = self.relu(self.bn3(self.conv3(x)))
         x = self.relu(self.bn4(self.conv4(x)))
         x = self.conv5(x)
+
         x = x.transpose(2, 1).contiguous()
-        x = x.view(-1, self.num_points, self.num_classes)
         return x, t_in, t_feat
 
 
 class PartSegmenter(torch.nn.Module):
-
-    def __init__(self):
+    # Following paper supplementary
+    # Original implementation (OI) at https://github.com/charlesq34/pointnet/blob/master/part_seg/pointnet_part_seg.py
+    def __init__(self,
+                 num_points=3000,
+                 num_classes=50,
+                 dim_input=3,
+                 dim_feature=0,
+                 input_transform=True,
+                 feature_transform=True):
         super(PartSegmenter, self).__init__()
-        raise NotImplementedError
+
+        # "Shared MLP" implemented as Conv 1D with 1x1 kernels and "channels first" inputs
+        self.conv1 = torch.nn.Conv1d(dim_input + dim_feature, 64, 1)
+        self.conv2 = torch.nn.Conv1d(64, 128, 1)
+        self.conv3 = torch.nn.Conv1d(128, 128, 1)
+        self.conv4 = torch.nn.Conv1d(128, 512, 1)
+        self.conv5 = torch.nn.Conv1d(512, 2048, 1)
+        # Contrary to paper, no overall object category given so 3008 instead of 3008 + 16
+        self.conv6 = torch.nn.Conv1d(3008, 256, 1)
+        self.conv7 = torch.nn.Conv1d(256, 256, 1)
+        self.conv8 = torch.nn.Conv1d(256, 128, 1)
+        self.conv9 = torch.nn.Conv1d(128, num_classes, 1)
+        self.bn1 = torch.nn.BatchNorm1d(64)
+        self.bn2 = torch.nn.BatchNorm1d(128)
+        self.bn3 = torch.nn.BatchNorm1d(128)
+        self.bn4 = torch.nn.BatchNorm1d(512)
+        self.bn5 = torch.nn.BatchNorm1d(2048)
+        self.bn6 = torch.nn.BatchNorm1d(256)
+        self.bn7 = torch.nn.BatchNorm1d(256)
+        self.bn8 = torch.nn.BatchNorm1d(128)
+        self.mp = torch.nn.MaxPool1d(num_points)
+        self.relu = torch.nn.ReLU()
+
+        # Initialize weights with Xavier as in original implementation (PyTorch default is Kaiming He)
+        self.apply(init_weights)
+
+        self.in_trans = Transform(num_points=num_points, k=dim_input)
+        self.feat_trans = Transform(num_points=num_points, k=128)
+
+        self.num_points = num_points
+        self.num_classes = num_classes
+        self.dim_input = dim_input
+        self.dim_feature = dim_feature
+        self.input_transform = input_transform
+        self.feature_transform = feature_transform
+
+    def forward(self, x):
+        if self.input_transform:
+            # Only transform spatial input dimensions
+            if self.dim_feature:
+                x_feat = x[:, self.dim_input:]
+                x = x[:, :self.dim_input]
+
+            t_in = self.in_trans(x)
+            x = torch.bmm(t_in, x)
+
+            if self.dim_feature:
+                x = torch.cat([x, x_feat], dim=1)
+        else:
+            t_in = None
+
+        x1 = self.relu(self.bn1(self.conv1(x)))
+        x2 = self.relu(self.bn2(self.conv2(x1)))
+        x3 = self.relu(self.bn3(self.conv3(x2)))
+
+        # Contrary to paper OI doesn't use output of feat. transf. (x4) in feat. concat.
+        if self.feature_transform:
+            t_feat = self.feat_trans(x3)
+            x4 = torch.bmm(t_feat, x3)
+        else:
+            t_feat = None
+            x4 = x3
+
+        x5 = self.relu(self.bn4(self.conv4(x4)))
+        # Contrary to paper OI uses output of conv5 in feat. concat.
+        x = self.relu(self.bn5(self.conv5(x5)))
+
+        x6 = self.mp(x)
+        x6 = x6.repeat(1, 1, self.num_points)
+        # Contrary to paper OI concats x6 first instead of last
+        x = torch.cat([x1, x2, x3, x4, x5, x6], dim=1)
+
+        # Contrary to paper OI uses dropout after conv6 and 7
+        x = self.relu(self.bn6(self.conv6(x)))
+        x = self.relu(self.bn7(self.conv7(x)))
+        x = self.relu(self.bn8(self.conv8(x)))
+        x = self.conv9(x)
+
+        x = x.transpose(2, 1).contiguous()
+        return x, t_in, t_feat
 
 
 def transform_regularizer(transform, reg_weight=0.001):
