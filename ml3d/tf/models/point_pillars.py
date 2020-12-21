@@ -314,8 +314,8 @@ class PointPillars(BaseModel):
         world_cam, cam_img = None, None
         if 'calib' in inputs:
             calib = inputs['calib']
-            world_cam = calib['world_cam']
-            cam_img = calib['cam_img']
+            world_cam = calib.get('world_cam', None)
+            cam_img = calib.get('cam_img', None)
 
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()

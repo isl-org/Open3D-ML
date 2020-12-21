@@ -158,7 +158,7 @@ class LyftSplit():
 
         world_cam = np.eye(4)
         world_cam[:3, :3] = R.from_quat(info['lidar2ego_rot']).as_matrix()
-        world_cam[:, -1] = info['lidar2ego_tr']
+        world_cam[:3, -1] = info['lidar2ego_tr']
         calib = {'world_cam': world_cam.T}
 
         pc = self.dataset.read_lidar(lidar_path)
