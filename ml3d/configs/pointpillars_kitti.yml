@@ -7,7 +7,7 @@ model:
   name: PointPillars
   ckpt_path: # path/to/your/checkpoint
 
-  batcher: "None"
+  batcher: "ignore"
 
   voxel_size: [0.16, 0.16, 4]
   point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]

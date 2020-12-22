@@ -33,6 +33,7 @@ def unpack(flat_t, cnts=None):
     for cnt in cnts:
         idx1 = idx0 + cnt
         data_list.append(flat_t[idx0:idx1])
+        idx0 = idx1
     return data_list
 
 class PointPillars(BaseModel):
