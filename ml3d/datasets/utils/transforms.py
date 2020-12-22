@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import pickle
+import copy
 from .operations import *
 
 
@@ -160,9 +161,6 @@ class ObjdetAugmentation():
         points = data['point']
         bboxes = data['bbox_objs']
 
-        if len(bboxes) == 0:
-            return []
-
         gt_labels_3d = [box.label_class for box in data['bbox_objs']]
 
         sampled_num_dict = {}
@@ -176,7 +174,7 @@ class ObjdetAugmentation():
             sampled_num_dict[class_name] = sampled_num
 
         sampled = []
-        avoid_coll_boxes = data['bbox_objs']
+        avoid_coll_boxes = copy.deepcopy(data['bbox_objs'])
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
             if sampled_num < 0:
