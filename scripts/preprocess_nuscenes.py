@@ -144,6 +144,7 @@ class NuScenesProcess():
 
             lidar_path, boxes, _ = nusc.get_sample_data(lidar_token)
 
+            lidar_path = os.path.abspath(lidar_path)
             assert os.path.exists(lidar_path)
 
             data = {
