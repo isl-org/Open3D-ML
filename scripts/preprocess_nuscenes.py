@@ -20,9 +20,11 @@ def parse_args():
     parser.add_argument('--dataset_path',
                         help='path to Nuscene root',
                         required=True)
-    parser.add_argument('--out_path',
-                        help='Output path to store infos',
-                        required=True)
+    parser.add_argument(
+        '--out_path',
+        help='Output path to store pickle (default to dataet_path)',
+        default=None,
+        required=False)
 
     parser.add_argument('--version',
                         help='one of {v1.0-trainval, v1.0-test, v1.0-mini}',
@@ -220,5 +222,8 @@ class NuScenesProcess():
 
 if __name__ == '__main__':
     args = parse_args()
+    out_path = args.out_path
+    if out_path is None:
+        args.out_path = args.dataset_path
     converter = NuScenesProcess(args.dataset_path, args.out_path, args.version)
     converter.convert()

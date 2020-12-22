@@ -26,7 +26,11 @@ def parse_args():
     parser.add_argument('--dataset_path',
                         help='path to Waymo tfrecord files',
                         required=True)
-    parser.add_argument('--out_path', help='Output path', required=True)
+    parser.add_argument(
+        '--out_path',
+        help='Output path to store pickle (default to dataet_path)',
+        default=None,
+        required=False)
 
     parser.add_argument('--workers',
                         help='Number of workers.',
@@ -444,6 +448,9 @@ class Waymo2KITTI():
 
 if __name__ == '__main__':
     args = parse_args()
+    out_path = args.out_path
+    if out_path is None:
+        args.out_path = args.dataset_path
     converter = Waymo2KITTI(args.dataset_path, args.out_path, args.workers,
                             args.is_test)
     converter.convert()
