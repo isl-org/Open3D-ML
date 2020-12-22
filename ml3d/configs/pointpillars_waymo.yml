@@ -73,13 +73,13 @@ model:
     ObjectRangeFilter: True
     ObjectSample:
       min_points_dict:
-        Car: 5
-        Pedestrian: 10
-        Cyclist: 10
+        VEHICLE: 5
+        PEDESTRIAN: 10
+        CYCLIST: 10
       sample_dict:
-        Car: 15
-        Pedestrian: 10
-        Cyclist: 10
+        VEHICLE: 15
+        PEDESTRIAN: 10
+        CYCLIST: 10
 
 
 pipeline:
