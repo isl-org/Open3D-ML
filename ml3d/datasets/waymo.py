@@ -35,8 +35,6 @@ class Waymo(BaseDataset):
             dataset_path (str): path to the dataset
             kwargs:
         """
-        if info_path is None:
-            info_path = dataset_path
 
         super().__init__(dataset_path=dataset_path,
                          name=name,
@@ -85,7 +83,7 @@ class Waymo(BaseDataset):
         return np.fromfile(path, dtype=np.float32).reshape(-1, 6)
 
     @staticmethod
-    def read_label(path):
+    def read_label(path, calib):
         if not Path(path).exists():
             return None
 
@@ -97,7 +95,7 @@ class Waymo(BaseDataset):
             label = line.strip().split(' ')
             center = [float(label[11]), float(label[12]), float(label[13])]
             size = [float(label[9]), float(label[8]), float(label[10])]
-            objects.append(Object3d(center, size, label))
+            objects.append(Object3d(center, size, label, calib))
 
         return objects
 
@@ -192,7 +190,7 @@ class WaymoSplit():
 
         pc = self.dataset.read_lidar(pc_path)
         calib = self.dataset.read_calib(calib_path)
-        label = self.dataset.read_label(label_path)
+        label = self.dataset.read_label(label_path, calib)
 
         data = {
             'point': pc,
@@ -216,7 +214,7 @@ class Object3d(BEVBox3D):
     Stores object specific details like bbox coordinates, occlusion etc.
     """
 
-    def __init__(self, center, front, up, left, size, label):
+    def __init__(self, center, size, label, calib):
         confidence = float(label[15]) if label.__len__() == 16 else -1.0
 
         world_cam = calib['world_cam']
