@@ -115,10 +115,9 @@ class Argoverse(BaseDataset):
 
             box2d = box['2d_coord']
 
-            ry = np.arctan(
+            yaw = np.pi / 2 + np.arctan(
                 (box2d[0][0] - box2d[1][0]) / (box2d[0][1] - box2d[1][1]))
-
-            objects.append(Object3d(center, size, ry, name, box))
+            objects.append(Object3d(center, size, yaw, name, box))
 
         return objects
 
