@@ -8,8 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
-from .utils import DataProcessing
-from ..vis.boundingbox import BEVBox3D
+from .utils import DataProcessing, BEVBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -100,10 +99,7 @@ class KITTI(BaseDataset):
                  float(label[12]),
                  float(label[13]), 1.0])
 
-            rect = calib['R0_rect']
-            Trv2c = calib['Tr_velo2cam']
-
-            points = center @ np.linalg.inv((rect @ Trv2c).T)
+            points = center @ np.linalg.inv(calib['world_cam'])
 
             size = [float(label[9]), float(label[8]), float(label[10])]  # w,h,l
             center = [points[0], points[1], size[1] / 2 + points[2]]
@@ -152,14 +148,10 @@ class KITTI(BaseDataset):
         Tr_velo_to_cam = np.array(obj, dtype=np.float32).reshape(3, 4)
         Tr_velo_to_cam = KITTI._extend_matrix(Tr_velo_to_cam)
 
-        return {
-            'P0': P0,
-            'P1': P1,
-            'P2': P2,
-            'P3': P3,
-            'R0_rect': rect_4x4,
-            'Tr_velo2cam': Tr_velo_to_cam
-        }
+        world_cam = np.transpose(rect_4x4 @ Tr_velo_to_cam)
+        cam_img = np.transpose(P2)
+
+        return {'world_cam': world_cam, 'cam_img': cam_img}
 
     def get_split(self, split):
         return KITTISplit(self, split=split)
@@ -213,8 +205,7 @@ class KITTISplit():
         label = self.dataset.read_label(label_path, calib)
 
         reduced_pc = DataProcessing.remove_outside_points(
-            pc, calib['R0_rect'], calib['Tr_velo2cam'], calib['P2'],
-            [370, 1224])
+            pc, calib['world_cam'], calib['cam_img'], [370, 1224])
 
         data = {
             'point': reduced_pc,
@@ -240,24 +231,15 @@ class Object3d(BEVBox3D):
     """
 
     def __init__(self, center, size, label, calib=None):
-
-        label_class = self.cls_type_to_id(label[0])
         confidence = float(label[15]) if label.__len__() == 16 else -1.0
 
-        world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
-        cam_img = np.transpose(calib['P2'])
+        world_cam = calib['world_cam']
+        cam_img = calib['cam_img']
 
         # kitti boxes are pointing backwards
         yaw = float(label[14]) - np.pi
         yaw = yaw - np.floor(yaw / (2 * np.pi) + 0.5) * 2 * np.pi
 
-        super().__init__(center, size, yaw, label_class, confidence, world_cam,
-                         cam_img)
-
-        self.yaw = float(label[14])
-
-        self.name = label[0]
-        self.cls_id = self.cls_type_to_id(self.name)
         self.truncation = float(label[1])
         self.occlusion = float(
             label[2]
@@ -268,31 +250,13 @@ class Object3d(BEVBox3D):
             label[6]), float(label[7])),
                               dtype=np.float32)
 
-        self.dis_to_cam = np.linalg.norm(self.center)
-        self.score = float(label[15]) if label.__len__() == 16 else -1.0
-        self.level = self.get_difficulty()
+        class_name = label[0] if label[0] in KITTI.get_label_to_names().values(
+        ) else 'DontCare'
 
-        classes = {
-            'Pedestrian', 'Cyclist', 'Car', 'Van', 'Person_sitting', 'DontCare'
-        }
-        self.cat2label = {name: i for i, name in enumerate(classes)}
-        self.label2cat = {i: name for i, name in enumerate(classes)}
-        self.points_inside_box = np.array([])
+        super().__init__(center, size, yaw, class_name, confidence, world_cam,
+                         cam_img)
 
-    @staticmethod
-    def cls_type_to_id(cls_type):
-        """
-        get object id from name.
-        """
-        type_to_id = {
-            'Pedestrian': 0,
-            'Cyclist': 1,
-            'Car': 2,
-            'Van': 3,
-            'Person_sitting': 4,
-            'DontCare': 5
-        }
-        return type_to_id.get(cls_type, 5)
+        self.yaw = float(label[14])
 
     def get_difficulty(self):
         """
@@ -315,15 +279,15 @@ class Object3d(BEVBox3D):
 
     def to_str(self):
         print_str = '%s %.3f %.3f %.3f box2d: %s hwl: [%.3f %.3f %.3f] pos: %s ry: %.3f' \
-                     % (self.name, self.truncation, self.occlusion, self.alpha, self.box2d, self.size[2], self.size[0], self.size[1],
-                        self.center, self.ry)
+                     % (self.label_class, self.truncation, self.occlusion, self.alpha, self.box2d, self.size[2], self.size[0], self.size[1],
+                        self.center, self.yaw)
         return print_str
 
     def to_kitti_format(self):
         kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
-                    % (self.name, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
+                    % (self.label_class, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
                        self.box2d[2], self.box2d[3], self.size[2], self.size[0], self.size[1], self.center[0], self.center[1], self.center[2],
-                       self.ry)
+                       self.yaw)
         return kitti_str
 
 

@@ -9,7 +9,7 @@ import yaml
 
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
-from ..vis.boundingbox import BoundingBox3D
+from .utils import BEVBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,7 +25,7 @@ class Argoverse(BaseDataset):
 
     def __init__(self,
                  dataset_path,
-                 info_path,
+                 info_path=None,
                  name='Argoverse',
                  cache_dir='./logs/cache',
                  use_cache=False,
@@ -36,6 +36,9 @@ class Argoverse(BaseDataset):
             dataset_path (str): path to the dataset
             kwargs:
         """
+        if info_path is None:
+            info_path = dataset_path
+
         super().__init__(dataset_path=dataset_path,
                          info_path=info_path,
                          name=name,
@@ -65,6 +68,10 @@ class Argoverse(BaseDataset):
         if os.path.exists(join(info_path, 'infos_test.pkl')):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
+
+        if os.path.exists(join(info_path, 'infos_sample.pkl')):
+            self.sample_info = pickle.load(
+                open(join(info_path, 'infos_sample.pkl'), 'rb'))
 
     @staticmethod
     def get_label_to_names():
@@ -108,14 +115,9 @@ class Argoverse(BaseDataset):
 
             box2d = box['2d_coord']
 
-            ry = np.arctan(
+            yaw = np.pi / 2 + np.arctan(
                 (box2d[0][0] - box2d[1][0]) / (box2d[0][1] - box2d[1][1]))
-
-            front = [np.cos(ry), np.sin(ry), 0]
-            up = [0, 0, 1]
-            left = [np.sin(ry), np.cos(ry), 0]
-
-            objects.append(Object3d(center, front, up, left, size, name, box))
+            objects.append(Object3d(center, size, yaw, name, box))
 
         return objects
 
@@ -129,13 +131,15 @@ class Argoverse(BaseDataset):
             return self.test_info
         elif split in ['val', 'validation']:
             return self.val_info
+        elif split in ['sample']:
+            return self.sample_info
 
         raise ValueError("Invalid split {}".format(split))
 
-    def is_tested():
+    def is_tested(self):
         pass
 
-    def save_test_result():
+    def save_test_result(self):
         pass
 
 
@@ -188,50 +192,18 @@ class ArgoverseSplit():
         return attr
 
 
-class Object3d(BoundingBox3D):
+class Object3d(BEVBox3D):
     """
     Stores object specific details like bbox coordinates.
     """
 
-    def __init__(self, center, front, up, left, size, name, box):
-        label_class = self.cls_type_to_id(name)
+    def __init__(self, center, size, yaw, name, box):
+        super().__init__(center, size, yaw, name, -1.0)
 
-        super().__init__(center, front, up, left, size, label_class, 1.0)
-
-        self.name = name
-        self.cls_id = self.cls_type_to_id(name)
-        self.dis_to_cam = np.linalg.norm(self.center)
         self.occlusion = box['occlusion']
         self.quaternion = box['quaternion']
         self.coords_3d = box['3d_coord']
         self.coords_2d = box['2d_coord']
-
-    @staticmethod
-    def cls_type_to_id(cls_type):
-        """
-        get object id from name.
-        """
-        type_to_id = {
-            'ignore': 0,
-            'VEHICLE': 1,
-            'PEDESTRIAN': 2,
-            'ON_ROAD_OBSTACLE': 3,
-            'LARGE_VEHICLE': 4,
-            'BICYCLE': 5,
-            'BICYCLIST': 6,
-            'BUS': 7,
-            'OTHER_MOVER': 8,
-            'TRAILER': 9,
-            'MOTORCYCLIST': 10,
-            'MOPED': 11,
-            'MOTORCYCLE': 12,
-            'STROLLER': 13,
-            'EMERGENCY_VEHICLE': 14,
-            'ANIMAL': 15
-        }
-        if cls_type not in type_to_id.keys():
-            return 0
-        return type_to_id[cls_type]
 
     def generate_corners3d(self):
         """

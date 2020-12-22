@@ -12,8 +12,9 @@ from pathlib import Path
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
+from ...datasets.utils import BEVBox3D
 
-from ...metrics.mAP import mAP, convert_data_eval
+from ...metrics.mAP import mAP
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -96,7 +97,7 @@ class ObjectDetection(BasePipeline):
         pred = []
         for i in tqdm(range(len(test_split)), desc='testing'):
             results = self.run_inference(test_split[i]['data'])
-            pred.append(convert_data_eval(results[0], [40, 25]))
+            pred.append(results[0])
 
         #dataset.save_test_result(pred, attr)
 
@@ -117,12 +118,13 @@ class ObjectDetection(BasePipeline):
                                     transform=model.transform,
                                     use_cache=False,
                                     get_batch_gen=model.get_batch_gen,
-                                    shuffle=False)
+                                    shuffle=True,
+                                    steps_per_epoch=dataset.cfg.get(
+                                        'steps_per_epoch_valid', None))
 
         log.info("Started validation")
 
         self.valid_losses = {}
-        self.valid_mAP = {}
 
         pred = []
         gt = []
@@ -137,8 +139,8 @@ class ObjectDetection(BasePipeline):
 
             # convert to bboxes for mAP evaluation
             boxes = model.inference_end(results, data)
-            pred.append(convert_data_eval(boxes[0], [40, 25]))
-            gt.append(convert_data_eval(data['bbox_objs']))
+            pred.append(BEVBox3D.to_dicts(boxes[0]))
+            gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
 
         sum_loss = 0
         desc = "validation - "
@@ -149,45 +151,42 @@ class ObjectDetection(BasePipeline):
 
         log.info(desc)
 
-        ap = mAP(pred,
-                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
-                 similar_classes={
-                     0: 4,
-                     2: 3
-                 })
-        log.info("mAP BEV:")
-        log.info(
-            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
-                                                                       0]))
-        log.info(
-            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
-                                                                       0]))
-        log.info(
-            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
-                                                                       0]))
-        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
-        self.valid_losses["mAP BEV"] = np.mean(ap[:, 2])
+        overlaps = cfg.get("overlaps", [0.5])
+        similar_classes = cfg.get("similar_classes", {})
+        difficulties = cfg.get("difficulties", [0])
 
         ap = mAP(pred,
-                 gt, [0, 1, 2], [0, 1, 2], [0.5, 0.5, 0.7],
-                 bev=False,
-                 similar_classes={
-                     0: 4,
-                     2: 3
-                 })
+                 gt,
+                 model.classes,
+                 difficulties,
+                 overlaps,
+                 similar_classes=similar_classes)
         log.info("")
-        log.info("mAP 3D:")
-        log.info(
-            "Pedestrian:   {} (easy) {} (medium) {} (hard)".format(*ap[0, :,
-                                                                       0]))
-        log.info(
-            "Bicycle:      {} (easy) {} (medium) {} (hard)".format(*ap[1, :,
-                                                                       0]))
-        log.info(
-            "Car:          {} (easy) {} (medium) {} (hard)".format(*ap[2, :,
-                                                                       0]))
-        log.info("Overall:      {}".format(np.mean(ap[:, 2])))
-        self.valid_losses["mAP 3D"] = np.mean(ap[:, 2])
+        log.info("=============== mAP BEV ===============")
+        log.info(("class \\ difficulty  " +
+                  "{:>5} " * len(difficulties)).format(*difficulties))
+        for i, c in enumerate(model.classes):
+            log.info(("{:<20} " + "{:>5.2f} " * len(difficulties)).format(
+                c + ":", *ap[i, :, 0]))
+        log.info("Overall: {:.2f}".format(np.mean(ap[:, -1])))
+        self.valid_losses["mAP BEV"] = np.mean(ap[:, -1])
+
+        ap = mAP(pred,
+                 gt,
+                 model.classes,
+                 difficulties,
+                 overlaps,
+                 similar_classes=similar_classes,
+                 bev=False)
+        log.info("")
+        log.info("=============== mAP  3D ===============")
+        log.info(("class \\ difficulty  " +
+                  "{:>5} " * len(difficulties)).format(*difficulties))
+        for i, c in enumerate(model.classes):
+            log.info(("{:<20} " + "{:>5.2f} " * len(difficulties)).format(
+                c + ":", *ap[i, :, 0]))
+        log.info("Overall: {:.2f}".format(np.mean(ap[:, -1])))
+        self.valid_losses["mAP 3D"] = np.mean(ap[:, -1])
 
     def run_train(self):
         model = self.model

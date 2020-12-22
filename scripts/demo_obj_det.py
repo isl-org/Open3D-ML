@@ -90,7 +90,7 @@ def main(args):
 
     lut = LabelLUT()
     for val in sorted(dataset.label_to_names.keys()):
-        lut.add_label(dataset.label_to_names[val], val)
+        lut.add_label(val, val)
 
     vis.visualize([{
         "name": "KITTI",

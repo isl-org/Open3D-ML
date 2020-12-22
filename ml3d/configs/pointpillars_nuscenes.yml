@@ -1,0 +1,106 @@
+dataset:
+  name: NuScenes
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  steps_per_epoch_train: 5000
+
+model:
+  name: PointPillars
+  ckpt_path: # path/to/your/checkpoint
+
+  point_cloud_range: [-50, -50, -5, 50, 50, 3.0]
+  classes: [
+    'car', 'truck', 'trailer', 'bicycle',
+    'pedestrian', 'traffic_cone', 'barrier'
+  ]
+
+  loss:
+    focal:
+      gamma: 2.0
+      alpha: 0.25
+      loss_weight: 1.0
+    smooth_l1:
+      beta: 0.11
+      loss_weight: 2.0
+    cross_entropy:
+      loss_weight: 0.2
+
+  voxelize:
+    max_num_points: 20
+    voxel_size: &vsize
+      [0.25, 0.25, 8]
+    max_voxels: [30000, 40000]
+  
+  voxel_encoder:
+    in_channels: 4
+    feat_channels: [64, 64]
+    voxel_size: *vsize
+
+  scatter:
+    in_channels: 64
+    output_shape: [400, 400]
+
+  backbone:
+    in_channels: 64
+    out_channels: [64, 128, 256]
+    layer_nums: [3, 5, 5]
+    layer_strides: [2, 2, 2]
+
+  neck:
+    in_channels: [64, 128, 256]
+    out_channels: [128, 128, 128]
+    upsample_strides: [1, 2, 4]
+    use_conv_for_no_stride: false
+
+  head:
+    in_channels: 384
+    feat_channels: 384
+    nms_pre: 1000
+    score_thr: 0.05
+    ranges: [
+      [-49.6, -49.6, -1.80032795, 49.6, 49.6, -1.80032795],
+      [-49.6, -49.6, -1.74440365, 49.6, 49.6, -1.74440365],
+      [-49.6, -49.6, -1.68526504, 49.6, 49.6, -1.68526504],
+      [-49.6, -49.6, -1.67339111, 49.6, 49.6, -1.67339111],
+      [-49.6, -49.6, -1.61785072, 49.6, 49.6, -1.61785072],
+      [-49.6, -49.6, -1.80984986, 49.6, 49.6, -1.80984986],
+      [-49.6, -49.6, -1.763965, 49.6, 49.6, -1.763965],
+    ]
+    sizes: [
+      [1.95017717, 4.60718145, 1.72270761],   # car
+      [2.4560939, 6.73778078, 2.73004906],    # truck
+      [2.87427237, 12.01320693, 3.81509561],  # trailer
+      [0.60058911, 1.68452161, 1.27192197],   # bicycle
+      [0.66344886, 0.7256437, 1.75748069],    # pedestrian
+      [0.39694519, 0.40359262, 1.06232151],   # traffic_cone
+      [2.49008838, 0.48578221, 0.98297065],   # barrier
+    ]
+    rotations: [0, 1.57]
+    iou_thr: [[0.3, 0.6]]
+    dir_offset: 0.7854
+  
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: True
+
+
+pipeline:
+  name: ObjectDetection
+  test_compute_metric: true
+  batch_size: 1
+  val_batch_size: 1
+  save_ckpt_freq: 5
+  max_epoch: 200
+  main_log_dir: ./logs
+  train_sum_dir: train_log
+  grad_clip_norm: 2
+
+  optimizer:
+    lr: 0.001
+    betas: [0.95, 0.99]
+    weight_decay: 0.01
+
+  # evaluation properties
+  overlaps: [0.7]
+  difficulties: [0]
+    

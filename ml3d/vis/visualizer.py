@@ -989,6 +989,7 @@ class Visualizer:
             if self._is_tree_name_geometry(name):
                 # available attrs could change
                 self._update_datasource_combobox()
+                self._update_bounding_boxes()
             self._3d.force_redraw()
 
         cell = gui.CheckableTextTreeCell(names[-1], True, on_checked)
@@ -1152,7 +1153,9 @@ class Visualizer:
             # When consolidated we assume bbox_data.name is the geometry name.
             if animation_frame is None:
                 for bbox_data in self._objects.bounding_box_data:
-                    boxes += bbox_data.boxes
+                    if bbox_data.name in self._name2treenode and self._name2treenode[
+                            bbox_data.name].checkbox.checked:
+                        boxes += bbox_data.boxes
             else:
                 geom_name = self._animation_frames[animation_frame]
                 for bbox_data in self._objects.bounding_box_data:
@@ -1382,7 +1385,7 @@ class Visualizer:
         bg_color = [
             new_color.red, new_color.green, new_color.blue, new_color.alpha
         ]
-        self._3d.scene.set_background_color(bg_color)
+        self._3d.scene.set_background(bg_color)
         self._3d.force_redraw()
 
     def _on_datasource_changed(self, attr_name, idx):
@@ -1492,8 +1495,8 @@ class Visualizer:
         """
         # Setup the labels
         lut = LabelLUT()
-        for val in sorted(dataset.label_to_names.keys()):
-            lut.add_label(dataset.label_to_names[val], val)
+        for val in sorted(dataset.label_to_names.values()):
+            lut.add_label(val, val)
         self.set_lut("labels", lut)
 
         self._consolidate_bounding_boxes = True

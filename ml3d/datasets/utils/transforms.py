@@ -163,18 +163,14 @@ class ObjdetAugmentation():
         if len(bboxes) == 0:
             return []
 
-        cat2label = bboxes[0].cat2label
-        label2cat = bboxes[0].label2cat
-
         gt_labels_3d = [box.label_class for box in data['bbox_objs']]
 
         sampled_num_dict = {}
 
         for class_name in sample_dict.keys():
             max_sample_num = sample_dict[class_name]
-            class_label = cat2label[class_name]
 
-            existing = np.sum([n == class_label for n in gt_labels_3d])
+            existing = np.sum([n == class_name for n in gt_labels_3d])
             sampled_num = int(max_sample_num - existing)
             sampled_num = np.round(rate * sampled_num).astype(np.int64)
             sampled_num_dict[class_name] = sampled_num
