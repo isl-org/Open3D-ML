@@ -7,7 +7,6 @@ from tqdm import tqdm
 import os
 
 from open3d.ml.tf.ops import voxelize
-from ...vis.boundingbox import BEVBox3D
 
 from .base_model_objdet import BaseModel
 from ...utils import MODEL
@@ -16,7 +15,7 @@ from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
-from ...datasets.utils import ObjdetAugmentation
+from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
 
@@ -57,8 +56,8 @@ class PointPillars(BaseModel):
 
     def __init__(self,
                  name="PointPillars",
-                 voxel_size=[0.16, 0.16, 4],
                  point_cloud_range=[0, -40.0, -3, 70.0, 40.0, 1],
+                 classes=['car'],
                  voxelize={},
                  voxel_encoder={},
                  scatter={},
@@ -72,20 +71,19 @@ class PointPillars(BaseModel):
                          point_cloud_range=point_cloud_range,
                          **kwargs)
         self.point_cloud_range = point_cloud_range
+        self.classes = classes
+        self.name2lbl = {n: i for i, n in enumerate(classes)}
+        self.lbl2name = {i: n for i, n in enumerate(classes)}
 
         self.voxel_layer = PointPillarsVoxelization(
-            point_cloud_range=point_cloud_range,
-            voxel_size=voxel_size,
-            **voxelize)
+            point_cloud_range=point_cloud_range, **voxelize)
         self.voxel_encoder = PillarFeatureNet(
-            point_cloud_range=point_cloud_range,
-            voxel_size=voxel_size,
-            **voxel_encoder)
+            point_cloud_range=point_cloud_range, **voxel_encoder)
         self.middle_encoder = PointPillarsScatter(**scatter)
 
         self.backbone = SECOND(**backbone)
         self.neck = SECONDFPN(**neck)
-        self.bbox_head = Anchor3DHead(**head)
+        self.bbox_head = Anchor3DHead(num_classes=len(self.classes), **head)
 
         self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
@@ -208,7 +206,7 @@ class PointPillars(BaseModel):
             target_dirs = tf.gather(tf.concat(gt_bboxes, axis=0),
                         target_idx)[:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
-            target_dirs = tf.cast(target_dirs / np.pi, tf.int32)
+            target_dirs = tf.cast(target_dirs / np.pi, tf.int32) % 2
 
             loss_dir = self.loss_dir(dirs, target_dirs, avg_factor=avg_factor)
 
@@ -313,7 +311,10 @@ class PointPillars(BaseModel):
             data = self.augment_data(data, attr)
 
         points = tf.constant(data['point'], dtype=tf.float32)
-        labels = tf.constant([bb.label_class for bb in data['bbox_objs']],
+        labels = tf.constant([
+            self.name2lbl.get(bb.label_class, len(self.classes))
+            for bb in data['bbox_objs']
+        ],
                              dtype=tf.int32)
         bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
                              dtype=tf.float32)
@@ -350,9 +351,11 @@ class PointPillars(BaseModel):
 
         inference_result = []
 
-        calib = inputs['calib']
-        world_cam = np.transpose(calib['R0_rect'] @ calib['Tr_velo2cam'])
-        cam_img = np.transpose(calib['P2'])
+        world_cam, cam_img = None, None
+        if 'calib' in inputs and inputs['calib'] is not None:
+            calib = inputs['calib']
+            world_cam = calib.get('world_cam', None)
+            cam_img = calib.get('cam_img', None)
 
         for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
@@ -364,8 +367,9 @@ class PointPillars(BaseModel):
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
                 yaw = bbox[-1]
+                name = self.lbl2name.get(label, "ignore")
                 inference_result[-1].append(
-                    BEVBox3D(pos, dim, yaw, label, score, world_cam, cam_img))
+                    BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
 
         return inference_result
 
@@ -879,6 +883,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
                  feat_channels=384,
                  nms_pre=100,
                  score_thr=0.1,
+                 dir_offset=0,
                  ranges=[[0, -40.0, -3, 70.0, 40.0, 1]],
                  sizes=[[0.6, 1.0, 1.5]],
                  rotations=[0, 1.57],
@@ -890,7 +895,13 @@ class Anchor3DHead(tf.keras.layers.Layer):
         self.feat_channels = feat_channels
         self.nms_pre = nms_pre
         self.score_thr = score_thr
+        self.dir_offset = dir_offset
         self.iou_thr = iou_thr
+
+        if len(self.iou_thr) != num_classes:
+            assert len(self.iou_thr) == 1
+            self.iou_thr = self.iou_thr * num_classes
+        assert len(self.iou_thr) == num_classes
 
         # build anchor generator
         self.anchor_generator = Anchor3DRangeGenerator(ranges=ranges,
@@ -1122,8 +1133,9 @@ class Anchor3DHead(tf.keras.layers.Layer):
         dir_scores = tf.gather(dir_scores, idxs)
 
         if bboxes.shape[0] > 0:
-            dir_rot = limit_period(bboxes[..., 6], 1, np.pi)
-            dir_rot = dir_rot + np.pi * tf.cast(dir_scores, dtype=bboxes.dtype)
+            dir_rot = limit_period(bboxes[..., 6] - self.dir_offset, 1, np.pi)
+            dir_rot = dir_rot + self.dir_offset + np.pi * tf.cast(
+                dir_scores, dtype=bboxes.dtype)
             bboxes = tf.concat(
                 [bboxes[:, :-1], tf.expand_dims(dir_rot, -1)], axis=-1)
 

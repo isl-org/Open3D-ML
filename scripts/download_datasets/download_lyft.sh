@@ -23,3 +23,16 @@ tar -xvf test.tar
 mkdir tar_files
 mv train.tar tar_files
 mv test.tar tar_files
+
+mkdir v1.01-train
+mkdir v1.01-test
+
+mv train_data v1.01-train/data
+mv train_images v1.01-train/images
+mv train_lidar v1.01-train/lidar
+mv train_maps v1.01-train/maps
+
+mv test_data v1.01-test/data
+mv test_images v1.01-test/images
+mv test_lidar v1.01-test/lidar
+mv test_maps v1.01-test/maps

@@ -8,7 +8,7 @@ import yaml
 
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
-from ..vis.boundingbox import BoundingBox3D
+from .utils import BEVBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +35,9 @@ class Waymo(BaseDataset):
             dataset_path (str): path to the dataset
             kwargs:
         """
+        if info_path is None:
+            info_path = dataset_path
+
         super().__init__(dataset_path=dataset_path,
                          name=name,
                          cache_dir=cache_dir,
@@ -49,7 +52,8 @@ class Waymo(BaseDataset):
         self.num_classes = 4
         self.label_to_names = self.get_label_to_names()
 
-        self.all_files = glob(join(cfg.dataset_path, 'velodyne', '*.bin'))
+        self.all_files = sorted(
+            glob(join(cfg.dataset_path, 'velodyne', '*.bin')))
         self.train_files = []
         self.val_files = []
 
@@ -91,16 +95,9 @@ class Waymo(BaseDataset):
         objects = []
         for line in lines:
             label = line.strip().split(' ')
-
             center = [float(label[11]), float(label[12]), float(label[13])]
-
-            ry = float(label[14])
-            front = [-1 * np.sin(ry), -1 * np.cos(ry), 0]
-            up = [0, 0, 1]
-            left = [-1 * np.cos(ry), np.sin(ry), 0]
             size = [float(label[9]), float(label[8]), float(label[10])]
-
-            objects.append(Object3d(center, front, up, left, size, label))
+            objects.append(Object3d(center, size, label))
 
         return objects
 
@@ -141,15 +138,10 @@ class Waymo(BaseDataset):
         Tr_velo_to_cam = np.array(obj, dtype=np.float32).reshape(3, 4)
         Tr_velo_to_cam = Waymo._extend_matrix(Tr_velo_to_cam)
 
-        return {
-            'P0': P0.reshape(3, 4),
-            'P1': P1.reshape(3, 4),
-            'P2': P2.reshape(3, 4),
-            'P3': P3.reshape(3, 4),
-            'P4': P3.reshape(3, 4),
-            'R0_rect': rect_4x4,
-            'Tr_velo2cam': Tr_velo_to_cam
-        }
+        world_cam = np.transpose(rect_4x4 @ Tr_velo_to_cam)
+        cam_img = np.transpose(P2)
+
+        return {'world_cam': world_cam, 'cam_img': cam_img}
 
     def get_split(self, split):
         return WaymoSplit(self, split=split)
@@ -219,19 +211,21 @@ class WaymoSplit():
         return attr
 
 
-class Object3d(BoundingBox3D):
+class Object3d(BEVBox3D):
     """
     Stores object specific details like bbox coordinates, occlusion etc.
     """
 
     def __init__(self, center, front, up, left, size, label):
-        label_class = self.cls_type_to_id(label[0])
         confidence = float(label[15]) if label.__len__() == 16 else -1.0
 
-        super().__init__(center, front, up, left, size, label_class, confidence)
+        world_cam = calib['world_cam']
+        cam_img = calib['cam_img']
 
-        self.name = label[0]
-        self.cls_id = self.cls_type_to_id(self.name)
+        # kitti boxes are pointing backwards
+        yaw = float(label[14]) - np.pi
+        yaw = yaw - np.floor(yaw / (2 * np.pi) + 0.5) * 2 * np.pi
+
         self.truncation = float(label[1])
         self.occlusion = float(
             label[2]
@@ -242,22 +236,12 @@ class Object3d(BoundingBox3D):
             label[6]), float(label[7])),
                               dtype=np.float32)
 
-        self.dis_to_cam = np.linalg.norm(self.center)
-        self.ry = float(label[14])
-        self.score = float(label[15]) if label.__len__() == 16 else -1.0
-        self.level = self.get_kitti_obj_level()
+        super().__init__(center, size, yaw, label[0], confidence, world_cam,
+                         cam_img)
 
-    @staticmethod
-    def cls_type_to_id(cls_type):
-        """
-        get object id from name.
-        """
-        type_to_id = {'PEDESTRIAN': 1, 'VEHICLE': 2, 'CYCLIST': 3, 'SIGN': 3}
-        if cls_type not in type_to_id.keys():
-            return -1
-        return type_to_id[cls_type]
+        self.yaw = float(label[14])
 
-    def get_kitti_obj_level(self):
+    def get_difficulty(self):
         """
         determines the difficulty level of object.
         """
@@ -276,35 +260,17 @@ class Object3d(BoundingBox3D):
             self.level_str = 'UnKnown'
             return -1
 
-    def generate_corners3d(self):
-        """
-        generate corners3d representation for this object
-        :return corners_3d: (8, 3) corners of box3d in camera coord
-        """
-        l, h, w = self.l, self.h, self.w
-        x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
-        y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
-        z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
-
-        R = np.array([[np.cos(self.ry), 0, np.sin(self.ry)], [0, 1, 0],
-                      [-np.sin(self.ry), 0,
-                       np.cos(self.ry)]])
-        corners3d = np.vstack([x_corners, y_corners, z_corners])  # (3, 8)
-        corners3d = np.dot(R, corners3d).T
-        corners3d = corners3d + self.loc
-        return corners3d
-
     def to_str(self):
         print_str = '%s %.3f %.3f %.3f box2d: %s hwl: [%.3f %.3f %.3f] pos: %s ry: %.3f' \
-                     % (self.cls_type, self.truncation, self.occlusion, self.alpha, self.box2d, self.h, self.w, self.l,
-                        self.loc, self.ry)
+                     % (self.label_class, self.truncation, self.occlusion, self.alpha, self.box2d, self.size[2], self.size[0], self.size[1],
+                        self.center, self.yaw)
         return print_str
 
     def to_kitti_format(self):
         kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
-                    % (self.cls_type, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
-                       self.box2d[2], self.box2d[3], self.h, self.w, self.l, self.loc[0], self.loc[1], self.loc[2],
-                       self.ry)
+                    % (self.label_class, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
+                       self.box2d[2], self.box2d[3], self.size[2], self.size[0], self.size[1], self.center[0], self.center[1], self.center[2],
+                       self.yaw)
         return kitti_str
 
 

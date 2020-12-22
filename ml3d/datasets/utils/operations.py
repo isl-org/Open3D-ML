@@ -84,21 +84,19 @@ def get_frustum(bbox_image, C, near_clip=0.001, far_clip=100):
     return ret_xyz
 
 
-def camera_to_lidar(points, r_rect, velo2cam):
+def camera_to_lidar(points, world_cam):
     """Convert points in camera coordinate to lidar coordinate.
     Args:
         points (np.ndarray, shape=[N, 3]): Points in camera coordinate.
-        r_rect (np.ndarray, shape=[4, 4]): Matrix to project points in
-            specific camera coordinate (e.g. CAM2) to CAM0.
-        velo2cam (np.ndarray, shape=[4, 4]): Matrix to project points in
-            camera coordinate to lidar coordinate.
+        world_cam (np.ndarray, shape=[4, 4]): Matrix to project points in
+            camera coordinates to lidar coordinates.
     Returns:
-        np.ndarray, shape=[N, 3]: Points in lidar coordinate.
+        np.ndarray, shape=[N, 3]: Points in lidar coordinates.
     """
     points_shape = list(points.shape[0:-1])
     if points.shape[-1] == 3:
         points = np.concatenate([points, np.ones(points_shape + [1])], axis=-1)
-    lidar_points = points @ np.linalg.inv((r_rect @ velo2cam).T)
+    lidar_points = points @ np.linalg.inv(world_cam)
     return lidar_points[..., :3]
 
 
@@ -330,8 +328,9 @@ def filter_by_min_points(bboxes, min_points_dict):
     filtered_boxes = []
 
     for box in bboxes:
-        if box.name in min_points_dict.keys():
-            if box.points_inside_box.shape[0] > min_points_dict[box.name]:
+        if box.label_class in min_points_dict.keys():
+            if box.points_inside_box.shape[0] > min_points_dict[
+                    box.label_class]:
                 filtered_boxes.append(box)
         else:
             filtered_boxes.append(box)

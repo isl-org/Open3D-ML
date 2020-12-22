@@ -1,8 +1,9 @@
 dataset:
-  name: KITTI
+  name: Argoverse
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
   steps_per_epoch_train: 5000
+  steps_per_epoch_valid: 1000
 
 model:
   name: PointPillars
@@ -10,8 +11,8 @@ model:
 
   batcher: "ignore"
 
-  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
-  classes: ['Pedestrian', 'Cyclist', 'Car']
+  point_cloud_range: [-50, -50, -5, 50, 50, 3.0]
+  classes: ['VEHICLE', 'BUS', 'TRAILER','PEDESTRIAN', 'BICYCLE']
 
   loss:
     focal:
@@ -25,19 +26,19 @@ model:
       loss_weight: 0.2
 
   voxelize:
-    max_num_points: 32
+    max_num_points: 20
     voxel_size: &vsize
-      [0.16, 0.16, 4]
-    max_voxels: [16000, 40000]
+      [0.25, 0.25, 8]
+    max_voxels: [30000, 40000]
   
   voxel_encoder:
-    in_channels: 4
-    feat_channels: [64]
+    in_channels: 3
+    feat_channels: [64, 64]
     voxel_size: *vsize
 
   scatter:
     in_channels: 64
-    output_shape: [496, 432]
+    output_shape: [400, 400]
 
   backbone:
     in_channels: 64
@@ -54,29 +55,29 @@ model:
   head:
     in_channels: 384
     feat_channels: 384
-    nms_pre: 100
-    score_thr: 0.1
+    nms_pre: 1000
+    score_thr: 0.05
     ranges: [
-      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
-      [0, -39.68, -1.78, 70.4, 39.68, -1.78]
+      [-49.6, -49.6, -1.80032795, 49.6, 49.6, -1.80032795],
+      [-49.6, -49.6, -1.74440365, 49.6, 49.6, -1.74440365],
+      [-49.6, -49.6, -1.68526504, 49.6, 49.6, -1.68526504],
+      [-49.6, -49.6, -1.61785072, 49.6, 49.6, -1.61785072],
+      [-49.6, -49.6, -1.763965, 49.6, 49.6, -1.763965],
     ]
-    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
+    sizes: [
+      [1.95017717, 4.60718145, 1.72270761],  # car
+      [2.4560939, 6.73778078, 2.73004906],  # truck
+      [2.87427237, 12.01320693, 3.81509561],  # trailer
+      [0.66344886, 0.7256437, 1.75748069],  # pedestrian
+      [2.49008838, 0.48578221, 0.98297065],  # barrier
+    ]
     rotations: [0, 1.57]
-    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+    iou_thr: [[0.3, 0.6]]
+    dir_offset: 0.7854
   
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
-    ObjectSample:
-      min_points_dict:
-        Car: 5
-        Pedestrian: 10
-        Cyclist: 10
-      sample_dict:
-        Car: 15
-        Pedestrian: 10
-        Cyclist: 10
 
 
 pipeline:
@@ -95,10 +96,6 @@ pipeline:
     weight_decay: 0.01
 
   # evaluation properties
-  overlaps: [0.5, 0.5, 0.7]
-  similar_classes: {
-    Van: Car,
-    Person_sitting: Pedestrian
-  }
-  difficulties: [0, 1, 2]
+  overlaps: [0.7]
+  difficulties: [0]
     
