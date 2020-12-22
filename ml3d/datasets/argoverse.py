@@ -9,7 +9,7 @@ import yaml
 
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
-from ..vis.boundingbox import BoundingBox3D
+from ..vis.boundingbox import BEVBox3D
 
 logging.basicConfig(
     level=logging.INFO,
@@ -108,14 +108,10 @@ class Argoverse(BaseDataset):
 
             box2d = box['2d_coord']
 
-            ry = np.arctan(
+            yaw = np.pi / 2 + np.arctan(
                 (box2d[0][0] - box2d[1][0]) / (box2d[0][1] - box2d[1][1]))
 
-            front = [np.cos(ry), np.sin(ry), 0]
-            up = [0, 0, 1]
-            left = [np.sin(ry), np.cos(ry), 0]
-
-            objects.append(Object3d(center, front, up, left, size, name, box))
+            objects.append(Object3d(center, size, yaw, name, box))
 
         return objects
 
@@ -188,15 +184,15 @@ class ArgoverseSplit():
         return attr
 
 
-class Object3d(BoundingBox3D):
+class Object3d(BEVBox3D):
     """
     Stores object specific details like bbox coordinates.
     """
 
-    def __init__(self, center, front, up, left, size, name, box):
+    def __init__(self, center, size, yaw, name, box):
         label_class = self.cls_type_to_id(name)
 
-        super().__init__(center, front, up, left, size, label_class, 1.0)
+        super().__init__(center, size, yaw, label_class, None, None, -1.0)
 
         self.name = name
         self.cls_id = self.cls_type_to_id(name)
