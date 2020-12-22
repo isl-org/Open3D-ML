@@ -201,11 +201,12 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         train_dataset = dataset.get_split('training')
-        train_loader = TFDataloader(dataset=train_dataset,
+        train_split = TFDataloader(dataset=train_dataset,
                                     model=model,
                                     use_cache=dataset.cfg.use_cache,
                                     steps_per_epoch=dataset.cfg.get(
                                         'steps_per_epoch_train', None))
+        train_loader, len_train = train_split.get_loader(cfg.batch_size, transform=False)
 
         self.optimizer = model.get_optimizer(cfg.optimizer)
 
@@ -228,12 +229,11 @@ class ObjectDetection(BasePipeline):
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                data = train_loader[i]['data']
+            process_bar = tqdm(train_loader, total=len_train, desc='training')
+            for data in process_bar:
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(data['point'])
-                    loss = model.loss(results, data)
+                    results = model(data[0], cnts=data[-1])
+                    loss = model.loss(results, data, cnts=data[-1])
                     loss_sum = tf.add_n(loss.values())
 
                 grads = tape.gradient(loss_sum, model.trainable_weights)
