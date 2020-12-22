@@ -321,14 +321,15 @@ The table shows the available models and datasets for the segmentation task and 
 
 ### Object Detection
 
-For the task of object detection, we measure the performance of different methods using the mean mean average precision (mAP) for bird's eye view (BEV) and 3D.
+For the task of object detection, we measure the performance of different methods using the mean average precision (mAP) for bird's eye view (BEV) and 3D.
 The table shows the available models and datasets for the object detection task and the respective scores. Each score links to the respective weight file.
+For the evaluation, the models were evaluated using the validation subset, according to KITTI's validation criteria. The models were trained for three classes (car, pedestrian and cyclist). The calculated values are the mean value over the mAP of all classes for all difficulty levels.
 
 
-| Model / Dataset    | mAP BEV | mAP 3D |
-|--------------------|---------------|----------- |
-| KITTI (tf)    | [TBD](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |  [TBD](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) | 
-| KITTI (torch) | [54.3](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)        |     [43.5](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)  | 
+| Model / Dataset    | KITTI [BEV / 3D] |
+|--------------------|---------------|
+| PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |
+| PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)   |
 
 
 ## Model Zoo
