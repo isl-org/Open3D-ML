@@ -1495,9 +1495,8 @@ class Visualizer:
         """
         # Setup the labels
         lut = LabelLUT()
-        for val in sorted(dataset.label_to_names.keys()):
-            class_name = dataset.label_to_names[val]
-            lut.add_label(class_name, class_name)
+        for val in sorted(dataset.label_to_names.values()):
+            lut.add_label(val, val)
         self.set_lut("labels", lut)
 
         self._consolidate_bounding_boxes = True
