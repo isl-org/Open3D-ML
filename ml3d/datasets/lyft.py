@@ -154,7 +154,7 @@ class LyftSplit():
 
     def get_data(self, idx):
         info = self.infos[idx]
-        lidar_path = info['lidar_path']        
+        lidar_path = info['lidar_path']
 
         world_cam = np.eye(4)
         world_cam[:3, :3] = R.from_quat(info['lidar2ego_rot']).as_matrix()

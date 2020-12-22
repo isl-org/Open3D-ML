@@ -114,7 +114,7 @@ class Argoverse(BaseDataset):
             ry = np.arctan(
                 (box2d[0][0] - box2d[1][0]) / (box2d[0][1] - box2d[1][1]))
 
-            objects.append(Object3d(center, size, ry, name, box2d))
+            objects.append(Object3d(center, size, ry, name, box))
 
         return objects
 

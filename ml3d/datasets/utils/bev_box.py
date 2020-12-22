@@ -1,6 +1,7 @@
 from ...vis import BoundingBox3D
 import numpy as np
 
+
 class BEVBox3D(BoundingBox3D):
     """Class that defines a special bounding box for object detection, with only one rotation axis (yaw)."""
 
@@ -97,7 +98,7 @@ class BEVBox3D(BoundingBox3D):
         """
         if self.cam_img is None:
             return None
-            
+
         corners = self.generate_corners3d()
         corners = np.concatenate(
             [corners, np.ones((corners.shape[0], 1))], axis=-1)
@@ -161,5 +162,5 @@ class BEVBox3D(BoundingBox3D):
             box_dict = bboxes[i].to_dict()
             for k in box_dict:
                 box_dicts[k][i] = box_dict[k]
-        
+
         return box_dicts

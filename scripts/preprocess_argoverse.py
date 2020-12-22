@@ -93,10 +93,9 @@ class ArgoverseProcess():
 
         bbox_all = []
 
-        for idx in tqdm(range(num_pc)):
+        for idx in tqdm(range(len(lidar_path))):
             boxes = []
             labels = scene.get_label_object(idx)
-
             for label in labels:
                 box = {}
                 box['l'] = label.length

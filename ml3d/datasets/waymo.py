@@ -140,10 +140,7 @@ class Waymo(BaseDataset):
         world_cam = np.transpose(rect_4x4 @ Tr_velo_to_cam)
         cam_img = np.transpose(P2)
 
-        return {
-            'world_cam': world_cam,
-            'cam_img': cam_img
-        }
+        return {'world_cam': world_cam, 'cam_img': cam_img}
 
     def get_split(self, split):
         return WaymoSplit(self, split=split)
@@ -242,7 +239,6 @@ class Object3d(BEVBox3D):
                          cam_img)
 
         self.yaw = float(label[14])
-
 
     def get_difficulty(self):
         """

@@ -85,18 +85,14 @@ class PointPillars(BaseModel):
         self.lbl2name = {i: n for i, n in enumerate(classes)}
 
         self.voxel_layer = PointPillarsVoxelization(
-            point_cloud_range=point_cloud_range,
-            **voxelize)
+            point_cloud_range=point_cloud_range, **voxelize)
         self.voxel_encoder = PillarFeatureNet(
-            point_cloud_range=point_cloud_range,
-            **voxel_encoder)
+            point_cloud_range=point_cloud_range, **voxel_encoder)
         self.middle_encoder = PointPillarsScatter(**scatter)
 
         self.backbone = SECOND(**backbone)
         self.neck = SECONDFPN(**neck)
-        self.bbox_head = Anchor3DHead(
-            num_classes=len(self.classes),
-            **head)
+        self.bbox_head = Anchor3DHead(num_classes=len(self.classes), **head)
 
         self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
@@ -183,7 +179,7 @@ class PointPillars(BaseModel):
             # to discrete bins
             target_dirs = gt_bboxes[target_idx][:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
-            target_dirs = (target_dirs / np.pi).long()
+            target_dirs = (target_dirs / np.pi).long() % 2
 
             loss_dir = self.loss_dir(dirs, target_dirs, avg_factor=avg_factor)
 
@@ -291,7 +287,10 @@ class PointPillars(BaseModel):
                               dtype=torch.float32,
                               device=self.device)
 
-        labels = torch.tensor([self.name2lbl.get(bb.label_class, len(self.classes)) for bb in data['bbox_objs']],
+        labels = torch.tensor([
+            self.name2lbl.get(bb.label_class, len(self.classes))
+            for bb in data['bbox_objs']
+        ],
                               dtype=torch.int64,
                               device=self.device)
         bboxes = torch.tensor([bb.to_xyzwhlr() for bb in data['bbox_objs']],
@@ -312,7 +311,7 @@ class PointPillars(BaseModel):
         inference_result = []
 
         world_cam, cam_img = None, None
-        if 'calib' in inputs:
+        if 'calib' in inputs and inputs['calib'] is not None:
             calib = inputs['calib']
             world_cam = calib.get('world_cam', None)
             cam_img = calib.get('cam_img', None)
@@ -1013,6 +1012,7 @@ class Anchor3DHead(nn.Module):
 
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6] - self.dir_offset, 1, np.pi)
-            bboxes[..., 6] = (dir_rot + self.dir_offset + np.pi * dir_scores.to(bboxes.dtype))
+            bboxes[..., 6] = (dir_rot + self.dir_offset +
+                              np.pi * dir_scores.to(bboxes.dtype))
 
         return bboxes, scores, labels

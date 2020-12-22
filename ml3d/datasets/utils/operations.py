@@ -329,7 +329,8 @@ def filter_by_min_points(bboxes, min_points_dict):
 
     for box in bboxes:
         if box.label_class in min_points_dict.keys():
-            if box.points_inside_box.shape[0] > min_points_dict[box.label_class]:
+            if box.points_inside_box.shape[0] > min_points_dict[
+                    box.label_class]:
                 filtered_boxes.append(box)
         else:
             filtered_boxes.append(box)

@@ -60,18 +60,14 @@ class PointPillars(BaseModel):
         self.lbl2name = {i: n for i, n in enumerate(classes)}
 
         self.voxel_layer = PointPillarsVoxelization(
-            point_cloud_range=point_cloud_range,
-            **voxelize)
+            point_cloud_range=point_cloud_range, **voxelize)
         self.voxel_encoder = PillarFeatureNet(
-            point_cloud_range=point_cloud_range,
-            **voxel_encoder)
+            point_cloud_range=point_cloud_range, **voxel_encoder)
         self.middle_encoder = PointPillarsScatter(**scatter)
 
         self.backbone = SECOND(**backbone)
         self.neck = SECONDFPN(**neck)
-        self.bbox_head = Anchor3DHead(
-            num_classes=len(self.classes),
-            **head)
+        self.bbox_head = Anchor3DHead(num_classes=len(self.classes), **head)
 
         self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
@@ -185,7 +181,7 @@ class PointPillars(BaseModel):
             # to discrete bins
             target_dirs = tf.gather(gt_bboxes, target_idx)[:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
-            target_dirs = tf.cast(target_dirs / np.pi, tf.int32)
+            target_dirs = tf.cast(target_dirs / np.pi, tf.int32) % 2
 
             loss_dir = self.loss_dir(dirs, target_dirs, avg_factor=avg_factor)
 
@@ -290,7 +286,10 @@ class PointPillars(BaseModel):
             data = self.augment_data(data, attr)
 
         points = tf.constant([data['point']], dtype=tf.float32)
-        labels = tf.constant([self.name2lbl.get(bb.label_class, len(self.classes)) for bb in data['bbox_objs']],
+        labels = tf.constant([
+            self.name2lbl.get(bb.label_class, len(self.classes))
+            for bb in data['bbox_objs']
+        ],
                              dtype=tf.int32)
         bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
                              dtype=tf.float32)
@@ -312,7 +311,7 @@ class PointPillars(BaseModel):
         inference_result = []
 
         world_cam, cam_img = None, None
-        if 'calib' in inputs:
+        if 'calib' in inputs and inputs['calib'] is not None:
             calib = inputs['calib']
             world_cam = calib.get('world_cam', None)
             cam_img = calib.get('cam_img', None)
@@ -1081,7 +1080,8 @@ class Anchor3DHead(tf.keras.layers.Layer):
 
         if bboxes.shape[0] > 0:
             dir_rot = limit_period(bboxes[..., 6] - self.dir_offset, 1, np.pi)
-            dir_rot = dir_rot + self.dir_offset + np.pi * tf.cast(dir_scores, dtype=bboxes.dtype)
+            dir_rot = dir_rot + self.dir_offset + np.pi * tf.cast(
+                dir_scores, dtype=bboxes.dtype)
             bboxes = tf.concat(
                 [bboxes[:, :-1], tf.expand_dims(dir_rot, -1)], axis=-1)
 
