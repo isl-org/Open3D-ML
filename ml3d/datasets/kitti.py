@@ -250,7 +250,10 @@ class Object3d(BEVBox3D):
             label[6]), float(label[7])),
                               dtype=np.float32)
 
-        super().__init__(center, size, yaw, label[0], confidence, world_cam,
+        class_name = label[0] if label[0] in KITTI.get_label_to_names().values(
+        ) else 'DontCare'
+
+        super().__init__(center, size, yaw, class_name, confidence, world_cam,
                          cam_img)
 
         self.yaw = float(label[14])
