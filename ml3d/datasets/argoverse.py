@@ -69,6 +69,10 @@ class Argoverse(BaseDataset):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
 
+        if os.path.exists(join(info_path, 'infos_sample.pkl')):
+            self.sample_info = pickle.load(
+                open(join(info_path, 'infos_sample.pkl'), 'rb'))
+
     @staticmethod
     def get_label_to_names():
         label_to_names = {
@@ -128,13 +132,15 @@ class Argoverse(BaseDataset):
             return self.test_info
         elif split in ['val', 'validation']:
             return self.val_info
+        elif split in ['sample']:
+            return self.sample_info
 
         raise ValueError("Invalid split {}".format(split))
 
-    def is_tested():
+    def is_tested(self):
         pass
 
-    def save_test_result():
+    def save_test_result(self):
         pass
 
 
