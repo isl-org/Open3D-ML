@@ -56,7 +56,6 @@ class ObjectDetection(BasePipeline):
         model = self.model
 
         inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
-        inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
 
         results = model(inputs, training=False)
         boxes = model.inference_end(results, data)
@@ -127,6 +126,7 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         for i in tqdm(range(len(valid_loader)), desc='validation'):
+            if i == 10: break
             data = valid_loader[i]['data']
             results = model(data['point'], training=False)
             loss = model.loss(results, data)

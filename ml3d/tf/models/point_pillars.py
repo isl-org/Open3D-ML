@@ -20,6 +20,21 @@ from ...datasets.utils import ObjdetAugmentation
 from ...datasets.utils.operations import filter_by_min_points
 
 
+def unpack(flat_t, cnts=None):
+    """
+    Converts flat tensor to list of tensors, 
+    with length according to cnts.
+    """
+    if cnts is None:
+        return [flat_t]
+        
+    data_list = []
+    idx0 = 0
+    for cnt in cnts:
+        idx1 = idx0 + cnt
+        data_list.append(flat_t[idx0:idx1])
+    return data_list
+
 class PointPillars(BaseModel):
     """Object detection model. 
     Based on the PointPillars architecture 
@@ -73,19 +88,7 @@ class PointPillars(BaseModel):
 
         self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
-        self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
-
-    @staticmethod
-    def unpack(flat_t, cnts=None):
-        if cnts is None:
-            return [flat_t]
-
-        data_list = []
-        idx0 = 0
-        for cnt in cnts:
-            idx1 = idx0 + cnt
-            data_list.append(flat_t[idx0:idx1])
-        
+        self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))        
 
     def extract_feats(self, points, training=False):
         """Extract features from points."""
@@ -309,7 +312,7 @@ class PointPillars(BaseModel):
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
-        points = tf.constant([data['point']], dtype=tf.float32)
+        points = tf.constant(data['point'], dtype=tf.float32)
         labels = tf.constant([bb.label_class for bb in data['bbox_objs']],
                              dtype=tf.int32)
         bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
@@ -329,15 +332,15 @@ class PointPillars(BaseModel):
             cnt = len(dataset) if steps_per_epoch is None else steps_per_epoch
             for i in np.arange(0, cnt, batch_size):
                 batch = [dataset[i+bi]['data'] for bi in range(batch_size)]
-                points = [b['point'] for b in batch]
+                points = tf.concat([b['point'] for b in batch], axis=0)
                 bboxes = tf.concat([b['bboxes'] for b in batch], axis=0)
                 labels = tf.concat([b['labels'] for b in batch], axis=0)
                 idx = tf.constant([len(b) for b in batch])
                 yield (points, bboxes, labels, idx)
 
         gen_func = batcher
-        gen_types = (list, tf.float32, tf.int32, tf.int32)
-        gen_shapes = ([None], [None, 7], [None], [None])
+        gen_types = (tf.float32, tf.float32, tf.int32, tf.int32)
+        gen_shapes = ([None, 4], [None, 7], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 
