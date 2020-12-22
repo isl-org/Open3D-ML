@@ -1153,7 +1153,8 @@ class Visualizer:
             # When consolidated we assume bbox_data.name is the geometry name.
             if animation_frame is None:
                 for bbox_data in self._objects.bounding_box_data:
-                    if bbox_data.name in self._name2treenode and self._name2treenode[bbox_data.name].checkbox.checked:
+                    if bbox_data.name in self._name2treenode and self._name2treenode[
+                            bbox_data.name].checkbox.checked:
                         boxes += bbox_data.boxes
             else:
                 geom_name = self._animation_frames[animation_frame]
