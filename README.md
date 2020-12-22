@@ -242,6 +242,11 @@ pipeline.run_train()
 
 ```
 
+Below is an example of visualization using KITTI. The example shows the use of bounding boxes for the KITTI dataset.
+
+<img width="480" src="https://github.com/intel-isl/Open3D/docs/images/visualizer_BoundingBoxes.png">
+
+
 For more examples see [`examples/`](https://github.com/intel-isl/Open3D-ML/tree/master/examples)
 and the [`scripts/`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts) directories.
 
