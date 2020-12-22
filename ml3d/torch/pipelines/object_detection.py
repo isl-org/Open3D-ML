@@ -65,7 +65,6 @@ class ObjectDetection(BasePipeline):
             inputs = torch.tensor(data['point'],
                                   dtype=torch.float32,
                                   device=self.device)
-            inputs = torch.reshape(inputs, (1, -1, inputs.shape[-1]))
             results = model(inputs)
             boxes = model.inference_end(results, data)
 
@@ -224,12 +223,16 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         train_dataset = dataset.get_split('training')
-        train_loader = TorchDataloader(dataset=train_dataset,
+        train_split = TorchDataloader(dataset=train_dataset,
                                        preprocess=model.preprocess,
                                        transform=model.transform,
                                        use_cache=dataset.cfg.use_cache,
                                        steps_per_epoch=dataset.cfg.get(
                                            'steps_per_epoch_train', None))
+
+        train_loader = DataLoader(train_split,
+                                  batch_size=cfg.batch_size,
+                                  collate_fn=model.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -254,12 +257,11 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                data = train_loader[i]['data']
-
-                results = model(data['point'])
-                loss = model.loss(results, data)
+            process_bar = tqdm(train_loader, desc='training')
+            for data in process_bar:
+                inputs, cnts_pts, cnts_lbs = data[:-2], data[-2], data[-1]
+                results = model(inputs[0], cnts=cnts_pts)
+                loss = model.loss(results, inputs, cnts=cnts_lbs)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()

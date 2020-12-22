@@ -126,7 +126,6 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         for i in tqdm(range(len(valid_loader)), desc='validation'):
-            if i == 10: break
             data = valid_loader[i]['data']
             results = model(data['point'], training=False)
             loss = model.loss(results, data)
@@ -231,9 +230,10 @@ class ObjectDetection(BasePipeline):
             self.losses = {}
             process_bar = tqdm(train_loader, total=len_train, desc='training')
             for data in process_bar:
+                inputs, cnts_pts, cnts_lbs = data[:-2], data[-2], data[-1]
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(data[0], cnts=data[-1])
-                    loss = model.loss(results, data, cnts=data[-1])
+                    results = model(inputs[0], cnts=cnts_pts)
+                    loss = model.loss(results, inputs, cnts=cnts_lbs)
                     loss_sum = tf.add_n(loss.values())
 
                 grads = tape.gradient(loss_sum, model.trainable_weights)

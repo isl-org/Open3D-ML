@@ -136,7 +136,6 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def call(self, inputs, training=True, cnts=None):
-        #if isinstance(inputs, tuple) or isinstance(inputs, list):
         inputs = unpack(inputs, cnts)
         x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
@@ -163,7 +162,7 @@ class PointPillars(BaseModel):
         if isinstance(inputs, dict):
             gt_bboxes, gt_labels = inputs['bboxes'], inputs['labels']
         else:
-            gt_bboxes, gt_labels, idxs = inputs[1:]
+            gt_bboxes, gt_labels = inputs[1:]
     
         gt_bboxes = unpack(gt_bboxes, cnts)
         gt_labels = unpack(gt_labels, cnts)
@@ -335,12 +334,13 @@ class PointPillars(BaseModel):
                 points = tf.concat([b['point'] for b in batch], axis=0)
                 bboxes = tf.concat([b['bboxes'] for b in batch], axis=0)
                 labels = tf.concat([b['labels'] for b in batch], axis=0)
-                idx = tf.constant([len(b) for b in batch])
-                yield (points, bboxes, labels, idx)
+                cnt_pts = tf.constant([len(b['point'] ) for b in batch])
+                cnt_lbs = tf.constant([len(b['labels']) for b in batch])
+                yield (points, bboxes, labels, cnt_pts, cnt_lbs)
 
         gen_func = batcher
-        gen_types = (tf.float32, tf.float32, tf.int32, tf.int32)
-        gen_shapes = ([None, 4], [None, 7], [None], [None])
+        gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32)
+        gen_shapes = ([None, 4], [None, 7], [None], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 

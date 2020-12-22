@@ -44,6 +44,21 @@ from ...datasets.utils import ObjdetAugmentation
 from ...datasets.utils.operations import filter_by_min_points
 
 
+def unpack(flat_t, cnts=None):
+    """
+    Converts flat tensor to list of tensors, 
+    with length according to cnts.
+    """
+    if cnts is None:
+        return [flat_t]
+        
+    data_list = []
+    idx0 = 0
+    for cnt in cnts:
+        idx1 = idx0 + cnt
+        data_list.append(flat_t[idx0:idx1])
+    return data_list
+
 class PointPillars(BaseModel):
     """Object detection model. 
     Based on the PointPillars architecture 
@@ -132,7 +147,8 @@ class PointPillars(BaseModel):
         coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors_batch
 
-    def forward(self, inputs):
+    def forward(self, inputs, cnts=None):
+        inputs = unpack(inputs, cnts)
         x = self.extract_feats(inputs)
         outs = self.bbox_head(x)
         return outs
@@ -141,10 +157,16 @@ class PointPillars(BaseModel):
         optimizer = torch.optim.AdamW(self.parameters(), **cfg)
         return optimizer, None
 
-    def loss(self, results, inputs):
+    def loss(self, results, inputs, cnts=None):
         scores, bboxes, dirs = results
-        gt_labels = inputs['labels']
-        gt_bboxes = inputs['bboxes']
+
+        if isinstance(inputs, dict):
+            gt_bboxes, gt_labels = inputs['bboxes'], inputs['labels']
+        else:
+            gt_bboxes, gt_labels = inputs[1:]
+    
+        gt_bboxes = unpack(gt_bboxes, cnts)
+        gt_labels = unpack(gt_labels, cnts)
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -286,7 +308,7 @@ class PointPillars(BaseModel):
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
-        points = torch.tensor([data['point']],
+        points = torch.tensor(data['point'],
                               dtype=torch.float32,
                               device=self.device)
 
@@ -328,6 +350,15 @@ class PointPillars(BaseModel):
                     BEVBox3D(pos, dim, yaw, label, score, world_cam, cam_img))
 
         return inference_result
+
+    def collate_fn(self, batch):
+        points = torch.cat([b['data']['point'] for b in batch], axis=0)
+        bboxes = torch.cat([b['data']['bboxes'] for b in batch], axis=0)
+        labels = torch.cat([b['data']['labels'] for b in batch], axis=0)
+        cnt_pts = torch.tensor([len(b['data']['point']) for b in batch], device=self.device)
+        cnt_lbs = torch.tensor([len(b['data']['labels']) for b in batch], device=self.device)
+
+        return (points, bboxes, labels, cnt_pts, cnt_lbs)
 
 
 MODEL._register_module(PointPillars, 'torch')
@@ -928,50 +959,6 @@ class Anchor3DHead(nn.Module):
                 neg_idx = flatten_idx(
                     neg_idx.nonzero(as_tuple=False).squeeze(-1),
                     j) + i * anchors_cnt
-                pos_idxs.append(pos_idx)
-                neg_idxs.append(neg_idx)
-
-            # compute offset for index computation
-            idx_off += len(target_bboxes[i])
-        idx_off = 0
-        for i in range(len(target_bboxes)):
-            for j, (neg_th, pos_th) in enumerate(self.iou_thr):
-                anchors_stride = tf.reshape(anchors[i][..., j, :, :],
-                                            (-1, self.box_code_size))
-
-                # compute a fast approximation of IoU
-                overlaps = bbox_overlaps(box3d_to_bev2d(target_bboxes[i]),
-                                         box3d_to_bev2d(anchors_stride))
-
-                # for each anchor the gt with max IoU
-                argmax_overlaps = tf.argmax(overlaps, axis=0)
-                max_overlaps = tf.reduce_max(overlaps, axis=0)
-                # for each gt the anchor with max IoU
-                gt_max_overlaps = tf.reduce_max(overlaps, axis=1)
-
-                pos_idx = max_overlaps >= pos_th
-                neg_idx = (max_overlaps >= 0) & (max_overlaps < neg_th)
-
-                # low-quality matching
-                for k in range(len(target_bboxes[i])):
-                    if gt_max_overlaps[k] >= neg_th:
-                        pos_idx = tf.where(overlaps[k, :] == gt_max_overlaps[k],
-                                           True, pos_idx)
-
-                pos_idx = tf.where(pos_idx)[:, 0]
-                neg_idx = tf.where(neg_idx)[:, 0]
-                max_idx = tf.gather(argmax_overlaps, pos_idx)
-
-                # encode bbox for positive matches
-                assigned_bboxes.append(
-                    self.bbox_coder.encode(tf.gather(anchors_stride, pos_idx),
-                                           tf.gather(target_bboxes[i],
-                                                     max_idx)))
-                target_idxs.append(max_idx + idx_off)
-
-                # store global indices in list
-                pos_idx = flatten_idx(pos_idx, j) + i * anchors_cnt
-                neg_idx = flatten_idx(neg_idx, j) + i * anchors_cnt
                 pos_idxs.append(pos_idx)
                 neg_idxs.append(neg_idx)
 
