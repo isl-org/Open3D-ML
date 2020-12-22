@@ -1145,7 +1145,7 @@ class Visualizer:
 
         mat = rendering.Material()
         mat.shader = "unlitLine"
-        mat.line_width = 70
+        mat.line_width = 2 * self.window.scaling
 
         if self._consolidate_bounding_boxes:
             name = Model.bounding_box_prefix.split("/")[0]
