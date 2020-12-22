@@ -26,5 +26,3 @@ test_kpconv/
 kernels/
 **/.fuse*
 train_log/
-data/Argoverse
-data/NuScenes
