@@ -3,6 +3,7 @@ from .registry import Registry, get_from_name
 MODEL = Registry('model')
 DATASET = Registry('dataset')
 PIPELINE = Registry('pipeline')
+SAMPLER = Registry('sampler')
 
 
 def build(cfg, registry, args=None):
@@ -11,6 +12,19 @@ def build(cfg, registry, args=None):
 
 def build_network(cfg):
     return build(cfg, NETWORK)
+
+
+def convert_device_name(framework):
+    """Convert device to either cpu or cuda"""
+    gpu_names = ["gpu", "cuda"]
+    cpu_names = ["cpu"]
+    if framework not in cpu_names + gpu_names:
+        raise KeyError("the device shoule either "
+                       "be cuda or cpu but got {}".format(framework))
+    if framework in gpu_names:
+        return "cuda"
+    else:
+        return "cpu"
 
 
 def convert_framework_name(framework):
@@ -34,6 +48,9 @@ def get_module(module_type, module_name, framework=None, **kwargs):
 
     elif module_type == "dataset":
         return get_from_name(module_name, DATASET, framework)
+
+    elif module_type == "sampler":
+        return get_from_name(module_name, SAMPLER, framework)
 
     elif module_type == "model":
         framework = convert_framework_name(framework)

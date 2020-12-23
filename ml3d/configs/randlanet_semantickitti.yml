@@ -12,8 +12,8 @@ dataset:
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   validation_split: ['08']
   use_cache: true
-  validation_split:
-  - '08'
+  sampler:
+    name: 'SemSegRandomSampler'
 model:
   name: RandLANet
   batcher: DefaultBatcher
@@ -37,7 +37,8 @@ model:
   - 4
   - 4
   - 4
-  recentering: False
+  t_normalize:
+    recentering: []
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

@@ -11,8 +11,10 @@ dataset:
   val_files:
   - Lille2.ply
   use_cache: true
-  steps_per_epoch_train: 100
+  steps_per_epoch_train: 50
   steps_per_epoch_valid: 10
+  sampler:
+    name: SemSegSpatiallyRegularSampler
 model:
   name: RandLANet
   batcher: DefaultBatcher
@@ -25,7 +27,7 @@ model:
   - 128
   - 256
   - 512
-  grid_size: 0.06
+  grid_size: 0.08
   ignored_label_inds:
   - 0
   k_n: 16
@@ -39,6 +41,9 @@ model:
   - 4
   - 2
   weight_decay: 0.001
+  t_align: true
+  t_normalize:
+    recentering: [0, 1]
   t_augment:
     turn_on: false
     rotation_method: vertical
@@ -47,9 +52,6 @@ model:
     noise_level: 0.01
     min_s: 0.9
     max_s: 1.1
-  t_normalize:
-    method: linear
-    normalize_points: False
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.004

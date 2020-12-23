@@ -57,7 +57,7 @@ Second, we will construct the networks and pipelines, load the pretrained weight
     pcs = get_custom_data(pc_names, data_path)
 ```
 
-Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` visualize is a list of point clouds and their predictions. Each point cloud is a dictionary like, 
+Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` is a list of point clouds and their predictions. Each point cloud is a dictionary like, 
 ```python
     vis_d = {
         "name": name,

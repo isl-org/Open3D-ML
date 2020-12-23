@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import open3d.ml.torch as ml3d
 from open3d.ml.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
-                                Toronto3D)
+                                Toronto3D, KITTI)
 from open3d.ml.vis import Visualizer, LabelLUT
 from open3d.ml.utils import get_module
 
@@ -18,7 +18,7 @@ from os.path import exists, join, isfile, dirname, abspath, split
 
 def print_usage_and_exit():
     print(
-        "Usage: ml-test.py [kitti|paris|toronto|semantic3d|s3dis|custom] path/to/dataset"
+        "Usage: ml-test.py [kitti|semantickitti|paris|toronto|semantic3d|s3dis|custom] path/to/dataset"
     )
     exit(0)
 
@@ -85,10 +85,14 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
         results_r = pipeline_r.run_inference(data)
         pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32)
+        # WARNING, THIS IS A HACK
+        # Fill "unlabeled" value because predictions have no 0 values.
         pred_label_r[0] = 0
 
         results_k = pipeline_k.run_inference(data)
         pred_label_k = (results_k['predict_labels'] + 1).astype(np.int32)
+        # WARNING, THIS IS A HACK
+        # Fill "unlabeled" value because predictions have no 0 values.
         pred_label_k[0] = 0
 
         label = data['label']
@@ -132,6 +136,8 @@ def main():
     path = args.dataset_path
 
     if which == "kitti":
+        dataset = KITTI(path)
+    elif which == "semantickitti":
         dataset = SemanticKITTI(path)
     elif which == "paris":
         dataset = ParisLille3D(path)

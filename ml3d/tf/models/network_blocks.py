@@ -82,7 +82,7 @@ def block_decider(block_name, radius, in_dim, out_dim, layer_ind, cfg):
                           out_dim,
                           cfg.use_batch_norm,
                           cfg.batch_norm_momentum,
-                          l_relu=cfg.get('l_relu', 0.1))
+                          l_relu=cfg.get('l_relu', 0.2))
 
     elif block_name in [
             'simple', 'simple_deformable', 'simple_invariant',
@@ -206,8 +206,10 @@ class KPConv(tf.keras.layers.Layer):
 
         self.reset_parameters()
 
-        self.kernel_points = self.init_KP()
-        return
+        if deformable:
+            self.kernel_points = self.offset_conv.kernel_points
+        else:
+            self.kernel_points = self.init_KP()
 
     def reset_parameters(self):
         return
@@ -450,7 +452,7 @@ class UnaryBlock(tf.keras.layers.Layer):
                  use_bn,
                  bn_momentum,
                  no_relu=False,
-                 l_relu=0.1):
+                 l_relu=0.2):
         """
         Initialize a standard unary block with its ReLU and BatchNorm.
         :param in_dim: dimension input features.
@@ -516,7 +518,7 @@ class SimpleBlock(tf.keras.layers.Layer):
 
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
-        self.leaky_relu = tf.keras.layers.LeakyReLU(cfg.get('l_relu', 0.1))
+        self.leaky_relu = tf.keras.layers.LeakyReLU(cfg.get('l_relu', 0.2))
 
     def call(self, x, batch, training=False):
 
@@ -531,7 +533,9 @@ class SimpleBlock(tf.keras.layers.Layer):
             neighb_inds = batch['neighbors'][self.layer_ind]
 
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
-        return self.leaky_relu(self.batch_norm(x, training))
+        x = self.batch_norm(x, training)
+        x = self.leaky_relu(x)
+        return x
 
 
 class IdentityBlock(tf.keras.layers.Layer):
@@ -569,7 +573,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
         self.layer_ind = layer_ind
         self.in_dim = in_dim
         self.out_dim = out_dim
-        l_relu = cfg.get('l_relu', 0.1)
+        l_relu = cfg.get('l_relu', 0.2)
 
         # First downscaling mlp
         if in_dim != out_dim // 4:

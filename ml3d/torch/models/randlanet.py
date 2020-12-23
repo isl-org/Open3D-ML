@@ -130,7 +130,24 @@ class RandLANet(BaseModel):
 
         return loss, labels, scores
 
-    def transform(self, data, attr, min_posbility_idx=None):
+    def update_probs(self, inputs, results, test_probs, test_labels):
+        self.test_smooth = 0.95
+
+        for b in range(results.size()[0]):
+
+            result = torch.reshape(results[b], (-1, self.cfg.num_classes))
+            probs = torch.nn.functional.softmax(result, dim=-1)
+            probs = result.cpu().data.numpy()
+            labels = np.argmax(probs, 1)
+            inds = inputs['data']['point_inds'][b]
+
+            test_probs[inds] = self.test_smooth * test_probs[inds] + (
+                1 - self.test_smooth) * probs
+            test_labels[inds] = labels
+
+        return test_probs, test_labels
+
+    def transform(self, data, attr, min_possibility_idx=None):
         cfg = self.cfg
         inputs = dict()
 
@@ -139,26 +156,20 @@ class RandLANet(BaseModel):
         feat = data['feat'].copy() if data['feat'] is not None else None
         tree = data['search_tree']
 
-        if min_posbility_idx is None:  # training
-            pick_idx = np.random.choice(len(pc), 1)
+        pc, selected_idxs, center_point = self.trans_point_sampler(
+            pc=pc,
+            feat=feat,
+            label=label,
+            search_tree=tree,
+            num_points=self.cfg.num_points)
+
+        label = label[selected_idxs]
+        if (feat is None):
+            feat = None
         else:
-            pick_idx = min_posbility_idx
+            feat = feat[selected_idxs]
 
-        center_point = pc[pick_idx, :].reshape(1, -1)
-
-        pc, feat, label, selected_idx = \
-            trans_crop_pc(pc, feat, label, tree, pick_idx, self.cfg.num_points)
-
-        if min_posbility_idx is not None:
-            dists = np.sum(np.square((pc).astype(np.float32)), axis=1)
-            delta = np.square(1 - dists / np.max(dists))
-            self.possibility[selected_idx] += delta
-            inputs['point_inds'] = selected_idx
-
-        if not cfg.get('recentering', True):
-            pc = pc + center_point
-
-        t_normalize = cfg.get('t_normalize', None)
+        t_normalize = cfg.get('t_normalize', {})
         pc, feat = trans_normalize(pc, feat, t_normalize)
 
         if attr['split'] in ['training', 'train']:
@@ -196,6 +207,7 @@ class RandLANet(BaseModel):
         inputs['sub_idx'] = input_pools
         inputs['interp_idx'] = input_up_samples
         inputs['features'] = features
+        inputs['point_inds'] = selected_idxs
 
         inputs['labels'] = label.astype(np.int64)
         return inputs
@@ -215,9 +227,9 @@ class RandLANet(BaseModel):
         self.batcher = DefaultBatcher()
 
     def inference_preprocess(self):
-        min_posbility_idx = np.argmin(self.possibility)
+        min_possibility_idx = np.argmin(self.possibility)
         attr = {'split': 'test'}
-        data = self.transform(self.inference_data, attr, min_posbility_idx)
+        data = self.transform(self.inference_data, attr, min_possibility_idx)
         inputs = {'data': data, 'attr': attr}
         inputs = self.batcher.collate_fn([inputs])
         self.inference_input = inputs
@@ -274,8 +286,12 @@ class RandLANet(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
-        split = attr['split']
+        if cfg.get('t_align', False):
+            points_min = np.expand_dims(points.min(0), 0)
+            points_min[0, :2] = 0
+            points = points - points_min
 
+        split = attr['split']
         data = dict()
 
         if (feat is None):

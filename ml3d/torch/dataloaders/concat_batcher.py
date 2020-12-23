@@ -169,6 +169,7 @@ class CustomBatch:
         self.reproj_masks = input_list[ind]
         ind += 1
         self.val_labels = input_list[ind]
+
         return
 
     def big_neighborhood_filter(self, neighbors, layer):

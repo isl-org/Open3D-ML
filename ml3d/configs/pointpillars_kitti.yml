@@ -1,0 +1,103 @@
+dataset:
+  name: KITTI
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  steps_per_epoch_train: 5000
+
+model:
+  name: PointPillars
+  ckpt_path: # path/to/your/checkpoint
+
+  point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
+  classes: ['Pedestrian', 'Cyclist', 'Car']
+
+  loss:
+    focal:
+      gamma: 2.0
+      alpha: 0.25
+      loss_weight: 1.0
+    smooth_l1:
+      beta: 0.11
+      loss_weight: 2.0
+    cross_entropy:
+      loss_weight: 0.2
+
+  voxelize:
+    max_num_points: 32
+    voxel_size: &vsize
+      [0.16, 0.16, 4]
+    max_voxels: [16000, 40000]
+  
+  voxel_encoder:
+    in_channels: 4
+    feat_channels: [64]
+    voxel_size: *vsize
+
+  scatter:
+    in_channels: 64
+    output_shape: [496, 432]
+
+  backbone:
+    in_channels: 64
+    out_channels: [64, 128, 256]
+    layer_nums: [3, 5, 5]
+    layer_strides: [2, 2, 2]
+
+  neck:
+    in_channels: [64, 128, 256]
+    out_channels: [128, 128, 128]
+    upsample_strides: [1, 2, 4]
+    use_conv_for_no_stride: false
+
+  head:
+    in_channels: 384
+    feat_channels: 384
+    nms_pre: 100
+    score_thr: 0.1
+    ranges: [
+      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+      [0, -39.68, -0.6, 70.4, 39.68, -0.6],
+      [0, -39.68, -1.78, 70.4, 39.68, -1.78]
+    ]
+    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
+    rotations: [0, 1.57]
+    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
+  
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: True
+    ObjectSample:
+      min_points_dict:
+        Car: 5
+        Pedestrian: 10
+        Cyclist: 10
+      sample_dict:
+        Car: 15
+        Pedestrian: 10
+        Cyclist: 10
+
+
+pipeline:
+  name: ObjectDetection
+  test_compute_metric: true
+  batch_size: 1
+  val_batch_size: 1
+  save_ckpt_freq: 5
+  max_epoch: 200
+  main_log_dir: ./logs
+  train_sum_dir: train_log
+  grad_clip_norm: 2
+
+  optimizer:
+    lr: 0.001
+    betas: [0.95, 0.99]
+    weight_decay: 0.01
+
+  # evaluation properties
+  overlaps: [0.5, 0.5, 0.7]
+  similar_classes: {
+    Van: Car,
+    Person_sitting: Pedestrian
+  }
+  difficulties: [0, 1, 2]
+    

@@ -70,9 +70,6 @@ model:
   num_layers: 5
   repulse_extent: 1.2
   use_batch_norm: true
-  t_normalize:
-    feat_bias: 0
-    feat_scale: 255
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

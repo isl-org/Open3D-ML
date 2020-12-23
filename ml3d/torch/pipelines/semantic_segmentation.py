@@ -8,18 +8,20 @@ import warnings
 from datetime import datetime
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
-from torch.utils.data import Dataset, IterableDataset, DataLoader, Sampler, BatchSampler
+from torch.utils.data import Dataset, IterableDataset, DataLoader
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
 
 from os.path import exists, join, isfile, dirname, abspath
 
 from .base_pipeline import BasePipeline
-from ..dataloaders import TorchDataloader, DefaultBatcher, ConcatBatcher
+from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord, Config, PIPELINE, get_runid, code2md
 from ...datasets.utils import DataProcessing
+from ...datasets import InferenceDummySplit
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -31,7 +33,59 @@ log = logging.getLogger(__name__)
 
 class SemanticSegmentation(BasePipeline):
     """
-    Pipeline for semantic segmentation. 
+    This class allows you to perform semantic segmentation for both training and inference using the Torch. This pipeline has multiple stages: Pre-processing, loading dataset, testing, and inference or training.
+    
+    **Example:** 
+        This example loads the Semantic Segmentation and performs a training using the SemanticKITTI dataset.
+
+            import torch, pickle
+            import torch.nn as nn
+
+            from .base_pipeline import BasePipeline
+            from torch.utils.tensorboard import SummaryWriter
+            from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
+
+            Mydataset = TorchDataloader(dataset=dataset.get_split('training')),
+            MyModel = SemanticSegmentation(self,model,dataset=Mydataset, name='SemanticSegmentation',
+            name='MySemanticSegmentation',
+            batch_size=4,
+            val_batch_size=4,
+            test_batch_size=3,
+            max_epoch=100,
+            learning_rate=1e-2,
+            lr_decays=0.95,
+            save_ckpt_freq=20,
+            adam_lr=1e-2,
+            scheduler_gamma=0.95,
+            momentum=0.98,
+            main_log_dir='./logs/',
+            device='gpu',
+            split='train',
+            train_sum_dir='train_log')
+            
+    **Args:**
+            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            model: The model to be used for building the pipeline.
+            name: The name of the current training.
+            batch_size: The batch size to be used for training.
+            val_batch_size: The batch size to be used for validation.
+            test_batch_size: The batch size to be used for testing.
+            max_epoch: The maximum size of the epoch to be used for training.
+            leanring_rate: The hyperparameter that controls the weights during training. Also, known as step size.
+            lr_decays: The learning rate decay for the training.
+            save_ckpt_freq: The frequency in which the checkpoint should be saved.
+            adam_lr: The leanring rate to be applied for Adam optimization.
+            scheduler_gamma: The decaying factor associated with the scheduler.
+            momentum: The momentum that accelerates the training rate schedule.
+            main_log_dir: The directory where logs are stored.
+            device: The device to be used for training.
+            split: The dataset split to be used. In this example, we have used "train".
+            train_sum_dir: The directory where the trainig summary is stored.
+            
+    **Returns:**
+            class: The corresponding class.
+        
+        
     """
 
     def __init__(
@@ -74,6 +128,11 @@ class SemanticSegmentation(BasePipeline):
                          train_sum_dir=train_sum_dir,
                          **kwargs)
 
+    """
+    Run the inference using the data passed.
+    
+    """
+
     def run_inference(self, data):
         cfg = self.cfg
         model = self.model
@@ -83,16 +142,43 @@ class SemanticSegmentation(BasePipeline):
         model.device = device
         model.eval()
 
-        model.inference_begin(data)
+        batcher = self.get_batcher(device)
+        infer_dataset = InferenceDummySplit(data)
+        self.dataset_split = infer_dataset
+        infer_sampler = infer_dataset.sampler
+        infer_split = TorchDataloader(dataset=infer_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      sampler=infer_sampler,
+                                      use_cache=False)
+        infer_loader = DataLoader(infer_split,
+                                  batch_size=cfg.batch_size,
+                                  sampler=get_sampler(infer_sampler),
+                                  collate_fn=batcher.collate_fn)
+
+        model.trans_point_sampler = infer_sampler.get_point_sampler()
+        self.curr_cloud_id = -1
+        self.test_probs = []
+        self.test_labels = []
+        self.ori_test_probs = []
+        self.ori_test_labels = []
 
         with torch.no_grad():
-            while True:
-                inputs = model.inference_preprocess()
+            for step, inputs in enumerate(infer_loader):
                 results = model(inputs['data'])
-                if model.inference_end(inputs, results):
-                    break
+                self.update_tests(infer_sampler, inputs, results)
 
-        return model.inference_result
+        inference_result = {
+            'predict_labels': self.ori_test_labels.pop(),
+            'predict_scores': self.ori_test_probs.pop()
+        }
+
+        return inference_result
+
+    """
+    Run the test using the data passed.
+    
+    """
 
     def run_test(self):
         model = self.model
@@ -101,6 +187,7 @@ class SemanticSegmentation(BasePipeline):
         cfg = self.cfg
         model.device = device
         model.to(device)
+        model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
         metric = SemSegMetric(self, model, dataset, device)
@@ -110,45 +197,96 @@ class SemanticSegmentation(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        batcher = self.get_batcher(device, split='test')
+        batcher = self.get_batcher(device)
 
-        test_split = TorchDataloader(dataset=dataset.get_split('test'),
+        test_dataset = dataset.get_split('test')
+        test_sampler = test_dataset.sampler
+        test_split = TorchDataloader(dataset=test_dataset,
                                      preprocess=model.preprocess,
                                      transform=model.transform,
-                                     use_cache=dataset.cfg.use_cache,
-                                     shuffle=False)
+                                     sampler=test_sampler,
+                                     use_cache=dataset.cfg.use_cache)
+        test_loader = DataLoader(test_split,
+                                 batch_size=cfg.batch_size,
+                                 sampler=get_sampler(test_sampler),
+                                 collate_fn=batcher.collate_fn)
+
+        self.dataset_split = test_dataset
 
         self.load_ckpt(model.cfg.ckpt_path)
 
-        datset_split = self.dataset.get_split('test')
+        model.trans_point_sampler = test_sampler.get_point_sampler()
+        self.curr_cloud_id = -1
+        self.test_probs = []
+        self.test_labels = []
+        self.ori_test_probs = []
+        self.ori_test_labels = []
 
         log.info("Started testing")
 
-        self.test_accs = []
-        self.test_ious = []
-
         with torch.no_grad():
-            for idx in tqdm(range(len(test_split)), desc='test'):
-                attr = datset_split.get_attr(idx)
-                if (cfg.get('test_continue', True) and dataset.is_tested(attr)):
-                    continue
-                data = datset_split.get_data(idx)
-                results = self.run_inference(data)
+            for step, inputs in enumerate(test_loader):
+                results = model(inputs['data'])
+                self.update_tests(test_sampler, inputs, results)
 
-                predict_label = results['predict_labels']
-                if cfg.get('test_compute_metric', True):
-                    acc = metric.acc_np_label(predict_label, data['label'])
-                    iou = metric.iou_np_label(predict_label, data['label'])
-                    self.test_accs.append(acc)
-                    self.test_ious.append(iou)
+                if self.complete_infer:
+                    inference_result = {
+                        'predict_labels': self.ori_test_labels.pop(),
+                        'predict_scores': self.ori_test_probs.pop()
+                    }
+                    attr = self.dataset_split.get_attr(test_sampler.cloud_id)
+                    dataset.save_test_result(inference_result, attr)
 
-                dataset.save_test_result(results, attr)
+        log.info("Finshed testing")
 
-        if cfg.get('test_compute_metric', True):
-            log.info("test acc: {}".format(
-                np.nanmean(np.array(self.test_accs)[:, -1])))
-            log.info("test iou: {}".format(
-                np.nanmean(np.array(self.test_ious)[:, -1])))
+    """
+    Update tests using sampler, inputs, and results.
+    
+    """
+
+    def update_tests(self, sampler, inputs, results):
+        split = sampler.split
+        end_threshold = 0.5
+        if self.curr_cloud_id != sampler.cloud_id:
+            self.curr_cloud_id = sampler.cloud_id
+            num_points = sampler.possibilities[sampler.cloud_id].shape[0]
+            self.pbar = tqdm(total=num_points,
+                             desc="{} {}/{}".format(split, self.curr_cloud_id,
+                                                    len(sampler.dataset)))
+            self.pbar_update = 0
+            self.test_probs.append(
+                np.zeros(shape=[num_points, self.model.cfg.num_classes],
+                         dtype=np.float16))
+            self.test_labels.append(np.zeros(shape=[num_points],
+                                             dtype=np.int16))
+            self.complete_infer = False
+
+        this_possiblility = sampler.possibilities[sampler.cloud_id]
+        self.pbar.update(this_possiblility[this_possiblility > end_threshold].shape[0] \
+            - self.pbar_update)
+        self.pbar_update = this_possiblility[
+            this_possiblility > end_threshold].shape[0]
+        self.test_probs[self.curr_cloud_id], self.test_labels[self.curr_cloud_id] \
+            = self.model.update_probs(inputs, results,
+                self.test_probs[self.curr_cloud_id],
+                self.test_labels[self.curr_cloud_id])
+
+        if split in ['test'] and this_possiblility[this_possiblility > end_threshold].shape[0] \
+          == this_possiblility.shape[0]:
+
+            proj_inds = self.model.preprocess(
+                self.dataset_split.get_data(self.curr_cloud_id),
+                {'split': split})['proj_inds']
+            self.ori_test_probs.append(
+                self.test_probs[self.curr_cloud_id][proj_inds])
+            self.ori_test_labels.append(
+                self.test_labels[self.curr_cloud_id][proj_inds])
+            self.complete_infer = True
+
+    """
+    Run the training on the self model.
+    
+    """
 
     def run_train(self):
         model = self.model
@@ -169,31 +307,35 @@ class SemanticSegmentation(BasePipeline):
         Loss = SemSegLoss(self, model, dataset, device)
         metric = SemSegMetric(self, model, dataset, device)
 
-        batcher = self.get_batcher(device)
+        self.batcher = self.get_batcher(device)
 
-        train_split = TorchDataloader(dataset=dataset.get_split('training'),
+        train_dataset = dataset.get_split('train')
+        train_sampler = train_dataset.sampler
+        train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
+                                      sampler=train_sampler,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
-                                  shuffle=True,
-                                  collate_fn=batcher.collate_fn)
+                                  sampler=get_sampler(train_sampler),
+                                  collate_fn=self.batcher.collate_fn)
 
-        valid_split = TorchDataloader(dataset=dataset.get_split('validation'),
+        valid_dataset = dataset.get_split('validation')
+        valid_sampler = valid_dataset.sampler
+        valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
+                                      sampler=valid_sampler,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
-
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
-                                  shuffle=True,
-                                  collate_fn=batcher.collate_fn)
+                                  sampler=get_sampler(valid_sampler),
+                                  collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -221,6 +363,8 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             self.accs = []
             self.ious = []
+            self.train_conf_m = []
+            model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
@@ -231,18 +375,20 @@ class SemanticSegmentation(BasePipeline):
                     continue
 
                 self.optimizer.zero_grad()
-                loss.backward()
+                # loss.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
                     torch.nn.utils.clip_grad_value_(model.parameters(),
                                                     model.cfg.grad_clip_norm)
                 self.optimizer.step()
 
+                conf_m = metric.confusion_matrix(predict_scores, gt_labels)
                 acc = metric.acc(predict_scores, gt_labels)
                 iou = metric.iou(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
                 self.accs.append(acc)
                 self.ious.append(iou)
+                self.train_conf_m.append(conf_m)
 
             self.scheduler.step()
 
@@ -251,29 +397,37 @@ class SemanticSegmentation(BasePipeline):
             self.valid_losses = []
             self.valid_accs = []
             self.valid_ious = []
+            self.valid_conf_m = []
+
+            model.trans_point_sampler = valid_sampler.get_point_sampler()
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
-
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
 
                     if predict_scores.size()[-1] == 0:
                         continue
+
+                    conf_m = metric.confusion_matrix(predict_scores, gt_labels)
                     acc = metric.acc(predict_scores, gt_labels)
                     iou = metric.iou(predict_scores, gt_labels)
 
                     self.valid_losses.append(loss.cpu().item())
                     self.valid_accs.append(acc)
                     self.valid_ious.append(iou)
-
-                    step = step + 1
+                    self.valid_conf_m.append(conf_m)
 
             self.save_logs(writer, epoch)
 
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
+
+    """
+    Get the batcher to be used based on the device and split.
+    
+    """
 
     def get_batcher(self, device, split='training'):
 
@@ -287,6 +441,11 @@ class SemanticSegmentation(BasePipeline):
             batcher = None
         return batcher
 
+    """
+    Save logs from the training and send results to TensorBoard.
+    
+    """
+
     def save_logs(self, writer, epoch):
 
         with warnings.catch_warnings():  # ignore Mean of empty slice.
@@ -296,6 +455,18 @@ class SemanticSegmentation(BasePipeline):
 
             valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
             valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
+
+        valid_conf_m = np.array(self.valid_conf_m).sum(0)
+        valid_total_acc = np.sum(np.diag(valid_conf_m)) / np.sum(valid_conf_m)
+        valid_total_iou = np.nanmean([valid_conf_m[i][i] / \
+            (valid_conf_m[i].sum() + valid_conf_m[:,i].sum() - valid_conf_m[i][i]) \
+          for i in range(valid_conf_m.shape[0])])
+
+        train_conf_m = np.array(self.train_conf_m).sum(0)
+        train_total_acc = np.sum(np.diag(train_conf_m)) / np.sum(train_conf_m)
+        train_total_iou = np.nanmean([train_conf_m[i][i] / \
+            (train_conf_m[i].sum() + train_conf_m[:,i].sum() - train_conf_m[i][i]) \
+          for i in range(train_conf_m.shape[0])])
 
         loss_dict = {
             'Training loss': np.mean(self.losses),
@@ -317,12 +488,26 @@ class SemanticSegmentation(BasePipeline):
         for key, val in iou_dicts[-1].items():
             writer.add_scalar("{}/ Overall".format(key), val, epoch)
 
+        writer.add_scalar("total acc train", train_total_acc, epoch)
+        writer.add_scalar("total iou train", train_total_iou, epoch)
+        writer.add_scalar("total acc valid", valid_total_acc, epoch)
+        writer.add_scalar("total iou valid", valid_total_iou, epoch)
+
         log.info(f"loss train: {loss_dict['Training loss']:.3f} "
                  f" eval: {loss_dict['Validation loss']:.3f}")
-        log.info(f"acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
+        log.info(f"mean acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
                  f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
-        log.info(f"iou train: {iou_dicts[-1]['Training IoU']:.3f} "
+        log.info(f"mean iou train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
+        log.info(f"total iou train: {train_total_iou:.3f} "
+                 f" eval: {valid_total_iou:.3f}")
+        log.info(f"total acc train: {valid_total_acc:.3f} "
+                 f" eval: {valid_total_acc:.3f}")
+
+    """
+    Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
+    
+    """
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -349,6 +534,11 @@ class SemanticSegmentation(BasePipeline):
             log.info(f'Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
+    """
+    Save a checkpoint at the passed epoch.
+    
+    """
+
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(path_ckpt)
@@ -360,10 +550,12 @@ class SemanticSegmentation(BasePipeline):
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
+    """
+    Save experiment configuration with Torch summary.
+    
+    """
+
     def save_config(self, writer):
-        '''
-        Save experiment configuration with tensorboard summary
-        '''
         writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
         writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
         writer.add_text('Configuration/Dataset',

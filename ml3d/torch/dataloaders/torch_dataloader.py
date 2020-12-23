@@ -10,13 +10,25 @@ from ...utils import Cache, get_hash
 
 class TorchDataloader(Dataset):
     """
-    Data loader for torch framework.
+    This class allows you to load datasets for a PyTorch framework.
+	**Example:** 
+        This example loads the SemanticKITTI dataset using the Torch dataloader:
+			
+			
+            import torch
+			
+			from torch.utils.data import Dataset, DataLoader
+					
+			train_split = TorchDataloader(dataset=dataset.get_split('training'))
+	
+	
     """
 
     def __init__(self,
                  dataset=None,
                  preprocess=None,
                  transform=None,
+                 sampler=None,
                  use_cache=True,
                  steps_per_epoch=None,
                  **kwargs):
@@ -24,13 +36,11 @@ class TorchDataloader(Dataset):
         Initialize
 
         Args:
-            dataset: ml3d dataset class.
-            dataset: model's preprocess method.
-            devce: model's transform mthod.
-            use_cache: whether to use cached preprocessed data.
-            steps_per_epch: steps per epoch. The step number will be the 
-                number of samples in the data if steps_per_epoch=None
-            kwargs:
+            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            preprocess: The model's preprocess method.
+            transform: The model's transform method.
+            use_cache: Indicates if preprocessed data should be cached.
+            steps_per_epoch: The number of steps per epoch that indicates the bactches of samples to train. If it is None, then the step number will be the number of samples in the data.
         Returns:
             class: The corresponding class.
         """
@@ -65,8 +75,13 @@ class TorchDataloader(Dataset):
 
         self.transform = transform
 
+        if sampler is not None:
+            sampler.initialize_with_dataloader(self)
+
     def __getitem__(self, index):
-        """Returns the item at index idx. """
+        """
+		Returns the item at index position (idx). 	
+		"""
         dataset = self.dataset
         index = index % len(dataset)
 
@@ -86,7 +101,7 @@ class TorchDataloader(Dataset):
         return inputs
 
     def __len__(self):
-        """Returns the number of steps for one epoch"""
+        """Returns the number of steps for an epoch."""
         if self.steps_per_epoch is not None:
             steps_per_epoch = self.steps_per_epoch
         else:

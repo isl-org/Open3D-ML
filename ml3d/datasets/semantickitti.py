@@ -6,7 +6,7 @@ import logging
 from sklearn.neighbors import KDTree
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from .utils import DataProcessing
 from ..utils import make_dir, DATASET
 
@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 class SemanticKITTI(BaseDataset):
     """
-    SemanticKITTI dataset, used in visualizer, training, or test
+    This class is used to create a dataset based on the SemanticKitti dataset, and used in visualizer, training, or testing. The dataset is best for semantic scene understanding.
     """
 
     def __init__(self,
@@ -49,11 +49,19 @@ class SemanticKITTI(BaseDataset):
                  ],
                  **kwargs):
         """
-        Initialize
-        Args:
-            dataset_path (str): path to the dataset
-            kwargs:
-        Returns:
+		Initialize the function by passing the dataset and other details.
+	
+		Args:
+			dataset_path: The path to the dataset to use.
+			name: The name of the dataset (Semantic3D in this case).
+			cache_dir: The directory where the cache is stored.
+			use_cache: Indicates if the dataset should be cached.
+			num_points: The maximum number of points to use when splitting the dataset.
+			class_weights: The class weights to use in the dataset.
+			ignored_label_inds: A list of labels that should be ignored in the dataset.
+			test_result_folder: The folder where the test results should be stored.
+				
+		Returns:
             class: The corresponding class.
         """
         super().__init__(dataset_path=dataset_path,
@@ -95,6 +103,13 @@ class SemanticKITTI(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
+        """
+	Returns a label to names dictonary object.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            values are the corresponding names.
+    """
         label_to_names = {
             0: 'unlabeled',
             1: 'car',
@@ -120,9 +135,28 @@ class SemanticKITTI(BaseDataset):
         return label_to_names
 
     def get_split(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+	"""
         return SemanticKITTISplit(self, split=split)
 
     def is_tested(self, attr):
+        """Checks if a datum in the dataset has been tested.
+        
+        Args:
+            dataset: The current dataset to which the datum belongs to.
+			attr: The attribute that needs to be checked.
+
+        Returns:
+            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+			
+	"""
         cfg = self.cfg
         name = attr['name']
         name_seq, name_points = name.split("_")
@@ -137,6 +171,12 @@ class SemanticKITTI(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
+        """Saves the output of a model.
+
+        Args:
+            results: The output of a model for the datum associated with the attribute passed.
+            attr: The attributes that correspond to the outputs passed in results.
+    """
         cfg = self.cfg
         name = attr['name']
         name_seq, name_points = name.split("_")
@@ -146,12 +186,11 @@ class SemanticKITTI(BaseDataset):
         save_path = join(test_path, name_seq, 'predictions')
         make_dir(save_path)
         test_file_name = name_points
-
-        pred = results['predict_labels']
-
-        store_path = join(save_path, name_points + '.label')
         for ign in cfg.ignored_label_inds:
             pred[pred >= ign] += 1
+
+        store_path = join(save_path, name_points + '.label')
+
         pred = self.remap_lut[pred].astype(np.uint32)
         pred.tofile(store_path)
 
@@ -179,6 +218,19 @@ class SemanticKITTI(BaseDataset):
             pred.tofile(store_path)
 
     def get_split_list(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+			
+		Raises:
+			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+            'training', 'test', 'validation', or 'all'.
+    """
         cfg = self.cfg
         dataset_path = cfg.dataset_path
         file_list = []
@@ -205,21 +257,13 @@ class SemanticKITTI(BaseDataset):
         return file_list
 
 
-class SemanticKITTISplit():
+class SemanticKITTISplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
+        super().__init__(dataset, split=split)
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
         self.remap_lut_val = dataset.remap_lut_val
-
-        if split == 'test':
-            dataset.test_list = path_list
-
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
 
     def __len__(self):
         return len(self.path_list)
@@ -253,7 +297,8 @@ class SemanticKITTISplit():
         _, seq = split(split(dir)[0])
         name = '{}_{}'.format(seq, file[:-4])
 
-        attr = {'name': name, 'path': pc_path, 'split': self.split}
+        pc_path = str(pc_path)
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': self.split}
         return attr
 
 

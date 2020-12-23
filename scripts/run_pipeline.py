@@ -26,6 +26,7 @@ def parse_args():
     parser.add_argument('--cfg_dataset',
                         help='path to the dataset\'s config file')
     parser.add_argument('--dataset_path', help='path to the dataset')
+    parser.add_argument('--ckpt_path', help='path to the checkpoint')
     parser.add_argument('--device',
                         help='device to run the pipeline',
                         default='gpu')
@@ -58,6 +59,7 @@ def main():
     args, extra_dict = parse_args()
 
     framework = _ml3d.utils.convert_framework_name(args.framework)
+    args.device = _ml3d.utils.convert_device_name(args.device)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
     else:
@@ -72,7 +74,7 @@ def main():
                     tf.config.experimental.set_memory_growth(gpu, True)
                 if device == 'cpu':
                     tf.config.set_visible_devices([], 'GPU')
-                elif device == 'gpu':
+                elif device == 'cuda':
                     tf.config.set_visible_devices(gpus[0], 'GPU')
                 else:
                     idx = device.split(':')[1]

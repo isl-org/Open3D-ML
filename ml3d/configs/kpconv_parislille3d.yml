@@ -8,45 +8,49 @@ dataset:
   test_result_folder: ./test
   val_files:
   - Lille2.ply
-  use_cache: False
-  steps_per_epoch_train: 100
+  use_cache: True
+  steps_per_epoch_train: 40
   steps_per_epoch_valid: 10
+  sampler:
+    name: SemSegSpatiallyRegularSampler
 model:
   name: KPFCNN
   ckpt_path: # path/to/your/checkpoint
   KP_extent: 1.0
   KP_influence: linear
   aggregation_mode: sum
-  architecture:
-  - simple
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - resnetb_strided
-  - resnetb
-  - nearest_upsample
-  - unary
-  - nearest_upsample
-  - unary
-  - nearest_upsample
-  - unary
-  - nearest_upsample
-  - unary
+  architecture: [
+  'simple',
+  'resnetb',
+  'resnetb_strided',
+  'resnetb',
+  'resnetb_strided',
+  'resnetb_deformable',
+  'resnetb_deformable_strided',
+  'resnetb_deformable',
+  'resnetb_deformable_strided',
+  'resnetb_deformable',
+  'nearest_upsample',
+  'unary',
+  'nearest_upsample',
+  'unary',
+  'nearest_upsample',
+  'unary',
+  'nearest_upsample',
+  'unary']
+  reduce_fc: true
   augment_color: 0.8
-  augment_noise: 0.001
+  augment_noise: 0.01
   augment_rotation: vertical
   augment_scale_anisotropic: true
-  augment_scale_max: 1.2
-  augment_scale_min: 0.8
+  augment_scale_max: 1.1
+  augment_scale_min: 0.9
   augment_symmetries:
   - true
   - false
   - false
-  batch_limit: 80000
+  batch_limit: 20000
+  grad_clip_norm: 100.0
   batch_norm_momentum: 0.98
   batcher: ConcatBatcher
   conv_radius: 2.5
@@ -55,15 +59,16 @@ model:
   deform_radius: 6.0
   density_parameter: 5.0
   first_features_dim: 128
-  first_subsampling_dl: 0.04
+  first_subsampling_dl: 0.08
   fixed_kernel_points: center
   ignored_label_inds: [0]
-  in_features_dim: 2
+  in_features_dim: 1
   in_points_dim: 3
-  in_radius: 1.5
+  l_relu: 0.2
+  in_radius: 4.0
   lbl_values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-  min_in_points: 20000
-  max_in_points: 50000
+  min_in_points: 10000
+  max_in_points: 17000
   modulated: false
   num_classes: 9
   num_kernel_points: 15
@@ -74,7 +79,7 @@ pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
   momentum: 0.98
-  batch_size: 2
+  batch_size: 1
   learning_rate: 0.01
   lr_decays: 0.98477
   deform_lr_factor: 0.1
@@ -82,7 +87,7 @@ pipeline:
   max_epoch: 100
   save_ckpt_freq: 5
   scheduler_gamma: 0.95
-  test_batch_size: 2
+  test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 2
+  val_batch_size: 1
   weight_decay: 0.001

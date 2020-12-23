@@ -1,0 +1,104 @@
+dataset:
+  name: Waymo
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  steps_per_epoch_train: 5000
+
+model:
+  name: PointPillars
+  ckpt_path: # path/to/your/checkpoint
+
+  point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
+  classes: ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
+
+  loss:
+    focal:
+      gamma: 2.0
+      alpha: 0.25
+      loss_weight: 1.0
+    smooth_l1:
+      beta: 0.11
+      loss_weight: 2.0
+    cross_entropy:
+      loss_weight: 0.2
+
+  voxelize:
+    max_num_points: 20
+    voxel_size: &vsize
+      [0.32, 0.32, 6]
+    max_voxels: [32000, 32000]
+  
+  voxel_encoder:
+    in_channels: 5
+    feat_channels: [64]
+    voxel_size: *vsize
+
+  scatter:
+    in_channels: 64
+    output_shape: [468, 468]
+
+  backbone:
+    in_channels: 64
+    out_channels: [64, 128, 256]
+    layer_nums: [3, 5, 5]
+    layer_strides: [2, 2, 2]
+
+  neck:
+    in_channels: [64, 128, 256]
+    out_channels: [128, 128, 128]
+    upsample_strides: [1, 2, 4]
+    use_conv_for_no_stride: false
+
+  head:
+    in_channels: 384
+    feat_channels: 384
+    nms_pre: 4096
+    score_thr: 0.1
+    ranges: [
+      [-74.88, -74.88, -0.0345, 74.88, 74.88, -0.0345],
+      [-74.88, -74.88, -0.1188, 74.88, 74.88, -0.1188],
+      [-74.88, -74.88, 0, 74.88, 74.88, 0],
+    ]
+    sizes: [
+      [2.08, 4.73, 1.77],  # car
+      [0.84, 1.81, 1.77],  # cyclist
+      [0.84, 0.91, 1.74]   # pedestrian
+    ]
+    dir_offset: 0.7854
+    rotations: [0, 1.57]
+    iou_thr: [[0.4, 0.55], [0.3, 0.5], [0.3, 0.5]]
+  
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: True
+    ObjectSample:
+      min_points_dict:
+        VEHICLE: 5
+        PEDESTRIAN: 10
+        CYCLIST: 10
+      sample_dict:
+        VEHICLE: 15
+        PEDESTRIAN: 10
+        CYCLIST: 10
+
+
+pipeline:
+  name: ObjectDetection
+  test_compute_metric: true
+  batch_size: 1
+  val_batch_size: 1
+  save_ckpt_freq: 5
+  max_epoch: 200
+  main_log_dir: ./logs
+  train_sum_dir: train_log
+  grad_clip_norm: 2
+
+  optimizer:
+    lr: 0.001
+    betas: [0.95, 0.99]
+    weight_decay: 0.01
+
+  # evaluation properties
+  overlaps: [0.5, 0.5, 0.7]
+  difficulties: [0, 1, 2]
+    

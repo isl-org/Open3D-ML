@@ -8,7 +8,7 @@ from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 import logging
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
 logging.basicConfig(
@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 class Toronto3D(BaseDataset):
     """
-    Toronto3D dataset, used in visualizer, training, or test
+    This class is used to create a dataset based on the Toronto3D dataset, and used in visualizer, training, or testing. The dataset is best used for semantic segmentation of urban roadways.
     """
 
     def __init__(self,
@@ -40,11 +40,19 @@ class Toronto3D(BaseDataset):
                  test_result_folder='./test',
                  **kwargs):
         """
-        Initialize
-        Args:
-            dataset_path (str): path to the dataset
-            kwargs:
-        Returns:
+		Initialize the function by passing the dataset and other details.
+	
+		Args:
+			dataset_path: The path to the dataset to use.
+			name: The name of the dataset (Semantic3D in this case).
+			cache_dir: The directory where the cache is stored.
+			use_cache: Indicates if the dataset should be cached.
+			num_points: The maximum number of points to use when splitting the dataset.
+			class_weights: The class weights to use in the dataset.
+			ignored_label_inds: A list of labels that should be ignored in the dataset.
+			test_result_folder: The folder where the test results should be stored.
+				
+		Returns:
             class: The corresponding class.
         """
         super().__init__(dataset_path=dataset_path,
@@ -80,6 +88,13 @@ class Toronto3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
+        """
+	Returns a label to names dictonary object.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            values are the corresponding names.
+    """
         label_to_names = {
             0: 'Unclassified',
             1: 'Ground',
@@ -94,9 +109,31 @@ class Toronto3D(BaseDataset):
         return label_to_names
 
     def get_split(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+	"""
         return Toronto3DSplit(self, split=split)
 
     def get_split_list(self, split):
+        """Returns the list of data splits available.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+			
+		Raises:
+			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+            'training', 'test', 'validation', or 'all'.
+    """
         if split in ['test', 'testing']:
             files = self.test_files
         elif split in ['train', 'training']:
@@ -111,6 +148,16 @@ class Toronto3D(BaseDataset):
         return files
 
     def is_tested(self, attr):
+        """Checks if a datum in the dataset has been tested.
+        
+        Args:
+            dataset: The current dataset to which the datum belongs to.
+			attr: The attribute that needs to be checked.
+
+        Returns:
+            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+			
+	"""
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -122,6 +169,12 @@ class Toronto3D(BaseDataset):
             return False
 
     def save_test_result(self, results, attr):
+        """Saves the output of a model.
+
+        Args:
+            results: The output of a model for the datum associated with the attribute passed.
+            attr: The attributes that correspond to the outputs passed in results.
+    """
         cfg = self.cfg
         name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
@@ -139,22 +192,14 @@ class Toronto3D(BaseDataset):
         log.info("Saved {} in {}.".format(name, store_path))
 
 
-class Toronto3DSplit():
+class Toronto3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
+        super().__init__(dataset, split=split)
 
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
-
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
         self.UTM_OFFSET = [627285, 4841948, 0]
-
-        self.cache_in_memory = self.cfg.get('cache_in_memory', False)
-        if self.cache_in_memory:
-            self.data_list = [None] * len(self.path_list)
 
     def __len__(self):
         return len(self.path_list)
@@ -163,15 +208,7 @@ class Toronto3DSplit():
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        if self.cache_in_memory:
-            if self.data_list[idx] is not None:
-                data = self.data_list[idx]
-            else:
-                data = PlyData.read(pc_path)['vertex']
-                self.data_list[idx] = data
-        else:
-            data = PlyData.read(pc_path)['vertex']
-
+        data = PlyData.read(pc_path)['vertex']
         points = np.vstack(
             (data['x'], data['y'], data['z'])).astype(np.float64).T
         points = points - self.UTM_OFFSET
@@ -192,7 +229,10 @@ class Toronto3DSplit():
         pc_path = Path(self.path_list[idx])
         name = pc_path.name.replace('.txt', '')
 
-        attr = {'name': name, 'path': str(pc_path), 'split': self.split}
+        pc_path = str(pc_path)
+        split = self.split
+        attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
+
         return attr
 
 

@@ -821,7 +821,7 @@ class KPFCNN(BaseModel):
             input_points = points[input_inds].copy() - pick_point
             feat = data['feat']
 
-            t_normalize = self.cfg.get('t_normalize', None)
+            t_normalize = self.cfg.get('t_normalize', {})
             input_points, feat = trans_normalize(input_points, feat,
                                                  t_normalize)
 
@@ -972,7 +972,7 @@ class KPFCNN(BaseModel):
                 input_points = points[input_inds].copy() - pick_point
                 feat = data['feat']
 
-                t_normalize = self.cfg.get('t_normalize', None)
+                t_normalize = self.cfg.get('t_normalize', {})
                 input_points, feat = trans_normalize(input_points, feat,
                                                      t_normalize)
 

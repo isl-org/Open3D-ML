@@ -6,6 +6,8 @@ from os.path import exists, join, isfile, dirname, abspath, split
 from open3d.ml.contrib import subsample
 from open3d.ml.contrib import knn_search
 
+from .operations import *
+
 
 class DataProcessing:
 
@@ -150,6 +152,10 @@ class DataProcessing:
         return IoU
 
     @staticmethod
+    def Acc_from_confusions(confusions):
+        return confusions.diagonal() / confusions.sum(axis=0)
+
+    @staticmethod
     def get_class_weights(num_per_class):
         # pre-calculate the number of points in each category
         num_per_class = np.array(num_per_class, dtype=np.float32)
@@ -158,3 +164,28 @@ class DataProcessing:
         ce_label_weight = 1 / (weight + 0.02)
 
         return np.expand_dims(ce_label_weight, axis=0)
+
+    @staticmethod
+    def remove_outside_points(points, world_cam, cam_img, image_shape):
+        """Remove points which are outside of image.
+        Args:
+            points (np.ndarray, shape=[N, 3+dims]): Total points.
+            world_cam (np.ndarray, shape=[4, 4]): Matrix to project points in
+                lidar coordinates to camera coordinates.
+            cam_img (p.array, shape=[4, 4]): Matrix to project points in
+                camera coordinates to image coordinates.
+            image_shape (list[int]): Shape of image.
+        Returns:
+            np.ndarray, shape=[N, 3+dims]: Filtered points.
+        """
+        C, R, T = projection_matrix_to_CRT_kitti(cam_img.T)
+        image_bbox = [0, 0, image_shape[1], image_shape[0]]
+        frustum = get_frustum(image_bbox, C)
+        frustum -= T
+        frustum = np.linalg.inv(R) @ frustum.T
+        frustum = camera_to_lidar(frustum.T, world_cam)
+        frustum_surfaces = corner_to_surfaces_3d(frustum[np.newaxis, ...])
+        indices = points_in_convex_polygon_3d(points[:, :3], frustum_surfaces)
+        points = points[indices.reshape([-1])]
+
+        return points
