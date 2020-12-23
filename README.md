@@ -1,5 +1,4 @@
 
-
 <p align="center">
 <img src="https://raw.githubusercontent.com/intel-isl/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
 <span style="font-size: 220%"><b>ML</b></span>
@@ -272,6 +271,7 @@ python scripts/run_pipeline.py torch -c ml3d/configs/randlanet_semantickitti.yml
 
 # Launch testing for PointPillars on KITTI with torch.
 python scripts/run_pipeline.py torch -c ml3d/configs/pointpillars_kitti.yml --split test --dataset.dataset_path <path-to-dataset> --pipeline ObjectDetection --dataset.use_cache True
+
 ```
 For further help, run `python scripts/run_pipeline.py --help`.
 
@@ -330,6 +330,7 @@ For the evaluation, the models were evaluated using the validation subset, accor
 |--------------------|---------------|
 | PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) |
 | PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)   |
+
 
 
 ## Model Zoo
