@@ -1,6 +1,6 @@
 import open3d
 
-if o3d.core.cuda.device_count() > 0:
+if open3d.core.cuda.device_count() > 0:
     # Open3D is built with CUDA and the has a CUDA device.
     from open3d.ml.contrib import iou_bev_cuda as iou_bev
     from open3d.ml.contrib import iou_3d_cuda as iou_3d
