@@ -4,5 +4,5 @@ numpy
 pandas
 plyfile
 pyyaml
-sklearn
+scikit-learn
 tqdm
