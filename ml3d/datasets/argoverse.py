@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 
 class Argoverse(BaseDataset):
     """
-    Argoverse 3D dataset for Object Detection, used in visualizer, training, or test
+     This class is used to create a dataset based on the Agroverse dataset, and used in object detection, visualizer, training, or testing.
     """
 
     def __init__(self,
@@ -31,10 +31,17 @@ class Argoverse(BaseDataset):
                  use_cache=False,
                  **kwargs):
         """
-        Initialize
-        Args:
-            dataset_path (str): path to the dataset
-            kwargs:
+		Initialize the function by passing the dataset and other details.
+	
+		Args:
+			dataset_path: The path to the dataset to use.
+			info_path: The path to the file that includes information about the dataset. This is default to dataset path if nothing is provided.
+			name: The name of the dataset.
+            cache_dir: The directory where the cache will be stored.
+			use_cache: Indicates if the dataset should be cached.
+				
+		Returns:
+            class: The corresponding class.
         """
         if info_path is None:
             info_path = dataset_path
@@ -75,6 +82,14 @@ class Argoverse(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
+        """
+	    Returns a label to names dictonary object.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            values are the corresponding names.
+        """
+
         label_to_names = {
             0: 'ignore',
             1: 'VEHICLE',
@@ -97,6 +112,12 @@ class Argoverse(BaseDataset):
 
     @staticmethod
     def read_lidar(path):
+        """
+	    Reads lidar data from the path provided.
+        
+        Returns:
+            A data object with lidar information.
+        """
         assert Path(path).exists()
 
         data = np.asarray(o3d.io.read_point_cloud(path).points).astype(
@@ -106,6 +127,12 @@ class Argoverse(BaseDataset):
 
     @staticmethod
     def read_label(bboxes):
+        """
+	    Reads labels of bound boxes.
+        
+        Returns:
+            The data objects with bound boxes information.
+        """
 
         objects = []
         for box in bboxes:
@@ -122,9 +149,31 @@ class Argoverse(BaseDataset):
         return objects
 
     def get_split(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+	    """
         return ArgoverseSplit(self, split=split)
 
     def get_split_list(self, split):
+        """Returns a dataset split.
+        
+        Args:
+            split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+
+        Returns:
+            A dataset split object providing the requested subset of the data.
+			
+		Raises:
+			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+            'training', 'test', 'validation', or 'all'.
+        """
         if split in ['train', 'training']:
             return self.train_info
         elif split in ['test', 'testing']:
@@ -137,13 +186,42 @@ class Argoverse(BaseDataset):
         raise ValueError("Invalid split {}".format(split))
 
     def is_tested(self):
+        """Checks if a datum in the dataset has been tested.
+        
+        Args:
+            dataset: The current dataset to which the datum belongs to.
+			attr: The attribute that needs to be checked.
+
+        Returns:
+            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+			
+	    """
         pass
 
     def save_test_result(self):
+        """Saves the output of a model.
+
+        Args:
+            results: The output of a model for the datum associated with the attribute passed.
+            attr: The attributes that correspond to the outputs passed in results.
+        """
         pass
 
 
 class ArgoverseSplit():
+    """
+    This class is used to create a split for Agroverse dataset.
+    
+    
+    Initialize the class.
+    Args:
+        dataset: The dataset to split.
+        split: A string identifying the dataset split that is usually one of
+            'training', 'test', 'validation', or 'all'.
+        **kwargs: The configuration of the model as keyword arguments.
+    Returns:
+        A dataset split object providing the requested subset of the data.		
+    """
 
     def __init__(self, dataset, split='train'):
         self.cfg = dataset.cfg
@@ -194,7 +272,7 @@ class ArgoverseSplit():
 
 class Object3d(BEVBox3D):
     """
-    Stores object specific details like bbox coordinates.
+    The class stores details that are object-specific, such as bounding box coordinates.
     """
 
     def __init__(self, center, size, yaw, name, box):
@@ -207,8 +285,7 @@ class Object3d(BEVBox3D):
 
     def generate_corners3d(self):
         """
-        generate corners3d representation for this object
-        :return corners_3d: (8, 3) corners of box3d in camera coord
+        This generates a Corners 3D representation for the object, and returns the corners in 3D, such as (8, 3) corners of a Box3D in camera coordinates.
         """
         return self.coords_3d
 
