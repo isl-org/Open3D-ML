@@ -9,6 +9,7 @@ if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
 else:
     base = '.'
 
+
 def test_randlanet_torch():
     import open3d.ml.torch as ml3d
 
@@ -158,8 +159,9 @@ def test_pointpillars_torch():
 
     net = ml3d.models.PointPillars(**cfg.model, device='cpu')
 
-    data = {'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
-    'calib': None
+    data = {
+        'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
+        'calib': None
     }
 
     net.eval()
@@ -170,6 +172,7 @@ def test_pointpillars_torch():
         boxes = net.inference_end(results, data)
         assert type(boxes) == list
 
+
 def test_pointpillars_tf():
     import open3d.ml.tf as ml3d
     from open3d.ml.utils import Config
@@ -179,8 +182,9 @@ def test_pointpillars_tf():
 
     net = ml3d.models.PointPillars(**cfg.model, device='cpu')
 
-    data = {'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
-    'calib': None
+    data = {
+        'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
+        'calib': None
     }
 
     inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
