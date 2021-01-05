@@ -170,3 +170,23 @@ def test_pointpillars_torch():
         boxes = net.inference_end(results, data)
         assert type(boxes) == list
 
+def test_pointpillars_tf():
+    import open3d.ml.tf as ml3d
+    from open3d.ml.utils import Config
+
+    cfg_path = base + '/ml3d/configs/pointpillars_kitti.yml'
+    cfg = Config.load_from_file(cfg_path)
+
+    net = ml3d.models.PointPillars(**cfg.model, device='cpu')
+
+    data = {'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
+    'calib': None
+    }
+
+    inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
+    inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
+
+    results = net(inputs, training=False)
+    boxes = net.inference_end(results, data)
+
+    assert type(boxes) == list
