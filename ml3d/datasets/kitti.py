@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 class KITTI(BaseDataset):
     """
-     This class is used to create a dataset based on the KITTI dataset, and used in object detection, visualizer, training, or testing.
+    This class is used to create a dataset based on the KITTI dataset, and used in object detection, visualizer, training, or testing.
     """
 
     def __init__(self,
@@ -357,7 +357,7 @@ class Object3d(BEVBox3D):
 
     def to_kitti_format(self):
         """
-        This transforms the class to kitti format.
+        This method transforms the class to kitti format.
         """
         kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
                     % (self.label_class, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],

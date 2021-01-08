@@ -89,6 +89,13 @@ class S3DIS(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
+        """
+        Returns a label to names dictonary object.
+        
+        Returns:
+            A dict where keys are label numbers and 
+            values are the corresponding names.
+        """
         label_to_names = {
             0: 'ceiling',
             1: 'floor',
@@ -106,7 +113,8 @@ class S3DIS(BaseDataset):
         }
         return label_to_names
 
-    """Returns a dataset split.
+    def get_split(self, split):
+        """Returns a dataset split.
         
         Args:
             split: A string identifying the dataset split that is usually one of
@@ -114,25 +122,9 @@ class S3DIS(BaseDataset):
 
         Returns:
             A dataset split object providing the requested subset of the data.
-    """
-
-    def get_split(self, split):
+        """
 
         return S3DISSplit(self, split=split)
-
-    """Returns a dataset split.
-        
-        Args:
-            split: A string identifying the dataset split that is usually one of
-            'training', 'test', 'validation', or 'all'.
-
-        Returns:
-            A dataset split object providing the requested subset of the data.
-			
-		Raises:
-			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
-            'training', 'test', 'validation', or 'all'.
-    """
 
     def get_split_list(self, split):
 
