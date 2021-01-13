@@ -442,8 +442,8 @@ def get_min_bbox(points):
     
     points = points[:, :2]
 
-    cov_hull = ConvexHull(points)
-    points = cov_hull.points[cov_hull.vertices]
+    # cov_hull = ConvexHull(points)
+    # points = cov_hull.points[cov_hull.vertices]
 
     cov_points = np.cov(points, rowvar=False, bias=True)
     val, vect = np.linalg.eig(cov_points)

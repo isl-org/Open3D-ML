@@ -9,8 +9,7 @@ from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
 
-from .utils import DataProcessing
-from .utils import get_min_bbox
+from .utils import DataProcessing, get_min_bbox, BEVBox3D
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
@@ -39,6 +38,7 @@ class S3DIS(BaseDataset):
                  num_points=40960,
                  test_area_idx=3,
                  ignored_label_inds=[],
+                 ignored_objects=['wall', 'floor', 'ceiling', 'beam', 'column', 'clutter'],
                  test_result_folder='./test',
                  **kwargs):
         """
@@ -68,6 +68,7 @@ class S3DIS(BaseDataset):
                          num_points=num_points,
                          test_area_idx=test_area_idx,
                          ignored_label_inds=ignored_label_inds,
+                         ignored_objects=ignored_objects,
                          **kwargs)
 
         cfg = self.cfg
@@ -163,43 +164,6 @@ class S3DIS(BaseDataset):
 
         return file_list
 
-    """Returns the data for the given index."""
-
-    def get_data(self, file_path, is_test=False):
-        file_path = Path(file_path)
-        kdtree_path = Path(
-            file_path
-        ).parent.parent / 'cache' / 'KDTree' / file_path.name.replace(
-            ".ply", ".pkl")
-
-        with open(kdtree_path, 'rb') as f:
-            search_tree = pickle.load(f)
-        points = np.array(search_tree.data, copy=False)
-
-        pc_feat_labels_path = kdtree_path.parent.parent / 'sub' / file_path.name.replace(
-            ".ply", "_sub.npy")
-        pc_feat_labels = np.load(pc_feat_labels_path)
-
-        feat = pc_feat_labels[:, 3:6]
-
-        if (is_test):
-            labels = np.zeros(np.shape(points)[0], dtype=np.uint8)
-        else:
-            labels = pc_feat_labels[:, 6]
-
-        return points, feat, search_tree, labels
-
-    """Checks if a datum in the dataset has been tested.
-        
-        Args:
-            dataset: The current dataset to which the datum belongs to.
-            attr: The attribute that needs to be checked.
-
-        Returns:
-            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
-            
-    """
-
     def is_tested(self, attr):
 
         cfg = self.cfg
@@ -251,7 +215,7 @@ class S3DIS(BaseDataset):
         class_names = [val for key, val in class_names.items()]
         label_to_idx = {l: i for i, l in enumerate(class_names)}
 
-        out_format = '.pkl'  # TODO : Use from config.
+        out_format = '.pkl'
 
         for anno_path in tqdm(anno_paths):
             elems = str(anno_path).split('/')
@@ -277,14 +241,21 @@ class S3DIS(BaseDataset):
             info = [pc_label, bboxes]
             with open(save_path, 'wb') as f:
                 pickle.dump(info, f)
-            print(f"saved in {save_path}")
 
-            # xyz = pc_label[:, :3].astype(np.float32)
-            # colors = pc_label[:, 3:6].astype(np.uint8)
-            # labels = pc_label[:, 6].astype(np.uint8)
+    @staticmethod
+    def read_bboxes(bboxes, ignored_objects):
+        objects = []
+        for box in bboxes:
+            name = box[0]
+            if name in ignored_objects:
+                continue
+            center = np.array([box[1], box[2], box[3]])
+            size = np.array([box[4], box[5], box[6]])  # w, h, l
+            yaw = box[7]
 
-            # S3DIS.write_ply(str(save_path), (xyz, colors, labels),
-            #                 ['x', 'y', 'z', 'red', 'green', 'blue', 'class'])
+            objects.append(Object3d(name, center, size, yaw))
+        
+        return objects
 
 
 class S3DISSplit():
@@ -320,11 +291,13 @@ class S3DISSplit():
 
         pc, bboxes = data
 
+        bboxes = self.dataset.read_bboxes(bboxes, self.cfg.ignored_objects)
+
         points = np.array(pc[:, :3], dtype=np.float32)
         feat = np.array(pc[:, 3:6], dtype=np.float32)
         labels = np.array(pc[:, 6], dtype=np.int32).reshape((-1,))
 
-        data = {'point': points, 'feat': feat, 'label': labels}
+        data = {'point': points, 'feat': feat, 'label': labels, 'bounding_boxes': bboxes}
 
         return data
 
@@ -336,6 +309,17 @@ class S3DISSplit():
         split = self.split
         attr = {'idx': idx, 'name': name, 'path': pc_path, 'split': split}
         return attr
+
+
+class Object3d(BEVBox3D):
+    """
+    Stores object specific details like bbox coordinates.
+    """
+
+    def __init__(self, name, center, size, yaw):
+        super().__init__(center, size, yaw, name, -1.0)
+
+        self.occlusion = 0.0
 
 
 DATASET._register_module(S3DIS)
