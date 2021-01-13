@@ -38,7 +38,9 @@ class S3DIS(BaseDataset):
                  num_points=40960,
                  test_area_idx=3,
                  ignored_label_inds=[],
-                 ignored_objects=['wall', 'floor', 'ceiling', 'beam', 'column', 'clutter'],
+                 ignored_objects=[
+                     'wall', 'floor', 'ceiling', 'beam', 'column', 'clutter'
+                 ],
                  test_result_folder='./test',
                  **kwargs):
         """
@@ -201,7 +203,6 @@ class S3DIS(BaseDataset):
         np.save(store_path, pred)
         log.info("Saved {} in {}.".format(name, store_path))
 
-
     @staticmethod
     def create_ply_files(dataset_path, class_names):
         os.makedirs(join(dataset_path, 'original_pkl'), exist_ok=True)
@@ -234,7 +235,7 @@ class S3DIS(BaseDataset):
                 labels = np.ones((pc.shape[0], 1)) * label_to_idx[class_name]
                 data_list.append(np.concatenate([pc, labels], 1))
                 bbox = [class_name] + get_min_bbox(pc)
-                bboxes.append(bbox)               
+                bboxes.append(bbox)
 
             pc_label = np.concatenate(data_list, 0)
 
@@ -254,7 +255,7 @@ class S3DIS(BaseDataset):
             yaw = box[7]
 
             objects.append(Object3d(name, center, size, yaw))
-        
+
         return objects
 
 
@@ -297,7 +298,12 @@ class S3DISSplit():
         feat = np.array(pc[:, 3:6], dtype=np.float32)
         labels = np.array(pc[:, 6], dtype=np.int32).reshape((-1,))
 
-        data = {'point': points, 'feat': feat, 'label': labels, 'bounding_boxes': bboxes}
+        data = {
+            'point': points,
+            'feat': feat,
+            'label': labels,
+            'bounding_boxes': bboxes
+        }
 
         return data
 

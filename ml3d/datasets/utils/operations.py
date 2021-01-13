@@ -439,7 +439,7 @@ def get_min_bbox(points):
     points = points.copy()
     h_min = np.min(points[:, 2])
     h_max = np.max(points[:, 2])
-    
+
     points = points[:, :2]
 
     # cov_hull = ConvexHull(points)
@@ -456,15 +456,15 @@ def get_min_bbox(points):
 
     diff = max_a - min_a
 
-    center = min_a + diff*0.5
-    center = np.dot(center,tvect)
+    center = min_a + diff * 0.5
+    center = np.dot(center, tvect)
 
-    center = np.array([center[0], center[1], (h_min + h_max)*0.5])
+    center = np.array([center[0], center[1], (h_min + h_max) * 0.5])
 
     width = diff[0]
     length = diff[1]
     height = h_max - h_min
 
-    yaw = math.atan(tvect[0, 1]/tvect[0, 0])
+    yaw = math.atan(tvect[0, 1] / tvect[0, 0])
 
     return [center[0], center[1], center[2], width, height, length, yaw]
