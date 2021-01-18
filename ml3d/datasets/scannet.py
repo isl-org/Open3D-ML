@@ -58,8 +58,7 @@ class Scannet(BaseDataset):
         self.cat_ids = np.array(
             [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
         self.cat_ids2class = {
-            nyu40id: i
-            for i, nyu40id in enumerate(list(self.cat_ids))
+            nyu40id: i for i, nyu40id in enumerate(list(self.cat_ids))
         }
 
         self.label_to_names = self.get_label_to_names()
@@ -69,13 +68,16 @@ class Scannet(BaseDataset):
         for f in files:
             if 'scene' in f and f.endswith('.npy'):
                 available_scenes.append(f[:12])
-        
+
         available_scenes = list(set(available_scenes))
 
         resource_path = Path(__file__).parent / '_resources' / 'scannet'
-        train_files = open(resource_path / 'scannetv2_train.txt').read().split('\n')[:-1]
-        val_files = open(resource_path / 'scannetv2_val.txt').read().split('\n')[:-1]
-        test_files = open(resource_path / 'scannetv2_test.txt').read().split('\n')[:-1]
+        train_files = open(resource_path /
+                           'scannetv2_train.txt').read().split('\n')[:-1]
+        val_files = open(resource_path /
+                         'scannetv2_val.txt').read().split('\n')[:-1]
+        test_files = open(resource_path /
+                          'scannetv2_test.txt').read().split('\n')[:-1]
 
         self.train_scenes = []
         self.val_scenes = []
@@ -88,7 +90,6 @@ class Scannet(BaseDataset):
                 self.val_scenes.append(join(self.dataset_path, scene))
             elif scene in test_files:
                 self.test_scenes.append(join(self.dataset_path, scene))
-        
 
     def get_label_to_names(self):
         return self.label2cat
@@ -147,7 +148,8 @@ class ScannetSplit():
 
         self.path_list = dataset.get_split_list(split)
 
-        log.info("Found {} pointclouds for {}".format(len(self.path_list), split))
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
 
         self.split = split
         self.dataset = dataset
@@ -192,5 +194,6 @@ class Object3d(BEVBox3D):
         super().__init__(center, size, yaw, name, -1.0)
 
         self.occlusion = 0.0
+
 
 DATASET._register_module(Scannet)

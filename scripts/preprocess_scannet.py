@@ -12,16 +12,14 @@ from tqdm import tqdm
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description='Preprocess Scannet Dataset.')
+    parser = argparse.ArgumentParser(description='Preprocess Scannet Dataset.')
     parser.add_argument('--dataset_path',
                         help='path to Scannet scans directory',
                         required=True)
-    parser.add_argument(
-        '--out_path',
-        help='Output path to store processed data.',
-        default=None,
-        required=False)
+    parser.add_argument('--out_path',
+                        help='Output path to store processed data.',
+                        default=None,
+                        required=False)
 
     args = parser.parse_args()
 
@@ -32,6 +30,7 @@ def parse_args():
               format(k))
 
     return args
+
 
 def represents_int(s):
     """Judge whether string s represents an int.
@@ -55,7 +54,7 @@ class ScannetProcess():
         out_path (str): Directory to save pickle file(infos).
     """
 
-    def __init__(self, dataset_path, out_path, max_num_point = 100000):
+    def __init__(self, dataset_path, out_path, max_num_point=100000):
 
         self.out_path = out_path
         self.dataset_path = dataset_path
@@ -69,7 +68,8 @@ class ScannetProcess():
                 self.scans.append(scan)
 
         self.DONOTCARE_IDS = np.array([])
-        self.OBJ_CLASS_IDS = np.array([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
+        self.OBJ_CLASS_IDS = np.array(
+            [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
 
         print(f"Total number of scans : {len(self.scans)}")
 
@@ -85,8 +85,11 @@ class ScannetProcess():
         seg_file = join(in_path, scan + '_vh_clean_2.0.010000.segs.json')
 
         meta_file = join(in_path, scan + '.txt')
-        label_map_file = str(Path(__file__).parent / '../ml3d/datasets/_resources/scannet/scannetv2-labels.combined.tsv')
-        mesh_vertices, semantic_labels, instance_labels, instance_bboxes, instance2semantic = self.export(mesh_file, agg_file, seg_file, meta_file, label_map_file)
+        label_map_file = str(
+            Path(__file__).parent /
+            '../ml3d/datasets/_resources/scannet/scannetv2-labels.combined.tsv')
+        mesh_vertices, semantic_labels, instance_labels, instance_bboxes, instance2semantic = self.export(
+            mesh_file, agg_file, seg_file, meta_file, label_map_file)
 
         mask = np.logical_not(np.in1d(semantic_labels, self.DONOTCARE_IDS))
         mesh_vertices = mesh_vertices[mask, :]
@@ -112,10 +115,11 @@ class ScannetProcess():
         np.save(f'{join(self.out_path, scan)}_ins_label.npy', instance_labels)
         np.save(f'{join(self.out_path, scan)}_bbox.npy', instance_bboxes)
 
-    
     def export(self, mesh_file, agg_file, seg_file, meta_file, label_map_file):
         mesh_vertices = self.read_mesh_vertices_rgb(mesh_file)
-        label_map = self.read_label_mapping(label_map_file, label_from='raw_category', label_to='nyu40id')
+        label_map = self.read_label_mapping(label_map_file,
+                                            label_from='raw_category',
+                                            label_to='nyu40id')
 
         # Load axis alignment matrix
         lines = open(meta_file).readlines()
@@ -131,7 +135,7 @@ class ScannetProcess():
         pts[:, 0:3] = mesh_vertices[:, 0:3]
         pts = np.dot(pts, axis_align_matrix.transpose())
         mesh_vertices[:, 0:3] = pts[:, 0:3]
-        
+
         # Load instance and semantic labels.
         object_id_to_segs, label_to_segs = self.read_aggregation(agg_file)
         seg_to_verts, num_verts = self.read_segmentation(seg_file)
@@ -144,8 +148,8 @@ class ScannetProcess():
                 verts = seg_to_verts[seg]
                 label_ids[verts] = label_id
 
-        instance_ids = np.zeros(
-            shape=(num_verts), dtype=np.uint32)  # 0: unannotated
+        instance_ids = np.zeros(shape=(num_verts),
+                                dtype=np.uint32)  # 0: unannotated
         num_instances = len(np.unique(list(object_id_to_segs.keys())))
         for object_id, segs in object_id_to_segs.items():
             for seg in segs:
@@ -167,8 +171,8 @@ class ScannetProcess():
             ymax = np.max(obj_pc[:, 1])
             zmax = np.max(obj_pc[:, 2])
             bbox = np.array([(xmin + xmax) / 2, (ymin + ymax) / 2,
-                            (zmin + zmax) / 2, xmax - xmin, ymax - ymin,
-                            zmax - zmin, label_id])
+                             (zmin + zmax) / 2, xmax - xmin, ymax - ymin,
+                             zmax - zmin, label_id])
             # NOTE: this assumes obj_id is in 1,2,3,.,,,.NUM_INSTANCES
             instance_bboxes[obj_id - 1, :] = bbox
 
@@ -177,8 +181,8 @@ class ScannetProcess():
 
     @staticmethod
     def read_label_mapping(filename,
-                        label_from='raw_category',
-                        label_to='nyu40id'):
+                           label_from='raw_category',
+                           label_to='nyu40id'):
         assert os.path.isfile(filename)
         mapping = dict()
         with open(filename) as csvfile:
@@ -244,7 +248,6 @@ class ScannetProcess():
                 else:
                     seg_to_verts[seg_id] = [i]
         return seg_to_verts, num_verts
-
 
 
 if __name__ == '__main__':
