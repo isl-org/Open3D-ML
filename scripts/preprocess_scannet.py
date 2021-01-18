@@ -55,7 +55,7 @@ class ScannetProcess():
         out_path (str): Directory to save pickle file(infos).
     """
 
-    def __init__(self, dataset_path, out_path, max_num_point = 50000):
+    def __init__(self, dataset_path, out_path, max_num_point = 100000):
 
         self.out_path = out_path
         self.dataset_path = dataset_path
