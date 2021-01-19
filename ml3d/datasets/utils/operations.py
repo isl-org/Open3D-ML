@@ -1,6 +1,8 @@
 import numpy as np
 import random
 import copy
+import math
+from scipy.spatial import ConvexHull
 
 from ...metrics import iou_bev
 
@@ -425,3 +427,44 @@ def remove_points_in_boxes(points, boxes):
     points = points[np.logical_not(masks.any(-1))]
 
     return points
+
+
+def get_min_bbox(points):
+    """Return minimum bounding box encapsulating points.
+    Args:
+        points (np.ndarray): Input point cloud array.
+    Returns:
+        np.ndarray: 3D BEV bounding box (x, y, z, w, h, l, yaw).
+    """
+    points = points.copy()
+    h_min = np.min(points[:, 2])
+    h_max = np.max(points[:, 2])
+
+    points = points[:, :2]
+
+    # cov_hull = ConvexHull(points)
+    # points = cov_hull.points[cov_hull.vertices]
+
+    cov_points = np.cov(points, rowvar=False, bias=True)
+    val, vect = np.linalg.eig(cov_points)
+    tvect = np.transpose(vect)
+
+    points_rot = np.dot(points, np.linalg.inv(tvect))
+
+    min_a = np.min(points_rot, axis=0)
+    max_a = np.max(points_rot, axis=0)
+
+    diff = max_a - min_a
+
+    center = min_a + diff * 0.5
+    center = np.dot(center, tvect)
+
+    center = np.array([center[0], center[1], (h_min + h_max) * 0.5])
+
+    width = diff[0]
+    length = diff[1]
+    height = h_max - h_min
+
+    yaw = math.atan(tvect[0, 1] / tvect[0, 0])
+
+    return [center[0], center[1], center[2], width, height, length, yaw]
