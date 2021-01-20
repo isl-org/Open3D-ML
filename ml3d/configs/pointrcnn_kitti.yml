@@ -1,0 +1,81 @@
+dataset:
+  name: KITTI
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  steps_per_epoch_train: 5000
+
+model:
+  name: PointRCNN
+  ckpt_path: # path/to/your/checkpoint
+
+  point_cloud_range: [0, -40, -1, 70.4, 40, 3]
+  classes: ['Pedestrian', 'Cyclist', 'Car']
+
+  rpn:
+    backbone:
+      todo: todo
+    cls_in_ch: 128
+    cls_out_ch: [128]
+    reg_in_ch: 128
+    reg_out_ch: [128]
+    db_rate: 0.5
+
+    # config of bin-based loss
+    loc_xz_fine: True
+    loc_scope: 3.0
+    loc_bin_siye: 0.5
+    num_head_bin: 12
+
+    focal_loss:
+      gamma: 2.0
+      alpha: 0.25
+      loss_weight: 1.0
+
+    rcnn:
+      # config of bin-based loss
+      loc_scope: 3.0
+      loc_bin_size: 0.5
+      num_head_bin: 12
+      loc_y_by_bin: False
+      loc_y_scope: 0.5
+      loc_y_bin_size: 0.25
+
+      SA_config:
+        npoints: [128, 32, -1]
+        radius: [0.2, 0.4, 100]
+        nsample: [64, 64, 64]
+        mlps: [[128, 128, 128],
+               [128, 128, 256],
+               [256, 256, 512]]
+      
+      loss:
+
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: True
+
+
+pipeline:
+  name: TwoStageDetection
+  test_compute_metric: true
+  batch_size: 1
+  val_batch_size: 1
+  save_ckpt_freq: 5
+  max_epoch: 200
+  main_log_dir: ./logs
+  train_sum_dir: train_log
+  grad_clip_norm: 2
+
+  optimizer:
+    lr: 0.001
+    betas: [0.95, 0.99]
+    weight_decay: 0.01
+
+  # evaluation properties
+  overlaps: [0.5, 0.5, 0.7]
+  similar_classes: {
+    Van: Car,
+    Person_sitting: Pedestrian
+  }
+  difficulties: [0, 1, 2]
+    
