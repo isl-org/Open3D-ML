@@ -3,6 +3,6 @@ matplotlib
 numpy
 pandas
 plyfile
-pyyaml
+pyyaml==5.4.1
 scikit-learn
 tqdm
