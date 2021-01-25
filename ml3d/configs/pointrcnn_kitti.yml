@@ -13,7 +13,16 @@ model:
 
   rpn:
     backbone:
-      todo: todo
+      SA_config:
+          npoints: [4096, 1024, 256, 64]
+          radius: [[0.1, 0.5], [0.5, 1.0], [1.0, 2.0], [2.0, 4.0]]
+          nsample: [[16, 32], [16, 32], [16, 32], [16, 32]]
+          mlps: [[[16, 16, 32], [32, 32, 64]],
+                 [[64, 64, 128], [64, 96, 128]],
+                 [[128, 196, 256], [128, 196, 256]],
+                 [[256, 256, 512], [256, 384, 512]]]
+      fp_mlps: [[128, 128], [256, 256], [512, 512], [512, 512]]
+
     cls_in_ch: 128
     cls_out_ch: [128]
     reg_in_ch: 128
@@ -31,24 +40,32 @@ model:
       alpha: 0.25
       loss_weight: 1.0
 
-    rcnn:
-      # config of bin-based loss
-      loc_scope: 3.0
-      loc_bin_size: 0.5
-      num_head_bin: 12
-      loc_y_by_bin: False
-      loc_y_scope: 0.5
-      loc_y_bin_size: 0.25
+  rcnn:
+    # config of bin-based loss
+    loc_scope: 3.0
+    loc_bin_size: 0.5
+    num_head_bin: 12
+    loc_y_by_bin: False
+    loc_y_scope: 0.5
+    loc_y_bin_size: 0.25
+    pool_extra_width: 1.0
+    num_points: 512
+    xyz_up_layer: [512, 512]
 
-      SA_config:
-        npoints: [128, 32, -1]
-        radius: [0.2, 0.4, 100]
-        nsample: [64, 64, 64]
-        mlps: [[128, 128, 128],
-               [128, 128, 256],
-               [256, 256, 512]]
-      
-      loss:
+    SA_config:
+      npoints: [128, 32, -1]
+      radius: [0.2, 0.4, 100]
+      nsample: [64, 64, 64]
+      mlps: [[128, 128, 128],
+              [128, 128, 256],
+              [256, 256, 512]]
+    
+    loss:
+      todo: todo
+
+  proposal:
+    nms_pre: 9000
+    nms_post: 512
 
   augment:
     PointShuffle: True
