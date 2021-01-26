@@ -49,7 +49,8 @@ class SunRGBDProcess():
         self.out_path = out_path
         self.dataset_path = dataset_path
 
-        allsplit = scipy.io.loadmat(join(dataset_path, 'SUNRGBDtoolbox/traintestSUNRGBD/allsplit.mat'))
+        allsplit = scipy.io.loadmat(
+            join(dataset_path, 'SUNRGBDtoolbox/traintestSUNRGBD/allsplit.mat'))
         train_split = allsplit['alltrain'][0]
         val_split = allsplit['alltest'][0]
 
@@ -66,13 +67,16 @@ class SunRGBDProcess():
                 path = path[:-1]
             val_paths.append(path)
 
-        print(f"Total scans : train : {len(train_paths)}, val : {len(val_paths)}")
+        print(
+            f"Total scans : train : {len(train_paths)}, val : {len(val_paths)}")
 
         self.train_idx = []
         self.val_idx = []
 
-        self.meta3 = scipy.io.loadmat(join(dataset_path, 'SUNRGBDMeta3DBB_v2.mat'))['SUNRGBDMeta'][0]
-        self.meta2 = scipy.io.loadmat(join(dataset_path, 'SUNRGBDMeta2DBB_v2.mat'))['SUNRGBDMeta2DBB'][0]
+        self.meta3 = scipy.io.loadmat(
+            join(dataset_path, 'SUNRGBDMeta3DBB_v2.mat'))['SUNRGBDMeta'][0]
+        self.meta2 = scipy.io.loadmat(
+            join(dataset_path, 'SUNRGBDMeta2DBB_v2.mat'))['SUNRGBDMeta2DBB'][0]
         for i in range(self.meta3.shape[0]):
             path = self.meta3[i][0][0]
             if path in train_paths:
@@ -81,28 +85,35 @@ class SunRGBDProcess():
                 self.val_idx.append(i)
             else:
                 raise ValueError(f"{path} not found")
-        
+
         self.create_dirs()
 
-        with open(join(self.out_path, 'sunrgbd_trainval/train_data_idx.txt'), 'w') as f:
+        with open(join(self.out_path, 'sunrgbd_trainval/train_data_idx.txt'),
+                  'w') as f:
             for idx in self.train_idx:
                 f.write(str(idx) + '\n')
 
-        with open(join(self.out_path, 'sunrgbd_trainval/val_data_idx.txt'), 'w') as f:
+        with open(join(self.out_path, 'sunrgbd_trainval/val_data_idx.txt'),
+                  'w') as f:
             for idx in self.val_idx:
                 f.write(str(idx) + '\n')
-    
+
     def create_dirs(self):
-        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'depth'), exist_ok=True)
-        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'image'), exist_ok=True)
-        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'calib'), exist_ok=True)
-        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'label'), exist_ok=True)
-        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'seg_label'), exist_ok=True)
+        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'depth'),
+                    exist_ok=True)
+        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'image'),
+                    exist_ok=True)
+        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'calib'),
+                    exist_ok=True)
+        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'label'),
+                    exist_ok=True)
+        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'seg_label'),
+                    exist_ok=True)
 
     def convert(self):
         for imageid in tqdm(range(0, 10335)):
             self.process_scene(imageid)
- 
+
     def process_scene(self, imageid):
         meta2 = self.meta2[imageid]
         meta3 = self.meta3[imageid]
@@ -110,12 +121,16 @@ class SunRGBDProcess():
 
         # Save points_rgb
         points_rgb = self.read3dpoints(meta3)
-        np.save(join(self.out_path, 'sunrgbd_trainval', 'depth', f'{imageid}.npy'), points_rgb)
+        np.save(
+            join(self.out_path, 'sunrgbd_trainval', 'depth', f'{imageid}.npy'),
+            points_rgb)
 
         # Save Image
-        copyfile(join(self.dataset_path, str(meta3['rgbpath'][17:])), join(self.out_path, 'sunrgbd_trainval/image', f'{imageid}.jpg'))
+        copyfile(
+            join(self.dataset_path, str(meta3['rgbpath'][17:])),
+            join(self.out_path, 'sunrgbd_trainval/image', f'{imageid}.jpg'))
 
-        # Save label        
+        # Save label
         labels = []
         save_2d_box = True
         for i in range(len(meta3['3DBB'])):
@@ -130,16 +145,28 @@ class SunRGBDProcess():
 
             if save_2d_box:
                 box2d = box2d[1][0]
-                label = [box['classname'], box['centroid'][0], box['centroid'][1], box['centroid'][2], box['coeff'][0], box['coeff'][1], box['coeff'][2], box['orientation'][0], box['orientation'][1], box2d[0], box2d[1], box2d[2], box2d[3]]
+                label = [
+                    box['classname'], box['centroid'][0], box['centroid'][1],
+                    box['centroid'][2], box['coeff'][0], box['coeff'][1],
+                    box['coeff'][2], box['orientation'][0],
+                    box['orientation'][1], box2d[0], box2d[1], box2d[2],
+                    box2d[3]
+                ]
             else:
-                label = [box['classname'], box['centroid'][0], box['centroid'][1], box['centroid'][2], box['coeff'][0], box['coeff'][1], box['coeff'][2], box['orientation'][0], box['orientation'][1]]
+                label = [
+                    box['classname'], box['centroid'][0], box['centroid'][1],
+                    box['centroid'][2], box['coeff'][0], box['coeff'][1],
+                    box['coeff'][2], box['orientation'][0],
+                    box['orientation'][1]
+                ]
 
             labels.append(label)
-        
-        with open(join(self.out_path, 'sunrgbd_trainval/label', f'{imageid}.pkl'), 'wb') as f:
+
+        with open(
+                join(self.out_path, 'sunrgbd_trainval/label', f'{imageid}.pkl'),
+                'wb') as f:
             pickle.dump(labels, f)
 
-    
     def data2dict(self, data):
         dat = {}
         dat['seqname'] = data[0][0]
@@ -173,7 +200,7 @@ class SunRGBDProcess():
         depth_path = join(self.dataset_path, str(data['depthpath'][17:]))
         depth = imageio.imread(depth_path)
         depth = (depth >> 3) | (depth << 13)
-        depth = np.array(depth, np.float32)/1000
+        depth = np.array(depth, np.float32) / 1000
 
         cx = data['K'][0][2]
         cy = data['K'][1][2]
@@ -181,20 +208,24 @@ class SunRGBDProcess():
         fy = data['K'][1][1]
 
         if data['rgbpath'] != '':
-            img = imageio.imread(join(self.dataset_path, str(data['rgbpath'][17:])))
+            img = imageio.imread(
+                join(self.dataset_path, str(data['rgbpath'][17:])))
             img = np.array(img, np.float32) / 255
         else:
             img = np.array((depth.shape[0], depth.shape[1], 3), np.float32)
             img[:, :, 1] = 1
-        
+
         invalid = depth == 0
 
-        x, y = np.meshgrid([i for i in range(1, depth.shape[1] + 1)], [j for j in range(1, depth.shape[0] + 1)])
-        x3 = (x - cx) * depth * 1.0/fx
-        y3 = (y - cy) * depth * 1.0/fy
+        x, y = np.meshgrid([i for i in range(1, depth.shape[1] + 1)],
+                           [j for j in range(1, depth.shape[0] + 1)])
+        x3 = (x - cx) * depth * 1.0 / fx
+        y3 = (y - cy) * depth * 1.0 / fy
         z3 = depth
 
-        points = np.concatenate([x3.reshape(-1, 1), z3.reshape(-1, 1), -y3.reshape(-1, 1)], axis=1)
+        points = np.concatenate(
+            [x3.reshape(-1, 1),
+             z3.reshape(-1, 1), -y3.reshape(-1, 1)], axis=1)
 
         points = np.transpose(np.matmul(data['Rtilt'], np.transpose(points)))
 
@@ -204,7 +235,6 @@ class SunRGBDProcess():
         points_img = np.concatenate([points, img], axis=1)
 
         return points_img
-
 
 
 if __name__ == '__main__':

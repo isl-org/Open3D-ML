@@ -62,8 +62,10 @@ class SunRGBD(BaseDataset):
             if f.endswith('.npy'):
                 available_idx.append(f.split('.')[0])
 
-        train_files = open(join(self.dataset_path, 'train_data_idx.txt')).read().split('\n')
-        val_files = open(join(self.dataset_path, 'val_data_idx.txt')).read().split('\n')
+        train_files = open(join(self.dataset_path,
+                                'train_data_idx.txt')).read().split('\n')
+        val_files = open(join(self.dataset_path,
+                              'val_data_idx.txt')).read().split('\n')
 
         self.train_idx = []
         self.val_idx = []
@@ -93,7 +95,7 @@ class SunRGBD(BaseDataset):
         for box in bboxes:
             name = box[0]
             center = box[1:4]
-            size = [box[4]*2, box[6]*2, box[5]*2]  # w, h, l
+            size = [box[4] * 2, box[6] * 2, box[5] * 2]  # w, h, l
             orientation = [box[7], box[8]]
             yaw = -1 * np.arctan(orientation[1] / orientation[0])
 
@@ -145,11 +147,13 @@ class SunRGBDSplit():
     def get_data(self, idx):
         idx = self.idx_list[idx]
 
-        pc = self.dataset.read_lidar(join(self.cfg.dataset_path, f'depth/{idx}.npy'))
+        pc = self.dataset.read_lidar(
+            join(self.cfg.dataset_path, f'depth/{idx}.npy'))
         feat = pc[:, 3:]
         pc = pc[:, :3]
 
-        bboxes = self.dataset.read_label(join(self.cfg.dataset_path, f'label/{idx}.pkl'))
+        bboxes = self.dataset.read_label(
+            join(self.cfg.dataset_path, f'label/{idx}.pkl'))
 
         data = {
             'point': pc,
