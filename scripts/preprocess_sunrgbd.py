@@ -107,8 +107,6 @@ class SunRGBDProcess():
                     exist_ok=True)
         os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'label'),
                     exist_ok=True)
-        os.makedirs(join(self.out_path, 'sunrgbd_trainval', 'seg_label'),
-                    exist_ok=True)
 
     def convert(self):
         for imageid in tqdm(range(0, 10335)):
