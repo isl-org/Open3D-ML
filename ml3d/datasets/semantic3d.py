@@ -148,7 +148,7 @@ class Semantic3D(BaseDataset):
 		Raises:
 			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
             'training', 'test', 'validation', or 'all'.
-    """
+        """
         if split in ['test', 'testing']:
             files = self.test_files
         elif split in ['train', 'training']:
