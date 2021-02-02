@@ -95,8 +95,6 @@ class ObjectDetection(BasePipeline):
                                      use_cache=False,
                                      shuffle=False)
 
-        for param_tensor in model.state_dict():
-            print(param_tensor, "\t", model.state_dict()[param_tensor].size())
         self.load_ckpt(model.cfg.ckpt_path)
 
         if cfg.get('test_compute_metric', True):
@@ -316,15 +314,6 @@ class ObjectDetection(BasePipeline):
 
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
-
-        keys = ckpt["model_state"].keys()
-        keys2 = self.model.state_dict().keys()
-
-        ckpt2 = {"model_state_dict": {}}
-
-        for k0, k1 in zip(keys, keys2):
-            ckpt2["model_state_dict"][k1] = ckpt["model_state"][k0]
-        ckpt = ckpt2
 
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):

@@ -51,7 +51,6 @@ class KITTI(BaseDataset):
 
         self.all_files = glob(
             join(cfg.dataset_path, 'training', 'velodyne', '*.bin'))
-        self.all_files.sort()
         self.train_files = []
         self.val_files = []
 
@@ -205,7 +204,7 @@ class KITTISplit():
         label = self.dataset.read_label(label_path, calib)
 
         reduced_pc = DataProcessing.remove_outside_points(
-            pc, calib['world_cam'], calib['cam_img'], [375, 1242])
+            pc, calib['world_cam'], calib['cam_img'], [370, 1224])
 
         data = {
             'point': reduced_pc,
