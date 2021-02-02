@@ -9,10 +9,13 @@ model:
   ckpt_path: # path/to/your/checkpoint
 
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
-  classes: ['Pedestrian', 'Cyclist', 'Car']
+  classes: ['Car']
+
+  score_thres: 0.3
 
   rpn:
     backbone:
+      in_channels: 0 # only xyz, no features
       SA_config:
           npoints: [4096, 1024, 256, 64]
           radius: [[0.1, 0.5], [0.5, 1.0], [1.0, 2.0], [2.0, 4.0]]
@@ -27,30 +30,30 @@ model:
     cls_out_ch: [128]
     reg_in_ch: 128
     reg_out_ch: [128]
-    db_rate: 0.5
-
-    # config of bin-based loss
-    loc_xz_fine: True
-    loc_scope: 3.0
-    loc_bin_siye: 0.5
-    num_head_bin: 12
+    db_ratio: 0.5
 
     focal_loss:
       gamma: 2.0
       alpha: 0.25
       loss_weight: 1.0
 
+    head:
+        # config of bin-based loss
+        loc_xz_fine: False #True
+        loc_scope: 3.0
+        loc_bin_size: 0.5
+        num_head_bin: 12
+        nms_pre: 9000
+        nms_post: 100
+        mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
+
   rcnn:
-    # config of bin-based loss
-    loc_scope: 3.0
-    loc_bin_size: 0.5
-    num_head_bin: 12
-    loc_y_by_bin: False
-    loc_y_scope: 0.5
-    loc_y_bin_size: 0.25
+    in_channels: 128
     pool_extra_width: 1.0
     num_points: 512
-    xyz_up_layer: [512, 512]
+    xyz_up_layer: [128, 128]
+    cls_out_ch: [256, 256]
+    reg_out_ch: [256, 256]
 
     SA_config:
       npoints: [128, 32, -1]
@@ -63,9 +66,19 @@ model:
     loss:
       todo: todo
 
-  proposal:
-    nms_pre: 9000
-    nms_post: 512
+    head:
+      # config of bin-based loss
+      loc_xz_fine: True
+      get_y_by_bin: False
+      loc_y_scope: 0.5
+      loc_y_bin_size: 0.25
+      get_ry_fine: True
+      loc_scope: 1.5
+      loc_bin_size: 0.5
+      num_head_bin: 9
+      mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
+      post_process: False
+
 
   augment:
     PointShuffle: True
@@ -73,7 +86,7 @@ model:
 
 
 pipeline:
-  name: TwoStageDetection
+  name: ObjectDetection
   test_compute_metric: true
   batch_size: 1
   val_batch_size: 1
@@ -89,7 +102,7 @@ pipeline:
     weight_decay: 0.01
 
   # evaluation properties
-  overlaps: [0.5, 0.5, 0.7]
+  overlaps: [0.7]
   similar_classes: {
     Van: Car,
     Person_sitting: Pedestrian

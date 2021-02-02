@@ -51,6 +51,7 @@ class KITTI(BaseDataset):
 
         self.all_files = glob(
             join(cfg.dataset_path, 'training', 'velodyne', '*.bin'))
+        self.all_files.sort()
         self.train_files = []
         self.val_files = []
 
@@ -79,7 +80,6 @@ class KITTI(BaseDataset):
     @staticmethod
     def read_lidar(path):
         assert Path(path).exists()
-
         return np.fromfile(path, dtype=np.float32).reshape(-1, 4)
 
     @staticmethod
@@ -205,7 +205,7 @@ class KITTISplit():
         label = self.dataset.read_label(label_path, calib)
 
         reduced_pc = DataProcessing.remove_outside_points(
-            pc, calib['world_cam'], calib['cam_img'], [370, 1224])
+            pc, calib['world_cam'], calib['cam_img'], [375, 1242])
 
         data = {
             'point': reduced_pc,
