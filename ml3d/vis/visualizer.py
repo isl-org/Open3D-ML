@@ -657,13 +657,9 @@ class Visualizer:
             self._progress.value = 0.0
             self._layout.add_child(self._progress)
 
-        
-
         def set_text(self, text):
             """Set the label text on the dialog box."""
             self._label.text = text + "                    "
-
-        
 
         def post_update(self, text=None):
             """Post updates to the main thread."""
@@ -678,8 +674,6 @@ class Visualizer:
 
                 gui.Application.instance.post_to_main_thread(
                     self._window, update_with_text)
-
-        
 
         def update(self):
             """Enumerate the progress in the dialog box."""
