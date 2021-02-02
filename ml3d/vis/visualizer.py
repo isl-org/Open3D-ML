@@ -18,7 +18,7 @@ class Model:
 
     class BoundingBoxData:
         """The class to define a bounding box that is used to describe the target location.
-            **Args:**
+            Args:
                 name: The name of the pointcloud array.
                 boxes: The array of pointcloud that define the bounding box.
         """
@@ -43,14 +43,13 @@ class Model:
         self._attr_rename = {"label": "labels", "feat": "feature"}
 
     def _init_data(self, name):
-        """Check if the data is loaded."""
         tcloud = o3d.t.geometry.PointCloud(o3d.core.Device("CPU:0"))
         self.tclouds[name] = tcloud
         self._data[name] = {}
         self.data_names.append(name)
 
     def is_loaded(self, name):
-        """If data is not loaded, then load the data."""
+        """Check if the data is loaded."""
         if name in self._data:
             return len(self._data[name]) > 0
         else:
@@ -59,6 +58,7 @@ class Model:
             return True
 
     def load(self, name, fail_if_no_space=False):
+        """If data is not loaded, then load the data."""
         assert (False)  # pure virtual
 
     def unload(self, name):
@@ -203,7 +203,7 @@ class Model:
 
 class DataModel(Model):
     """The class for data i/o and storage of visualization.
-    **Args:**
+    Args:
         userdata: The dataset to be used in the visualization.
     """
 
@@ -233,7 +233,7 @@ class DataModel(Model):
 
 class DatasetModel(Model):
     """The class used to manage a dataset model.
-    **Args:**
+    Args:
         dataset:  The 3D ML dataset to use. You can use the base dataset, sample datasets , or a custom dataset.
         split: A string identifying the dataset split that is usually one of 'training', 'test', 'validation', or 'all'.
         indices: The indices to be used for the datamodel. This may vary based on the split used.
@@ -344,7 +344,7 @@ class DatasetModel(Model):
         return pcloud_size
 
     def unload(self, name):
-        """Unload the data (only if you have loaded it earlier)."""
+        """Unload the data (if it was loaded earlier)."""
         # Only unload if this was loadable; we might have an in-memory,
         # user-specified data created directly through create_point_cloud().
         if name in self._name2datasetidx:
@@ -633,9 +633,10 @@ class Visualizer:
             gui.Application.instance.post_to_main_thread(self._window, update)
 
     class ProgressDialog:
-        """This class is used to manage the progress dialog displayed during visualization.
-        Initialize the class.
-        **Args:**
+        """
+        This class is used to manage the progress dialog displayed during visualization.
+        
+        Args:
             title: The title of the dialog box.
             window: The window where the progress dialog box should be displayed.
             n_items: The maximum number of items.
@@ -656,14 +657,16 @@ class Visualizer:
             self._progress.value = 0.0
             self._layout.add_child(self._progress)
 
-        """Set the label text on the dialog box."""
+        
 
         def set_text(self, text):
+            """Set the label text on the dialog box."""
             self._label.text = text + "                    "
 
-        """Post updates to the main thread."""
+        
 
         def post_update(self, text=None):
+            """Post updates to the main thread."""
             if text is None:
                 gui.Application.instance.post_to_main_thread(
                     self._window, self.update)
@@ -676,9 +679,10 @@ class Visualizer:
                 gui.Application.instance.post_to_main_thread(
                     self._window, update_with_text)
 
-        """Enumerate the progress in the dialog box."""
+        
 
         def update(self):
+            """Enumerate the progress in the dialog box."""
             value = min(1.0, self._progress.value + 1.0 / self._n_items)
             self._progress.value = value
 
@@ -916,14 +920,14 @@ class Visualizer:
 
     def set_lut(self, attr_name, lut):
         """Set the LUT for a specific attribute.
-        **Args:**
+        Args:
         attr_name: The attribute name as string.
         lut: The LabelLUT object that should be updated.
         """
         self._attrname2lut[attr_name] = lut
 
     def setup_camera(self):
-        """Set up camera for visualization"""
+        """Set up camera for visualization."""
         selected_names = self._get_selected_names()
         selected_bounds = [
             self._objects.calc_bounds_for(n) for n in selected_names
@@ -1456,9 +1460,10 @@ class Visualizer:
                           indices=None,
                           width=1024,
                           height=768):
-        """Visualize a dataset.
+        """
+        Visualize a dataset.
 
-        **Example:**
+        Example:
             Minimal example for visualizing a dataset::
                 import open3d.ml.torch as ml3d  # or open3d.ml.tf as ml3d
 
@@ -1466,7 +1471,7 @@ class Visualizer:
                 vis = ml3d.vis.Visualizer()
                 vis.visualize_dataset(dataset, 'all', indices=range(100))
 
-        **Args:**
+        Args:
             dataset: The dataset to use for visualization.
             split: The dataset split to be used, such as 'training'
             indices: An iterable with a subset of the data points to visualize, such as [0,2,3,4].
@@ -1489,9 +1494,10 @@ class Visualizer:
                   bounding_boxes=None,
                   width=1024,
                   height=768):
-        """Visualize a custom point cloud data.
+        """
+        Visualize a custom point cloud data.
 
-        **Example:**
+        Example:
             Minimal example for visualizing a single point cloud with an
             attribute::
                 import numpy as np
@@ -1507,7 +1513,7 @@ class Visualizer:
                 vis = ml3d.vis.Visualizer()
                 vis.visualize(data) 
 
-        **Args:**
+        Args:
             data: A list of dictionaries. Each dictionary is a point cloud with
                 attributes. Each dictionary must have the entries 'name' and
                 'points'. Points and point attributes can be passed as numpy 
