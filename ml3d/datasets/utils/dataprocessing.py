@@ -227,15 +227,3 @@ class DataProcessing:
         valid = np.logical_and(val_flag_merge, depth >= 0)
 
         return points[valid]
-
-        # C, R, T = projection_matrix_to_CRT_kitti(cam_img.T)
-        # image_bbox = [0, 0, image_shape[1], image_shape[0]]
-        # frustum = get_frustum(image_bbox, C)
-        # frustum -= T
-        # frustum = np.linalg.inv(R) @ frustum.T
-        # frustum = camera_to_lidar(frustum.T, world_cam)
-        # frustum_surfaces = corner_to_surfaces_3d(frustum[np.newaxis, ...])
-        # indices = points_in_convex_polygon_3d(points[:, :3], frustum_surfaces)
-        # points = points[indices.reshape([-1])]
-
-        # return points
