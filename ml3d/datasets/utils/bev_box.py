@@ -18,9 +18,9 @@ class BEVBox3D(BoundingBox3D):
         and must be normalized and mutually orthogonal.
 
         center: (x, y, z) that defines the center of the box
-        yaw: yaw angle of box
         size: (width, height, depth) that defines the size of the box, as
             measured from edge to edge
+        yaw: yaw angle of box
         label_class: integer specifying the classification label. If an LUT is
             specified in create_lines() this will be used to determine the color
             of the box.
