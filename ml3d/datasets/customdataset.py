@@ -73,7 +73,7 @@ class Custom3DSplit():
 
 class Custom3D(BaseDataset):
     """
-    A template for customized datasetthat you can use with a dataloader to feed data when training a model. This inherits all functions from the base dataset and can be modified by users.
+    A template for customized dataset that you can use with a dataloader to feed data when training a model. This inherits all functions from the base dataset and can be modified by users.
     Initialize the function by passing the dataset and other details.
     
     Args:
