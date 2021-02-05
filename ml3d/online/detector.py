@@ -19,7 +19,7 @@ import gtimer as gt
 import ipdb
 
 
-class pipeline_gui(object):
+class PipelineViewer(object):
     """ GUI for the frame pipeline """
 
     def __init__(self, labels=None, vfov=60):
@@ -37,35 +37,31 @@ class pipeline_gui(object):
         gui.Application.instance.initialize()
         self.window = gui.Application.instance.create_window(
             "Open3D || 3D Object Detection", 1024, 768)
+        self.window.set_on_layout(self._on_layout)
         self.window.set_on_close(self._on_window_close)
-        em = self.window.theme.font_size
-
-        # layout = gui.Vert()
-        # self.window.add_child(layout)  # window can have only one child
 
         # 3D scene
-        self.scene = gui.SceneWidget()
-        self.window.add_child(self.scene)
-        self.scene.enable_scene_caching(True)  # makes UI _much_ more responsive
-        self.scene.scene = rendering.Open3DScene(self.window.renderer)
-        self.scene.scene.set_background([1, 1, 1, 1])  # White brackground
-        self.scene.scene.show_axes(True)
-        self._reset_view()
+        self.pcdview = gui.SceneWidget()
+        self.window.add_child(self.pcdview)
+        self.pcdview.enable_scene_caching(
+            True)  # makes UI _much_ more responsive
+        self.pcdview.scene = rendering.Open3DScene(self.window.renderer)
+        self.pcdview.scene.set_background([1, 1, 1, 1])  # White brackground
+        self.pcdview.scene.show_axes(True)
+        self._camera_view()
+        em = self.window.theme.font_size
 
         # Options panel
-        self.options_window = gui.Application.instance.create_window(
-            "Open3D || 3D Object Detection || Options", 128, 256)
-        self.options_window.set_on_close(self._on_window_close)
-        panel = gui.Vert(em / 2, gui.Margins(em, em, em, em))
-        self.options_window.add_child(panel)
-        panel.add_stretch()  # before first child
+        self.panel = gui.Vert(em / 2, gui.Margins(em, 0, em, 0))
+        self.window.add_child(self.panel)
+        self.panel.add_fixed(em)
 
         self.flag_capture = False
         self.cv_capture = threading.Condition()
         toggle_capture = gui.Checkbox("Capture")
         toggle_capture.checked = self.flag_capture
         toggle_capture.set_on_checked(self._on_toggle_capture)
-        panel.add_child(toggle_capture)
+        self.panel.add_child(toggle_capture)
 
         self.flag_detector = False
         if labels:
@@ -74,12 +70,15 @@ class pipeline_gui(object):
             toggle_detect = gui.Checkbox("Run Detector")
             toggle_detect.checked = self.flag_detector
             toggle_detect.set_on_checked(self._on_toggle_detector)
-            panel.add_child(toggle_detect)
+            self.panel.add_child(toggle_detect)
 
-        reset_view = gui.Button("Reset view")
-        reset_view.set_on_clicked(self._reset_view)
-        panel.add_child(reset_view)
-        panel.add_stretch()  # after last child
+        camera_view = gui.Button("Camera view")
+        camera_view.set_on_clicked(self._camera_view)
+        self.panel.add_child(camera_view)
+        birds_eye_view = gui.Button("Bird's eye view")
+        birds_eye_view.set_on_clicked(self._birds_eye_view)
+        self.panel.add_child(birds_eye_view)
+        self.panel.add_fixed(em)
 
         self.flag_exit = False
         self.flag_gui_empty = True
@@ -95,15 +94,25 @@ class pipeline_gui(object):
         """
         if not self.flag_gui_empty:
             for name in frame_elements.keys():
-                self.scene.scene.remove_geometry(name)
+                self.pcdview.scene.remove_geometry(name)
         else:
             self.flag_gui_empty = False
 
         # Add point cloud and bounding boxes
         for name, element in frame_elements.items():
-            self.scene.scene.add_geometry(name, element, self.material)
-        self.scene.force_redraw()
+            self.pcdview.scene.add_geometry(name, element, self.material)
+        self.pcdview.force_redraw()
         gt.stamp(name="GUI", unique=False)
+
+    def _on_layout(self, theme):
+        frame = self.window.content_rect
+        em = theme.font_size
+        panel_size = self.panel.calc_preferred_size(theme)
+        panel_rect = gui.Rect(frame.get_right() - panel_size.width - 2 * em,
+                              frame.y + 2 * em, panel_size.width,
+                              panel_size.height)
+        self.panel.frame = panel_rect
+        self.pcdview.frame = frame
 
     def _on_window_close(self):
         """ Callback when the user closes the application window """
@@ -123,17 +132,26 @@ class pipeline_gui(object):
             with self.cv_capture:
                 self.cv_capture.notify()
 
-    def _reset_view(self):
+    def _camera_view(self):
         """ Callback to reset point cloud view to the camera """
         # Point cloud bounds, depend on the sensor range
         pcd_bounds = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0], [3, 3, 6])
-        self.scene.setup_camera(self.vfov, pcd_bounds, [0, 0, 0])
+        self.pcdview.setup_camera(self.vfov, pcd_bounds, [0, 0, 0])
         # Look at [0, 0, 1] from an eye placed at [0, 0, 0] with Y axis
         # pointing at [0, -1, 0]
-        self.scene.scene.camera.look_at([0, 0, 1], [0, 0, 0], [0, -1, 0])
+        self.pcdview.scene.camera.look_at([0, 0, 1], [0, 0, 0], [0, -1, 0])
+
+    def _birds_eye_view(self):
+        """ Callback to reset point cloud view to birds eye (overhead) view """
+        # Point cloud bounds, depend on the sensor range
+        pcd_bounds = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0], [3, 3, 6])
+        self.pcdview.setup_camera(self.vfov, pcd_bounds, [0, 0, 0])
+        # Look at [0, 0, 1] from an eye placed at [0, 0, 0] with Y axis
+        # pointing at [0, -1, 0]
+        self.pcdview.scene.camera.look_at([0, 0, 1.5], [0, 3, 1.5], [0, -1, 0])
 
 
-class frame_pipeline(object):
+class DetectorPipeline(object):
     """Capture RGBD frames, convert to point cloud, run detector and show
     bounding boxes overlayed on the Point Cloud"""
 
@@ -204,7 +222,7 @@ class frame_pipeline(object):
             'classes'] if self.run_detector else None
         vfov = np.rad2deg(2 * np.arctan(self.intrinsic_matrix[1, 2].item() /
                                         self.intrinsic_matrix[1, 1].item()))
-        self.gui = pipeline_gui(labels=labels, vfov=vfov)
+        self.gui = PipelineViewer(labels=labels, vfov=vfov)
 
     def _run_detector_torch(self, pcd_frame):
         """ Run PyTorch 3D detector """
@@ -223,25 +241,36 @@ class frame_pipeline(object):
                 pcd_points.numpy(), dtype=torch.float32, device=self.device)
 
             gt.stamp("DepthToPCDPost", unique=False)
-            #results = self.net(self.det_inputs[:,:pcd_points.shape[0],:])
-            #boxes = self.net.inference_end(results, {
-            #    'point': pcd_points,
-            #    'calib': self.calib
-            #})
+            results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
+            boxes = self.net.inference_end(results, {
+                'point': pcd_points,
+                'calib': self.calib
+            })
 
         test_box = BEVBox3D([1, 1, 1], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
                             self.calib['world_cam'], self.calib['cam_img'])
-        return [test_box]
+        return [test_box]  # boxes
 
     def _run_detector_tf(self, pcd_frame):
         """ Run Tensorflow 3D detector """
         import tensorflow as tf
 
-        inputs = tf.convert_to_tensor(data_frame['point'], dtype=np.float32)
-        inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
+        if self.det_inputs is None:
+            self.det_inputs = tf.ones((1, self.max_points, 4),
+                                      dtype=tf.float32,
+                                      device=self.device)
+        pcd_points = pcd_frame.point['points']
+        # https://github.com/tensorflow/tensorflow/issues/33254#issuecomment-542379165
+        # npy -> tf will always copy data
+        self.det_inputs[0, :pcd_points.shape[0], :3] = pcd_points.numpy()
 
-        results = self.net(inputs, training=False)
-        boxes = self.net.inference_end(results, data_frame)
+        gt.stamp("DepthToPCDPost", unique=False)
+        results = self.net(self.det_inputs[:, :pcd_points.shape[0], :],
+                           training=False)
+        boxes = self.net.inference_end(results, {
+            'point': pcd_points,
+            'calib': self.calib
+        })
         return boxes
 
     def launch(self):
@@ -306,12 +335,13 @@ if __name__ == "__main__":
 
     log.basicConfig(level=log.DEBUG)
     parser = argparse.ArgumentParser(
-        description=R"""Online 3D object detection pipeline\n\n
-    - Connects to a depth camera (currently RealSense)\n
-    - Captures color and depth frames\n
-    - Convert frames to point cloud\n
-    - Run object detector on point cloud\n
-    - Visualize results""")
+        description="""Online 3D object detection pipeline
+    - Connects to a depth camera (currently RealSense)
+    - Captures color and depth frames
+    - Convert frames to point cloud
+    - Run object detector on point cloud
+    - Visualize results""",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--camera-config',
                         help='Depth camera configuration JSON file')
     parser.add_argument('--detector-config',
@@ -319,9 +349,9 @@ if __name__ == "__main__":
                         help='Detector configuration YAML file')
     parser.add_argument('--device',
                         help='Device to run model inference. '
-                        'Default is CUDA if available, else CPU.')
+                        'Default is CUDA GPU if available, else CPU.')
 
     args = parser.parse_args()
 
-    frame_pipeline(args.detector_config, args.device,
-                   args.camera_config).launch()
+    DetectorPipeline(args.detector_config, args.device,
+                     args.camera_config).launch()
