@@ -190,7 +190,7 @@ class DataProcessing:
             (points, np.ones((points.shape[0], 1), dtype=np.float32)))
         points = np.matmul(points, cam_img)
 
-        pts_img = (points[:, 0:2].T / points[:, 2]).T  # (N, 2)
+        pts_img = (points[:, :2].T / points[:, 3]).T  # (N, 2)
         depth = points[:, 2] - cam_img[3, 2]  # depth in rect camera coord
         return pts_img, depth
 

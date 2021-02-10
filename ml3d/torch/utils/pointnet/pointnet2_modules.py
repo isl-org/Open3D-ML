@@ -165,12 +165,12 @@ class PointnetFPModule(nn.Module):
             new_features: (B, mlp[-1], n) tensor of the features of the unknown features
         """
         if known is not None:
-            dist, idx = pointnet2_utils.three_nn(unknown, known)
+            dist, idx = pointnet2_utils.three_nn_gpu(unknown, known)
             dist_recip = 1.0 / (dist + 1e-8)
             norm = torch.sum(dist_recip, dim=2, keepdim=True)
             weight = dist_recip / norm
 
-            interpolated_feats = pointnet2_utils.three_interpolate(
+            interpolated_feats = pointnet2_utils.three_interpolate_gpu(
                 known_feats, idx, weight)
         else:
             interpolated_feats = known_feats.expand(*known_feats.size()[0:2],

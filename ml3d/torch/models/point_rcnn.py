@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 import numpy as np
 
@@ -59,17 +60,16 @@ class PointRCNN(BaseModel):
 
                     # proposal layer
                     rois, roi_scores_raw = self.rpn.proposal_layer(
-                        (rpn_scores_raw, rpn_reg, backbone_xyz))  # (B, M, 7)
+                        rpn_scores_raw, rpn_reg, backbone_xyz)  # (B, M, 7)
 
-                inputs = (rois, None, backbone_xyz,
-                          backbone_features.permute(
-                              (0, 2, 1)), seg_mask, pts_depth)
-                cls_score, reg_score = self.rcnn(inputs)
+                cls_score, reg_score = self.rcnn(
+                    rois, None, backbone_xyz,
+                    backbone_features.permute((0, 2, 1)), seg_mask, pts_depth)
 
                 output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         elif self.use_rcnn:
-            output = self.rcnn(inputs)
+            output = self.rcnn(*inputs)
 
         return output
 
@@ -121,27 +121,14 @@ class PointRCNN(BaseModel):
         }
 
     def inference_end(self, results, inputs):
-        batch_size = 1
-
         roi_boxes3d = results['rois']  # (B, M, 7)
+        batch_size = roi_boxes3d.shape[0]
 
         rcnn_cls = results['cls'].view(batch_size, -1, results['cls'].shape[1])
         rcnn_reg = results['reg'].view(batch_size, -1, results['reg'].shape[1])
 
-        pred_boxes3d = self.rcnn.proposal_layer(
-            (None, rcnn_reg, roi_boxes3d))[0]
-
-        # scoring
-        if rcnn_cls.shape[2] == 1:
-            raw_scores = rcnn_cls  # (B, M, 1)
-
-            norm_scores = torch.sigmoid(raw_scores)
-            pred_classes = (norm_scores < 0.3).long()
-        else:
-            pred_classes = torch.argmax(rcnn_cls, dim=1).view(-1)
-            cls_norm_scores = F.softmax(rcnn_cls, dim=1)
-            raw_scores = rcnn_cls[:, pred_classes]
-            norm_scores = cls_norm_scores[:, pred_classes]
+        pred_boxes3d, rcnn_cls = self.rcnn.proposal_layer(
+            rcnn_cls, rcnn_reg, roi_boxes3d)
 
         world_cam, cam_img = None, None
         if 'calib' in inputs and inputs['calib'] is not None:
@@ -150,16 +137,29 @@ class PointRCNN(BaseModel):
             cam_img = calib.get('cam_img', None)
 
         inference_result = []
-        for _bboxes, _scores, _labels in zip(pred_boxes3d, norm_scores,
-                                             pred_classes):
-            bboxes = _bboxes.cpu().numpy()
-            scores = _scores.cpu().numpy()
-            labels = _labels.cpu().numpy()
+        for bboxes, scores in zip(pred_boxes3d, rcnn_cls):
+            # scoring
+            if scores.shape[-1] == 1:
+                scores = torch.sigmoid(scores)
+                labels = (scores < self.score_thres).long()
+            else:
+                labels = torch.argmax(scores)
+                scores = F.softmax(scores, dim=0)
+                scores = scores[labels]
+
+            fltr = torch.flatten(scores > self.score_thres)
+            bboxes = bboxes[fltr]
+            labels = labels[fltr]
+            scores = scores[fltr]
+
+            bboxes = bboxes.cpu().numpy()
+            scores = scores.cpu().numpy()
+            labels = labels.cpu().numpy()
             inference_result.append([])
 
             for bbox, score, label in zip(bboxes, scores, labels):
-                dim = bbox[[4, 3, 5]]
                 pos = bbox[:3]
+                dim = bbox[[4, 3, 5]]
                 # transform into world space
                 pos = DataProcessing.cam2world(pos.reshape((1, -1)),
                                                world_cam).flatten()
@@ -358,8 +358,8 @@ class RCNN(nn.Module):
 
         return xyz, features
 
-    def forward(self, x):
-        roi_boxes3d, gt_boxes3d, rpn_xyz, rpn_features, seg_mask, pts_depth = x
+    def forward(self, roi_boxes3d, gt_boxes3d, rpn_xyz, rpn_features, seg_mask,
+                pts_depth):
         pts_extra_input_list = [seg_mask.unsqueeze(dim=2)]
         pts_extra_input_list.append((pts_depth / 70.0 - 0.5).unsqueeze(dim=2))
         pts_extra_input = torch.cat(pts_extra_input_list, dim=2)
@@ -436,6 +436,7 @@ class ProposalLayer(nn.Module):
     def __init__(self,
                  nms_pre=9000,
                  nms_post=512,
+                 nms_thres=0.8,
                  mean_size=[1.0],
                  loc_xz_fine=True,
                  loc_scope=3.0,
@@ -449,6 +450,7 @@ class ProposalLayer(nn.Module):
         super().__init__()
         self.nms_pre = nms_pre
         self.nms_post = nms_post
+        self.nms_thres = nms_thres
         self.mean_size = torch.tensor(mean_size)
         self.loc_scope = loc_scope
         self.loc_bin_size = loc_bin_size
@@ -460,9 +462,7 @@ class ProposalLayer(nn.Module):
         self.loc_y_bin_size = loc_y_bin_size
         self.post_process = post_process
 
-    def forward(self, x):
-        rpn_scores, rpn_reg, xyz = x
-
+    def forward(self, rpn_scores, rpn_reg, xyz):
         batch_size = xyz.shape[0]
         proposals = decode_bbox_target(
             xyz.view(-1, xyz.shape[-1]),
@@ -476,9 +476,8 @@ class ProposalLayer(nn.Module):
             get_ry_fine=self.get_ry_fine,
             loc_y_scope=self.loc_y_scope,
             loc_y_bin_size=self.loc_y_bin_size)  # (N, 7)
+
         proposals = proposals.view(batch_size, -1, 7)
-        ret_bbox3d = proposals
-        ret_scores = rpn_scores
 
         if self.post_process:
             proposals[...,
@@ -501,6 +500,16 @@ class ProposalLayer(nn.Module):
                 proposals_tot = proposals_single.size(0)
                 ret_bbox3d[k, :proposals_tot] = proposals_single
                 ret_scores[k, :proposals_tot] = scores_single
+        else:
+            batch_size = rpn_scores.size(0)
+            ret_bbox3d = []
+            ret_scores = []
+            for k in range(batch_size):
+                bev = xywhr_to_xyxyr(proposals[k, :, [0, 2, 3, 5, 6]])
+                keep_idx = nms(bev, rpn_scores[k], self.nms_thres)
+
+                ret_bbox3d.append(proposals[k, keep_idx])
+                ret_scores.append(rpn_scores[k, keep_idx])
 
         return ret_bbox3d, ret_scores
 
@@ -556,8 +565,8 @@ class ProposalLayer(nn.Module):
                     pre_top_n_list[i - 1]:][:pre_top_n_list[i]]
 
             # oriented nms
-            bev = xywhr_to_xyxyr(box3d_to_bev(cur_proposals))
-            keep_idx = nms(bev, cur_scores, 0.8)
+            bev = xywhr_to_xyxyr(cur_proposals[:, [0, 2, 3, 5, 6]])
+            keep_idx = nms(bev, cur_scores, self.nms_thres)
 
             # Fetch post nms top k
             keep_idx = keep_idx[:post_top_n_list[i]]

@@ -45,6 +45,7 @@ model:
         num_head_bin: 12
         nms_pre: 9000
         nms_post: 100
+        nms_thres: 0.8
         mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
 
   rcnn:
@@ -62,9 +63,6 @@ model:
       mlps: [[128, 128, 128],
               [128, 128, 256],
               [256, 256, 512]]
-    
-    loss:
-      todo: todo
 
     head:
       # config of bin-based loss
@@ -78,7 +76,7 @@ model:
       num_head_bin: 9
       mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
       post_process: False
-
+      nms_thres: 0.1
 
   augment:
     PointShuffle: True
@@ -104,8 +102,7 @@ pipeline:
   # evaluation properties
   overlaps: [0.7]
   similar_classes: {
-    Van: Car,
-    Person_sitting: Pedestrian
+    Van: Car
   }
   difficulties: [0, 1, 2]
     
