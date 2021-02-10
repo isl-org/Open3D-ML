@@ -1,5 +1,5 @@
 import torch
-import roipool3d_cuda
+from open3d.ml.torch.ops import roipool3d
 import numpy as np
 
 
@@ -31,20 +31,14 @@ def roipool3d_gpu(pts,
         pooled_features: (B, M, 512, 3 + C)
         pooled_empty_flag: (B, M)
     """
-    batch_size, boxes_num, feature_len = pts.shape[0], boxes3d.shape[
-        1], pts_feature.shape[2]
+    batch_size = pts.shape[0]
     pooled_boxes3d = enlarge_box3d(boxes3d.view(-1, 7),
                                    pool_extra_width).view(batch_size, -1, 7)
 
-    pooled_features = torch.cuda.FloatTensor(
-        torch.Size(
-            (batch_size, boxes_num, sampled_pt_num, 3 + feature_len))).zero_()
-    pooled_empty_flag = torch.cuda.IntTensor(torch.Size(
-        (batch_size, boxes_num))).zero_()
-
-    roipool3d_cuda.forward(pts.contiguous(), pooled_boxes3d.contiguous(),
-                           pts_feature.contiguous(), pooled_features,
-                           pooled_empty_flag)
+    pooled_features, pooled_empty_flag = roipool3d(pts.contiguous(),
+                                                   pooled_boxes3d.contiguous(),
+                                                   pts_feature.contiguous(),
+                                                   sampled_pt_num)
 
     return pooled_features, pooled_empty_flag
 
