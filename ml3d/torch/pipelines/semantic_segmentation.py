@@ -128,12 +128,40 @@ class SemanticSegmentation(BasePipeline):
                          train_sum_dir=train_sum_dir,
                          **kwargs)
 
-    """
-    Run the inference using the data passed.
-    
-    """
+        """
+        Run inference on given data.
+
+        Args:
+            data: A raw data.
+        Returns:
+            Returns the inference results.
+        """
 
     def run_inference(self, data):
+        if self.model.cfg.name == 'SparseConvUnet':
+            return self.run_inference_direct(data)
+        else:
+            return self.run_inference_patchwise(data)
+
+    def run_inference_direct(self, data):
+        model = self.model
+        device = self.device
+
+        model.to(device)
+        model.device = device
+        model.eval()
+
+        model.inference_begin(data)
+        inputs = model.inference_preprocess()
+
+        with torch.no_grad():
+            results = model(inputs)
+        
+        results = model.inference_end(inputs, results)
+
+        return results
+
+    def run_inference_patchwise(self, data):
         cfg = self.cfg
         model = self.model
         device = self.device
