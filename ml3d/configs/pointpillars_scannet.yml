@@ -8,7 +8,7 @@ dataset:
 model:
   name: PointPillars
   # path/to/your/checkpoint
-  ckpt_path: /Users/ssheorey/Documents/Open3D/Models/PointPillars/pointpillars_kitti_202012221652utc.pth
+  ckpt_path: /home/ssheorey/Documents/Open3D/Models/PointPillars/pointpillars_kitti_202012221652utc.pth
 
   point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
   classes: ['Pedestrian', 'Cyclist', 'Car']

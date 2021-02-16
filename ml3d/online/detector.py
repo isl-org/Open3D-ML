@@ -100,7 +100,7 @@ class PipelineViewer(object):
 
         # Add point cloud and bounding boxes
         for name, element in frame_elements.items():
-            self.pcdview.scene.add_geometry(name, element, self.material)
+            self.pcdview.scene.add_geometry(name, element.cpu() if hasattr(element, 'cpu') else element, self.material)
         self.pcdview.force_redraw()
         gt.stamp(name="GUI", unique=False)
 
@@ -164,19 +164,24 @@ class DetectorPipeline(object):
         if device:
             self.device = device
         else:
-            self.device = 'cuda' if o3d.core.cuda.is_available() else 'cpu'
+            self.device = 'cuda:0' if o3d.core.cuda.is_available() else 'cpu:0'
+        self.o3d_device = o3d.core.Device(self.device)
         if detector_config_file:
             self.detector_config = Config.load_from_file(detector_config_file)
-            if self.detector_config['model']['ckpt_path'].endswith('.pth'):
+            ckpt_path = self.detector_config['model']['ckpt_path']
+            if ckpt_path.endswith('.pth'):
                 import open3d.ml.torch as ml3d
+                import torch
                 self.run_detector = self._run_detector_torch
                 log.info("Using PyTorch for inference")
 
             else:
                 import open3d.ml.tf as ml3d
+                import tensorflow as tf
                 self.run_detector = self._run_detector_tf
                 log.info("Using Tensorflow for inference")
 
+            # FIXME: No error if model cannot be loaded
             self.net = ml3d.models.PointPillars(**self.detector_config.model,
                                                 device=self.device)
             if self.run_detector is self._run_detector_torch:
@@ -227,6 +232,7 @@ class DetectorPipeline(object):
     def _run_detector_torch(self, pcd_frame):
         """ Run PyTorch 3D detector """
         import torch
+        from torch.utils import dlpack as torch_dlpack
 
         with torch.no_grad():
             if self.det_inputs is None:
@@ -237,8 +243,7 @@ class DetectorPipeline(object):
             #     axis=2).reshape((-1, 1))
             # Add fake reflectance data
             pcd_points = pcd_frame.point['points']
-            self.det_inputs[0, :pcd_points.shape[0], :3] = torch.as_tensor(
-                pcd_points.numpy(), dtype=torch.float32, device=self.device)
+            self.det_inputs[0, :pcd_points.shape[0], :3] = torch_dlpack.from_dlpack(pcd_points.to_dlpack())
 
             gt.stamp("DepthToPCDPost", unique=False)
             results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
@@ -247,13 +252,14 @@ class DetectorPipeline(object):
                 'calib': self.calib
             })
 
-        test_box = BEVBox3D([1, 1, 1], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
+        test_box = BEVBox3D([-0.5, 0.5, 0.5], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
                             self.calib['world_cam'], self.calib['cam_img'])
         return [test_box]  # boxes
 
     def _run_detector_tf(self, pcd_frame):
         """ Run Tensorflow 3D detector """
         import tensorflow as tf
+        from tensorflow.experimental import dlpack as tf_dlpack
 
         if self.det_inputs is None:
             self.det_inputs = tf.ones((1, self.max_points, 4),
@@ -262,7 +268,7 @@ class DetectorPipeline(object):
         pcd_points = pcd_frame.point['points']
         # https://github.com/tensorflow/tensorflow/issues/33254#issuecomment-542379165
         # npy -> tf will always copy data
-        self.det_inputs[0, :pcd_points.shape[0], :3] = pcd_points.numpy()
+        self.det_inputs[0, :pcd_points.shape[0], :3] = tf_dlpack.from_dlpack(pcd_points.to_dlpack())
 
         gt.stamp("DepthToPCDPost", unique=False)
         results = self.net(self.det_inputs[:, :pcd_points.shape[0], :],
@@ -287,16 +293,21 @@ class DetectorPipeline(object):
             frame_id = 0
             rgbd_frame = self.rscam.capture_frame(wait=True,
                                                   align_depth_to_color=True)
+            pcd_errors = 0
             while frame_id < 1000 and not self.gui.flag_exit:
                 future_rgbd_frame = executor.submit(self.rscam.capture_frame,
                                                     wait=True,
                                                     align_depth_to_color=True)
                 gt.stamp("SubmitCapture", unique=False)
 
-                pcd_frame = o3d.t.geometry.PointCloud.create_from_depth_image(
-                    rgbd_frame.depth, self.intrinsic_matrix, self.extrinsics,
-                    self.rgbd_metadata.depth_scale, self.depth_max,
-                    self.pcd_stride)
+                try:
+                    pcd_frame = o3d.t.geometry.PointCloud.create_from_depth_image(
+                            rgbd_frame.depth.to(self.o3d_device), self.intrinsic_matrix,
+                            self.extrinsics, self.rgbd_metadata.depth_scale, self.depth_max,
+                            self.pcd_stride)
+                except RuntimeError:
+                    pcd_errors += 1
+
                 frame_elements = {self.rgbd_metadata.serial_number: pcd_frame}
                 gt.stamp("DepthToPCD", unique=False)
                 if pcd_frame.is_empty():
@@ -328,6 +339,7 @@ class DetectorPipeline(object):
                 frame_id += 1
 
         self.rscam.stop_capture()
+        log.info(f"create_from_depth_image() errors = {pcd_errors}")
         log.info(gt.report())
 
 
@@ -348,7 +360,7 @@ if __name__ == "__main__":
                         required=False,
                         help='Detector configuration YAML file')
     parser.add_argument('--device',
-                        help='Device to run model inference. '
+            help='Device to run model inference. e.g. cpu:0 or cuda:0'
                         'Default is CUDA GPU if available, else CPU.')
 
     args = parser.parse_args()
