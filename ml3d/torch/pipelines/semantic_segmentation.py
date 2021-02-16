@@ -127,7 +127,6 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
-
         """
         Run inference on given data.
 
@@ -156,7 +155,7 @@ class SemanticSegmentation(BasePipeline):
 
         with torch.no_grad():
             results = model(inputs)
-        
+
         results = model.inference_end(inputs, results)
 
         return results
