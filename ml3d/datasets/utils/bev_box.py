@@ -51,7 +51,7 @@ class BEVBox3D(BoundingBox3D):
         generate corners3d representation for this object
         :return corners_3d: (8, 3) corners of box3d in camera coord
         """
-        l, h, w = self.size[2::-1]
+        w, h, l = self.size
         x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
         y_corners = [0, 0, 0, 0, -h, -h, -h, -h]
         z_corners = [w / 2, -w / 2, -w / 2, w / 2, w / 2, -w / 2, -w / 2, w / 2]
@@ -104,7 +104,7 @@ class BEVBox3D(BoundingBox3D):
             [corners, np.ones((corners.shape[0], 1))], axis=-1)
 
         bbox_img = np.matmul(corners, self.cam_img)
-        bbox_img = bbox_img[:, :2] / bbox_img[:, 2:3]
+        bbox_img = bbox_img[:, :2] / bbox_img[:, 3:]
 
         minxy = np.min(bbox_img, axis=0)
         maxxy = np.max(bbox_img, axis=0)
