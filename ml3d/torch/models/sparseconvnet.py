@@ -94,9 +94,10 @@ class SparseConvUnet(BaseModel):
         return data
 
     def transform(self, data, attr):
-        data['point'] = torch.from_numpy(data['point'])
-        data['feat'] = torch.from_numpy(data['feat'])
-        data['label'] = torch.from_numpy(data['label'])
+        device = self.device
+        data['point'] = torch.from_numpy(data['point']).to(device)
+        data['feat'] = torch.from_numpy(data['feat']).to(device)
+        data['label'] = torch.from_numpy(data['label']).to(device)
 
         return data
 
@@ -168,21 +169,21 @@ class SubmanifoldSparseConv(nn.Module):
 
 
 def calculate_grid(inp_positions):
-    inp_pos = inp_positions.numpy().astype(np.int32)
+    inp_pos = inp_positions.long()
     out_pos = []
     for p in inp_pos:
         for i in range(-1, 1):
             for j in range(-1, 1):
                 for k in range(-1, 1):
-                    if not np.any(p + [i, j, k] < 0):
-                        arr = p + [i, j, k]
+                    arr = p + torch.Tensor([i, j, k]).to(p.device)
+                    if not torch.any(arr < 0):
                         if arr[0] % 2 or arr[1] % 2 or arr[2] % 2:
                             continue
                         out_pos.append(arr)
-    out_pos = np.array(out_pos).astype(np.float32)
-    out_pos = np.unique(out_pos, axis=0)
+    out_pos = torch.cat(out_pos).float().reshape(-1, 3)
+    out_pos = torch.unique(out_pos, dim=0)
 
-    return torch.from_numpy(out_pos + 0.5)
+    return out_pos + 0.5
 
 
 class Convolution(nn.Module):
