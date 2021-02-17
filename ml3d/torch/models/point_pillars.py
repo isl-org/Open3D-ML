@@ -94,7 +94,7 @@ class PointPillars(BaseModel):
         self.neck = SECONDFPN(**neck)
         self.bbox_head = Anchor3DHead(num_classes=len(self.classes), **head)
 
-        self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
+        self.loss_cls = FocalLoss(**loss.get("focal", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
         self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
 
