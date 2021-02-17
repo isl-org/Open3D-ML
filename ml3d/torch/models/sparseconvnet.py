@@ -8,6 +8,7 @@ from ...utils import MODEL
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
+
 class SparseConvUnet(BaseModel):
 
     def __init__(self,
@@ -54,8 +55,6 @@ class SparseConvUnet(BaseModel):
         return output
 
     def preprocess(self, data, attr):
-        cfg = self.cfg
-
         points = np.array(data['point'], dtype=np.float32)
 
         if 'label' not in data.keys() or data['label'] is None:
@@ -110,24 +109,21 @@ class SparseConvUnet(BaseModel):
         inputs = inputs[0]
         results = results[0]
         results = torch.reshape(results, (-1, self.cfg.num_classes))
-        print(results)
 
         m_softmax = torch.nn.Softmax(dim=-1)
         results = m_softmax(results)
         results = results.cpu().data.numpy()
 
-        probs = np.reshape(results,
-                           [-1, self.cfg.num_classes])
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
 
         pred_l = np.argmax(probs, 1)
-        print(pred_l[:30])
 
         return {'inference_labels': pred_l, 'inference_scores': probs}
 
-    def get_loss():
+    def get_loss(self):
         raise NotImplementedError
 
-    def get_optimizer():
+    def get_optimizer(self):
         raise NotImplementedError
 
 
@@ -135,13 +131,14 @@ MODEL._register_module(SparseConvUnet, 'torch')
 
 
 class InputLayer(nn.Module):
-    def __init__(self,
-                 voxel_size=1.0):
+
+    def __init__(self, voxel_size=1.0):
         super(InputLayer, self).__init__()
         self.voxel_size = torch.Tensor([voxel_size, voxel_size, voxel_size])
 
     def forward(self, features, inp_positions):
-        v = voxelize(inp_positions, self.voxel_size, torch.Tensor([0, 0, 0]), torch.Tensor([40960, 40960, 40960]))
+        v = voxelize(inp_positions, self.voxel_size, torch.Tensor([0, 0, 0]),
+                     torch.Tensor([40960, 40960, 40960]))
 
         # Contiguous repeating positions.
         inp_positions = inp_positions[v.voxel_point_indices]
@@ -149,7 +146,8 @@ class InputLayer(nn.Module):
 
         # Find reverse mapping.
         rev1 = np.zeros((inp_positions.shape[0],))
-        rev1[v.voxel_point_indices.cpu().numpy()] = np.arange(inp_positions.shape[0])
+        rev1[v.voxel_point_indices.cpu().numpy()] = np.arange(
+            inp_positions.shape[0])
         rev1 = rev1.astype(np.int32)
 
         # Unique positions.
@@ -157,24 +155,30 @@ class InputLayer(nn.Module):
 
         # Mean of features.
         count = v.voxel_point_row_splits[1:] - v.voxel_point_row_splits[:-1]
-        rev2 = np.repeat(np.arange(count.shape[0]), count.cpu().numpy()).astype(np.int32)
+        rev2 = np.repeat(np.arange(count.shape[0]),
+                         count.cpu().numpy()).astype(np.int32)
 
         features_avg = inp_positions.clone()
-        features_avg[:, 0] = reduce_subarrays_sum(features[:, 0], v.voxel_point_row_splits)
-        features_avg[:, 1] = reduce_subarrays_sum(features[:, 1], v.voxel_point_row_splits)
-        features_avg[:, 2] = reduce_subarrays_sum(features[:, 2], v.voxel_point_row_splits)
+        features_avg[:, 0] = reduce_subarrays_sum(features[:, 0],
+                                                  v.voxel_point_row_splits)
+        features_avg[:, 1] = reduce_subarrays_sum(features[:, 1],
+                                                  v.voxel_point_row_splits)
+        features_avg[:, 2] = reduce_subarrays_sum(features[:, 2],
+                                                  v.voxel_point_row_splits)
 
         features_avg = features_avg / count.unsqueeze(1)
 
         return features_avg, inp_positions, rev2[rev1]
 
+
 class OutputLayer(nn.Module):
-    def __init__(self,
-                 voxel_size=1.0):
+
+    def __init__(self, voxel_size=1.0):
         super(OutputLayer, self).__init__()
 
     def forward(self, features, rev):
         return features[rev]
+
 
 class SubmanifoldSparseConv(nn.Module):
 
@@ -195,17 +199,20 @@ class SubmanifoldSparseConv(nn.Module):
 
         offset = torch.full((3,), offset, dtype=torch.float32)
         self.net = SparseConv(in_channels=in_channels,
-                                          filters=filters,
-                                          kernel_size=kernel_size,
-                                          use_bias=use_bias,
-                                          offset=offset,
-                                          normalize=normalize)
+                              filters=filters,
+                              kernel_size=kernel_size,
+                              use_bias=use_bias,
+                              offset=offset,
+                              normalize=normalize)
 
-    def forward(self, features, inp_positions, out_positions=None, voxel_size=1.0):
+    def forward(self,
+                features,
+                inp_positions,
+                out_positions=None,
+                voxel_size=1.0):
         if out_positions is None:
             out_positions = inp_positions
-        out = self.net(features, inp_positions, out_positions, voxel_size)
-        return out
+        return self.net(features, inp_positions, out_positions, voxel_size)
 
     def __name__(self):
         return "SubmanifoldSparseConv"
@@ -248,11 +255,11 @@ class Convolution(nn.Module):
 
         offset = torch.full((3,), offset, dtype=torch.float32)
         self.net = SparseConv(in_channels=in_channels,
-                                          filters=filters,
-                                          kernel_size=kernel_size,
-                                          use_bias=use_bias,
-                                          offset=offset,
-                                          normalize=normalize)
+                              filters=filters,
+                              kernel_size=kernel_size,
+                              use_bias=use_bias,
+                              offset=offset,
+                              normalize=normalize)
 
     def forward(self, features, inp_positions, voxel_size=1.0):
         out_positions = calculate_grid(inp_positions)
@@ -282,11 +289,11 @@ class DeConvolution(nn.Module):
 
         offset = torch.full((3,), offset, dtype=torch.float32)
         self.net = SparseConvTranspose(in_channels=in_channels,
-                                                   filters=filters,
-                                                   kernel_size=kernel_size,
-                                                   use_bias=use_bias,
-                                                   offset=offset,
-                                                   normalize=normalize)
+                                       filters=filters,
+                                       kernel_size=kernel_size,
+                                       use_bias=use_bias,
+                                       offset=offset,
+                                       normalize=normalize)
 
     def forward(self, features, inp_positions, out_positions, voxel_size=1.0):
         return self.net(features, inp_positions, out_positions, voxel_size)
@@ -329,7 +336,6 @@ class UNet(nn.Module):
                  leakiness=0):
         super(UNet, self).__init__()
         self.net = nn.ModuleList(self.U(nPlanes))
-        # print(self.net)
 
     @staticmethod
     def block(m, a, b):
