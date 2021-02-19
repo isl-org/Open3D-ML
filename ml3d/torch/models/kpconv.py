@@ -15,7 +15,6 @@ from open3d.ml.contrib import radius_search
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
-from ...utils.ply import write_ply, read_ply
 from ...utils import MODEL
 
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
