@@ -15,12 +15,14 @@ class SparseConvUnet(BaseModel):
                  name="SparseConvUnet",
                  device="cuda",
                  m=16,
+                 scale=20,
                  in_channels=3,
                  num_classes=20,
                  **kwargs):
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
                                              m=m,
+                                             scale=scale,
                                              in_channels=in_channels,
                                              num_classes=num_classes,
                                              **kwargs)
@@ -67,6 +69,8 @@ class SparseConvUnet(BaseModel):
                 "SparseConvnet doesn't work without feature values.")
 
         feat = np.array(data['feat'], dtype=np.float32) / 127.5 - 1
+
+        points *= self.cfg.scale  # Scale = 1/voxel_size
 
         offset = np.clip(4096 - points.max(0) + points.min(0) - 0.001, 0,
                          None) / 2
@@ -217,20 +221,24 @@ class SubmanifoldSparseConv(nn.Module):
     def __name__(self):
         return "SubmanifoldSparseConv"
 
-
 def calculate_grid(inp_positions):
-    inp_pos = inp_positions.long()
-    out_pos = []
-    for p in inp_pos:
-        for i in range(-1, 1):
-            for j in range(-1, 1):
-                for k in range(-1, 1):
-                    arr = p + torch.Tensor([i, j, k]).to(p.device)
-                    if not torch.any(arr < 0):
-                        if arr[0] % 2 or arr[1] % 2 or arr[2] % 2:
-                            continue
-                        out_pos.append(arr)
-    out_pos = torch.cat(out_pos).float().reshape(-1, 3)
+    filter = torch.Tensor(
+        [[-1, -1, -1],
+        [-1, -1, 0],
+        [-1, 0, -1],
+        [-1, 0, 0],
+        [0, -1, -1],
+        [0, -1, 0],
+        [0, 0, -1],
+        [0, 0, 0]]
+    ).to(inp_positions.device)
+
+    out_pos = inp_positions.long().repeat(1, filter.shape[0]).reshape(-1, 3)
+    filter = filter.repeat(inp_positions.shape[0], 1)
+
+    out_pos = out_pos + filter
+    out_pos = out_pos[out_pos.min(1).values >= 0]
+    out_pos = out_pos[(~((out_pos.long()%2).bool()).any(1))]
     out_pos = torch.unique(out_pos, dim=0)
 
     return out_pos + 0.5
