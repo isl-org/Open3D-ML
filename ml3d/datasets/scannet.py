@@ -91,6 +91,11 @@ class Scannet(BaseDataset):
             elif scene in test_files:
                 self.test_scenes.append(join(self.dataset_path, scene))
 
+        self.semantic_ids = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
+            39
+        ]
+
     def get_label_to_names(self):
         return self.label2cat
 
@@ -109,6 +114,12 @@ class Scannet(BaseDataset):
         ## For filtering semantic labels to have same classes as object detection.
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)
+
+        remapper = np.ones(150) * (-100)
+        for i, x in enumerate(self.semantic_ids):
+            remapper[x] = i
+
+        semantic_mask = remapper[semantic_mask]
 
         objects = []
         for box in bboxes:
