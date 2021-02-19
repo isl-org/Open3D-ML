@@ -221,24 +221,18 @@ class SubmanifoldSparseConv(nn.Module):
     def __name__(self):
         return "SubmanifoldSparseConv"
 
+
 def calculate_grid(inp_positions):
-    filter = torch.Tensor(
-        [[-1, -1, -1],
-        [-1, -1, 0],
-        [-1, 0, -1],
-        [-1, 0, 0],
-        [0, -1, -1],
-        [0, -1, 0],
-        [0, 0, -1],
-        [0, 0, 0]]
-    ).to(inp_positions.device)
+    filter = torch.Tensor([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
+                           [0, -1, -1], [0, -1, 0], [0, 0, -1],
+                           [0, 0, 0]]).to(inp_positions.device)
 
     out_pos = inp_positions.long().repeat(1, filter.shape[0]).reshape(-1, 3)
     filter = filter.repeat(inp_positions.shape[0], 1)
 
     out_pos = out_pos + filter
     out_pos = out_pos[out_pos.min(1).values >= 0]
-    out_pos = out_pos[(~((out_pos.long()%2).bool()).any(1))]
+    out_pos = out_pos[(~((out_pos.long() % 2).bool()).any(1))]
     out_pos = torch.unique(out_pos, dim=0)
 
     return out_pos + 0.5
