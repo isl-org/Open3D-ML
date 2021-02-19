@@ -2,7 +2,6 @@ addict
 matplotlib
 numpy
 pandas
-plyfile
 pyyaml
-scikit-learn
+scikit-learn>=0.21
 tqdm

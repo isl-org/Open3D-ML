@@ -21,7 +21,7 @@ log = logging.getLogger(__name__)
 # For test files, format should be : ['x', 'y', 'z', 'feat_1', 'feat_2', ........,'feat_n'].
 
 
-class Custom3DSplit():
+class Custom3DSplit(BaseDatasetSplit):
     """This class is used to create a custom dataset split.
     Initialize the class.
     Args:
@@ -33,6 +33,7 @@ class Custom3DSplit():
     """
 
     def __init__(self, dataset, split='training'):
+        super().__init__(dataset, split=split)
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))
