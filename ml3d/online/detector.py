@@ -17,17 +17,24 @@ BEVBox3D = datasets.utils.bev_box.BEVBox3D
 
 import gtimer as gt
 import ipdb
+import numpy as np
 
 
 class PipelineViewer(object):
     """ GUI for the frame pipeline """
 
-    def __init__(self, labels=None, vfov=60):
+    def __init__(self,
+                 labels=None,
+                 vfov=60,
+                 pcd_name='points',
+                 max_pcd_vertices=1 << 20):
         """ Initialize GUI
 
         Args:
-            labels: List of class labels for the detector
-            vfov: Camera vertical field of view in degrees
+            labels: List of class labels for the detector.
+            vfov: Camera vertical field of view in degrees.
+            pcd_name: Name for displayed point cloud.
+            max_pcd_vertices: max vertices allowed in the point cloud display.
         """
         self.vfov = vfov
         self.material = o3d.visualization.rendering.Material()
@@ -49,6 +56,8 @@ class PipelineViewer(object):
         self.pcdview.scene.set_background([1, 1, 1, 1])  # White brackground
         self.pcdview.scene.show_axes(True)
         self._camera_view()
+        self.pcd_name = pcd_name
+        self.max_pcd_vertices = max_pcd_vertices
         em = self.window.theme.font_size
 
         # Options panel
@@ -92,15 +101,26 @@ class PipelineViewer(object):
                 Dictionary of labels to geometry elements to be updated in the
                 GUI
         """
-        if not self.flag_gui_empty:
-            for name in frame_elements.keys():
-                self.pcdview.scene.remove_geometry(name)
-        else:
+        if self.flag_gui_empty:
+            # Set dummy point cloud to allocate graphics memory
+            dummy_pcd = o3d.t.geometry.PointCloud(
+                points=o3d.core.Tensor.zeros((self.max_pcd_vertices,
+                                              3), o3d.core.Dtype.Float32))
+            dummy_pcd.point['points'][0] = [1., 1., 1.]
+            self.pcdview.scene.add_geometry(self.pcd_name, dummy_pcd,
+                                            self.material)
             self.flag_gui_empty = False
+        else:
+            if self.pcdview.scene.has_geometry('Boxes'):
+                self.pcdview.scene.remove_geometry('Boxes')
 
-        # Add point cloud and bounding boxes
-        for name, element in frame_elements.items():
-            self.pcdview.scene.add_geometry(name, element.cpu() if hasattr(element, 'cpu') else element, self.material)
+        # Update point cloud and add bounding boxes
+        if 'Boxes' in frame_elements:
+            self.pcdview.scene.add_geometry('Boxes', frame_elements['Boxes'],
+                                            self.material)
+        self.pcdview.scene.scene.update_geometry(
+            self.pcd_name, frame_elements[self.pcd_name].cpu(),
+            rendering.Scene.UPDATE_POINTS_FLAG)
         self.pcdview.force_redraw()
         gt.stamp(name="GUI", unique=False)
 
@@ -174,18 +194,23 @@ class DetectorPipeline(object):
                 import torch
                 self.run_detector = self._run_detector_torch
                 log.info("Using PyTorch for inference")
+                self.net = ml3d.models.PointPillars(**
+                                                    self.detector_config.model,
+                                                    device=self.device)
+                ckpt = torch.load(ckpt_path, map_location=self.device)
+                self.net.load_state_dict(ckpt['model_state_dict'])
+                self.net.eval()
 
             else:
                 import open3d.ml.tf as ml3d
                 import tensorflow as tf
                 self.run_detector = self._run_detector_tf
                 log.info("Using Tensorflow for inference")
-
-            # FIXME: No error if model cannot be loaded
-            self.net = ml3d.models.PointPillars(**self.detector_config.model,
-                                                device=self.device)
-            if self.run_detector is self._run_detector_torch:
-                self.net.eval()
+                self.net = ml3d.models.PointPillars(**
+                                                    self.detector_config.model,
+                                                    device=self.device)
+                ckpt = tf.train.Checkpoint(step=tf.Variable(1), model=self.net)
+                ckpt.restore(ckpt_path).expect_partial()
 
             log.info(
                 f"Loaded model from {self.detector_config['model']['ckpt_path']}"
@@ -227,7 +252,10 @@ class DetectorPipeline(object):
             'classes'] if self.run_detector else None
         vfov = np.rad2deg(2 * np.arctan(self.intrinsic_matrix[1, 2].item() /
                                         self.intrinsic_matrix[1, 1].item()))
-        self.gui = PipelineViewer(labels=labels, vfov=vfov)
+        self.gui = PipelineViewer(labels=labels,
+                                  vfov=vfov,
+                                  pcd_name=self.rgbd_metadata.serial_number,
+                                  max_pcd_vertices=self.max_points)
 
     def _run_detector_torch(self, pcd_frame):
         """ Run PyTorch 3D detector """
@@ -243,18 +271,24 @@ class DetectorPipeline(object):
             #     axis=2).reshape((-1, 1))
             # Add fake reflectance data
             pcd_points = pcd_frame.point['points']
-            self.det_inputs[0, :pcd_points.shape[0], :3] = torch_dlpack.from_dlpack(pcd_points.to_dlpack())
+            self.det_inputs[
+                0, :pcd_points.shape[0], :3] = torch_dlpack.from_dlpack(
+                    pcd_points.to_dlpack())
 
             gt.stamp("DepthToPCDPost", unique=False)
-            results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
-            boxes = self.net.inference_end(results, {
-                'point': pcd_points,
-                'calib': self.calib
-            })
+            #np.save("det_inputs.npy",
+            #        self.det_inputs[:, :pcd_points.shape[0], :].cpu().numpy())
+            #results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
+            #boxes = self.net.inference_end(results, {
+            #    'point': pcd_points,
+            #    'calib': self.calib
+            #})
 
-        test_box = BEVBox3D([-0.5, 0.5, 0.5], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
-                            self.calib['world_cam'], self.calib['cam_img'])
-        return [test_box]  # boxes
+        boxes = [
+            BEVBox3D([-0.5, 0.5, 0.5], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
+                     self.calib['world_cam'], self.calib['cam_img'])
+        ]
+        return boxes
 
     def _run_detector_tf(self, pcd_frame):
         """ Run Tensorflow 3D detector """
@@ -266,9 +300,8 @@ class DetectorPipeline(object):
                                       dtype=tf.float32,
                                       device=self.device)
         pcd_points = pcd_frame.point['points']
-        # https://github.com/tensorflow/tensorflow/issues/33254#issuecomment-542379165
-        # npy -> tf will always copy data
-        self.det_inputs[0, :pcd_points.shape[0], :3] = tf_dlpack.from_dlpack(pcd_points.to_dlpack())
+        self.det_inputs[0, :pcd_points.shape[0], :3] = tf_dlpack.from_dlpack(
+            pcd_points.to_dlpack())
 
         gt.stamp("DepthToPCDPost", unique=False)
         results = self.net(self.det_inputs[:, :pcd_points.shape[0], :],
@@ -294,7 +327,7 @@ class DetectorPipeline(object):
             rgbd_frame = self.rscam.capture_frame(wait=True,
                                                   align_depth_to_color=True)
             pcd_errors = 0
-            while frame_id < 1000 and not self.gui.flag_exit:
+            while frame_id < 10000 and not self.gui.flag_exit:
                 future_rgbd_frame = executor.submit(self.rscam.capture_frame,
                                                     wait=True,
                                                     align_depth_to_color=True)
@@ -302,9 +335,10 @@ class DetectorPipeline(object):
 
                 try:
                     pcd_frame = o3d.t.geometry.PointCloud.create_from_depth_image(
-                            rgbd_frame.depth.to(self.o3d_device), self.intrinsic_matrix,
-                            self.extrinsics, self.rgbd_metadata.depth_scale, self.depth_max,
-                            self.pcd_stride)
+                        rgbd_frame.depth.to(self.o3d_device),
+                        self.intrinsic_matrix, self.extrinsics,
+                        self.rgbd_metadata.depth_scale, self.depth_max,
+                        self.pcd_stride)
                 except RuntimeError:
                     pcd_errors += 1
 
@@ -325,10 +359,10 @@ class DetectorPipeline(object):
 
                 rgbd_frame = future_rgbd_frame.result()
                 gt.stamp("GetCapture", unique=False)
-                if frame_id % 10 == 0:
+                if frame_id % 30 == 0:
                     t0, t1 = t1, time.perf_counter()
                     print(
-                        f"\nframe_id = {frame_id}, {(t1-t0)*100:0.2f} ms/frame",
+                        f"\nframe_id = {frame_id}, {(t1-t0)*1000./30:0.2f} ms/frame",
                         end='')
 
                 with self.gui.cv_capture:  # Wait for capture to be enabled
@@ -359,9 +393,10 @@ if __name__ == "__main__":
     parser.add_argument('--detector-config',
                         required=False,
                         help='Detector configuration YAML file')
-    parser.add_argument('--device',
-            help='Device to run model inference. e.g. cpu:0 or cuda:0'
-                        'Default is CUDA GPU if available, else CPU.')
+    parser.add_argument(
+        '--device',
+        help='Device to run model inference. e.g. cpu:0 or cuda:0'
+        'Default is CUDA GPU if available, else CPU.')
 
     args = parser.parse_args()
 
