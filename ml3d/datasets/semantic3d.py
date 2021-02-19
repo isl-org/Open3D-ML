@@ -4,7 +4,6 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 import logging
 

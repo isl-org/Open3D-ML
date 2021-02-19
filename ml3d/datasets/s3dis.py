@@ -4,7 +4,6 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath, isdir
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -301,7 +300,7 @@ class S3DISSplit():
 
     def get_attr(self, idx):
         pc_path = Path(self.path_list[idx])
-        name = pc_path.name.replace('.ply', '')
+        name = pc_path.name.replace('.pkl', '')
 
         pc_path = str(pc_path)
         split = self.split
