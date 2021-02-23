@@ -182,7 +182,7 @@ class DetectorPipeline(object):
 
         # Detector
         if device:
-            self.device = device
+            self.device = device.lower()
         else:
             self.device = 'cuda:0' if o3d.core.cuda.is_available() else 'cpu:0'
         self.o3d_device = o3d.core.Device(self.device)
@@ -197,7 +197,8 @@ class DetectorPipeline(object):
                 self.net = ml3d.models.PointPillars(**
                                                     self.detector_config.model,
                                                     device=self.device)
-                ckpt = torch.load(ckpt_path, map_location=self.device)
+                ckpt = torch.load(ckpt_path,
+                                  map_location=self.device.split(':')[0])
                 self.net.load_state_dict(ckpt['model_state_dict'])
                 self.net.eval()
 
@@ -241,9 +242,10 @@ class DetectorPipeline(object):
             'world_cam':
                 self.extrinsics.numpy(),
             'cam_img':
-                np.hstack((self.intrinsic_matrix.numpy(),
-                           np.zeros((3, 1), dtype=np.float32))).T
+                np.block([[self.intrinsic_matrix.numpy(),
+                           np.zeros((3, 1))], [np.zeros((1, 3)), 1]]).T
         }
+        print(f"cam_img: {self.calib['cam_img']}")
         self.depth_max = 3.0  # m
         self.pcd_stride = 1  # downsample point cloud
 
@@ -276,13 +278,13 @@ class DetectorPipeline(object):
                     pcd_points.to_dlpack())
 
             gt.stamp("DepthToPCDPost", unique=False)
-            #np.save("det_inputs.npy",
-            #        self.det_inputs[:, :pcd_points.shape[0], :].cpu().numpy())
-            #results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
-            #boxes = self.net.inference_end(results, {
-            #    'point': pcd_points,
-            #    'calib': self.calib
-            #})
+            np.save("det_inputs.npy",
+                    self.det_inputs[:, :pcd_points.shape[0], :].cpu().numpy())
+            results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
+            boxes = self.net.inference_end(results, {
+                'point': pcd_points,
+                'calib': self.calib
+            })
 
         boxes = [
             BEVBox3D([-0.5, 0.5, 0.5], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
@@ -322,12 +324,13 @@ class DetectorPipeline(object):
         with ThreadPoolExecutor(max_workers=1,
                                 thread_name_prefix='Capture') as executor:
             gt.stamp('Startup')
-            t1 = time.perf_counter()
+            n_pts = 0
             frame_id = 0
+            t1 = time.perf_counter()
             rgbd_frame = self.rscam.capture_frame(wait=True,
                                                   align_depth_to_color=True)
             pcd_errors = 0
-            while frame_id < 10000 and not self.gui.flag_exit:
+            while frame_id < 300 and not self.gui.flag_exit:
                 future_rgbd_frame = executor.submit(self.rscam.capture_frame,
                                                     wait=True,
                                                     align_depth_to_color=True)
@@ -342,6 +345,7 @@ class DetectorPipeline(object):
                 except RuntimeError:
                     pcd_errors += 1
 
+                n_pts += pcd_frame.point['points'].shape[0]
                 frame_elements = {self.rgbd_metadata.serial_number: pcd_frame}
                 gt.stamp("DepthToPCD", unique=False)
                 if pcd_frame.is_empty():
@@ -362,8 +366,10 @@ class DetectorPipeline(object):
                 if frame_id % 30 == 0:
                     t0, t1 = t1, time.perf_counter()
                     print(
-                        f"\nframe_id = {frame_id}, {(t1-t0)*1000./30:0.2f} ms/frame",
+                        f"\nframe_id = {frame_id}, \t {(t1-t0)*1000./30:0.2f}"
+                        f"ms/frame \t {(t1-t0)*1e9/n_pts} ms/Mp\t",
                         end='')
+                    n_pts = 0
 
                 with self.gui.cv_capture:  # Wait for capture to be enabled
                     self.gui.cv_capture.wait_for(

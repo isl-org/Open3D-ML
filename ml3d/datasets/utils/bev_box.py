@@ -25,8 +25,9 @@ class BEVBox3D(BoundingBox3D):
             specified in create_lines() this will be used to determine the color
             of the box.
         confidence: confidence level of the box
-        world_cam: world to camera transformation
-        cam_img: camera to image transformation"""
+        world_cam: world to camera transformation (shape = [4,4])
+        cam_img: camera to image transformation (shape = [4,4])
+        """
 
         self.yaw = yaw
         self.world_cam = world_cam

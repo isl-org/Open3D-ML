@@ -1,7 +1,7 @@
 dataset:
   name: KITTI
   # path/to/your/dataset
-  dataset_path: /home/ssheorey/Documents/Open3D/Data/ScanNet/
+  dataset_path: /home/ssheorey/Documents/Open3D/Data/ScanNet/test
   cache_dir: ./logs/cache
   steps_per_epoch_train: 5000
 
@@ -10,13 +10,8 @@ model:
   # path/to/your/checkpoint
   ckpt_path: /home/ssheorey/Documents/Open3D/Models/PointPillars/pointpillars_kitti_202012221652utc.pth
 
-  point_cloud_range: [-3, -3, 0, 3, 3, 6]   # TBC
-  classes: [
-      'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
-      'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-      'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
-      'garbagebin'
-  ]
+  point_cloud_range: [-3, -3, 0, 3, 3, 6]
+  classes: ['Pedestrian', 'Cyclist', 'Car']
 
   loss:
     focal:
@@ -32,7 +27,7 @@ model:
   voxelize:
     max_num_points: 32
     voxel_size: &vsize
-      [0.025, 0.025, 4]             # TBC
+      [0.025, 0.025, 4]
     max_voxels: [16000, 40000]      # [P_train, P_test]
 
   voxel_encoder:
@@ -60,59 +55,28 @@ model:
     in_channels: 384
     feat_channels: 384
     nms_pre: 100
-    score_thr: 0.1
-    ranges: [                   # TBC
+    score_thr: 0.1    # set to 0
+    ranges: [
       [-3, -3, 0, 3, 3, 0],
       [-3, -3, 0, 3, 3, 0],
       [-3, -3, 0, 3, 3, 0],
     ]
-    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]  # TBC
+    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
     rotations: [0, 1.57]
-    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]                # TBC
+    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
 
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
     ObjectSample:
       min_points_dict:
-          cabinet: 10
-          bed: 10
-          chair: 10
-          sofa: 10
-          table: 10
-          door: 10
-          window: 10
-          bookshelf: 10
-          picture: 10
-          counter: 10
-          desk: 10
-          curtain: 10
-          refrigerator: 10
-          showercurtrain: 10
-          toilet: 10
-          sink: 10
-          bathtub: 10
-          garbagebin: 10
-
+        Car: 5
+        Pedestrian: 10
+        Cyclist: 10
       sample_dict:
-          cabinet: 10
-          bed: 10
-          chair: 10
-          sofa: 10
-          table: 10
-          door: 10
-          window: 10
-          bookshelf: 10
-          picture: 10
-          counter: 10
-          desk: 10
-          curtain: 10
-          refrigerator: 10
-          showercurtrain: 10
-          toilet: 10
-          sink: 10
-          bathtub: 10
-          garbagebin: 10
+        Car: 15
+        Pedestrian: 10
+        Cyclist: 10
 
 
 pipeline:
@@ -132,7 +96,9 @@ pipeline:
     weight_decay: 0.01
 
   # evaluation properties
-  overlaps: [0.5, 0.5, 0.7]                     # TBC
+  overlaps: [0.5, 0.5, 0.7]
   similar_classes: {
+    Van: Car,
+    Person_sitting: Pedestrian
   }
   difficulties: [0, 1, 2]
