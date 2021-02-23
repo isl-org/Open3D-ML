@@ -4,7 +4,10 @@ from torch.autograd import Function
 import torch.nn as nn
 from typing import Tuple
 
-from open3d.ml.torch.ops import furthest_point_sampling, gather_points, gather_points_grad, three_nn, three_interpolate, three_interpolate_grad, group_points, group_points_grad, ball_query
+import open3d
+
+if open3d.core.cuda.device_count() > 0:
+    from open3d.ml.torch.ops import furthest_point_sampling, gather_points, gather_points_grad, three_nn, three_interpolate, three_interpolate_grad, group_points, group_points_grad, ball_query
 
 
 class FurthestPointSampling(Function):
@@ -19,6 +22,9 @@ class FurthestPointSampling(Function):
         :param npoint: int, number of features in the sampled set
         :return:tensor containing the set
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         assert xyz.is_contiguous()
         output = furthest_point_sampling(xyz, npoint)
         return output
@@ -42,6 +48,9 @@ class GatherOperation(Function):
         :return:
             output: (B, C, npoint)
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         assert features.is_contiguous()
         assert idx.is_contiguous()
 
@@ -53,6 +62,9 @@ class GatherOperation(Function):
 
     @staticmethod
     def backward(ctx, grad_out):
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         idx, C, N = ctx.for_backwards
         grad_out_data = grad_out.data.contiguous()
         grad_features = gather_points_grad(grad_out_data, idx, C, N)
@@ -76,6 +88,9 @@ class ThreeNN(Function):
             dist: (B, N, 3) l2 distance to the three nearest neighbors
             idx: (B, N, 3) index of 3 nearest neighbors
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         assert query_pts.is_contiguous()
         assert data_pts.is_contiguous()
 
@@ -104,6 +119,9 @@ class ThreeInterpolate(Function):
         :return:
             output: (B, C, N) tensor of the interpolated features
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         assert features.is_contiguous()
         assert idx.is_contiguous()
         assert weight.is_contiguous()
@@ -124,6 +142,9 @@ class ThreeInterpolate(Function):
             None:
             None:
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         idx, weight, m = ctx.three_interpolate_for_backward
 
         grad_out_data = grad_out.data.contiguous()
@@ -145,6 +166,9 @@ class GroupingOperation(Function):
         :return:
             output: (B, C, npoint, nsample) tensor
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         assert features.is_contiguous()
         assert idx.is_contiguous()
 
@@ -162,6 +186,9 @@ class GroupingOperation(Function):
         :return:
             grad_features: (B, C, N) gradient of the features
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         idx, N = ctx.for_backwards
 
         grad_out_data = grad_out.data.contiguous()
@@ -186,6 +213,9 @@ class BallQuery(Function):
         :return:
             idx: (B, npoint, nsample) tensor with the indicies of the features that form the query balls
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         assert new_xyz.is_contiguous()
         assert xyz.is_contiguous()
 
@@ -222,6 +252,9 @@ class QueryAndGroup(nn.Module):
         :return:
             new_features: (B, 3 + C, npoint, nsample)
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         idx = ball_query_gpu(self.radius, self.nsample, xyz, new_xyz)
         xyz_trans = xyz.transpose(1, 2).contiguous()
         grouped_xyz = grouping_operation(xyz_trans,
@@ -259,6 +292,9 @@ class GroupAll(nn.Module):
         :return:
             new_features: (B, C + 3, 1, N)
         """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
         grouped_xyz = xyz.transpose(1, 2).unsqueeze(2)
         if features is not None:
             grouped_features = features.unsqueeze(2)
