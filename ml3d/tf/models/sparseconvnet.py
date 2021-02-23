@@ -1,12 +1,11 @@
 import numpy as np
-import torch
-import torch.nn as nn
+import tensorflow as tf
 
 from .base_model import BaseModel
 from ...utils import MODEL
 
-from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
-from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
+from open3d.ml.tf.layers import SparseConv, SparseConvTranspose
+from open3d.ml.tf.ops import voxelize, reduce_subarrays_sum
 
 
 class SparseConvUnet(BaseModel):
@@ -27,7 +26,6 @@ class SparseConvUnet(BaseModel):
                                              num_classes=num_classes,
                                              **kwargs)
         cfg = self.cfg
-        self.device = device
         self.m = cfg.m
         self.inp = InputLayer()
         self.ssc = SubmanifoldSparseConv(in_channels=in_channels,
@@ -35,12 +33,14 @@ class SparseConvUnet(BaseModel):
                                          kernel_size=[3, 3, 3])
         self.unet = UNet(1, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
                          False)
-        self.bn = nn.BatchNorm1d(m, eps=1e-4, momentum=0.01)
-        self.relu = nn.ReLU()
-        self.linear = nn.Linear(m, num_classes)
+        
+        self.bn = tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4)
+        self.relu = tf.keras.layers.ReLU()
+
+        self.linear = tf.keras.layers.Dense(num_classes)
         self.out = OutputLayer()
 
-    def forward(self, inputs):
+    def call(self, inputs, training=False):
         output = []
         for inp in inputs:
             pos = inp['point']
@@ -48,8 +48,8 @@ class SparseConvUnet(BaseModel):
 
             feat, pos, rev = self.inp(feat, pos)
             feat = self.ssc(feat, pos, voxel_size=1.0)
-            feat = self.unet(pos, feat)
-            feat = self.bn(feat)
+            feat = self.unet(pos, feat, training=training)
+            feat = self.bn(feat, training=training)
             feat = self.relu(feat)
             feat = self.linear(feat)
             feat = self.out(feat, rev)
@@ -94,10 +94,9 @@ class SparseConvUnet(BaseModel):
         return data
 
     def transform(self, data, attr):
-        device = self.device
-        data['point'] = torch.from_numpy(data['point']).to(device)
-        data['feat'] = torch.from_numpy(data['feat']).to(device)
-        data['label'] = torch.from_numpy(data['label']).to(device)
+        data['point'] = tf.constant(data['point'])
+        data['feat'] = tf.constant(data['feat'])
+        data['label'] = tf.constant(data['label'])
 
         return data
 
@@ -111,13 +110,12 @@ class SparseConvUnet(BaseModel):
         return [self.inference_input]
 
     def inference_end(self, inputs, results):
-        inputs = inputs[0]
         results = results[0]
-        results = torch.reshape(results, (-1, self.cfg.num_classes))
+        results = tf.reshape(results, [-1, self.cfg.num_classes])
 
-        m_softmax = torch.nn.Softmax(dim=-1)
+        m_softmax = tf.keras.layers.Softmax(axis=-1)
         results = m_softmax(results)
-        results = results.cpu().data.numpy()
+        results = results.numpy()
 
         probs = np.reshape(results, [-1, self.cfg.num_classes])
 
@@ -132,22 +130,22 @@ class SparseConvUnet(BaseModel):
         raise NotImplementedError
 
 
-MODEL._register_module(SparseConvUnet, 'torch')
+MODEL._register_module(SparseConvUnet, 'tf')
 
 
-class InputLayer(nn.Module):
+class InputLayer(tf.keras.layers.Layer):
 
     def __init__(self, voxel_size=1.0):
         super(InputLayer, self).__init__()
-        self.voxel_size = torch.Tensor([voxel_size, voxel_size, voxel_size])
+        self.voxel_size = tf.constant([voxel_size, voxel_size, voxel_size])
 
-    def forward(self, features, inp_positions):
-        v = voxelize(inp_positions, self.voxel_size, torch.Tensor([0, 0, 0]),
-                     torch.Tensor([40960, 40960, 40960]))
+    def call(self, features, inp_positions):
+        v = voxelize(inp_positions, self.voxel_size, tf.constant([0., 0., 0.]),
+                     tf.constant([40960., 40960., 40960.]))
 
         # Contiguous repeating positions.
-        inp_positions = inp_positions[v.voxel_point_indices]
-        features = features[v.voxel_point_indices]
+        inp_positions = tf.gather(inp_positions, v.voxel_point_indices)
+        features = tf.gather(features, v.voxel_point_indices)
 
         # Find reverse mapping.
         rev1 = np.zeros((inp_positions.shape[0],))
@@ -156,36 +154,37 @@ class InputLayer(nn.Module):
         rev1 = rev1.astype(np.int32)
 
         # Unique positions.
-        inp_positions = inp_positions[v.voxel_point_row_splits[:-1]]
+        inp_positions = tf.gather(inp_positions, v.voxel_point_row_splits[:-1])
 
         # Mean of features.
         count = v.voxel_point_row_splits[1:] - v.voxel_point_row_splits[:-1]
         rev2 = np.repeat(np.arange(count.shape[0]),
                          count.cpu().numpy()).astype(np.int32)
 
-        features_avg = inp_positions.clone()
-        features_avg[:, 0] = reduce_subarrays_sum(features[:, 0],
-                                                  v.voxel_point_row_splits)
-        features_avg[:, 1] = reduce_subarrays_sum(features[:, 1],
-                                                  v.voxel_point_row_splits)
-        features_avg[:, 2] = reduce_subarrays_sum(features[:, 2],
-                                                  v.voxel_point_row_splits)
+        features_avg_0 = tf.expand_dims(reduce_subarrays_sum(features[:, 0],
+                                                  v.voxel_point_row_splits), 1)
+        features_avg_1 = tf.expand_dims(reduce_subarrays_sum(features[:, 1],
+                                                  v.voxel_point_row_splits), 1)
+        features_avg_2 = tf.expand_dims(reduce_subarrays_sum(features[:, 2],
+                                                  v.voxel_point_row_splits), 1)
 
-        features_avg = features_avg / count.unsqueeze(1)
+        features_avg = tf.concat([features_avg_0, features_avg_1, features_avg_2], 1)
+
+        features_avg = features_avg / tf.expand_dims(tf.cast(count, tf.float32), 1)
 
         return features_avg, inp_positions, rev2[rev1]
 
 
-class OutputLayer(nn.Module):
+class OutputLayer(tf.keras.layers.Layer):
 
     def __init__(self, voxel_size=1.0):
         super(OutputLayer, self).__init__()
 
-    def forward(self, features, rev):
-        return features[rev]
+    def call(self, features, rev):
+        return tf.gather(features, rev)
 
 
-class SubmanifoldSparseConv(nn.Module):
+class SubmanifoldSparseConv(tf.keras.layers.Layer):
 
     def __init__(self,
                  in_channels,
@@ -202,7 +201,7 @@ class SubmanifoldSparseConv(nn.Module):
             else:
                 offset = 0.5
 
-        offset = torch.full((3,), offset, dtype=torch.float32)
+        offset = tf.fill((3,), offset)
         self.net = SparseConv(in_channels=in_channels,
                               filters=filters,
                               kernel_size=kernel_size,
@@ -210,7 +209,7 @@ class SubmanifoldSparseConv(nn.Module):
                               offset=offset,
                               normalize=normalize)
 
-    def forward(self,
+    def call(self,
                 features,
                 inp_positions,
                 out_positions=None,
@@ -223,23 +222,59 @@ class SubmanifoldSparseConv(nn.Module):
         return "SubmanifoldSparseConv"
 
 
-def calculate_grid(inp_positions):
-    filter = torch.Tensor([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
-                           [0, -1, -1], [0, -1, 0], [0, 0, -1],
-                           [0, 0, 0]]).to(inp_positions.device)
+def tf_unique_2d(x):
+    x_shape = tf.shape(x)
+    x1 = tf.tile(x, [1, x_shape[0]])
+    x2 = tf.tile(x, [x_shape[0], 1])
 
-    out_pos = inp_positions.long().repeat(1, filter.shape[0]).reshape(-1, 3)
-    filter = filter.repeat(inp_positions.shape[0], 1)
+    x1_2 = tf.reshape(x1, [x_shape[0] * x_shape[0], x_shape[1]])
+    x2_2 = tf.reshape(x2, [x_shape[0] * x_shape[0], x_shape[1]])
+    cond = tf.reduce_all(tf.equal(x1_2, x2_2), axis=1)
+    cond = tf.reshape(cond, [x_shape[0], x_shape[0]])  # reshaping cond to match x1_2 & x2_2
+    cond_shape = tf.shape(cond)
+    cond_cast = tf.cast(cond, tf.int32)  # convertin condition boolean to int
+    cond_zeros = tf.zeros(cond_shape, tf.int32)  # replicating condition tensor into all 0's
+
+    # CREATING RANGE TENSOR
+    r = tf.range(x_shape[0])
+    r = tf.add(tf.tile(r, [x_shape[0]]), 1)
+    r = tf.reshape(r, [x_shape[0], x_shape[0]])
+
+    # converting TRUE=1 FALSE=MAX(index)+1 (which is invalid by default) so when we take min it wont get selected & in end we will only take values <max(indx).
+    f1 = tf.multiply(tf.ones(cond_shape, tf.int32), x_shape[0] + 1)
+    f2 = tf.ones(cond_shape, tf.int32)
+    cond_cast2 = tf.where(tf.equal(cond_cast, cond_zeros), f1, f2)  # if false make it max_index+1 else keep it 1
+
+    # multiply range with new int boolean mask
+    r_cond_mul = tf.multiply(r, cond_cast2)
+    r_cond_mul2 = tf.reduce_min(r_cond_mul, axis=1)
+    r_cond_mul3, unique_idx = tf.unique(r_cond_mul2)
+    r_cond_mul4 = tf.subtract(r_cond_mul3, 1)
+
+    # get actual values from unique indexes
+    op = tf.gather(x, r_cond_mul4)
+
+    return (op)
+
+def calculate_grid(inp_positions):
+    filter = tf.constant([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
+                           [0, -1, -1], [0, -1, 0], [0, 0, -1],
+                           [0, 0, 0]])
+
+    out_pos = tf.reshape(tf.tile(tf.cast(inp_positions, tf.int32), tf.constant([1, filter.shape[0]])), [-1, 3])
+    filter = tf.tile(filter, tf.constant([inp_positions.shape[0], 1]))
 
     out_pos = out_pos + filter
-    out_pos = out_pos[out_pos.min(1).values >= 0]
-    out_pos = out_pos[(~((out_pos.long() % 2).bool()).any(1))]
-    out_pos = torch.unique(out_pos, dim=0)
+    out_pos = out_pos[tf.math.reduce_min(out_pos, 1) >= 0]
 
-    return out_pos + 0.5
+    out_pos = out_pos[(~tf.math.reduce_any(tf.cast((tf.cast(out_pos, tf.int32) % 2), tf.bool), 1))]
+
+    out_pos = tf_unique_2d(out_pos)
+
+    return tf.cast(out_pos, tf.float32) + 0.5
 
 
-class Convolution(nn.Module):
+class Convolution(tf.keras.layers.Layer):
 
     def __init__(self,
                  in_channels,
@@ -256,7 +291,7 @@ class Convolution(nn.Module):
             else:
                 offset = -0.5
 
-        offset = torch.full((3,), offset, dtype=torch.float32)
+        offset = tf.fill((3,), offset)
         self.net = SparseConv(in_channels=in_channels,
                               filters=filters,
                               kernel_size=kernel_size,
@@ -264,7 +299,7 @@ class Convolution(nn.Module):
                               offset=offset,
                               normalize=normalize)
 
-    def forward(self, features, inp_positions, voxel_size=1.0):
+    def call(self, features, inp_positions, voxel_size=1.0):
         out_positions = calculate_grid(inp_positions)
         out = self.net(features, inp_positions, out_positions, voxel_size)
         return out, out_positions / 2
@@ -273,7 +308,7 @@ class Convolution(nn.Module):
         return "Convolution"
 
 
-class DeConvolution(nn.Module):
+class DeConvolution(tf.keras.layers.Layer):
 
     def __init__(self,
                  in_channels,
@@ -290,7 +325,7 @@ class DeConvolution(nn.Module):
             else:
                 offset = -0.5
 
-        offset = torch.full((3,), offset, dtype=torch.float32)
+        offset = tf.fill((3,), offset)
         self.net = SparseConvTranspose(in_channels=in_channels,
                                        filters=filters,
                                        kernel_size=kernel_size,
@@ -298,14 +333,14 @@ class DeConvolution(nn.Module):
                                        offset=offset,
                                        normalize=normalize)
 
-    def forward(self, features, inp_positions, out_positions, voxel_size=1.0):
+    def call(self, features, inp_positions, out_positions, voxel_size=1.0):
         return self.net(features, inp_positions, out_positions, voxel_size)
 
     def __name__(self):
         return "DeConvolution"
 
 
-class ConcatFeat(nn.Module):
+class ConcatFeat(tf.keras.layers.Layer):
 
     def __init__(self):
         super(ConcatFeat, self).__init__()
@@ -313,11 +348,11 @@ class ConcatFeat(nn.Module):
     def __name__(self):
         return "ConcatFeat"
 
-    def forward(self, feat):
+    def call(self, feat):
         return feat
 
 
-class JoinFeat(nn.Module):
+class JoinFeat(tf.keras.layers.Layer):
 
     def __init__(self):
         super(JoinFeat, self).__init__()
@@ -325,11 +360,11 @@ class JoinFeat(nn.Module):
     def __name__(self):
         return "JoinFeat"
 
-    def forward(self, feat_cat, feat):
-        return torch.cat([feat_cat, feat], -1)
+    def call(self, feat_cat, feat):
+        return tf.concat([feat_cat, feat], -1)
 
 
-class UNet(nn.Module):
+class UNet(tf.keras.layers.Layer):
 
     def __init__(self,
                  reps,
@@ -338,12 +373,12 @@ class UNet(nn.Module):
                  downsample=[2, 2],
                  leakiness=0):
         super(UNet, self).__init__()
-        self.net = nn.ModuleList(self.U(nPlanes))
+        self.net = self.U(nPlanes)
 
     @staticmethod
     def block(m, a, b):
-        m.append(nn.BatchNorm1d(a, eps=1e-4, momentum=0.01))
-        m.append(nn.LeakyReLU(0))
+        m.append(tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+        m.append(tf.keras.layers.LeakyReLU(0.))
         m.append(
             SubmanifoldSparseConv(in_channels=a,
                                   filters=b,
@@ -356,15 +391,15 @@ class UNet(nn.Module):
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
-            m.append(nn.BatchNorm1d(nPlanes[0], eps=1e-4, momentum=0.01))
-            m.append(nn.LeakyReLU(0))
+            m.append(tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+            m.append(tf.keras.layers.LeakyReLU(0.))
             m.append(
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
             m = m + UNet.U(nPlanes[1:])
-            m.append(nn.BatchNorm1d(nPlanes[1], eps=1e-4, momentum=0.01))
-            m.append(nn.LeakyReLU(0))
+            m.append(tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+            m.append(tf.keras.layers.LeakyReLU(0.))
             m.append(
                 DeConvolution(in_channels=nPlanes[1],
                               filters=nPlanes[0],
@@ -376,27 +411,27 @@ class UNet(nn.Module):
 
         return m
 
-    def forward(self, pos, feat):
+    def call(self, pos, feat, training=False):
         conv_pos = []
         concat_feat = []
         for module in self.net:
-            if isinstance(module, nn.BatchNorm1d):
-                feat = module(feat)
-            elif isinstance(module, nn.LeakyReLU):
+            if isinstance(module, tf.keras.layers.BatchNormalization):
+                feat = module(feat, training=training)
+            elif isinstance(module, tf.keras.layers.LeakyReLU):
                 feat = module(feat)
 
             elif module.__name__() == "SubmanifoldSparseConv":
                 feat = module(feat, pos)
 
             elif module.__name__() == "Convolution":
-                conv_pos.append(pos.clone())
+                conv_pos.append(tf.identity(pos))
                 feat, pos = module(feat, pos)
             elif module.__name__() == "DeConvolution":
                 feat = module(feat, 2 * pos, conv_pos[-1])
                 pos = conv_pos.pop()
 
             elif module.__name__() == "ConcatFeat":
-                concat_feat.append(module(feat).clone())
+                concat_feat.append(tf.identity(module(feat)))
             elif module.__name__() == "JoinFeat":
                 feat = module(concat_feat.pop(), feat)
 
@@ -407,20 +442,6 @@ class UNet(nn.Module):
 
 
 def load_unet_wts(net, path):
-    wts = list(torch.load(path).values())
-    state_dict = net.state_dict()
-    i = 0
-    for key in state_dict.keys():
-        if 'offset' in key or 'tracked' in key:
-            continue
-        if len(wts[i].shape) == 4:
-            shp = wts[i].shape
-            state_dict[key] = np.transpose(
-                wts[i].reshape(int(shp[0]**(1 / 3)), int(shp[0]**(1 / 3)),
-                               int(shp[0]**(1 / 3)), shp[-2], shp[-1]),
-                (2, 1, 0, 3, 4))
-        else:
-            state_dict[key] = wts[i]
-        i += 1
+    pass
 
-    net.load_state_dict(state_dict)
+
