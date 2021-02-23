@@ -33,8 +33,9 @@ class SparseConvUnet(BaseModel):
                                          kernel_size=[3, 3, 3])
         self.unet = UNet(1, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
                          False)
-        
-        self.bn = tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4)
+
+        self.bn = tf.keras.layers.BatchNormalization(momentum=0.99,
+                                                     epsilon=1e-4)
         self.relu = tf.keras.layers.ReLU()
 
         self.linear = tf.keras.layers.Dense(num_classes)
@@ -161,16 +162,18 @@ class InputLayer(tf.keras.layers.Layer):
         rev2 = np.repeat(np.arange(count.shape[0]),
                          count.cpu().numpy()).astype(np.int32)
 
-        features_avg_0 = tf.expand_dims(reduce_subarrays_sum(features[:, 0],
-                                                  v.voxel_point_row_splits), 1)
-        features_avg_1 = tf.expand_dims(reduce_subarrays_sum(features[:, 1],
-                                                  v.voxel_point_row_splits), 1)
-        features_avg_2 = tf.expand_dims(reduce_subarrays_sum(features[:, 2],
-                                                  v.voxel_point_row_splits), 1)
+        features_avg_0 = tf.expand_dims(
+            reduce_subarrays_sum(features[:, 0], v.voxel_point_row_splits), 1)
+        features_avg_1 = tf.expand_dims(
+            reduce_subarrays_sum(features[:, 1], v.voxel_point_row_splits), 1)
+        features_avg_2 = tf.expand_dims(
+            reduce_subarrays_sum(features[:, 2], v.voxel_point_row_splits), 1)
 
-        features_avg = tf.concat([features_avg_0, features_avg_1, features_avg_2], 1)
+        features_avg = tf.concat(
+            [features_avg_0, features_avg_1, features_avg_2], 1)
 
-        features_avg = features_avg / tf.expand_dims(tf.cast(count, tf.float32), 1)
+        features_avg = features_avg / tf.expand_dims(tf.cast(count, tf.float32),
+                                                     1)
 
         return features_avg, inp_positions, rev2[rev1]
 
@@ -209,11 +212,7 @@ class SubmanifoldSparseConv(tf.keras.layers.Layer):
                               offset=offset,
                               normalize=normalize)
 
-    def call(self,
-                features,
-                inp_positions,
-                out_positions=None,
-                voxel_size=1.0):
+    def call(self, features, inp_positions, out_positions=None, voxel_size=1.0):
         if out_positions is None:
             out_positions = inp_positions
         return self.net(features, inp_positions, out_positions, voxel_size)
@@ -230,10 +229,12 @@ def tf_unique_2d(x):
     x1_2 = tf.reshape(x1, [x_shape[0] * x_shape[0], x_shape[1]])
     x2_2 = tf.reshape(x2, [x_shape[0] * x_shape[0], x_shape[1]])
     cond = tf.reduce_all(tf.equal(x1_2, x2_2), axis=1)
-    cond = tf.reshape(cond, [x_shape[0], x_shape[0]])  # reshaping cond to match x1_2 & x2_2
+    cond = tf.reshape(
+        cond, [x_shape[0], x_shape[0]])  # reshaping cond to match x1_2 & x2_2
     cond_shape = tf.shape(cond)
     cond_cast = tf.cast(cond, tf.int32)  # convertin condition boolean to int
-    cond_zeros = tf.zeros(cond_shape, tf.int32)  # replicating condition tensor into all 0's
+    cond_zeros = tf.zeros(cond_shape,
+                          tf.int32)  # replicating condition tensor into all 0's
 
     # CREATING RANGE TENSOR
     r = tf.range(x_shape[0])
@@ -243,7 +244,8 @@ def tf_unique_2d(x):
     # converting TRUE=1 FALSE=MAX(index)+1 (which is invalid by default) so when we take min it wont get selected & in end we will only take values <max(indx).
     f1 = tf.multiply(tf.ones(cond_shape, tf.int32), x_shape[0] + 1)
     f2 = tf.ones(cond_shape, tf.int32)
-    cond_cast2 = tf.where(tf.equal(cond_cast, cond_zeros), f1, f2)  # if false make it max_index+1 else keep it 1
+    cond_cast2 = tf.where(tf.equal(cond_cast, cond_zeros), f1,
+                          f2)  # if false make it max_index+1 else keep it 1
 
     # multiply range with new int boolean mask
     r_cond_mul = tf.multiply(r, cond_cast2)
@@ -256,18 +258,22 @@ def tf_unique_2d(x):
 
     return (op)
 
+
 def calculate_grid(inp_positions):
     filter = tf.constant([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
-                           [0, -1, -1], [0, -1, 0], [0, 0, -1],
-                           [0, 0, 0]])
+                          [0, -1, -1], [0, -1, 0], [0, 0, -1], [0, 0, 0]])
 
-    out_pos = tf.reshape(tf.tile(tf.cast(inp_positions, tf.int32), tf.constant([1, filter.shape[0]])), [-1, 3])
+    out_pos = tf.reshape(
+        tf.tile(tf.cast(inp_positions, tf.int32),
+                tf.constant([1, filter.shape[0]])), [-1, 3])
     filter = tf.tile(filter, tf.constant([inp_positions.shape[0], 1]))
 
     out_pos = out_pos + filter
     out_pos = out_pos[tf.math.reduce_min(out_pos, 1) >= 0]
 
-    out_pos = out_pos[(~tf.math.reduce_any(tf.cast((tf.cast(out_pos, tf.int32) % 2), tf.bool), 1))]
+    out_pos = out_pos[(
+        ~tf.math.reduce_any(tf.cast(
+            (tf.cast(out_pos, tf.int32) % 2), tf.bool), 1))]
 
     out_pos = tf_unique_2d(out_pos)
 
@@ -377,7 +383,8 @@ class UNet(tf.keras.layers.Layer):
 
     @staticmethod
     def block(m, a, b):
-        m.append(tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+        m.append(tf.keras.layers.BatchNormalization(momentum=0.99,
+                                                    epsilon=1e-4))
         m.append(tf.keras.layers.LeakyReLU(0.))
         m.append(
             SubmanifoldSparseConv(in_channels=a,
@@ -391,14 +398,16 @@ class UNet(tf.keras.layers.Layer):
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
-            m.append(tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+            m.append(
+                tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
             m.append(tf.keras.layers.LeakyReLU(0.))
             m.append(
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
             m = m + UNet.U(nPlanes[1:])
-            m.append(tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+            m.append(
+                tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
             m.append(tf.keras.layers.LeakyReLU(0.))
             m.append(
                 DeConvolution(in_channels=nPlanes[1],
@@ -443,5 +452,3 @@ class UNet(tf.keras.layers.Layer):
 
 def load_unet_wts(net, path):
     pass
-
-
