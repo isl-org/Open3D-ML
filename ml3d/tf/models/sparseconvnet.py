@@ -110,7 +110,7 @@ class SparseConvUnet(BaseModel):
     def inference_preprocess(self):
         return [self.inference_input]
 
-    def inference_end(self, inputs, results):
+    def inference_end(self, results):
         results = results[0]
         results = tf.reshape(results, [-1, self.cfg.num_classes])
 
@@ -122,7 +122,12 @@ class SparseConvUnet(BaseModel):
 
         pred_l = np.argmax(probs, 1)
 
-        return {'inference_labels': pred_l, 'inference_scores': probs}
+        self.inference_result = {
+            'inference_labels': pred_l,
+            'inference_scores': probs
+        }
+
+        return True
 
     def get_loss(self):
         raise NotImplementedError
@@ -222,41 +227,7 @@ class SubmanifoldSparseConv(tf.keras.layers.Layer):
 
 
 def tf_unique_2d(x):
-    x_shape = tf.shape(x)
-    x1 = tf.tile(x, [1, x_shape[0]])
-    x2 = tf.tile(x, [x_shape[0], 1])
-
-    x1_2 = tf.reshape(x1, [x_shape[0] * x_shape[0], x_shape[1]])
-    x2_2 = tf.reshape(x2, [x_shape[0] * x_shape[0], x_shape[1]])
-    cond = tf.reduce_all(tf.equal(x1_2, x2_2), axis=1)
-    cond = tf.reshape(
-        cond, [x_shape[0], x_shape[0]])  # reshaping cond to match x1_2 & x2_2
-    cond_shape = tf.shape(cond)
-    cond_cast = tf.cast(cond, tf.int32)  # convertin condition boolean to int
-    cond_zeros = tf.zeros(cond_shape,
-                          tf.int32)  # replicating condition tensor into all 0's
-
-    # CREATING RANGE TENSOR
-    r = tf.range(x_shape[0])
-    r = tf.add(tf.tile(r, [x_shape[0]]), 1)
-    r = tf.reshape(r, [x_shape[0], x_shape[0]])
-
-    # converting TRUE=1 FALSE=MAX(index)+1 (which is invalid by default) so when we take min it wont get selected & in end we will only take values <max(indx).
-    f1 = tf.multiply(tf.ones(cond_shape, tf.int32), x_shape[0] + 1)
-    f2 = tf.ones(cond_shape, tf.int32)
-    cond_cast2 = tf.where(tf.equal(cond_cast, cond_zeros), f1,
-                          f2)  # if false make it max_index+1 else keep it 1
-
-    # multiply range with new int boolean mask
-    r_cond_mul = tf.multiply(r, cond_cast2)
-    r_cond_mul2 = tf.reduce_min(r_cond_mul, axis=1)
-    r_cond_mul3, unique_idx = tf.unique(r_cond_mul2)
-    r_cond_mul4 = tf.subtract(r_cond_mul3, 1)
-
-    # get actual values from unique indexes
-    op = tf.gather(x, r_cond_mul4)
-
-    return (op)
+    return tf.convert_to_tensor(np.unique(x.numpy(), axis=0))
 
 
 def calculate_grid(inp_positions):
@@ -448,7 +419,3 @@ class UNet(tf.keras.layers.Layer):
                 raise Exception("Unknown module {}".format(module))
 
         return feat
-
-
-def load_unet_wts(net, path):
-    pass
