@@ -7,7 +7,7 @@ from glob import glob
 import logging
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
 from .utils import BEVBox3D
 
@@ -115,7 +115,7 @@ class Scannet(BaseDataset):
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)
 
-        remapper = np.ones(150) * (-100)
+        remapper = np.ones(150) * (-1)
         for i, x in enumerate(self.semantic_ids):
             remapper[x] = i
 
@@ -152,7 +152,7 @@ class Scannet(BaseDataset):
         pass
 
 
-class ScannetSplit():
+class ScannetSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
         self.cfg = dataset.cfg

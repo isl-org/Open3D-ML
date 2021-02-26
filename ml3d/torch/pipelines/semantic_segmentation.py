@@ -337,31 +337,31 @@ class SemanticSegmentation(BasePipeline):
         self.batcher = self.get_batcher(device)
 
         train_dataset = dataset.get_split('train')
-        train_sampler = train_dataset.sampler
+        # train_sampler = train_dataset.sampler
         train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      sampler=train_sampler,
+                                    #   sampler=train_sampler,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
-                                  sampler=get_sampler(train_sampler),
+                                #   sampler=get_sampler(train_sampler),
                                   collate_fn=self.batcher.collate_fn)
 
         valid_dataset = dataset.get_split('validation')
-        valid_sampler = valid_dataset.sampler
+        # valid_sampler = valid_dataset.sampler
         valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
-                                      sampler=valid_sampler,
+                                    #   sampler=valid_sampler,
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
-                                  sampler=get_sampler(valid_sampler),
+                                #   sampler=get_sampler(valid_sampler),
                                   collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
@@ -391,7 +391,7 @@ class SemanticSegmentation(BasePipeline):
             self.accs = []
             self.ious = []
             self.train_conf_m = []
-            model.trans_point_sampler = train_sampler.get_point_sampler()
+            # model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 results = model(inputs['data'])
@@ -426,7 +426,7 @@ class SemanticSegmentation(BasePipeline):
             self.valid_ious = []
             self.valid_conf_m = []
 
-            model.trans_point_sampler = valid_sampler.get_point_sampler()
+            # model.trans_point_sampler = valid_sampler.get_point_sampler()
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):

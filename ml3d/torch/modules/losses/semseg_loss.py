@@ -25,11 +25,12 @@ def filter_valid_label(scores, labels, num_classes, ignored_label_inds, device):
     inserted_value = torch.zeros([1], dtype=torch.int64)
 
     for ign_label in ignored_label_inds:
+        if ign_label >= 0:
 
-        reducing_list = torch.cat([
-            reducing_list[:ign_label], inserted_value, reducing_list[ign_label:]
-        ], 0)
-    valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels)
+            reducing_list = torch.cat([
+                reducing_list[:ign_label], inserted_value, reducing_list[ign_label:]
+            ], 0)
+    valid_labels = torch.gather(reducing_list.to(device), 0, valid_labels.long())
 
     valid_labels = valid_labels.unsqueeze(0)
     valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)

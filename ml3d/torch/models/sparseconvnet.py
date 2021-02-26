@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from .base_model import BaseModel
 from ...utils import MODEL
+from ..modules.losses import filter_valid_label
 
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
@@ -41,10 +42,7 @@ class SparseConvUnet(BaseModel):
 
     def forward(self, inputs):
         output = []
-        for inp in inputs:
-            pos = inp['point']
-            feat = inp['feat']
-
+        for pos, feat in zip(inputs['point'], inputs['feat']):
             feat, pos, rev = self.inp(feat, pos)
             feat = self.ssc(feat, pos, voxel_size=1.0)
             feat = self.unet(pos, feat)
@@ -124,12 +122,32 @@ class SparseConvUnet(BaseModel):
 
         return {'inference_labels': pred_l, 'inference_scores': probs}
 
-    def get_loss(self):
-        raise NotImplementedError
+    def get_loss(self, Loss, results, inputs, device):
+        """
+        Runs the loss on outputs of the model
+        :param outputs: logits
+        :param labels: labels
+        :return: loss
+        """
+        cfg = self.cfg
+        results = torch.cat(results, dim=0)
+        labels = inputs['data']['label'].reshape(-1)
 
-    def get_optimizer(self):
-        raise NotImplementedError
+        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
+                                            cfg.ignored_label_inds, device)
 
+        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+
+        return loss, labels, scores
+
+
+    def get_optimizer(self, cfg_pipeline):
+        optimizer = torch.optim.Adam(self.parameters(),
+                                lr=cfg_pipeline.adam_lr)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
+
+        return optimizer, scheduler
 
 MODEL._register_module(SparseConvUnet, 'torch')
 
