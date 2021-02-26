@@ -1,0 +1,31 @@
+dataset:
+  name: Scannet
+  dataset_path:  # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  test_result_folder: ./test
+  use_cache: False
+  sampler:
+    name: 'SemSegRandomSampler'
+model:
+  name: SparseConvUnet
+  batcher: DefaultBatcher
+  ckpt_path: # path/to/your/checkpoint
+  m: 16
+  scale: 20
+  in_channels: 3
+  num_classes: 20
+  ignored_label_inds:
+  - -1
+pipeline:
+  name: SemanticSegmentation
+  adam_lr: 0.01
+  batch_size: 2
+  learning_rate: 0.01
+  main_log_dir: ./logs
+  max_epoch: 512
+  save_ckpt_freq: 2
+  scheduler_gamma: 0.95
+  test_batch_size: 1
+  train_sum_dir: train_log
+  val_batch_size: 1
