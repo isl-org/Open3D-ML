@@ -404,7 +404,7 @@ class SemanticSegmentation(BasePipeline):
                     continue
 
                 self.optimizer.zero_grad()
-                # loss.backward()
+                loss.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
                     torch.nn.utils.clip_grad_value_(model.parameters(),
                                                     model.cfg.grad_clip_norm)
@@ -465,7 +465,7 @@ class SemanticSegmentation(BasePipeline):
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':
-            batcher = ConcatBatcher(device)
+            batcher = ConcatBatcher(device, self.model.cfg.name)
         else:
             batcher = None
         return batcher

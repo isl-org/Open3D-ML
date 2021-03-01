@@ -42,7 +42,11 @@ class SparseConvUnet(BaseModel):
 
     def forward(self, inputs):
         output = []
-        for pos, feat in zip(inputs['point'], inputs['feat']):
+        start_idx = 0
+        for length in inputs['batch_lengths']:
+            pos = inputs['point'][start_idx:start_idx + length]
+            feat = inputs['feat'][start_idx:start_idx + length]
+
             feat, pos, rev = self.inp(feat, pos)
             feat = self.ssc(feat, pos, voxel_size=1.0)
             feat = self.unet(pos, feat)
@@ -52,7 +56,8 @@ class SparseConvUnet(BaseModel):
             feat = self.out(feat, rev)
 
             output.append(feat)
-        return output
+            start_idx += length
+        return torch.cat(output, 0)
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)
@@ -92,24 +97,23 @@ class SparseConvUnet(BaseModel):
 
     def transform(self, data, attr):
         device = self.device
-        data['point'] = torch.from_numpy(data['point']).to(device)
-        data['feat'] = torch.from_numpy(data['feat']).to(device)
-        data['label'] = torch.from_numpy(data['label']).to(device)
+        data['point'] = torch.from_numpy(data['point'])
+        data['feat'] = torch.from_numpy(data['feat'])
+        data['label'] = torch.from_numpy(data['label'])
 
         return data
 
     def inference_begin(self, data):
         data = self.preprocess(data, {})
+        data['batch_lengths'] = [data['point'].shape[0]]
         data = self.transform(data, {})
 
         self.inference_input = data
 
     def inference_preprocess(self):
-        return [self.inference_input]
+        return self.inference_input
 
     def inference_end(self, inputs, results):
-        inputs = inputs[0]
-        results = results[0]
         results = torch.reshape(results, (-1, self.cfg.num_classes))
 
         m_softmax = torch.nn.Softmax(dim=-1)
@@ -130,8 +134,7 @@ class SparseConvUnet(BaseModel):
         :return: loss
         """
         cfg = self.cfg
-        results = torch.cat(results, dim=0)
-        labels = inputs['data']['label'].reshape(-1)
+        labels = inputs['data']['label']
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)

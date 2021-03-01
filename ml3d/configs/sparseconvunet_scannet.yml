@@ -9,14 +9,13 @@ dataset:
     name: 'SemSegRandomSampler'
 model:
   name: SparseConvUnet
-  batcher: DefaultBatcher
+  batcher: ConcatBatcher
   ckpt_path: # path/to/your/checkpoint
   m: 16
   scale: 20
   in_channels: 3
   num_classes: 20
-  ignored_label_inds:
-  - -1
+  ignored_label_inds: [-1]
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

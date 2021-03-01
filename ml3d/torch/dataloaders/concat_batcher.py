@@ -12,7 +12,7 @@ from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 from torch.utils.data import Sampler, get_worker_info
 
 
-class CustomBatch:
+class KPConvBatch:
     """Batched results for KPConv"""
 
     def __init__(self, batches):
@@ -407,10 +407,32 @@ class CustomBatch:
         return all_p_list
 
 
+def SparseConvUnetBatch(batches, device):
+    pc = []
+    feat = []
+    label = []
+    lengths = []
+
+    for batch in batches:
+        data = batch['data']
+        pc.append(data['point'])
+        feat.append(data['feat'])
+        label.append(data['label'])
+        lengths.append(data['point'].shape[0])
+
+    pc = torch.cat(pc, 0).to(device)
+    feat = torch.cat(feat, 0).to(device)
+    label = torch.cat(label, 0).to(device)
+
+    data = {'point': pc, 'feat': feat, 'label': label, 'batch_lengths': lengths}
+
+    return {'data': data, 'attr': {}}
+
+
 class ConcatBatcher(object):
     """ConcatBatcher for KPConv"""
 
-    def __init__(self, device):
+    def __init__(self, device, model='KPConv'):
         """
         Initialize
 
@@ -422,6 +444,7 @@ class ConcatBatcher(object):
         """
         super(ConcatBatcher, self).__init__()
         self.device = device
+        self.model = model
 
     def collate_fn(self, batches):
         """
@@ -433,6 +456,15 @@ class ConcatBatcher(object):
         Returns:
             class: the batched result
         """
-        batching_result = CustomBatch(batches)
-        batching_result.to(self.device)
-        return {'data': batching_result, 'attr': []}
+        if self.model == "KPConv":
+            batching_result = KPConvBatch(batches)
+            batching_result.to(self.device)
+            return {'data': batching_result, 'attr': []}
+
+        elif self.model == "SparseConvUnet":
+            return SparseConvUnetBatch(batches, self.device)
+
+        else:
+            raise Exception(
+                f"Please define collate_fn for {self.model}, or use Default Batcher"
+            )
