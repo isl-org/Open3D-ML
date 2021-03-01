@@ -5,7 +5,7 @@ import torch.nn as nn
 from .base_model import BaseModel
 from ...utils import MODEL
 from ..modules.losses import filter_valid_label
-
+from ...datasets.utils import trans_augment
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
@@ -71,6 +71,10 @@ class SparseConvUnet(BaseModel):
             raise Exception(
                 "SparseConvnet doesn't work without feature values.")
 
+        if attr['split'] in ['training', 'train']:
+            t_augment = self.cfg.get('t_augment', None)
+            points = trans_augment(points, t_augment)
+
         feat = np.array(data['feat'], dtype=np.float32) / 127.5 - 1
 
         points *= self.cfg.scale  # Scale = 1/voxel_size
@@ -104,7 +108,7 @@ class SparseConvUnet(BaseModel):
         return data
 
     def inference_begin(self, data):
-        data = self.preprocess(data, {})
+        data = self.preprocess(data, {'split': 'test'})
         data['batch_lengths'] = [data['point'].shape[0]]
         data = self.transform(data, {})
 

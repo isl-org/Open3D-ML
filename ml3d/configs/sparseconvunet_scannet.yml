@@ -16,6 +16,14 @@ model:
   in_channels: 3
   num_classes: 20
   ignored_label_inds: [-1]
+  t_augment:
+    turn_on: True
+    rotation_method: vertical
+    scale_anisotropic: false
+    symmetries: false
+    noise_level: 0.0001
+    min_s: 0.9
+    max_s: 1.1
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
