@@ -47,10 +47,11 @@ class SemSegLoss(object):
         reducing_list = tf.range(self.num_classes, dtype=tf.int32)
         inserted_value = tf.zeros((1,), dtype=tf.int32)
         for ign_label in self.ignored_label_inds:
-            reducing_list = tf.concat([
-                reducing_list[:ign_label], inserted_value,
-                reducing_list[ign_label:]
-            ], 0)
+            if ign_label >= 0:
+                reducing_list = tf.concat([
+                    reducing_list[:ign_label], inserted_value,
+                    reducing_list[ign_label:]
+                ], 0)
 
         valid_labels = tf.gather(reducing_list, valid_labels_init)
 
