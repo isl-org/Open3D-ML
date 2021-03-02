@@ -105,10 +105,10 @@ class SparseConvUnet(BaseModel):
 
     def transform(self, point, feat, label, lengths):
         return {
-            'point' : point,
-            'feat' : feat,
-            'label' : label,
-            'batch_lengths' : lengths
+            'point': point,
+            'feat': feat,
+            'label': label,
+            'batch_lengths': lengths
         }
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
@@ -118,13 +118,13 @@ class SparseConvUnet(BaseModel):
             iters = dataset.num_pc // batch_size
             if dataset.num_pc % batch_size:
                 iters += 1
-            
+
             for batch_id in range(iters):
                 pc = []
                 feat = []
                 label = []
                 lengths = []
-                start_id = batch_id  * batch_size
+                start_id = batch_id * batch_size
                 end_id = min(start_id + batch_size, dataset.num_pc)
 
                 for cloud_id in range(start_id, end_id):
@@ -133,14 +133,14 @@ class SparseConvUnet(BaseModel):
                     feat.append(data['feat'])
                     label.append(data['label'])
                     lengths.append(data['point'].shape[0])
-                
+
                 pc = np.concatenate(pc, 0)
                 feat = np.concatenate(feat, 0)
                 label = np.concatenate(label, 0)
                 lengths = np.array(lengths, dtype=np.int32)
 
                 yield pc, feat, label, lengths
-            
+
         gen_func = concat_batch_gen
         gen_types = (tf.float32, tf.float32, tf.int32, tf.int32)
         gen_shapes = ([None, 3], [None, 3], [None], [None])
@@ -197,7 +197,6 @@ class SparseConvUnet(BaseModel):
             learning_rate=cfg_pipeline.learning_rate)
 
         return optimizer
-
 
 
 MODEL._register_module(SparseConvUnet, 'tf')
