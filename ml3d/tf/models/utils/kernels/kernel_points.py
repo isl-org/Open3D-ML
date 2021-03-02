@@ -28,8 +28,6 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
-from .....utils.ply import read_ply, write_ply
-
 # ------------------------------------------------------------------------------------------
 #
 #           Functions
@@ -441,7 +439,7 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
 
     # Kernel_file
     kernel_file = join(
-        kernel_dir, 'k_{:03d}_{:s}_{:d}D.ply'.format(num_kpoints, fixed,
+        kernel_dir, 'k_{:03d}_{:s}_{:d}D.npy'.format(num_kpoints, fixed,
                                                      dimension))
 
     # Check if already done
@@ -470,11 +468,10 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
             # Save points
             kernel_points = kernel_points[best_k, :, :]
 
-        write_ply(kernel_file, kernel_points, ['x', 'y', 'z'])
+        np.save(kernel_file, kernel_points)
 
     else:
-        data = read_ply(kernel_file)
-        kernel_points = np.vstack((data['x'], data['y'], data['z'])).T
+        kernel_points = np.load(kernel_file)
 
     # Random roations for the kernel
     # N.B. 4D random rotations not supported yet
