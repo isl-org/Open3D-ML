@@ -528,10 +528,10 @@ class SemanticSegmentation(BasePipeline):
                  f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
         log.info(f"mean iou train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
+        log.info(f"total acc train: {train_total_acc:.3f} "
+                 f" eval: {valid_total_acc:.3f}")
         log.info(f"total iou train: {train_total_iou:.3f} "
                  f" eval: {valid_total_iou:.3f}")
-        log.info(f"total acc train: {valid_total_acc:.3f} "
-                 f" eval: {valid_total_acc:.3f}")
 
     """
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.

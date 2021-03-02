@@ -404,7 +404,10 @@ class UNet(nn.Module):
         concat_feat = []
         for module in self.net:
             if isinstance(module, nn.BatchNorm1d):
-                feat = module(feat)
+                if feat.shape[0] == 1:
+                    feat *= 0  # Cannot calculate std_dev for 1 dimension.
+                else:
+                    feat = module(feat)
             elif isinstance(module, nn.LeakyReLU):
                 feat = module(feat)
 
