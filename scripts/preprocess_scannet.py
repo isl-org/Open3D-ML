@@ -5,6 +5,7 @@ import argparse
 import json
 import csv
 import logging as log
+import traceback
 import open3d as o3d
 import numpy as np
 from tqdm import tqdm
@@ -77,11 +78,14 @@ class ScannetProcess():
         for scan in tqdm(self.scans):
             try:
                 self.process_scene(scan)
-            except Exception as e:
-                errors.append(f'{scan}: {repr(e)}')
+            except Exception:
+                errors.append(f'{scan}: ' + traceback.format_exc(1))
 
         if errors:
-            log.warning("Processing failed:\n" + "\n".join(errors))
+            errmsg = "Processing failed:\n" + "\n".join(errors)
+            log.warning(errmsg)
+            with open(join(self.out_path, 'errors.txt'), 'w') as errfile:
+                errfile.write(errmsg)
 
     def process_scene(self, scan):
         if (isfile(f'{join(self.out_path, scan)}_vert.npy') and

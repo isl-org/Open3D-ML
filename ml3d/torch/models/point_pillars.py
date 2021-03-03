@@ -389,8 +389,8 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
-        assert (points.less(self.points_range_max.to(device=points.device)).all() and
-                points.greater_equal(self.points_range_min.to(device=points.device)).all()), \
+        assert (points.le(self.points_range_max.to(device=points.device)).all() and
+                points.ge(self.points_range_min.to(device=points.device)).all()), \
                 "Input point cloud exceeds pre-defined point cloud range!"
 
         ans = voxelize(points, self.voxel_size, self.points_range_min,
@@ -895,7 +895,10 @@ class Anchor3DHead(nn.Module):
         assigned_bboxes, target_idxs, pos_idxs, neg_idxs = [], [], [], []
 
         def flatten_idx(idx, j):
-            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""
+            """inject class dimension in the given indices
+            (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j *
+                                          rot_angles + x)
+            """
             z = idx // rot_angles
             x = idx % rot_angles
 

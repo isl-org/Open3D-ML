@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 class ObjectDetection(BasePipeline):
     """
-    Pipeline for object detection. 
+    Pipeline for object detection.
     """
 
     def __init__(self,
@@ -73,7 +73,8 @@ class ObjectDetection(BasePipeline):
 
     def run_test(self):
         """
-        Run test with test data split, computes mean average precision of the prediction results.
+        Run test with test data split, computes mean average precision of the
+        prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -113,7 +114,8 @@ class ObjectDetection(BasePipeline):
 
     def run_valid(self):
         """
-        Run validation with validation data split, computes mean average precision and the loss of the prediction results.
+        Run validation with validation data split, computes mean average
+        precision and the loss of the prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -144,9 +146,13 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         gt = []
+        no_bboxes = 0
         with torch.no_grad():
             for i in tqdm(range(len(valid_loader)), desc='validation'):
                 data = valid_loader[i]['data']
+                if data['bboxes'].numel() == 0:
+                    no_bboxes += 1
+                    continue
                 results = model(data['point'])
                 loss = model.loss(results, data)
                 for l, v in loss.items():
@@ -159,6 +165,9 @@ class ObjectDetection(BasePipeline):
                 pred.append(BEVBox3D.to_dicts(boxes[0]))
                 gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
 
+        if no_bboxes > 0:
+            log.warning("No bounding box labels in " +
+                        f"{no_bboxes}/{len(process_bar)} cases.")
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -254,9 +263,13 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
+            no_bboxes = 0
             process_bar = tqdm(range(len(train_loader)), desc='training')
             for i in process_bar:
                 data = train_loader[i]['data']
+                if data['bboxes'].numel() == 0:
+                    no_bboxes += 1
+                    continue
 
                 results = model(data['point'])
                 loss = model.loss(results, data)
@@ -278,6 +291,9 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
+            if no_bboxes > 0:
+                log.warning("No bounding box labels in " +
+                            f"{no_bboxes}/{len(process_bar)} cases.")
             #self.scheduler.step()
 
             # --------------------- validation

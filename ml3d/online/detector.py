@@ -330,7 +330,7 @@ class DetectorPipeline(object):
             rgbd_frame = self.rscam.capture_frame(wait=True,
                                                   align_depth_to_color=True)
             pcd_errors = 0
-            while frame_id < 300 and not self.gui.flag_exit:
+            while frame_id < 1000 and not self.gui.flag_exit:
                 future_rgbd_frame = executor.submit(self.rscam.capture_frame,
                                                     wait=True,
                                                     align_depth_to_color=True)

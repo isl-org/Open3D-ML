@@ -1,14 +1,14 @@
 dataset:
-  name: KITTI
+  name: Scannet
   # path/to/your/dataset
-  dataset_path: /home/ssheorey/Documents/Open3D/Data/ScanNet/
+  dataset_path: /home/ssheorey/Datasets/ScanNet/npy-tiny
   cache_dir: ./logs/cache
   steps_per_epoch_train: 5000
 
 model:
   name: PointPillars
   # path/to/your/checkpoint
-  ckpt_path: /home/ssheorey/Documents/Open3D/Models/PointPillars/pointpillars_kitti_202012221652utc.pth
+  ckpt_path:
 
   point_cloud_range: [-3, -3, 0, 3, 3, 6]   # TBC
   classes: [
@@ -36,7 +36,7 @@ model:
     max_voxels: [16000, 40000]      # [P_train, P_test]
 
   voxel_encoder:
-    in_channels: 4
+    in_channels: 3
     feat_channels: [64]
     voxel_size: *vsize
 
@@ -65,55 +65,43 @@ model:
       [-3, -3, 0, 3, 3, 0],
       [-3, -3, 0, 3, 3, 0],
       [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0],
+      [-3, -3, 0, 3, 3, 0]
     ]
-    sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]  # TBC
+    sizes: [
+        [0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56],
+        [0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56],
+        [0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56],
+        [0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56],
+        [0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56],
+        [0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]
+    ]  # TBC
     rotations: [0, 1.57]
-    iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]                # TBC
+    iou_thr: [
+        [0.35, 0.5], [0.35, 0.5], [0.45, 0.6],
+        [0.35, 0.5], [0.35, 0.5], [0.45, 0.6],
+        [0.35, 0.5], [0.35, 0.5], [0.45, 0.6],
+        [0.35, 0.5], [0.35, 0.5], [0.45, 0.6],
+        [0.35, 0.5], [0.35, 0.5], [0.45, 0.6],
+        [0.35, 0.5], [0.35, 0.5], [0.45, 0.6],
+    ]                # TBC
 
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
-    ObjectSample:
-      min_points_dict:
-          cabinet: 10
-          bed: 10
-          chair: 10
-          sofa: 10
-          table: 10
-          door: 10
-          window: 10
-          bookshelf: 10
-          picture: 10
-          counter: 10
-          desk: 10
-          curtain: 10
-          refrigerator: 10
-          showercurtrain: 10
-          toilet: 10
-          sink: 10
-          bathtub: 10
-          garbagebin: 10
-
-      sample_dict:
-          cabinet: 10
-          bed: 10
-          chair: 10
-          sofa: 10
-          table: 10
-          door: 10
-          window: 10
-          bookshelf: 10
-          picture: 10
-          counter: 10
-          desk: 10
-          curtain: 10
-          refrigerator: 10
-          showercurtrain: 10
-          toilet: 10
-          sink: 10
-          bathtub: 10
-          garbagebin: 10
-
 
 pipeline:
   name: ObjectDetection
@@ -132,7 +120,14 @@ pipeline:
     weight_decay: 0.01
 
   # evaluation properties
-  overlaps: [0.5, 0.5, 0.7]                     # TBC
+  overlaps: [
+      0.5, 0.5, 0.7,
+      0.5, 0.5, 0.7,
+      0.5, 0.5, 0.7,
+      0.5, 0.5, 0.7,
+      0.5, 0.5, 0.7,
+      0.5, 0.5, 0.7
+  ]                     # TBC
   similar_classes: {
   }
-  difficulties: [0, 1, 2]
+  difficulties: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
