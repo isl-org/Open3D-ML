@@ -7,7 +7,7 @@ import random
 import argparse
 import json
 import csv
-from plyfile import PlyData
+import open3d as o3d
 from tqdm import tqdm
 
 
@@ -203,15 +203,10 @@ class ScannetProcess():
         """
         assert os.path.isfile(filename)
         with open(filename, 'rb') as f:
-            plydata = PlyData.read(f)
-            num_verts = plydata['vertex'].count
-            vertices = np.zeros(shape=[num_verts, 6], dtype=np.float32)
-            vertices[:, 0] = plydata['vertex'].data['x']
-            vertices[:, 1] = plydata['vertex'].data['y']
-            vertices[:, 2] = plydata['vertex'].data['z']
-            vertices[:, 3] = plydata['vertex'].data['red']
-            vertices[:, 4] = plydata['vertex'].data['green']
-            vertices[:, 5] = plydata['vertex'].data['blue']
+            data = o3d.t.io.read_point_cloud(f.name).point
+            points = data["points"].numpy().astype(np.float32)
+            colors = data["colors"].numpy().astype(np.float32)
+            vertices = np.concatenate([points, colors], axis=1)
         return vertices
 
     @staticmethod
