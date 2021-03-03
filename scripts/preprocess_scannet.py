@@ -1,13 +1,12 @@
-import numpy as np
-import os, sys, glob, pickle
+import os, sys
 from pathlib import Path
-from os.path import join, exists, dirname, abspath
-from os import makedirs
-import random
+from os.path import join, isfile
 import argparse
 import json
 import csv
+import logging as log
 import open3d as o3d
+import numpy as np
 from tqdm import tqdm
 
 
@@ -74,12 +73,24 @@ class ScannetProcess():
         print(f"Total number of scans : {len(self.scans)}")
 
     def convert(self):
+        errors = []
         for scan in tqdm(self.scans):
-            self.process_scene(scan)
+            try:
+                self.process_scene(scan)
+            except Exception as e:
+                errors.append(f'{scan}: {repr(e)}')
+
+        if errors:
+            log.warning("Processing failed:\n" + "\n".join(errors))
 
     def process_scene(self, scan):
-        in_path = join(self.dataset_path, scan)
+        if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
+                isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
+                isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
+                isfile(f'{join(self.out_path, scan)}_bbox.npy')):
+            return
 
+        in_path = join(self.dataset_path, scan)
         mesh_file = join(in_path, scan + '_vh_clean_2.ply')
         agg_file = join(in_path, scan + '.aggregation.json')
         seg_file = join(in_path, scan + '_vh_clean_2.0.010000.segs.json')
