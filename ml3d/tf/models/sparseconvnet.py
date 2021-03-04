@@ -96,13 +96,6 @@ class SparseConvUnet(BaseModel):
 
         return data
 
-    def transform_inference(self, data, attr):
-        data['point'] = tf.constant(data['point'])
-        data['feat'] = tf.constant(data['feat'])
-        data['label'] = tf.constant(data['label'])
-
-        return data
-
     def transform(self, point, feat, label, lengths):
         return {
             'point': point,
@@ -149,15 +142,16 @@ class SparseConvUnet(BaseModel):
 
     def inference_begin(self, data):
         data = self.preprocess(data, {})
-        data = self.transform(data, {})
 
-        self.inference_input = data
+        self.inference_input = self.transform(
+            tf.constant(data['point']), tf.constant(data['feat']),
+            tf.constant(data['label']), tf.constant([data['point'].shape[0]]))
 
     def inference_preprocess(self):
-        return [self.inference_input]
+        return self.inference_input
 
     def inference_end(self, results):
-        results = results[0]
+        results = results
         results = tf.reshape(results, [-1, self.cfg.num_classes])
 
         m_softmax = tf.keras.layers.Softmax(axis=-1)

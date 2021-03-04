@@ -396,6 +396,7 @@ class SemanticSegmentation(BasePipeline):
             # model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+                self.optimizer.zero_grad()
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
@@ -403,7 +404,6 @@ class SemanticSegmentation(BasePipeline):
                 if predict_scores.size()[-1] == 0:
                     continue
 
-                self.optimizer.zero_grad()
                 loss.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
                     torch.nn.utils.clip_grad_value_(model.parameters(),
