@@ -4,7 +4,6 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 import logging
 
@@ -202,7 +201,7 @@ class Semantic3D(BaseDataset):
         log.info("Saved {} in {}.".format(name, store_path))
 
 
-class Semantic3DSplit():
+class Semantic3DSplit(BaseDatasetSplit):
     """
     This class is used to create a split for Semantic3D dataset.
     
@@ -218,6 +217,7 @@ class Semantic3DSplit():
     """
 
     def __init__(self, dataset, split='training'):
+        super().__init__(dataset, split=split)
 
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
