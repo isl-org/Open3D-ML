@@ -9,6 +9,7 @@ if [ "$#" -ne 2 ]; then
 fi
 
 pushd ../..
-python scripts/run_pipeline.py $1 -c ml3d/configs/pointpillars_scannet.yml \
---dataset_path $2 --pipeline ObjectDetection
+cp -r "$2" "$TMPDIR"
+python scripts/run_pipeline.py "$1" -c ml3d/configs/pointpillars_scannet.yml \
+    --dataset_path "$TMPDIR" --pipeline ObjectDetection
 popd

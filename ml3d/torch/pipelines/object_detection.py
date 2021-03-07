@@ -148,7 +148,8 @@ class ObjectDetection(BasePipeline):
         gt = []
         no_bboxes = 0
         with torch.no_grad():
-            for i in tqdm(range(len(valid_loader)), desc='validation'):
+            process_bar = tqdm(range(len(valid_loader)), desc='validation')
+            for i in process_bar:
                 data = valid_loader[i]['data']
                 if data['bboxes'].numel() == 0:
                     no_bboxes += 1
@@ -331,14 +332,14 @@ class ObjectDetection(BasePipeline):
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
 
-        keys = ckpt["model_state"].keys()
-        keys2 = self.model.state_dict().keys()
+        # keys = ckpt["model_state"].keys()
+        # keys2 = self.model.state_dict().keys()
 
-        ckpt2 = {"model_state_dict": {}}
+        # ckpt2 = {"model_state_dict": {}}
 
-        for k0, k1 in zip(keys, keys2):
-            ckpt2["model_state_dict"][k1] = ckpt["model_state"][k0]
-        ckpt = ckpt2
+        # for k0, k1 in zip(keys, keys2):
+        #     ckpt2["model_state_dict"][k1] = ckpt["model_state"][k0]
+        # ckpt = ckpt2
 
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
@@ -348,7 +349,7 @@ class ObjectDetection(BasePipeline):
             log.info(f'Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
-        return epoch
+        return ckpt['epoch'] + 1
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')

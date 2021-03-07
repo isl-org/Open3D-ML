@@ -16,7 +16,7 @@ def filter_data(data, labels, diffs=None):
             (optional)
 
     Returns:
-        Tuple wit dictionary with same as format as input, with only the given labels
+        Tuple with dictionary with same as format as input, with only the given labels
         and difficulties and the indices.
     """
     cond = np.any([data['label'] == label for label in labels], axis=0)
@@ -47,7 +47,7 @@ def precision_3d(pred,
         pred (dict): Dictionary with the prediction data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
+                'label':      [...],
                 'score':      [...],
                 'difficulty': [...],
                 ...
@@ -55,7 +55,7 @@ def precision_3d(pred,
         target (dict): Dictionary with the target data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
+                'label':      [...],
                 'difficulty': [...],
                 ...
             }
@@ -71,7 +71,7 @@ def precision_3d(pred,
             Default is {}.
 
     Returns:
-        A tuple with a list of detection quantities 
+        A tuple with a list of detection quantities
         (score, true pos., false. pos) for each box
         and a list of the false negatives.
     """
@@ -140,7 +140,7 @@ def sample_thresholds(scores, gt_cnt, sample_cnt=41):
     Args:
         scores (list): list of scores
         gt_cnt (number): amount of gt samples
-        sample_cnt (number): amount of samples 
+        sample_cnt (number): amount of samples
             Default is 41.
     Returns:
         Returns a list of equally spaced samples of the input scores.
@@ -172,14 +172,14 @@ def mAP(pred,
         pred (dict): List of dictionaries with the prediction data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
+                'label':      [...],
                 'score':      [...],
                 'difficulty': [...]
             }[]
         target (dict): List of dictionaries with the target data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],   
+                'label':      [...],
                 'difficulty': [...]
             }[]
         classes (number[]): List of classes which should be evaluated.
