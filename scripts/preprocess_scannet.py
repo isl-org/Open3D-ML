@@ -1,20 +1,24 @@
-import os, sys
+""" Preprocess ScanNet dataset and cache in Numpy data files """
+import os
 from pathlib import Path
 from os.path import join, isfile
+# import concurrent.futures
 import argparse
 import json
 import csv
 import logging as log
 import traceback
-import open3d as o3d
+import yaml
 import numpy as np
 from tqdm import tqdm
+import open3d as o3d
+from open3d.ml.datasets import utils
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Preprocess Scannet Dataset.')
+    parser = argparse.ArgumentParser(description='Preprocess ScanNet Dataset.')
     parser.add_argument('--dataset_path',
-                        help='path to Scannet scans directory',
+                        help='path to ScanNet scans directory',
                         required=True)
     parser.add_argument('--out_path',
                         help='Output path to store processed data.',
@@ -47,10 +51,10 @@ def represents_int(s):
 
 
 class ScannetProcess():
-    """Preprocess Scannet.
-    This class converts Scannet raw data into npy files.
+    """Preprocess ScanNet.
+    This class converts ScanNet raw data into npy files.
     Args:
-        dataset_path (str): Directory to load argoverse data.
+        dataset_path (str): Directory to load ScanNet data.
         out_path (str): Directory to save pickle file(infos).
     """
 
@@ -75,24 +79,36 @@ class ScannetProcess():
 
     def convert(self):
         errors = []
+        scene_stats = []
+
+        # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+        #     future_scene_stats = [
+        #         executor.submit(self.process_scene, scan) for scan in self.scans
+        #     ]
+        #     for future in tqdm(future_scene_stats):
         for scan in tqdm(self.scans):
             try:
-                self.process_scene(scan)
-            except Exception:
+                scene_stats.append(self.process_scene(scan))
+            except Exception as e:
+                log.warning(repr(e))
                 errors.append(f'{scan}: ' + traceback.format_exc(1))
 
+            # executor.shutdown(wait=True)
+
+        dataset_stats = utils.statistics.compute_dataset_stats(scene_stats)
         if errors:
             errmsg = "Processing failed:\n" + "\n".join(errors)
             log.warning(errmsg)
-            with open(join(self.out_path, 'errors.txt'), 'w') as errfile:
-                errfile.write(errmsg)
+            dataset_stats["Errors"] = errmsg
+        with open(join(self.out_path, 'summary.yaml'), 'w') as sumfile:
+            yaml.dump(dataset_stats, sumfile)
 
     def process_scene(self, scan):
-        if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
-                isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
-                isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
-                isfile(f'{join(self.out_path, scan)}_bbox.npy')):
-            return
+        # if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
+        #         isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
+        #         isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
+        #         isfile(f'{join(self.out_path, scan)}_bbox.npy')):
+        #     return
 
         in_path = join(self.dataset_path, scan)
         mesh_file = join(in_path, scan + '_vh_clean_2.ply')
@@ -103,8 +119,9 @@ class ScannetProcess():
         label_map_file = str(
             Path(__file__).parent /
             '../ml3d/datasets/_resources/scannet/scannetv2-labels.combined.tsv')
-        mesh_vertices, semantic_labels, instance_labels, instance_bboxes, instance2semantic = self.export(
-            mesh_file, agg_file, seg_file, meta_file, label_map_file)
+        (mesh_vertices, semantic_labels, instance_labels, instance_bboxes,
+         instance2semantic) = self.export(mesh_file, agg_file, seg_file,
+                                          meta_file, label_map_file)
 
         mask = np.logical_not(np.in1d(semantic_labels, self.DONOTCARE_IDS))
         mesh_vertices = mesh_vertices[mask, :]
@@ -129,6 +146,11 @@ class ScannetProcess():
         np.save(f'{join(self.out_path, scan)}_sem_label.npy', semantic_labels)
         np.save(f'{join(self.out_path, scan)}_ins_label.npy', instance_labels)
         np.save(f'{join(self.out_path, scan)}_bbox.npy', instance_bboxes)
+
+        return utils.statistics.compute_scene_stats(mesh_vertices,
+                                                    semantic_labels,
+                                                    instance_labels,
+                                                    instance_bboxes)
 
     def export(self, mesh_file, agg_file, seg_file, meta_file, label_map_file):
         mesh_vertices = self.read_mesh_vertices_rgb(mesh_file)
