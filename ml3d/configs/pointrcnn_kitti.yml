@@ -7,6 +7,9 @@ dataset:
 model:
   name: PointRCNN
   ckpt_path: # path/to/your/checkpoint
+  
+  use_rpn: True
+  use_rcnn: False
 
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
   classes: ['Car']
@@ -36,6 +39,8 @@ model:
       gamma: 2.0
       alpha: 0.25
       loss_weight: 1.0
+
+    loss_weight: [1.0, 1.0]
 
     head:
         # config of bin-based loss
@@ -86,7 +91,7 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 1
+  batch_size: 16
   val_batch_size: 1
   save_ckpt_freq: 5
   max_epoch: 200
@@ -95,9 +100,18 @@ pipeline:
   grad_clip_norm: 2
 
   optimizer:
-    lr: 0.001
-    betas: [0.95, 0.99]
-    weight_decay: 0.01
+    lr: 0.002
+    betas: [0.9, 0.99]
+    weight_decay: 0.5
+    moms: [0.95, 0.85]
+    div_factor: 10.0
+    pct_start: 0.4
+    bn_decay_step_list: [1000]
+    bn_decay: 0.5
+    bnm_clip: 0.01
+    bn_momentum: 0.1
+    warmup_epoch: 1
+    warmup_min: 0.0002
 
   # evaluation properties
   overlaps: [0.7]

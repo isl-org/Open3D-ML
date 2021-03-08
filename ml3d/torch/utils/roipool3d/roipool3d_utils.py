@@ -1,7 +1,7 @@
 import torch
 import open3d
 if open3d.core.cuda.device_count() > 0:
-    from open3d.ml.torch.ops import roipool3d
+    from open3d.ml.torch.ops import roi_pool
 import numpy as np
 
 
@@ -40,7 +40,7 @@ def roipool3d_gpu(pts,
     pooled_boxes3d = enlarge_box3d(boxes3d.view(-1, 7),
                                    pool_extra_width).view(batch_size, -1, 7)
 
-    pooled_features, pooled_empty_flag = roipool3d(pts.contiguous(),
+    pooled_features, pooled_empty_flag = roi_pool(pts.contiguous(),
                                                    pooled_boxes3d.contiguous(),
                                                    pts_feature.contiguous(),
                                                    sampled_pt_num)
