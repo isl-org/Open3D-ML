@@ -13,13 +13,14 @@ from ..utils.objdet_helper import xywhr_to_xyxyr, box3d_to_bev
 from open3d.ml.torch.ops import nms
 from ..utils.torch_utils import gen_CNN
 from ...datasets.utils import DataProcessing, BEVBox3D
-from ...datasets.utils.operations import points_in_box
+from ...datasets.utils.operations import points_in_box, rotation_3d_in_axis
 
 from ...utils import MODEL
 from ..modules.optimizers import OptimWrapper
 from ..modules.schedulers import BNMomentumScheduler, OneCycleScheduler, CosineWarmupLR
 
 from ..utils.roipool3d import roipool3d_utils
+from ...metrics import iou_3d
 
 
 class PointRCNN(BaseModel):
@@ -48,7 +49,7 @@ class PointRCNN(BaseModel):
         self.device = device
         self.to(device)
 
-    def forward(self, inputs, gt_boxes3d=None):
+    def forward(self, inputs):
 
         #inputs = torch.tensor(np.load("pts_input.npy"), device="cuda")
         #gt_boxes3d = torch.tensor(np.load("gt_boxes3d.npy"), device='cuda')
@@ -57,7 +58,8 @@ class PointRCNN(BaseModel):
             if not self.use_rpn:
                 self.rpn.eval()
             rois = None
-            cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(inputs)
+            cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(inputs['point'])
+            output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         if self.use_rcnn:
             with torch.no_grad():
@@ -70,11 +72,10 @@ class PointRCNN(BaseModel):
                 rois, roi_scores_raw = self.rpn.proposal_layer(
                     rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
 
-            cls_score, reg_score = self.rcnn(
-                rois, None, backbone_xyz,
-                backbone_features.permute((0, 2, 1)), seg_mask, pts_depth, gt_boxes3d)
+            output = self.rcnn(
+                rois, inputs['bboxes'] if self.training else None, backbone_xyz,
+                backbone_features.permute((0, 2, 1)), seg_mask, pts_depth)
 
-        output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         return output
 
@@ -190,10 +191,10 @@ class PointRCNN(BaseModel):
         points = torch.tensor([points],
                               dtype=torch.float32,
                               device=self.device)
-        labels = torch.tensor(labels,
+        labels = torch.tensor([labels],
                               dtype=torch.int64,
                               device=self.device)
-        bboxes = torch.tensor(bboxes,
+        bboxes = torch.tensor([bboxes],
                               dtype=torch.float32,
                               device=self.device)
 
@@ -313,7 +314,7 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
         x_res_norm_label = x_res_label / loc_bin_size
         z_res_norm_label = z_res_label / loc_bin_size
 
-        x_bin_onehot = torch.cuda.FloatTensor(x_bin_label.size(0), per_loc_bin_num).zero_()
+        x_bin_onehot = torch.zeros(x_bin_label.size(0), per_loc_bin_num).zero_()
         x_bin_onehot.scatter_(1, x_bin_label.view(-1, 1).long(), 1)
         z_bin_onehot = torch.cuda.FloatTensor(z_bin_label.size(0), per_loc_bin_num).zero_()
         z_bin_onehot.scatter_(1, z_bin_label.view(-1, 1).long(), 1)
@@ -512,7 +513,7 @@ class RPN(nn.Module):
         # RPN regression loss
         point_num = rpn_reg.size(0) * rpn_reg.size(1)
         fg_sum = fg_mask.long().sum().item()
-        if fg_sum != 0:s
+        if fg_sum != 0:
             loss_loc, loss_angle, loss_size, reg_loss_dict = \
                 get_reg_loss(rpn_reg.view(point_num, -1)[fg_mask],
                                         rpn_reg_label.view(point_num, 7)[fg_mask],
@@ -648,9 +649,10 @@ class RCNN(nn.Module):
 
         if self.training:
             with torch.no_grad():
-                sampled_pts, pts_feature = self.proposal_target_layer(
+                target = self.proposal_target_layer(
                     [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
-            pts_input = torch.cat((sampled_pts, pts_feature), dim=2)
+                pts_input = torch.cat((target['sampled_pts'], target['pts_feature']), dim=2)
+                target['pts_input'] = pts_input
         else:
             pooled_features, pooled_empty_flag = roipool3d_utils.roipool3d_gpu(
                 rpn_xyz,
@@ -694,23 +696,23 @@ class RCNN(nn.Module):
         rcnn_reg = self.reg_blocks(l_features[-1]).transpose(
             1, 2).contiguous().squeeze(dim=1)  # (B, C)
 
+        ret_dict = {'rcnn_cls': rcnn_cls, 'rcnn_reg': rcnn_reg}
+
         if self.training:
-            return rcnn_cls, rcnn_reg, target
-        return rcnn_cls, rcnn_reg
+            ret_dict.update(target)
+        return ret_dict
+        
 
     def loss(self, results, inputs):
-        rcnn_cls = results['cls']
-        rcnn_reg = results['reg']
+        rcnn_cls = results['rcnn_cls']
+        rcnn_reg = results['rcnn_reg']
         
-        roi_boxes3d = results['rois']
+        cls_label = results['cls_label'].float()
+        reg_valid_mask = results['reg_valid_mask']
+        roi_boxes3d = results['roi_boxes3d']
         roi_size = roi_boxes3d[:, 3:6]
-
-        cls_label = inputs['labels'].float()
-        reg_valid_mask = inputs['valid_mask']
-        gt_boxes3d_ct = inputs['bboxes']
-        pts_input = inputs['point']
-
-        tb_dict = {}
+        gt_boxes3d_ct = results['gt_of_rois']
+        pts_input = results['pts_input']
 
         cls_label_flat = cls_label.view(-1)
         
@@ -741,7 +743,6 @@ class RCNN(nn.Module):
 
             loss_size = 3 * loss_size  # consistent with old codes
             rcnn_loss_reg = loss_loc + loss_angle + loss_size
-            tb_dict.update(reg_loss_dict)
         else:
             loss_loc = loss_angle = loss_size = rcnn_loss_reg = rcnn_loss_cls * 0
 
@@ -1075,9 +1076,13 @@ class ProposalTargetLayer(nn.Module):
         self.num_points = num_points
         self.reg_fg_thresh = reg_fg_thresh
         self.cls_fg_thresh = cls_fg_thresh
+        self.cls_bg_thresh = cls_bg_thresh
         self.cls_bg_thresh_lo = cls_bg_thresh_lo
         self.fg_ratio = fg_ratio
         self.roi_per_image = roi_per_image
+        self.aug_rot_range = aug_rot_range
+        self.hard_bg_ratio = hard_bg_ratio
+        self.roi_fg_aug_times = roi_fg_aug_times
 
     def forward(self, x):
         roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature = x
@@ -1112,7 +1117,7 @@ class ProposalTargetLayer(nn.Module):
         reg_valid_mask = ((batch_roi_iou > self.reg_fg_thresh) & valid_mask).long()
 
         # classification label
-        batch_cls_label = (batch_roi_iou > self.rcnn_cls_fg_thresh).long()
+        batch_cls_label = (batch_roi_iou > self.cls_fg_thresh).long()
         invalid_mask = (batch_roi_iou > self.cls_bg_thresh) & (batch_roi_iou < self.cls_fg_thresh)
         batch_cls_label[valid_mask == 0] = -1
         batch_cls_label[invalid_mask > 0] = -1
@@ -1154,12 +1159,13 @@ class ProposalTargetLayer(nn.Module):
             cur_gt = cur_gt[:k + 1]
 
             # include gt boxes in the candidate rois
-            iou3d = iou3d_utils.boxes_iou3d_gpu(cur_roi, cur_gt[:, 0:7])  # (M, N)
+            iou3d = iou_3d(cur_roi.detach().cpu().numpy(), cur_gt[:, 0:7].detach().cpu().numpy())  # (M, N)
+            iou3d = torch.tensor(iou3d, device=cur_roi.device)
 
             max_overlaps, gt_assignment = torch.max(iou3d, dim=1)
 
             # sample fg, easy_bg, hard_bg
-            fg_thresh = min(self.reg_fg_thres, self.cls_fg_thresh)
+            fg_thresh = min(self.reg_fg_thresh, self.cls_fg_thresh)
             fg_inds = torch.nonzero((max_overlaps >= fg_thresh)).view(-1)
 
             # TODO: this will mix the fg and bg when CLS_BG_THRESH_LO < iou < CLS_BG_THRESH
@@ -1282,7 +1288,9 @@ class ProposalTargetLayer(nn.Module):
                     aug_box3d = self.random_aug_box3d(roi_box3d)
                     keep = False
                 aug_box3d = aug_box3d.view((1, 7))
-                iou3d = iou3d_utils.boxes_iou3d_gpu(aug_box3d, gt_box3d)
+
+                iou3d = iou_3d(aug_box3d.detach().cpu().numpy(), gt_box3d.detach().cpu().numpy())  
+                iou3d = torch.tensor(iou3d, device=aug_box3d.device)
                 temp_iou = iou3d[0][0]
                 cnt += 1
             roi_boxes3d[k] = aug_box3d.view(-1)
@@ -1313,6 +1321,26 @@ class ProposalTargetLayer(nn.Module):
         aug_box3d = torch.cat([box3d[0:3] + pos_shift, box3d[3:6] * hwl_scale, box3d[6:7] + angle_rot], dim=0)
         return aug_box3d
 
+    @staticmethod
+    def rotate_pc_along_y_torch(pc, rot_angle):
+        """
+        :param pc: (N, 512, 3 + C)
+        :param rot_angle: (N)
+        :return:
+        """
+        cosa = torch.cos(rot_angle).view(-1, 1)  # (N, 1)
+        sina = torch.sin(rot_angle).view(-1, 1)  # (N, 1)
+
+        raw_1 = torch.cat([cosa, -sina], dim=1)  # (N, 2)
+        raw_2 = torch.cat([sina, cosa], dim=1)  # (N, 2)
+        R = torch.cat((raw_1.unsqueeze(dim=1), raw_2.unsqueeze(dim=1)), dim=1)  # (N, 2, 2)
+
+        pc_temp = pc[:, :, [0, 2]]  # (N, 512, 2)
+
+        pc[:, :, [0, 2]] = torch.matmul(pc_temp, R.permute(0, 2, 1))  # (N, 512, 2)
+
+        return pc
+
     def data_augmentation(self, pts, rois, gt_of_rois):
         """
         :param pts: (B, M, 512, 3)
@@ -1335,9 +1363,9 @@ class ProposalTargetLayer(nn.Module):
         roi_alpha = -torch.sign(temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
 
         for k in range(batch_size):
-            pts[k] = kitti_utils.rotate_pc_along_y_torch(pts[k], angles[k])
-            gt_of_rois[k] = kitti_utils.rotate_pc_along_y_torch(gt_of_rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
-            rois[k] = kitti_utils.rotate_pc_along_y_torch(rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
+            pts[k] = ProposalTargetLayer.rotate_pc_along_y_torch(pts[k], angles[k]) 
+            gt_of_rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(gt_of_rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
+            rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
 
             # calculate the ry after rotation
             temp_x, temp_z = gt_of_rois[:, :, 0], gt_of_rois[:, :, 2]

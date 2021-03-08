@@ -66,7 +66,7 @@ class ObjectDetection(BasePipeline):
                                   dtype=torch.float32,
                                   device=self.device)
             inputs = torch.reshape(inputs, (1, -1, inputs.shape[-1]))
-            results = model(inputs)
+            results = model({'point': inputs})
             boxes = model.inference_end(results, data)
 
         return boxes
@@ -147,7 +147,7 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             for i in tqdm(range(len(valid_loader)), desc='validation'):
                 data = valid_loader[i]['data']
-                results = model(data['point'])
+                results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
@@ -258,7 +258,7 @@ class ObjectDetection(BasePipeline):
             for i in process_bar:
                 data = train_loader[i]['data']
 
-                results = model(data['point'])
+                results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
 
