@@ -15,7 +15,6 @@ from open3d.ml.contrib import radius_search
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
-from ...utils.ply import write_ply, read_ply
 from ...utils import MODEL
 
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
@@ -1890,7 +1889,7 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
 
     # Kernel_file
     kernel_file = join(
-        kernel_dir, 'k_{:03d}_{:s}_{:d}D.ply'.format(num_kpoints, fixed,
+        kernel_dir, 'k_{:03d}_{:s}_{:d}D.npy'.format(num_kpoints, fixed,
                                                      dimension))
 
     # Check if already done
@@ -1919,11 +1918,10 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
             # Save points
             kernel_points = kernel_points[best_k, :, :]
 
-        write_ply(kernel_file, kernel_points, ['x', 'y', 'z'])
+        np.save(kernel_file, kernel_points)
 
     else:
-        data = read_ply(kernel_file)
-        kernel_points = np.vstack((data['x'], data['y'], data['z'])).T
+        kernel_points = np.load(kernel_file)
 
     # Random roations for the kernel
     # N.B. 4D random rotations not supported yet

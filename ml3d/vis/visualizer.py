@@ -18,7 +18,7 @@ class Model:
 
     class BoundingBoxData:
         """The class to define a bounding box that is used to describe the target location.
-            **Args:**
+            Args:
                 name: The name of the pointcloud array.
                 boxes: The array of pointcloud that define the bounding box.
         """
@@ -48,9 +48,8 @@ class Model:
         self._data[name] = {}
         self.data_names.append(name)
 
-    """Check if the data is loaded."""
-
     def is_loaded(self, name):
+        """Check if the data is loaded."""
         if name in self._data:
             return len(self._data[name]) > 0
         else:
@@ -58,17 +57,15 @@ class Model:
             # (for instance, if this is a bounding box).
             return True
 
-    """If data is not loaded, then load the data."""
-
     def load(self, name, fail_if_no_space=False):
+        """If data is not loaded, then load the data."""
         assert (False)  # pure virtual
 
     def unload(self, name):
         assert (False)  # pure virtual
 
-    """Create a point cloud based on the data provided. The data should include name and points."""
-
     def create_point_cloud(self, data):
+        """Create a point cloud based on the data provided. The data should include name and points."""
         assert ("name" in data)  # name is a required field
         assert ("points" in data)  # 'points' is a required field
 
@@ -138,26 +135,23 @@ class Model:
 
         return None
 
-    """Get an attribute from data based on the name passed."""
-
     def get_attr(self, name, attr_name):
+        """Get an attribute from data based on the name passed."""
         if name in self._data:
             attrs = self._data[name]
             if attr_name in attrs:
                 return attrs[attr_name]
         return None
 
-    """Get a shape from data based on the name passed."""
-
     def get_attr_shape(self, name, attr_name):
+        """Get a shape from data based on the name passed."""
         attr = self.get_attr(name, attr_name)
         if attr is not None:
             return attr.shape
         return []
 
-    """Get the minimum and maximum for an attribute."""
-
     def get_attr_minmax(self, attr_name, channel):
+        """Get the minimum and maximum for an attribute."""
         attr_key_base = attr_name + ":" + str(channel)
 
         attr_min = 1e30
@@ -179,9 +173,8 @@ class Model:
             return (0.0, 0.0)
         return (attr_min, attr_max)
 
-    """Get a list of attributes based on the name."""
-
     def get_available_attrs(self, names):
+        """Get a list of attributes based on the name."""
         attr_names = None
         for n in names:
             known = self._known_attrs.get(n)
@@ -194,9 +187,8 @@ class Model:
             return []
         return sorted(attr_names)
 
-    """Calculate the bounds for a pointcloud."""
-
     def calc_bounds_for(self, name):
+        """Calculate the bounds for a pointcloud."""
         if name in self.tclouds and not self.tclouds[name].is_empty():
             tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
@@ -211,9 +203,9 @@ class Model:
 
 class DataModel(Model):
     """The class for data i/o and storage of visualization.
-    **Args:**
+    Args:
         userdata: The dataset to be used in the visualization.
-"""
+    """
 
     def __init__(self, userdata):
         super().__init__()
@@ -227,27 +219,25 @@ class DataModel(Model):
             self._init_data(name)
             self._name2srcdata[name] = d
 
-    """Load a pointcloud based on the name provided."""
-
     def load(self, name, fail_if_no_space=False):
+        """Load a pointcloud based on the name provided."""
         if self.is_loaded(name):
             return
 
         self.create_point_cloud(self._name2srcdata[name])
 
-    """Unload a pointcloud."""
-
     def unload(self, name):
+        """Unload a pointcloud."""
         pass
 
 
 class DatasetModel(Model):
     """The class used to manage a dataset model.
-    **Args:**
+    Args:
         dataset:  The 3D ML dataset to use. You can use the base dataset, sample datasets , or a custom dataset.
         split: A string identifying the dataset split that is usually one of 'training', 'test', 'validation', or 'all'.
         indices: The indices to be used for the datamodel. This may vary based on the split used.
-"""
+    """
 
     def __init__(self, dataset, split, indices):
         super().__init__()
@@ -297,9 +287,8 @@ class DatasetModel(Model):
         else:
             print("[ERROR] Dataset split has no data")
 
-    """Check if the data is loaded."""
-
     def is_loaded(self, name):
+        """Check if the data is loaded."""
         loaded = super().is_loaded(name)
         if loaded and name in self._cached_data:
             # make this point cloud the most recently used
@@ -307,9 +296,8 @@ class DatasetModel(Model):
             self._cached_data.append(name)
         return loaded
 
-    """If data is not loaded, then load the data."""
-
     def load(self, name, fail_if_no_space=False):
+        """Check if data is not loaded, and then load the data."""
         assert (name in self._name2datasetidx)
 
         if self.is_loaded(name):
@@ -347,6 +335,7 @@ class DatasetModel(Model):
             return True
 
     def _calc_pointcloud_size(self, raw_data, pcloud):
+        """Calcute the size of the pointcloud based on the rawdata."""
         pcloud_size = 0
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
@@ -354,9 +343,8 @@ class DatasetModel(Model):
         pcloud_size += pcloud.point["points"].num_elements() * 64
         return pcloud_size
 
-    """Unload the data (only if you have loaded it earlier)."""
-
     def unload(self, name):
+        """Unload the data (if it was loaded earlier)."""
         # Only unload if this was loadable; we might have an in-memory,
         # user-specified data created directly through create_point_cloud().
         if name in self._name2datasetidx:
@@ -382,20 +370,17 @@ class Visualizer:
             self._on_changed = None  # takes no args, returns no value
             self.clear()
 
-        """Clears the look-up table."""
-
         def clear(self):
+            """Clears the look-up table."""
             self.widget.clear()
             self._label2color = {}
 
-        """Checks if the look-up table is empty."""
-
         def is_empty(self):
+            """Checks if the look-up table is empty."""
             return len(self._label2color) == 0
 
-        """Returns a list of label keys."""
-
         def get_colors(self):
+            """Returns a list of label keys."""
             return [
                 self._label2color[label]
                 for label in sorted(self._label2color.keys())
@@ -404,9 +389,8 @@ class Visualizer:
         def set_on_changed(self, callback):  # takes no args, no return value
             self._on_changed = callback
 
-        """Updates the labels based on look-up table passsed."""
-
         def set_labels(self, labellut):
+            """Updates the labels based on look-up table passsed."""
             self.widget.clear()
             root = self.widget.get_root_item()
             for key in sorted(labellut.labels.keys()):
@@ -504,9 +488,8 @@ class Visualizer:
         def set_on_changed(self, callback):  # takes no args, no return value
             self._on_changed = callback
 
-        """Updates the colormap based on the minimum and maximum values passed."""
-
         def update(self, colormap, min_val, max_val):
+            """Updates the colormap based on the minimum and maximum values passed."""
             self.colormap = colormap
 
             self._min_value = min_val
@@ -650,9 +633,10 @@ class Visualizer:
             gui.Application.instance.post_to_main_thread(self._window, update)
 
     class ProgressDialog:
-        """This class is used to manage the progress dialog displayed during visualization.
-        Initialize the class.
-        **Args:**
+        """
+        This class is used to manage the progress dialog displayed during visualization.
+        
+        Args:
             title: The title of the dialog box.
             window: The window where the progress dialog box should be displayed.
             n_items: The maximum number of items.
@@ -673,14 +657,12 @@ class Visualizer:
             self._progress.value = 0.0
             self._layout.add_child(self._progress)
 
-        """Set the label text on the dialog box."""
-
         def set_text(self, text):
+            """Set the label text on the dialog box."""
             self._label.text = text + "                    "
 
-        """Post updates to the main thread."""
-
         def post_update(self, text=None):
+            """Post updates to the main thread."""
             if text is None:
                 gui.Application.instance.post_to_main_thread(
                     self._window, self.update)
@@ -693,9 +675,8 @@ class Visualizer:
                 gui.Application.instance.post_to_main_thread(
                     self._window, update_with_text)
 
-        """Enumerate the progress in the dialog box."""
-
         def update(self):
+            """Enumerate the progress in the dialog box."""
             value = min(1.0, self._progress.value + 1.0 / self._n_items)
             self._progress.value = value
 
@@ -931,18 +912,16 @@ class Visualizer:
 
         self._update_datasource_combobox()
 
-    """Set the LUT for a specific attribute.
-    **Args:**
+    def set_lut(self, attr_name, lut):
+        """Set the LUT for a specific attribute.
+        Args:
         attr_name: The attribute name as string.
         lut: The LabelLUT object that should be updated.
-    """
-
-    def set_lut(self, attr_name, lut):
+        """
         self._attrname2lut[attr_name] = lut
 
-    """Set up camera for visualization"""
-
     def setup_camera(self):
+        """Set up camera for visualization."""
         selected_names = self._get_selected_names()
         selected_bounds = [
             self._objects.calc_bounds_for(n) for n in selected_names
@@ -956,9 +935,8 @@ class Visualizer:
         bounds = o3d.geometry.AxisAlignedBoundingBox(min_val, max_val)
         self._3d.setup_camera(60, bounds, bounds.get_center())
 
-    """Show geometry for a given node."""
-
     def show_geometries_under(self, name, show):
+        """Show geometry for a given node."""
         prefix = name
         for (n, node) in self._name2treenode.items():
             if n.startswith(prefix):
@@ -1145,7 +1123,7 @@ class Visualizer:
 
         mat = rendering.Material()
         mat.shader = "unlitLine"
-        mat.line_width = 70
+        mat.line_width = 2 * self.window.scaling
 
         if self._consolidate_bounding_boxes:
             name = Model.bounding_box_prefix.split("/")[0]
@@ -1476,9 +1454,10 @@ class Visualizer:
                           indices=None,
                           width=1024,
                           height=768):
-        """Visualize a dataset.
+        """
+        Visualize a dataset.
 
-        **Example:**
+        Example:
             Minimal example for visualizing a dataset::
                 import open3d.ml.torch as ml3d  # or open3d.ml.tf as ml3d
 
@@ -1486,7 +1465,7 @@ class Visualizer:
                 vis = ml3d.vis.Visualizer()
                 vis.visualize_dataset(dataset, 'all', indices=range(100))
 
-        **Args:**
+        Args:
             dataset: The dataset to use for visualization.
             split: The dataset split to be used, such as 'training'
             indices: An iterable with a subset of the data points to visualize, such as [0,2,3,4].
@@ -1495,8 +1474,8 @@ class Visualizer:
         """
         # Setup the labels
         lut = LabelLUT()
-        for val in sorted(dataset.label_to_names.keys()):
-            lut.add_label(dataset.label_to_names[val], val)
+        for val in sorted(dataset.label_to_names.values()):
+            lut.add_label(val, val)
         self.set_lut("labels", lut)
 
         self._consolidate_bounding_boxes = True
@@ -1509,9 +1488,10 @@ class Visualizer:
                   bounding_boxes=None,
                   width=1024,
                   height=768):
-        """Visualize a custom point cloud data.
+        """
+        Visualize a custom point cloud data.
 
-        **Example:**
+        Example:
             Minimal example for visualizing a single point cloud with an
             attribute::
                 import numpy as np
@@ -1527,7 +1507,7 @@ class Visualizer:
                 vis = ml3d.vis.Visualizer()
                 vis.visualize(data) 
 
-        **Args:**
+        Args:
             data: A list of dictionaries. Each dictionary is a point cloud with
                 attributes. Each dictionary must have the entries 'name' and
                 'points'. Points and point attributes can be passed as numpy 

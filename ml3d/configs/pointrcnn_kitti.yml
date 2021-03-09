@@ -1,0 +1,108 @@
+dataset:
+  name: KITTI
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  steps_per_epoch_train: 5000
+
+model:
+  name: PointRCNN
+  ckpt_path: # path/to/your/checkpoint
+
+  point_cloud_range: [0, -40, -1, 70.4, 40, 3]
+  classes: ['Car']
+
+  score_thres: 0.3
+
+  rpn:
+    backbone:
+      in_channels: 0 # only xyz, no features
+      SA_config:
+          npoints: [4096, 1024, 256, 64]
+          radius: [[0.1, 0.5], [0.5, 1.0], [1.0, 2.0], [2.0, 4.0]]
+          nsample: [[16, 32], [16, 32], [16, 32], [16, 32]]
+          mlps: [[[16, 16, 32], [32, 32, 64]],
+                 [[64, 64, 128], [64, 96, 128]],
+                 [[128, 196, 256], [128, 196, 256]],
+                 [[256, 256, 512], [256, 384, 512]]]
+      fp_mlps: [[128, 128], [256, 256], [512, 512], [512, 512]]
+
+    cls_in_ch: 128
+    cls_out_ch: [128]
+    reg_in_ch: 128
+    reg_out_ch: [128]
+    db_ratio: 0.5
+
+    focal_loss:
+      gamma: 2.0
+      alpha: 0.25
+      loss_weight: 1.0
+
+    head:
+        # config of bin-based loss
+        loc_xz_fine: False #True
+        loc_scope: 3.0
+        loc_bin_size: 0.5
+        num_head_bin: 12
+        nms_pre: 9000
+        nms_post: 100
+        nms_thres: 0.8
+        mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
+
+  rcnn:
+    in_channels: 128
+    pool_extra_width: 1.0
+    num_points: 512
+    xyz_up_layer: [128, 128]
+    cls_out_ch: [256, 256]
+    reg_out_ch: [256, 256]
+
+    SA_config:
+      npoints: [128, 32, -1]
+      radius: [0.2, 0.4, 100]
+      nsample: [64, 64, 64]
+      mlps: [[128, 128, 128],
+              [128, 128, 256],
+              [256, 256, 512]]
+
+    head:
+      # config of bin-based loss
+      loc_xz_fine: True
+      get_y_by_bin: False
+      loc_y_scope: 0.5
+      loc_y_bin_size: 0.25
+      get_ry_fine: True
+      loc_scope: 1.5
+      loc_bin_size: 0.5
+      num_head_bin: 9
+      mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
+      post_process: False
+      nms_thres: 0.1
+
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: True
+
+
+pipeline:
+  name: ObjectDetection
+  test_compute_metric: true
+  batch_size: 1
+  val_batch_size: 1
+  save_ckpt_freq: 5
+  max_epoch: 200
+  main_log_dir: ./logs
+  train_sum_dir: train_log
+  grad_clip_norm: 2
+
+  optimizer:
+    lr: 0.001
+    betas: [0.95, 0.99]
+    weight_decay: 0.01
+
+  # evaluation properties
+  overlaps: [0.7]
+  similar_classes: {
+    Van: Car
+  }
+  difficulties: [0, 1, 2]
+    

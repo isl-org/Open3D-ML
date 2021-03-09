@@ -166,6 +166,44 @@ class DataProcessing:
         return np.expand_dims(ce_label_weight, axis=0)
 
     @staticmethod
+    def invT(T):
+        R = T[:3, :3]  # 3x3 rotation + scale
+        t = T[3:, :3]  # 1x3 translation
+
+        R = np.linalg.inv(R)
+        t = t @ -R
+
+        M = np.concatenate([R, t], axis=0)
+        return np.concatenate([M, [[0], [0], [0], [1]]], axis=1)
+
+    @staticmethod
+    def world2cam(points, world_cam):
+        # transform in cam space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        return np.matmul(points, world_cam)[..., :3]
+
+    @staticmethod
+    def cam2img(points, cam_img):
+        # transform in image space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        points = np.matmul(points, cam_img)
+
+        pts_img = (points[:, :2].T / points[:, 3]).T  # (N, 2)
+        depth = points[:, 2] - cam_img[3, 2]  # depth in rect camera coord
+        return pts_img, depth
+
+    @staticmethod
+    def cam2world(points, world_cam):
+        cam_world = DataProcessing.invT(world_cam)
+
+        # transform in world space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        return np.matmul(points, cam_world)[..., :3]
+
+    @staticmethod
     def remove_outside_points(points, world_cam, cam_img, image_shape):
         """Remove points which are outside of image.
         Args:
@@ -178,14 +216,14 @@ class DataProcessing:
         Returns:
             np.ndarray, shape=[N, 3+dims]: Filtered points.
         """
-        C, R, T = projection_matrix_to_CRT_kitti(cam_img.T)
-        image_bbox = [0, 0, image_shape[1], image_shape[0]]
-        frustum = get_frustum(image_bbox, C)
-        frustum -= T
-        frustum = np.linalg.inv(R) @ frustum.T
-        frustum = camera_to_lidar(frustum.T, world_cam)
-        frustum_surfaces = corner_to_surfaces_3d(frustum[np.newaxis, ...])
-        indices = points_in_convex_polygon_3d(points[:, :3], frustum_surfaces)
-        points = points[indices.reshape([-1])]
+        pts_cam = DataProcessing.world2cam(points[:, :3], world_cam)
+        pts_img, depth = DataProcessing.cam2img(pts_cam, cam_img)
 
-        return points
+        val_flag_1 = np.logical_and(pts_img[:, 0] >= 0,
+                                    pts_img[:, 0] < image_shape[1])
+        val_flag_2 = np.logical_and(pts_img[:, 1] >= 0,
+                                    pts_img[:, 1] < image_shape[0])
+        val_flag_merge = np.logical_and(val_flag_1, val_flag_2)
+        valid = np.logical_and(val_flag_merge, depth >= 0)
+
+        return points[valid]

@@ -3,7 +3,6 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -22,7 +21,7 @@ log = logging.getLogger(__name__)
 # For test files, format should be : ['x', 'y', 'z', 'feat_1', 'feat_2', ........,'feat_n'].
 
 
-class Custom3DSplit():
+class Custom3DSplit(BaseDatasetSplit):
     """This class is used to create a custom dataset split.
     Initialize the class.
     Args:
@@ -34,6 +33,7 @@ class Custom3DSplit():
     """
 
     def __init__(self, dataset, split='training'):
+        super().__init__(dataset, split=split)
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))
@@ -73,7 +73,7 @@ class Custom3DSplit():
 
 class Custom3D(BaseDataset):
     """
-    A template for customized datasetthat you can use with a dataloader to feed data when training a model. This inherits all functions from the base dataset and can be modified by users.
+    A template for customized dataset that you can use with a dataloader to feed data when training a model. This inherits all functions from the base dataset and can be modified by users.
     Initialize the function by passing the dataset and other details.
     
     Args:

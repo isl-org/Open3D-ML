@@ -1,5 +1,4 @@
 
-
 <p align="center">
 <img src="https://raw.githubusercontent.com/intel-isl/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
 <span style="font-size: 220%"><b>ML</b></span>
@@ -244,7 +243,7 @@ pipeline.run_train()
 
 Below is an example of visualization using KITTI. The example shows the use of bounding boxes for the KITTI dataset.
 
-<img width="480" src="https://github.com/intel-isl/Open3D/docs/images/visualizer_BoundingBoxes.png">
+<img width="480" src="https://github.com/intel-isl/Open3D-ML/blob/master/docs/images/visualizer_BoundingBoxes.png?raw=true">
 
 
 For more examples see [`examples/`](https://github.com/intel-isl/Open3D-ML/tree/master/examples)
@@ -272,6 +271,7 @@ python scripts/run_pipeline.py torch -c ml3d/configs/randlanet_semantickitti.yml
 
 # Launch testing for PointPillars on KITTI with torch.
 python scripts/run_pipeline.py torch -c ml3d/configs/pointpillars_kitti.yml --split test --dataset.dataset_path <path-to-dataset> --pipeline ObjectDetection --dataset.use_cache True
+
 ```
 For further help, run `python scripts/run_pipeline.py --help`.
 
@@ -315,20 +315,22 @@ The table shows the available models and datasets for the segmentation task and 
 |--------------------|---------------|----------- |-------|--------------|-------------|
 | RandLA-Net (tf)    | [53.7](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |  [69.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.zip)    | [76.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantic3d_202012120312utc.zip) |  [70.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_parislille3d_202012160654utc.zip) |
 | RandLA-Net (torch) | [52.8](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth)        |     [71.2](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3D_202010091306.pth)  |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.pth)  | [76.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantic3d_202012120312utc.pth) |  [70.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_parislille3d_202012160654utc.pth) |
-| KPConv     (tf)    | [58.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.zip)  |  [65.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.zip) | - |  [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.zip) |
-| KPConv     (torch) | [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202010081102utc.pth) |  [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  | - | [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.pth) |
+| KPConv     (tf)    | [58.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.zip)  |  [65.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.zip) | - |  [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.zip) |
+| KPConv     (torch) | [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.pth) |  [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  | - | [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.pth) |
 
 
 ### Object Detection
 
-For the task of object detection, we measure the performance of different methods using the mean mean average precision (mAP) for bird's eye view (BEV) and 3D.
+For the task of object detection, we measure the performance of different methods using the mean average precision (mAP) for bird's eye view (BEV) and 3D.
 The table shows the available models and datasets for the object detection task and the respective scores. Each score links to the respective weight file.
+For the evaluation, the models were evaluated using the validation subset, according to KITTI's validation criteria. The models were trained for three classes (car, pedestrian and cyclist). The calculated values are the mean value over the mAP of all classes for all difficulty levels.
 
 
-| Model / Dataset    | mAP BEV | mAP 3D |
-|--------------------|---------------|----------- |
-| KITTI (tf)    | [TBD](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |  [TBD](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) | 
-| KITTI (torch) | [54.3](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)        |     [43.5](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012171738utc.pth)  | 
+| Model / Dataset    | KITTI [BEV / 3D] |
+|--------------------|---------------|
+| PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) |
+| PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)   |
+
 
 
 ## Model Zoo

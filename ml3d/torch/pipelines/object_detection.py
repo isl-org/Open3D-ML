@@ -128,7 +128,7 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
-        valid_dataset = dataset.get_split('validation')
+        valid_dataset = dataset.get_split('train')
         valid_loader = TorchDataloader(dataset=valid_dataset,
                                        preprocess=model.preprocess,
                                        transform=model.transform,
@@ -316,6 +316,16 @@ class ObjectDetection(BasePipeline):
 
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
+
+        keys = ckpt["model_state"].keys()
+        keys2 = self.model.state_dict().keys()
+
+        ckpt2 = {"model_state_dict": {}}
+
+        for k0, k1 in zip(keys, keys2):
+            ckpt2["model_state_dict"][k1] = ckpt["model_state"][k0]
+        ckpt = ckpt2
+
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
             log.info(f'Loading checkpoint optimizer_state_dict')

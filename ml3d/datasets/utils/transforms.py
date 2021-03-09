@@ -173,7 +173,7 @@ class ObjdetAugmentation():
             sampled_num = np.round(rate * sampled_num).astype(np.int64)
             sampled_num_dict[class_name] = sampled_num
 
-        sampled = []
+        sampled = []        
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
             if sampled_num < 0:

@@ -4,9 +4,9 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 import logging
+import open3d as o3d
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
@@ -208,18 +208,14 @@ class Toronto3DSplit(BaseDatasetSplit):
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
 
-        data = PlyData.read(pc_path)['vertex']
-        points = np.vstack(
-            (data['x'], data['y'], data['z'])).astype(np.float64).T
-        points = points - self.UTM_OFFSET
+        data = o3d.t.io.read_point_cloud(pc_path).point
+
+        points = data["points"].numpy() - self.UTM_OFFSET
         points = np.float32(points)
 
-        feat = np.zeros(points.shape, dtype=np.float32)
-        feat[:, 0] = data['red']
-        feat[:, 1] = data['green']
-        feat[:, 2] = data['blue']
+        feat = data["colors"].numpy().astype(np.float32)
 
-        labels = np.array(data['scalar_Label'], dtype=np.int32)
+        labels = data['scalar_Label'].numpy().astype(np.int32).reshape((-1,))
 
         data = {'point': points, 'feat': feat, 'label': labels}
 
