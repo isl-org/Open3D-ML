@@ -40,12 +40,18 @@ class SparseConvUnet(BaseModel):
 
         self.linear = tf.keras.layers.Dense(num_classes)
         self.out = OutputLayer()
+        tf.no_gradient("Open3DFixedRadiusSearch")
+        tf.no_gradient("Open3DVoxelize")
+        tf.no_gradient("Open3DReduceSubarraysSum")
 
-    def call(self, inputs, training=False):
-        output = []
+    @tf.function
+    def graph_call(self, inputs, training):
+        output = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
         start_idx = 0
-        for length in inputs['batch_lengths']:
+        for i in range(inputs['batch_lengths'].shape[0]):
+            length = inputs['batch_lengths'][i]
             pos = inputs['point'][start_idx:start_idx + length]
+            tf.print(pos)
             feat = inputs['feat'][start_idx:start_idx + length]
 
             feat, pos, rev = self.inp(feat, pos)
@@ -56,9 +62,13 @@ class SparseConvUnet(BaseModel):
             feat = self.linear(feat)
             feat = self.out(feat, rev)
 
-            output.append(feat)
+            output = output.write(i, feat)
             start_idx += length
-        return tf.concat(output, 0)
+        return output.stack()
+
+    def call(self, inputs, training=False):
+        output = self.graph_call(inputs, training)
+        return output
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)
@@ -202,6 +212,16 @@ class InputLayer(tf.keras.layers.Layer):
         super(InputLayer, self).__init__()
         self.voxel_size = tf.constant([voxel_size, voxel_size, voxel_size])
 
+    def rev_mapping_1(self, voxel_point_indices, length):
+        length = length.shape[0]
+        rev = np.zeros((length,))
+        rev[voxel_point_indices] = np.arange(length)
+
+        return rev.astype(np.int32)
+
+    def rev_mapping_2(self, count):
+        return np.repeat(np.arange(count.shape[0]), count).astype(np.int32)
+
     def call(self, features, inp_positions):
         v = voxelize(inp_positions, self.voxel_size, tf.constant([0., 0., 0.]),
                      tf.constant([40960., 40960., 40960.]))
@@ -211,18 +231,16 @@ class InputLayer(tf.keras.layers.Layer):
         features = tf.gather(features, v.voxel_point_indices)
 
         # Find reverse mapping.
-        rev1 = np.zeros((inp_positions.shape[0],))
-        rev1[v.voxel_point_indices.cpu().numpy()] = np.arange(
-            inp_positions.shape[0])
-        rev1 = rev1.astype(np.int32)
+        rev1 = tf.numpy_function(self.rev_mapping_1,
+                                 [v.voxel_point_indices, inp_positions],
+                                 tf.int32)
 
         # Unique positions.
         inp_positions = tf.gather(inp_positions, v.voxel_point_row_splits[:-1])
 
         # Mean of features.
         count = v.voxel_point_row_splits[1:] - v.voxel_point_row_splits[:-1]
-        rev2 = np.repeat(np.arange(count.shape[0]),
-                         count.cpu().numpy()).astype(np.int32)
+        rev2 = tf.numpy_function(self.rev_mapping_2, [count], tf.int32)
 
         features_avg_0 = tf.expand_dims(
             reduce_subarrays_sum(features[:, 0], v.voxel_point_row_splits), 1)
@@ -237,7 +255,7 @@ class InputLayer(tf.keras.layers.Layer):
         features_avg = features_avg / tf.expand_dims(tf.cast(count, tf.float32),
                                                      1)
 
-        return features_avg, inp_positions, rev2[rev1]
+        return features_avg, inp_positions, tf.gather(rev2, rev1)
 
 
 class OutputLayer(tf.keras.layers.Layer):
@@ -283,31 +301,6 @@ class SubmanifoldSparseConv(tf.keras.layers.Layer):
         return "SubmanifoldSparseConv"
 
 
-def tf_unique_2d(x):
-    return tf.convert_to_tensor(np.unique(x.numpy(), axis=0))
-
-
-def calculate_grid(inp_positions):
-    filter = tf.constant([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
-                          [0, -1, -1], [0, -1, 0], [0, 0, -1], [0, 0, 0]])
-
-    out_pos = tf.reshape(
-        tf.tile(tf.cast(inp_positions, tf.int32),
-                tf.constant([1, filter.shape[0]])), [-1, 3])
-    filter = tf.tile(filter, tf.constant([inp_positions.shape[0], 1]))
-
-    out_pos = out_pos + filter
-    out_pos = out_pos[tf.math.reduce_min(out_pos, 1) >= 0]
-
-    out_pos = out_pos[(
-        ~tf.math.reduce_any(tf.cast(
-            (tf.cast(out_pos, tf.int32) % 2), tf.bool), 1))]
-
-    out_pos = tf_unique_2d(out_pos)
-
-    return tf.cast(out_pos, tf.float32) + 0.5
-
-
 class Convolution(tf.keras.layers.Layer):
 
     def __init__(self,
@@ -333,8 +326,41 @@ class Convolution(tf.keras.layers.Layer):
                               offset=offset,
                               normalize=normalize)
 
+    @staticmethod
+    def tf_unique_2d(x):  # TODO : Compare with np.unique and tf.numpy_function
+        v = voxelize(tf.cast(x, tf.float32), tf.constant([1., 1., 1.]),
+                     tf.constant([0., 0., 0.]),
+                     tf.constant([40960., 40960., 40960.]))
+        idx = tf.gather(v.voxel_point_indices, v.voxel_point_row_splits[:-1])
+        out = tf.gather(x, idx)
+
+        out = tf.gather(out, tf.argsort(out[:, 2]))
+        out = tf.gather(out, tf.argsort(out[:, 1]))
+        out = tf.gather(out, tf.argsort(out[:, 0]))
+
+        return out
+
+    @staticmethod
+    def calculate_grid(inp_positions):
+        filter = np.array([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
+                           [0, -1, -1], [0, -1, 0], [0, 0, -1], [0, 0, 0]])
+
+        out_pos = inp_positions.astype(np.int32).repeat(filter.shape[0],
+                                                        axis=0).reshape(-1, 3)
+        filter = np.expand_dims(filter, 0).repeat(inp_positions.shape[0],
+                                                  axis=0).reshape(-1, 3)
+
+        out_pos = out_pos + filter
+        out_pos = out_pos[out_pos.min(1) >= 0]
+        out_pos = out_pos[(
+            ~((out_pos.astype(np.int32) % 2).astype(np.bool)).any(1))]
+        out_pos = np.unique(out_pos, axis=0)
+
+        return (out_pos + 0.5).astype(np.float32)
+
     def call(self, features, inp_positions, voxel_size=1.0):
-        out_positions = calculate_grid(inp_positions)
+        out_positions = tf.numpy_function(self.calculate_grid, [inp_positions],
+                                          tf.float32)
         out = self.net(features, inp_positions, out_positions, voxel_size)
         return out, out_positions / 2
 

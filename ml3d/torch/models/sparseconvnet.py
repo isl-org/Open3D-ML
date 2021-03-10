@@ -72,11 +72,12 @@ class SparseConvUnet(BaseModel):
             raise Exception(
                 "SparseConvnet doesn't work without feature values.")
 
+        feat = np.array(data['feat'], dtype=np.float32) / 127.5 - 1
+
         if attr['split'] in ['training', 'train']:
             t_augment = self.cfg.get('t_augment', None)
             points = trans_augment(points, t_augment)
-
-        feat = np.array(data['feat'], dtype=np.float32) / 127.5 - 1
+            feat += np.random.randn(3) * 0.1
 
         points *= self.cfg.scale  # Scale = 1/voxel_size
 
