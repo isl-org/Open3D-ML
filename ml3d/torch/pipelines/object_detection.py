@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 
 from .base_pipeline import BasePipeline
-from ..dataloaders import TorchDataloader
+from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
@@ -129,6 +129,8 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         valid_dataset = dataset.get_split('train')
         valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
@@ -142,7 +144,7 @@ class ObjectDetection(BasePipeline):
             batch_size=cfg.val_batch_size,
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
-            collate_fn=lambda x: x,
+            collate_fn=batcher.collate_fn,
         )
 
         log.info("Started validation")
@@ -152,9 +154,8 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for inputs in tqdm(valid_loader, desc='validation'):
-                data = inputs[0]['data']
-                results = model(data['point'])
+            for data in tqdm(valid_loader, desc='validation'):
+                results = model(data.point)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
@@ -164,7 +165,7 @@ class ObjectDetection(BasePipeline):
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, data)
                 pred.append(BEVBox3D.to_dicts(boxes[0]))
-                gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
+                gt.append(BEVBox3D.to_dicts(data.bbox_objs))
 
         sum_loss = 0
         desc = "validation - "
@@ -230,6 +231,8 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         train_dataset = dataset.get_split('training')
         train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
@@ -242,7 +245,7 @@ class ObjectDetection(BasePipeline):
             batch_size=cfg.batch_size,
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
-            collate_fn=lambda x: x,
+            collate_fn=batcher.collate_fn,
         )
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
@@ -270,10 +273,8 @@ class ObjectDetection(BasePipeline):
             self.losses = {}
 
             process_bar = tqdm(train_loader, desc='training')
-            for inputs in process_bar:
-                data = inputs[0]['data']
-
-                results = model(data['point'])
+            for data in process_bar:
+                results = model(data.point)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
 
