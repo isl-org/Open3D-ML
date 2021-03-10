@@ -130,13 +130,20 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         valid_dataset = dataset.get_split('train')
-        valid_loader = TorchDataloader(dataset=valid_dataset,
-                                       preprocess=model.preprocess,
-                                       transform=model.transform,
-                                       use_cache=dataset.cfg.use_cache,
-                                       shuffle=True,
-                                       steps_per_epoch=dataset.cfg.get(
-                                           'steps_per_epoch_valid', None))
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      shuffle=True,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+        valid_loader = DataLoader(
+            valid_split,
+            batch_size=cfg.val_batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=lambda x: x,
+        )
 
         log.info("Started validation")
 
@@ -145,8 +152,8 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for i in tqdm(range(len(valid_loader)), desc='validation'):
-                data = valid_loader[i]['data']
+            for inputs in tqdm(valid_loader, desc='validation'):
+                data = inputs[0]['data']
                 results = model(data['point'])
                 loss = model.loss(results, data)
                 for l, v in loss.items():
@@ -224,12 +231,19 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         train_dataset = dataset.get_split('training')
-        train_loader = TorchDataloader(dataset=train_dataset,
-                                       preprocess=model.preprocess,
-                                       transform=model.transform,
-                                       use_cache=dataset.cfg.use_cache,
-                                       steps_per_epoch=dataset.cfg.get(
-                                           'steps_per_epoch_train', None))
+        train_split = TorchDataloader(dataset=train_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=lambda x: x,
+        )
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -254,9 +268,10 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                data = train_loader[i]['data']
+
+            process_bar = tqdm(train_loader, desc='training')
+            for inputs in process_bar:
+                data = inputs[0]['data']
 
                 results = model(data['point'])
                 loss = model.loss(results, data)
