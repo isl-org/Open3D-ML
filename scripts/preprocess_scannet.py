@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 from os.path import join, isfile
-# import concurrent.futures
+import concurrent.futures
 import argparse
 import json
 import csv
@@ -24,6 +24,12 @@ def parse_args():
                         help='Output path to store processed data.',
                         default=None,
                         required=False)
+    parser.add_argument(
+        '--only_stats',
+        help='Do not preprocess. Only compute dataset statistics.',
+        default=False,
+        action='store_true',
+        required=False)
 
     args = parser.parse_args()
 
@@ -79,36 +85,32 @@ class ScannetProcess():
 
     def convert(self):
         errors = []
-        scene_stats = []
 
-        # with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         #     future_scene_stats = [
         #         executor.submit(self.process_scene, scan) for scan in self.scans
         #     ]
         #     for future in tqdm(future_scene_stats):
         for scan in tqdm(self.scans):
             try:
-                scene_stats.append(self.process_scene(scan))
+                self.process_scene(scan)
             except Exception as e:
-                log.warning(repr(e))
-                errors.append(f'{scan}: ' + traceback.format_exc(1))
+                errors.append(f'{scan}: ' + traceback.format_exc())
 
             # executor.shutdown(wait=True)
 
-        dataset_stats = utils.statistics.compute_dataset_stats(scene_stats)
         if errors:
             errmsg = "Processing failed:\n" + "\n".join(errors)
             log.warning(errmsg)
-            dataset_stats["Errors"] = errmsg
-        with open(join(self.out_path, 'summary.yaml'), 'w') as sumfile:
-            yaml.dump(dataset_stats, sumfile)
+        with open(join(self.out_path, 'errors.txt'), 'w') as errfile:
+            errfile.write(errmsg)
 
     def process_scene(self, scan):
-        # if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
-        #         isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
-        #         isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
-        #         isfile(f'{join(self.out_path, scan)}_bbox.npy')):
-        #     return
+        if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
+                isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
+                isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
+                isfile(f'{join(self.out_path, scan)}_bbox.npy')):
+            return
 
         in_path = join(self.dataset_path, scan)
         mesh_file = join(in_path, scan + '_vh_clean_2.ply')
@@ -146,11 +148,6 @@ class ScannetProcess():
         np.save(f'{join(self.out_path, scan)}_sem_label.npy', semantic_labels)
         np.save(f'{join(self.out_path, scan)}_ins_label.npy', instance_labels)
         np.save(f'{join(self.out_path, scan)}_bbox.npy', instance_bboxes)
-
-        return utils.statistics.compute_scene_stats(mesh_vertices,
-                                                    semantic_labels,
-                                                    instance_labels,
-                                                    instance_bboxes)
 
     def export(self, mesh_file, agg_file, seg_file, meta_file, label_map_file):
         mesh_vertices = self.read_mesh_vertices_rgb(mesh_file)
@@ -281,11 +278,35 @@ class ScannetProcess():
                     seg_to_verts[seg_id] = [i]
         return seg_to_verts, num_verts
 
+    def compute_dataset_statistics(self):
+
+        def get_scene_stats(scan):
+            mesh_vertices = np.load(f'{join(self.out_path, scan)}_vert.npy')
+            semantic_labels = np.load(
+                f'{join(self.out_path, scan)}_sem_label.npy')
+            instance_labels = np.load(
+                f'{join(self.out_path, scan)}_ins_label.npy')
+            instance_bboxes = np.load(f'{join(self.out_path, scan)}_bbox.npy')
+            return utils.statistics.compute_scene_stats(mesh_vertices,
+                                                        semantic_labels,
+                                                        instance_labels,
+                                                        instance_bboxes)
+
+        # ProcessPoolExecutor deadlocks
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            scene_stats = executor.map(get_scene_stats, self.scans)
+
+        dataset_stats = utils.statistics.compute_dataset_stats(
+            list(scene_stats))
+        with open(join(self.out_path, 'summary.yaml'), 'w') as sumfile:
+            yaml.dump(dataset_stats, sumfile)
+
 
 if __name__ == '__main__':
     args = parse_args()
-    out_path = args.out_path
-    if out_path is None:
+    if args.out_path is None:
         args.out_path = args.dataset_path
     converter = ScannetProcess(args.dataset_path, args.out_path)
-    converter.convert()
+    if not args.only_stats:
+        converter.convert()
+    converter.compute_dataset_statistics()
