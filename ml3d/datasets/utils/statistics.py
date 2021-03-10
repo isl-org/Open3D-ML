@@ -1,4 +1,6 @@
-""" Tools for computing various statistics on point cloud datasets """
+""" Tools for computing various statistics on point cloud datasets
+    Currently works only with ScanNet
+"""
 
 import functools
 import numpy as np
@@ -24,7 +26,8 @@ def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
     }
     class_id, class_bbox_count = np.unique(instance_bboxes[:, -1],
                                            return_counts=True)
-    stats['class_count'] = dict(zip(class_id, class_bbox_count))
+    stats['class_count'] = dict(
+        zip(class_id.tolist(), class_bbox_count.tolist()))
 
     stats['bbox_shape'] = {
         class_id: [] for class_id in np.unique(instance_bboxes[:, -1])
@@ -65,14 +68,37 @@ def compute_dataset_stats(scene_stats):
             'std': float(np.std(points_per_scene)),
         }
     if 'vertices' in scene_stats[0]:
-        data_stats['vertices'] = {
-            'min':
+
+        scene_size = [
+            stats['vertices']['max'] - stats['vertices']['min']
+            for stats in scene_stats
+        ]
+        data_stats['point_cloud'] = {
+            'points_min':
                 functools.reduce(np.fmin, (stats['vertices']['min']
                                            for stats in scene_stats)).tolist(),
-            'max':
+            'points_max':
                 functools.reduce(np.fmax, (stats['vertices']['max']
-                                           for stats in scene_stats)).tolist()
+                                           for stats in scene_stats)).tolist(),
+            'size_min':
+                functools.reduce(np.fmin, scene_size).tolist(),
+            'size_max':
+                functools.reduce(np.fmax, scene_size).tolist(),
+            'size_mean':
+                np.mean(scene_size, axis=0).tolist(),
+            'size_std':
+                np.std(scene_size, axis=0).tolist(),
         }
+    if 'class_count' in scene_stats[0]:
+
+        def accumulate_dict(accumulator, new_dict):
+            for key, value in new_dict.items():
+                accumulator[key] = value + accumulator.get(key, 0)
+            return accumulator
+
+        data_stats['class_count'] = functools.reduce(
+            accumulate_dict, (stats['class_count'] for stats in scene_stats))
+
     if 'bbox_shape' in scene_stats[0]:
         class_ids = np.unique([
             clsid for stats in scene_stats
