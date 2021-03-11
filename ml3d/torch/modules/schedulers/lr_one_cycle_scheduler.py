@@ -6,6 +6,7 @@ from ..optimizers import OptimWrapper
 
 
 class LRSchedulerStep(object):
+
     def __init__(self, fai_optimizer: OptimWrapper, total_step, lr_phases,
                  mom_phases):
         # if not isinstance(fai_optimizer, OptimWrapper):
@@ -21,9 +22,12 @@ class LRSchedulerStep(object):
             if isinstance(lambda_func, str):
                 lambda_func = eval(lambda_func)
             if i < len(lr_phases) - 1:
-                self.lr_phases.append((int(start * total_step), int(lr_phases[i + 1][0] * total_step), lambda_func))
+                self.lr_phases.append(
+                    (int(start * total_step),
+                     int(lr_phases[i + 1][0] * total_step), lambda_func))
             else:
-                self.lr_phases.append((int(start * total_step), total_step, lambda_func))
+                self.lr_phases.append(
+                    (int(start * total_step), total_step, lambda_func))
         assert self.lr_phases[0][0] == 0
         self.mom_phases = []
         for i, (start, lambda_func) in enumerate(mom_phases):
@@ -32,9 +36,12 @@ class LRSchedulerStep(object):
             if isinstance(lambda_func, str):
                 lambda_func = eval(lambda_func)
             if i < len(mom_phases) - 1:
-                self.mom_phases.append((int(start * total_step), int(mom_phases[i + 1][0] * total_step), lambda_func))
+                self.mom_phases.append(
+                    (int(start * total_step),
+                     int(mom_phases[i + 1][0] * total_step), lambda_func))
             else:
-                self.mom_phases.append((int(start * total_step), total_step, lambda_func))
+                self.mom_phases.append(
+                    (int(start * total_step), total_step, lambda_func))
         assert self.mom_phases[0][0] == 0
 
     def step(self, step):
@@ -54,6 +61,7 @@ def annealing_cos(start, end, pct):
 
 
 class OneCycleScheduler(LRSchedulerStep):
+
     def __init__(self, fai_optimizer, total_step, lr_max, moms, div_factor,
                  pct_start):
         self.lr_max = lr_max

@@ -13,12 +13,14 @@ def set_bn_momentum_default(bn_momentum):
 
 class BNMomentumScheduler(object):
 
-    def __init__(
-            self, model, bn_lambda, last_epoch=-1,
-            setter=set_bn_momentum_default
-    ):
+    def __init__(self,
+                 model,
+                 bn_lambda,
+                 last_epoch=-1,
+                 setter=set_bn_momentum_default):
         if not isinstance(model, nn.Module):
-            raise RuntimeError("Class '{}' is not a PyTorch nn Module".format(type(model).__name__))
+            raise RuntimeError("Class '{}' is not a PyTorch nn Module".format(
+                type(model).__name__))
 
         self.model = model
         self.setter = setter

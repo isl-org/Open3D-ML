@@ -54,7 +54,8 @@ class PointRCNN(BaseModel):
             if not self.mode == "RPN":
                 self.rpn.eval()
             rois = None
-            cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(inputs['point'])
+            cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
+                inputs['point'])
             output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         if self.mode == "RCNN":
@@ -68,33 +69,37 @@ class PointRCNN(BaseModel):
                 rois, roi_scores_raw = self.rpn.proposal_layer(
                     rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
 
-            output = self.rcnn(
-                rois, inputs['bboxes'] if self.training else None, backbone_xyz,
-                backbone_features.permute((0, 2, 1)), seg_mask, pts_depth)
-
+            output = self.rcnn(rois,
+                               inputs['bboxes'] if self.training else None,
+                               backbone_xyz, backbone_features.permute(
+                                   (0, 2, 1)), seg_mask, pts_depth)
 
         return output
 
     def get_optimizer(self, cfg):
+
         def children(m: nn.Module):
             return list(m.children())
 
         def num_children(m: nn.Module) -> int:
             return len(children(m))
 
-        flatten_model = lambda m: sum(map(flatten_model, m.children()), []) if num_children(m) else [m]
+        flatten_model = lambda m: sum(map(flatten_model, m.children()), []
+                                     ) if num_children(m) else [m]
         get_layer_groups = lambda m: [nn.Sequential(*flatten_model(m))]
 
         optimizer_func = partial(torch.optim.Adam, betas=tuple(cfg.betas))
-        optimizer = OptimWrapper.create(
-            optimizer_func, 3e-3, get_layer_groups(self), wd=cfg.weight_decay, true_wd=True, bn_wd=True
-        )
+        optimizer = OptimWrapper.create(optimizer_func,
+                                        3e-3,
+                                        get_layer_groups(self),
+                                        wd=cfg.weight_decay,
+                                        true_wd=True,
+                                        bn_wd=True)
 
         # fix rpn: do this since we use customized optimizer.step
         if self.mode == "RCNN":
             for param in self.rpn.parameters():
                 param.requires_grad = False
-
 
         def bnm_lmbd(cur_epoch):
             cur_decay = 1
@@ -103,21 +108,21 @@ class PointRCNN(BaseModel):
                     cur_decay = cur_decay * cfg.bn_decay
             return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
 
-        lr_scheduler = OneCycleScheduler(
-            optimizer, 40800, cfg.lr, list(cfg.moms), cfg.div_factor, cfg.pct_start
-        )
+        lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
+                                         list(cfg.moms), cfg.div_factor,
+                                         cfg.pct_start)
 
         # bnm_scheduler = BNMomentumScheduler(self.model, bnm_lmbd, last_epoch=last_epoch)
 
         # lr_warmup_scheduler = CosineWarmupLR(optimizer, T_max=cfg.warmup_epoch * len(train_loader),
         #                                               eta_min=cfg.warmup_min)
 
-        return optimizer, lr_scheduler#, bnm_scheduler
+        return optimizer, lr_scheduler  #, bnm_scheduler
 
     def loss(self, results, inputs):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
-        else: 
+        else:
             return self.rcnn.loss(results, inputs)
 
     def preprocess(self, data, attr):
@@ -137,7 +142,8 @@ class PointRCNN(BaseModel):
     @staticmethod
     def generate_rpn_training_labels(points, bboxes):
         cls_label = np.zeros((points.shape[0]), dtype=np.int32)
-        reg_label = np.zeros((points.shape[0], 7), dtype=np.float32)  # dx, dy, dz, ry, h, w, l
+        reg_label = np.zeros((points.shape[0], 7),
+                             dtype=np.float32)  # dx, dy, dz, ry, h, w, l
 
         pts_idx = points_in_box(points, bboxes)
 
@@ -160,7 +166,7 @@ class PointRCNN(BaseModel):
             # pixel offset of object center
             center3d = bboxes[k][0:3].copy()  # (x, y, z)
             center3d[1] -= bboxes[k][3] / 2
-            reg_label[fg_pt_flag, 0:3] = center3d - fg_pts_rect 
+            reg_label[fg_pt_flag, 0:3] = center3d - fg_pts_rect
 
             # size and angle encoding
             reg_label[fg_pt_flag, 3] = bboxes[k][3]  # h
@@ -169,7 +175,7 @@ class PointRCNN(BaseModel):
             reg_label[fg_pt_flag, 6] = bboxes[k][6]  # ry
 
         return cls_label, reg_label
-        
+
     def transform(self, data, attr):
         points = data['point']
 
@@ -181,18 +187,12 @@ class PointRCNN(BaseModel):
         bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
 
         if self.mode == "RPN":
-            labels, bboxes = PointRCNN.generate_rpn_training_labels(points, bboxes)
+            labels, bboxes = PointRCNN.generate_rpn_training_labels(
+                points, bboxes)
 
-
-        points = torch.tensor([points],
-                              dtype=torch.float32,
-                              device=self.device)
-        labels = torch.tensor([labels],
-                              dtype=torch.int64,
-                              device=self.device)
-        bboxes = torch.tensor([bboxes],
-                              dtype=torch.float32,
-                              device=self.device)
+        points = torch.tensor([points], dtype=torch.float32, device=self.device)
+        labels = torch.tensor([labels], dtype=torch.int64, device=self.device)
+        bboxes = torch.tensor([bboxes], dtype=torch.float32, device=self.device)
 
         return {
             'point': points,
@@ -258,9 +258,17 @@ class PointRCNN(BaseModel):
 MODEL._register_module(PointRCNN, 'torch')
 
 
-def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anchor_size,
-                 get_xz_fine=True, get_y_by_bin=False, loc_y_scope=0.5, loc_y_bin_size=0.25, get_ry_fine=False):
-
+def get_reg_loss(pred_reg,
+                 reg_label,
+                 loc_scope,
+                 loc_bin_size,
+                 num_head_bin,
+                 anchor_size,
+                 get_xz_fine=True,
+                 get_y_by_bin=False,
+                 loc_y_scope=0.5,
+                 loc_y_bin_size=0.25,
+                 get_ry_fine=False):
     """
     Bin-based 3D bounding boxes regression loss. See https://arxiv.org/abs/1812.04244 for more details.
     
@@ -284,7 +292,10 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
     loc_loss = 0
 
     # xz localization loss
-    x_offset_label, y_offset_label, z_offset_label = reg_label[:, 0], reg_label[:, 1], reg_label[:, 2]
+    x_offset_label, y_offset_label, z_offset_label = reg_label[:,
+                                                               0], reg_label[:,
+                                                                             1], reg_label[:,
+                                                                                           2]
     x_shift = torch.clamp(x_offset_label + loc_scope, 0, loc_scope * 2 - 1e-3)
     z_shift = torch.clamp(z_offset_label + loc_scope, 0, loc_scope * 2 - 1e-3)
     x_bin_label = (x_shift / loc_bin_size).floor().long()
@@ -294,8 +305,8 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
     z_bin_l, z_bin_r = per_loc_bin_num, per_loc_bin_num * 2
     start_offset = z_bin_r
 
-    loss_x_bin = F.cross_entropy(pred_reg[:, x_bin_l: x_bin_r], x_bin_label)
-    loss_z_bin = F.cross_entropy(pred_reg[:, z_bin_l: z_bin_r], z_bin_label)
+    loss_x_bin = F.cross_entropy(pred_reg[:, x_bin_l:x_bin_r], x_bin_label)
+    loss_z_bin = F.cross_entropy(pred_reg[:, z_bin_l:z_bin_r], z_bin_label)
     reg_loss_dict['loss_x_bin'] = loss_x_bin.item()
     reg_loss_dict['loss_z_bin'] = loss_z_bin.item()
     loc_loss += loss_x_bin + loss_z_bin
@@ -305,18 +316,28 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
         z_res_l, z_res_r = per_loc_bin_num * 3, per_loc_bin_num * 4
         start_offset = z_res_r
 
-        x_res_label = x_shift - (x_bin_label.float() * loc_bin_size + loc_bin_size / 2)
-        z_res_label = z_shift - (z_bin_label.float() * loc_bin_size + loc_bin_size / 2)
+        x_res_label = x_shift - (x_bin_label.float() * loc_bin_size +
+                                 loc_bin_size / 2)
+        z_res_label = z_shift - (z_bin_label.float() * loc_bin_size +
+                                 loc_bin_size / 2)
         x_res_norm_label = x_res_label / loc_bin_size
         z_res_norm_label = z_res_label / loc_bin_size
 
-        x_bin_onehot = torch.zeros((x_bin_label.size(0), per_loc_bin_num), device=anchor_size.device, dtype=torch.float32)
+        x_bin_onehot = torch.zeros((x_bin_label.size(0), per_loc_bin_num),
+                                   device=anchor_size.device,
+                                   dtype=torch.float32)
         x_bin_onehot.scatter_(1, x_bin_label.view(-1, 1).long(), 1)
-        z_bin_onehot = torch.zeros((z_bin_label.size(0), per_loc_bin_num), device=anchor_size.device, dtype=torch.float32)
+        z_bin_onehot = torch.zeros((z_bin_label.size(0), per_loc_bin_num),
+                                   device=anchor_size.device,
+                                   dtype=torch.float32)
         z_bin_onehot.scatter_(1, z_bin_label.view(-1, 1).long(), 1)
 
-        loss_x_res = F.smooth_l1_loss((pred_reg[:, x_res_l: x_res_r] * x_bin_onehot).sum(dim=1), x_res_norm_label)
-        loss_z_res = F.smooth_l1_loss((pred_reg[:, z_res_l: z_res_r] * z_bin_onehot).sum(dim=1), z_res_norm_label)
+        loss_x_res = F.smooth_l1_loss(
+            (pred_reg[:, x_res_l:x_res_r] * x_bin_onehot).sum(dim=1),
+            x_res_norm_label)
+        loss_z_res = F.smooth_l1_loss(
+            (pred_reg[:, z_res_l:z_res_r] * z_bin_onehot).sum(dim=1),
+            z_res_norm_label)
         reg_loss_dict['loss_x_res'] = loss_x_res.item()
         reg_loss_dict['loss_z_res'] = loss_z_res.item()
         loc_loss += loss_x_res + loss_z_res
@@ -327,16 +348,21 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
         y_res_l, y_res_r = y_bin_r, y_bin_r + loc_y_bin_num
         start_offset = y_res_r
 
-        y_shift = torch.clamp(y_offset_label + loc_y_scope, 0, loc_y_scope * 2 - 1e-3)
+        y_shift = torch.clamp(y_offset_label + loc_y_scope, 0,
+                              loc_y_scope * 2 - 1e-3)
         y_bin_label = (y_shift / loc_y_bin_size).floor().long()
-        y_res_label = y_shift - (y_bin_label.float() * loc_y_bin_size + loc_y_bin_size / 2)
+        y_res_label = y_shift - (y_bin_label.float() * loc_y_bin_size +
+                                 loc_y_bin_size / 2)
         y_res_norm_label = y_res_label / loc_y_bin_size
 
-        y_bin_onehot = torch.cuda.FloatTensor(y_bin_label.size(0), loc_y_bin_num).zero_()
+        y_bin_onehot = torch.cuda.FloatTensor(y_bin_label.size(0),
+                                              loc_y_bin_num).zero_()
         y_bin_onehot.scatter_(1, y_bin_label.view(-1, 1).long(), 1)
 
-        loss_y_bin = F.cross_entropy(pred_reg[:, y_bin_l: y_bin_r], y_bin_label)
-        loss_y_res = F.smooth_l1_loss((pred_reg[:, y_res_l: y_res_r] * y_bin_onehot).sum(dim=1), y_res_norm_label)
+        loss_y_bin = F.cross_entropy(pred_reg[:, y_bin_l:y_bin_r], y_bin_label)
+        loss_y_res = F.smooth_l1_loss(
+            (pred_reg[:, y_res_l:y_res_r] * y_bin_onehot).sum(dim=1),
+            y_res_norm_label)
 
         reg_loss_dict['loss_y_bin'] = loss_y_bin.item()
         reg_loss_dict['loss_y_res'] = loss_y_res.item()
@@ -346,7 +372,8 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
         y_offset_l, y_offset_r = start_offset, start_offset + 1
         start_offset = y_offset_r
 
-        loss_y_offset = F.smooth_l1_loss(pred_reg[:, y_offset_l: y_offset_r].sum(dim=1), y_offset_label)
+        loss_y_offset = F.smooth_l1_loss(
+            pred_reg[:, y_offset_l:y_offset_r].sum(dim=1), y_offset_label)
         reg_loss_dict['loss_y_offset'] = loss_y_offset.item()
         loc_loss += loss_y_offset
 
@@ -362,14 +389,18 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
 
         ry_label = ry_label % (2 * np.pi)  # 0 ~ 2pi
         opposite_flag = (ry_label > np.pi * 0.5) & (ry_label < np.pi * 1.5)
-        ry_label[opposite_flag] = (ry_label[opposite_flag] + np.pi) % (2 * np.pi)  # (0 ~ pi/2, 3pi/2 ~ 2pi)
+        ry_label[opposite_flag] = (ry_label[opposite_flag] + np.pi) % (
+            2 * np.pi)  # (0 ~ pi/2, 3pi/2 ~ 2pi)
         shift_angle = (ry_label + np.pi * 0.5) % (2 * np.pi)  # (0 ~ pi)
 
-        shift_angle = torch.clamp(shift_angle - np.pi * 0.25, min=1e-3, max=np.pi * 0.5 - 1e-3)  # (0, pi/2)
+        shift_angle = torch.clamp(shift_angle - np.pi * 0.25,
+                                  min=1e-3,
+                                  max=np.pi * 0.5 - 1e-3)  # (0, pi/2)
 
         # bin center is (5, 10, 15, ..., 85)
         ry_bin_label = (shift_angle / angle_per_class).floor().long()
-        ry_res_label = shift_angle - (ry_bin_label.float() * angle_per_class + angle_per_class / 2)
+        ry_res_label = shift_angle - (ry_bin_label.float() * angle_per_class +
+                                      angle_per_class / 2)
         ry_res_norm_label = ry_res_label / (angle_per_class / 2)
 
     else:
@@ -379,13 +410,17 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
 
         shift_angle = (heading_angle + angle_per_class / 2) % (2 * np.pi)
         ry_bin_label = (shift_angle / angle_per_class).floor().long()
-        ry_res_label = shift_angle - (ry_bin_label.float() * angle_per_class + angle_per_class / 2)
+        ry_res_label = shift_angle - (ry_bin_label.float() * angle_per_class +
+                                      angle_per_class / 2)
         ry_res_norm_label = ry_res_label / (angle_per_class / 2)
 
-    ry_bin_onehot = torch.cuda.FloatTensor(ry_bin_label.size(0), num_head_bin).zero_()
+    ry_bin_onehot = torch.cuda.FloatTensor(ry_bin_label.size(0),
+                                           num_head_bin).zero_()
     ry_bin_onehot.scatter_(1, ry_bin_label.view(-1, 1).long(), 1)
     loss_ry_bin = F.cross_entropy(pred_reg[:, ry_bin_l:ry_bin_r], ry_bin_label)
-    loss_ry_res = F.smooth_l1_loss((pred_reg[:, ry_res_l: ry_res_r] * ry_bin_onehot).sum(dim=1), ry_res_norm_label)
+    loss_ry_res = F.smooth_l1_loss(
+        (pred_reg[:, ry_res_l:ry_res_r] * ry_bin_onehot).sum(dim=1),
+        ry_res_norm_label)
 
     reg_loss_dict['loss_ry_bin'] = loss_ry_bin.item()
     reg_loss_dict['loss_ry_res'] = loss_ry_res.item()
@@ -393,7 +428,8 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
 
     # size loss
     size_res_l, size_res_r = ry_res_r, ry_res_r + 3
-    assert pred_reg.shape[1] == size_res_r, '%d vs %d' % (pred_reg.shape[1], size_res_r)
+    assert pred_reg.shape[1] == size_res_r, '%d vs %d' % (pred_reg.shape[1],
+                                                          size_res_r)
 
     size_res_norm_label = (reg_label[:, 3:6] - anchor_size) / anchor_size
     size_res_norm = pred_reg[:, size_res_l:size_res_r]
@@ -485,7 +521,7 @@ class RPN(nn.Module):
 
         return rpn_cls, rpn_reg, backbone_xyz, backbone_features
 
-    def loss(self, results, inputs):            
+    def loss(self, results, inputs):
         rpn_cls = results['cls']
         rpn_reg = results['reg']
 
@@ -503,7 +539,10 @@ class RPN(nn.Module):
         cls_weights = pos + neg
         pos_normalizer = pos.sum()
         cls_weights = cls_weights / torch.clamp(pos_normalizer, min=1.0)
-        rpn_loss_cls = self.loss_cls(rpn_cls_flat, rpn_cls_target, cls_weights, avg_factor=1.0)
+        rpn_loss_cls = self.loss_cls(rpn_cls_flat,
+                                     rpn_cls_target,
+                                     cls_weights,
+                                     avg_factor=1.0)
 
         # RPN regression loss
         point_num = rpn_reg.size(0) * rpn_reg.size(1)
@@ -520,13 +559,13 @@ class RPN(nn.Module):
                                         get_y_by_bin=False,
                                         get_ry_fine=False)
 
-            loss_size = 3 * loss_size 
+            loss_size = 3 * loss_size
             rpn_loss_reg = loss_loc + loss_angle + loss_size
         else:
             loss_loc = loss_angle = loss_size = rpn_loss_reg = rpn_loss_cls * 0
 
         return {
-            "cls": rpn_loss_cls * self.loss_weight[0], 
+            "cls": rpn_loss_cls * self.loss_weight[0],
             "reg": rpn_loss_reg * self.loss_weight[1]
         }
 
@@ -617,7 +656,8 @@ class RCNN(nn.Module):
 
         self.reg_blocks = nn.Sequential(*layers)
 
-        self.proposal_target_layer = ProposalTargetLayer(self.pool_extra_width, self.num_points)
+        self.proposal_target_layer = ProposalTargetLayer(
+            self.pool_extra_width, self.num_points)
         self.init_weights()
 
     def init_weights(self):
@@ -646,7 +686,8 @@ class RCNN(nn.Module):
             with torch.no_grad():
                 target = self.proposal_target_layer(
                     [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
-                pts_input = torch.cat((target['sampled_pts'], target['pts_feature']), dim=2)
+                pts_input = torch.cat(
+                    (target['sampled_pts'], target['pts_feature']), dim=2)
                 target['pts_input'] = pts_input
         else:
             pooled_features, pooled_empty_flag = roipool3d_utils.roipool3d_gpu(
@@ -681,8 +722,7 @@ class RCNN(nn.Module):
         l_xyz, l_features = [xyz], [merged_feature.squeeze(dim=3)]
 
         for i in range(len(self.SA_modules)):
-            li_xyz, li_features = self.SA_modules[i](l_xyz[i],
-                                                        l_features[i])
+            li_xyz, li_features = self.SA_modules[i](l_xyz[i], l_features[i])
             l_xyz.append(li_xyz)
             l_features.append(li_features)
 
@@ -696,12 +736,11 @@ class RCNN(nn.Module):
         if self.training:
             ret_dict.update(target)
         return ret_dict
-        
 
     def loss(self, results, inputs):
         rcnn_cls = results['rcnn_cls']
         rcnn_reg = results['rcnn_reg']
-        
+
         cls_label = results['cls_label'].float()
         reg_valid_mask = results['reg_valid_mask']
         roi_boxes3d = results['roi_boxes3d']
@@ -710,12 +749,15 @@ class RCNN(nn.Module):
         pts_input = results['pts_input']
 
         cls_label_flat = cls_label.view(-1)
-        
+
         # binary cross entropy
         rcnn_cls_flat = rcnn_cls.view(-1)
-        batch_loss_cls = F.binary_cross_entropy(torch.sigmoid(rcnn_cls_flat), cls_label, reduction='none')
+        batch_loss_cls = F.binary_cross_entropy(torch.sigmoid(rcnn_cls_flat),
+                                                cls_label,
+                                                reduction='none')
         cls_valid_mask = (cls_label_flat >= 0).float()
-        rcnn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(cls_valid_mask.sum(), min=1.0)
+        rcnn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(
+            cls_valid_mask.sum(), min=1.0)
 
         # rcnn regression loss
         batch_size = pts_input.shape[0]
@@ -741,10 +783,7 @@ class RCNN(nn.Module):
         else:
             loss_loc = loss_angle = loss_size = rcnn_loss_reg = rcnn_loss_cls * 0
 
-        return {
-            "cls": rcnn_loss_cls, 
-            "reg": rcnn_loss_reg
-        }
+        return {"cls": rcnn_loss_cls, "reg": rcnn_loss_reg}
 
 
 def rotate_pc_along_y(pc, rot_angle):
@@ -842,7 +881,6 @@ class ProposalLayer(nn.Module):
                 ret_scores.append(rpn_scores[k, keep_idx])
 
         return ret_bbox3d, ret_scores
-
 
     def distance_based_proposal(self, scores, proposals, order):
         """
@@ -1054,18 +1092,19 @@ def rotate_pc_along_y_torch(pc, rot_angle):
 
 
 class ProposalTargetLayer(nn.Module):
+
     def __init__(self,
-            pool_extra_width=1.0,
-            num_points=512,
-            reg_fg_thresh=0.55,
-            cls_fg_thresh=0.6,
-            cls_bg_thresh=0.45,
-            cls_bg_thresh_lo=0.05,
-            fg_ratio=0.5,
-            roi_per_image=64,
-            aug_rot_range=18,
-            hard_bg_ratio=0.8,
-            roi_fg_aug_times=10):
+                 pool_extra_width=1.0,
+                 num_points=512,
+                 reg_fg_thresh=0.55,
+                 cls_fg_thresh=0.6,
+                 cls_bg_thresh=0.45,
+                 cls_bg_thresh_lo=0.05,
+                 fg_ratio=0.5,
+                 roi_per_image=64,
+                 aug_rot_range=18,
+                 hard_bg_ratio=0.8,
+                 roi_fg_aug_times=10):
         super().__init__()
         self.pool_extra_width = pool_extra_width
         self.num_points = num_points
@@ -1081,14 +1120,17 @@ class ProposalTargetLayer(nn.Module):
 
     def forward(self, x):
         roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature = x
-        batch_rois, batch_gt_of_rois, batch_roi_iou = self.sample_rois_for_rcnn(roi_boxes3d, gt_boxes3d)
+        batch_rois, batch_gt_of_rois, batch_roi_iou = self.sample_rois_for_rcnn(
+            roi_boxes3d, gt_boxes3d)
 
         # point cloud pooling
         pooled_features, pooled_empty_flag = \
             roipool3d_utils.roipool3d_gpu(rpn_xyz, pts_feature, batch_rois, self.pool_extra_width,
                                           sampled_pt_num=self.num_points)
 
-        sampled_pts, sampled_features = pooled_features[:, :, :, 0:3], pooled_features[:, :, :, 3:]
+        sampled_pts, sampled_features = pooled_features[:, :, :, 0:
+                                                        3], pooled_features[:, :, :,
+                                                                            3:]
 
         # data augmentation
         sampled_pts, batch_rois, batch_gt_of_rois = \
@@ -1098,35 +1140,48 @@ class ProposalTargetLayer(nn.Module):
         batch_size = batch_rois.shape[0]
         roi_ry = batch_rois[:, :, 6] % (2 * np.pi)
         roi_center = batch_rois[:, :, 0:3]
-        sampled_pts = sampled_pts - roi_center.unsqueeze(dim=2)  # (B, M, 512, 3)
+        sampled_pts = sampled_pts - roi_center.unsqueeze(
+            dim=2)  # (B, M, 512, 3)
         batch_gt_of_rois[:, :, 0:3] = batch_gt_of_rois[:, :, 0:3] - roi_center
         batch_gt_of_rois[:, :, 6] = batch_gt_of_rois[:, :, 6] - roi_ry
 
         for k in range(batch_size):
-            sampled_pts[k] = rotate_pc_along_y_torch(sampled_pts[k], batch_rois[k, :, 6])
-            batch_gt_of_rois[k] = rotate_pc_along_y_torch(batch_gt_of_rois[k].unsqueeze(dim=1),
-                                                          roi_ry[k]).squeeze(dim=1)
+            sampled_pts[k] = rotate_pc_along_y_torch(sampled_pts[k],
+                                                     batch_rois[k, :, 6])
+            batch_gt_of_rois[k] = rotate_pc_along_y_torch(
+                batch_gt_of_rois[k].unsqueeze(dim=1), roi_ry[k]).squeeze(dim=1)
 
         # regression valid mask
         valid_mask = (pooled_empty_flag == 0)
-        reg_valid_mask = ((batch_roi_iou > self.reg_fg_thresh) & valid_mask).long()
+        reg_valid_mask = ((batch_roi_iou > self.reg_fg_thresh) &
+                          valid_mask).long()
 
         # classification label
         batch_cls_label = (batch_roi_iou > self.cls_fg_thresh).long()
-        invalid_mask = (batch_roi_iou > self.cls_bg_thresh) & (batch_roi_iou < self.cls_fg_thresh)
+        invalid_mask = (batch_roi_iou > self.cls_bg_thresh) & (
+            batch_roi_iou < self.cls_fg_thresh)
         batch_cls_label[valid_mask == 0] = -1
         batch_cls_label[invalid_mask > 0] = -1
 
-        output_dict = {'sampled_pts': sampled_pts.view(-1, self.num_points, 3),
-                       'pts_feature': sampled_features.view(-1, self.num_points, sampled_features.shape[3]),
-                       'cls_label': batch_cls_label.view(-1),
-                       'reg_valid_mask': reg_valid_mask.view(-1),
-                       'gt_of_rois': batch_gt_of_rois.view(-1, 7),
-                       'gt_iou': batch_roi_iou.view(-1),
-                       'roi_boxes3d': batch_rois.view(-1, 7)}
+        output_dict = {
+            'sampled_pts':
+                sampled_pts.view(-1, self.num_points, 3),
+            'pts_feature':
+                sampled_features.view(-1, self.num_points,
+                                      sampled_features.shape[3]),
+            'cls_label':
+                batch_cls_label.view(-1),
+            'reg_valid_mask':
+                reg_valid_mask.view(-1),
+            'gt_of_rois':
+                batch_gt_of_rois.view(-1, 7),
+            'gt_iou':
+                batch_roi_iou.view(-1),
+            'roi_boxes3d':
+                batch_rois.view(-1, 7)
+        }
 
         return output_dict
-
 
     def sample_rois_for_rcnn(self, roi_boxes3d, gt_boxes3d):
         """
@@ -1142,7 +1197,8 @@ class ProposalTargetLayer(nn.Module):
         fg_rois_per_image = int(np.round(self.fg_ratio * self.roi_per_image))
 
         batch_rois = gt_boxes3d.new(batch_size, self.roi_per_image, 7).zero_()
-        batch_gt_of_rois = gt_boxes3d.new(batch_size, self.roi_per_image, 7).zero_()
+        batch_gt_of_rois = gt_boxes3d.new(batch_size, self.roi_per_image,
+                                          7).zero_()
         batch_roi_iou = gt_boxes3d.new(batch_size, self.roi_per_image).zero_()
 
         for idx in range(batch_size):
@@ -1154,7 +1210,10 @@ class ProposalTargetLayer(nn.Module):
             cur_gt = cur_gt[:k + 1]
 
             # include gt boxes in the candidate rois
-            iou3d = iou_3d(cur_roi.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]], cur_gt[:, 0:7].detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]])  # (M, N)
+            iou3d = iou_3d(
+                cur_roi.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]],
+                cur_gt[:, 0:7].detach().cpu().numpy()
+                [:, [0, 1, 2, 5, 3, 4, 6]])  # (M, N)
             iou3d = torch.tensor(iou3d, device=cur_roi.device)
 
             max_overlaps, gt_assignment = torch.max(iou3d, dim=1)
@@ -1166,9 +1225,10 @@ class ProposalTargetLayer(nn.Module):
             # TODO: this will mix the fg and bg when CLS_BG_THRESH_LO < iou < CLS_BG_THRESH
             # fg_inds = torch.cat((fg_inds, roi_assignment), dim=0)  # consider the roi which has max_iou with gt as fg
 
-            easy_bg_inds = torch.nonzero((max_overlaps < self.cls_bg_thresh_lo)).view(-1)
-            hard_bg_inds = torch.nonzero((max_overlaps < self.cls_bg_thresh) &
-                                         (max_overlaps >= self.cls_bg_thresh_lo)).view(-1)
+            easy_bg_inds = torch.nonzero(
+                (max_overlaps < self.cls_bg_thresh_lo)).view(-1)
+            hard_bg_inds = torch.nonzero((max_overlaps < self.cls_bg_thresh) & (
+                max_overlaps >= self.cls_bg_thresh_lo)).view(-1)
 
             fg_num_rois = fg_inds.numel()
             bg_num_rois = hard_bg_inds.numel() + easy_bg_inds.numel()
@@ -1177,16 +1237,19 @@ class ProposalTargetLayer(nn.Module):
                 # sampling fg
                 fg_rois_per_this_image = min(fg_rois_per_image, fg_num_rois)
 
-                rand_num = torch.from_numpy(np.random.permutation(fg_num_rois)).type_as(gt_boxes3d).long()
+                rand_num = torch.from_numpy(np.random.permutation(
+                    fg_num_rois)).type_as(gt_boxes3d).long()
                 fg_inds = fg_inds[rand_num[:fg_rois_per_this_image]]
 
                 # sampling bg
                 bg_rois_per_this_image = self.roi_per_image - fg_rois_per_this_image
-                bg_inds = self.sample_bg_inds(hard_bg_inds, easy_bg_inds, bg_rois_per_this_image)
+                bg_inds = self.sample_bg_inds(hard_bg_inds, easy_bg_inds,
+                                              bg_rois_per_this_image)
 
             elif fg_num_rois > 0 and bg_num_rois == 0:
                 # sampling fg
-                rand_num = np.floor(np.random.rand(self.roi_per_image) * fg_num_rois)
+                rand_num = np.floor(
+                    np.random.rand(self.roi_per_image) * fg_num_rois)
                 rand_num = torch.from_numpy(rand_num).type_as(gt_boxes3d).long()
                 fg_inds = fg_inds[rand_num]
                 fg_rois_per_this_image = self.roi_per_image
@@ -1194,7 +1257,8 @@ class ProposalTargetLayer(nn.Module):
             elif bg_num_rois > 0 and fg_num_rois == 0:
                 # sampling bg
                 bg_rois_per_this_image = self.roi_per_image
-                bg_inds = self.sample_bg_inds(hard_bg_inds, easy_bg_inds, bg_rois_per_this_image)
+                bg_inds = self.sample_bg_inds(hard_bg_inds, easy_bg_inds,
+                                              bg_rois_per_this_image)
 
                 fg_rois_per_this_image = 0
             else:
@@ -1208,8 +1272,11 @@ class ProposalTargetLayer(nn.Module):
                 fg_rois_src = cur_roi[fg_inds]
                 gt_of_fg_rois = cur_gt[gt_assignment[fg_inds]]
                 iou3d_src = max_overlaps[fg_inds]
-                fg_rois, fg_iou3d = self.aug_roi_by_noise_torch(fg_rois_src, gt_of_fg_rois, iou3d_src,
-                                                                aug_times=self.roi_fg_aug_times)
+                fg_rois, fg_iou3d = self.aug_roi_by_noise_torch(
+                    fg_rois_src,
+                    gt_of_fg_rois,
+                    iou3d_src,
+                    aug_times=self.roi_fg_aug_times)
                 roi_list.append(fg_rois)
                 roi_iou_list.append(fg_iou3d)
                 roi_gt_list.append(gt_of_fg_rois)
@@ -1219,8 +1286,8 @@ class ProposalTargetLayer(nn.Module):
                 gt_of_bg_rois = cur_gt[gt_assignment[bg_inds]]
                 iou3d_src = max_overlaps[bg_inds]
                 aug_times = 1 if self.roi_fg_aug_times > 0 else 0
-                bg_rois, bg_iou3d = self.aug_roi_by_noise_torch(bg_rois_src, gt_of_bg_rois, iou3d_src,
-                                                                aug_times=aug_times)
+                bg_rois, bg_iou3d = self.aug_roi_by_noise_torch(
+                    bg_rois_src, gt_of_bg_rois, iou3d_src, aug_times=aug_times)
                 roi_list.append(bg_rois)
                 roi_iou_list.append(bg_iou3d)
                 roi_gt_list.append(gt_of_bg_rois)
@@ -1235,36 +1302,49 @@ class ProposalTargetLayer(nn.Module):
 
         return batch_rois, batch_gt_of_rois, batch_roi_iou
 
-    def sample_bg_inds(self, hard_bg_inds, easy_bg_inds, bg_rois_per_this_image):
+    def sample_bg_inds(self, hard_bg_inds, easy_bg_inds,
+                       bg_rois_per_this_image):
         if hard_bg_inds.numel() > 0 and easy_bg_inds.numel() > 0:
             hard_bg_rois_num = int(bg_rois_per_this_image * self.hard_bg_ratio)
             easy_bg_rois_num = bg_rois_per_this_image - hard_bg_rois_num
 
             # sampling hard bg
-            rand_idx = torch.randint(low=0, high=hard_bg_inds.numel(), size=(hard_bg_rois_num,)).long()
+            rand_idx = torch.randint(low=0,
+                                     high=hard_bg_inds.numel(),
+                                     size=(hard_bg_rois_num,)).long()
             hard_bg_inds = hard_bg_inds[rand_idx]
 
             # sampling easy bg
-            rand_idx = torch.randint(low=0, high=easy_bg_inds.numel(), size=(easy_bg_rois_num,)).long()
+            rand_idx = torch.randint(low=0,
+                                     high=easy_bg_inds.numel(),
+                                     size=(easy_bg_rois_num,)).long()
             easy_bg_inds = easy_bg_inds[rand_idx]
 
             bg_inds = torch.cat([hard_bg_inds, easy_bg_inds], dim=0)
         elif hard_bg_inds.numel() > 0 and easy_bg_inds.numel() == 0:
             hard_bg_rois_num = bg_rois_per_this_image
             # sampling hard bg
-            rand_idx = torch.randint(low=0, high=hard_bg_inds.numel(), size=(hard_bg_rois_num,)).long()
+            rand_idx = torch.randint(low=0,
+                                     high=hard_bg_inds.numel(),
+                                     size=(hard_bg_rois_num,)).long()
             bg_inds = hard_bg_inds[rand_idx]
         elif hard_bg_inds.numel() == 0 and easy_bg_inds.numel() > 0:
             easy_bg_rois_num = bg_rois_per_this_image
             # sampling easy bg
-            rand_idx = torch.randint(low=0, high=easy_bg_inds.numel(), size=(easy_bg_rois_num,)).long()
+            rand_idx = torch.randint(low=0,
+                                     high=easy_bg_inds.numel(),
+                                     size=(easy_bg_rois_num,)).long()
             bg_inds = easy_bg_inds[rand_idx]
         else:
             raise NotImplementedError
 
         return bg_inds
 
-    def aug_roi_by_noise_torch(self, roi_boxes3d, gt_boxes3d, iou3d_src, aug_times=10):
+    def aug_roi_by_noise_torch(self,
+                               roi_boxes3d,
+                               gt_boxes3d,
+                               iou3d_src,
+                               aug_times=10):
         iou_of_rois = torch.zeros(roi_boxes3d.shape[0]).type_as(gt_boxes3d)
         pos_thresh = min(self.reg_fg_thresh, self.cls_fg_thresh)
 
@@ -1284,7 +1364,9 @@ class ProposalTargetLayer(nn.Module):
                     keep = False
                 aug_box3d = aug_box3d.view((1, 7))
 
-                iou3d = iou_3d(aug_box3d.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]], gt_box3d.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]])  
+                iou3d = iou_3d(
+                    aug_box3d.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]],
+                    gt_box3d.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]])
                 iou3d = torch.tensor(iou3d, device=aug_box3d.device)
                 temp_iou = iou3d[0][0]
                 cnt += 1
@@ -1302,18 +1384,25 @@ class ProposalTargetLayer(nn.Module):
         random shift, scale, orientation
         """
         # pos_range, hwl_range, angle_range, mean_iou
-        range_config = [[0.2, 0.1, np.pi / 12, 0.7],
-                        [0.3, 0.15, np.pi / 12, 0.6],
-                        [0.5, 0.15, np.pi / 9, 0.5],
-                        [0.8, 0.15, np.pi / 6, 0.3],
+        range_config = [[0.2, 0.1, np.pi / 12,
+                         0.7], [0.3, 0.15, np.pi / 12, 0.6],
+                        [0.5, 0.15, np.pi / 9,
+                         0.5], [0.8, 0.15, np.pi / 6, 0.3],
                         [1.0, 0.15, np.pi / 3, 0.2]]
         idx = torch.randint(low=0, high=len(range_config), size=(1,))[0].long()
 
-        pos_shift = ((torch.rand(3, device=box3d.device) - 0.5) / 0.5) * range_config[idx][0]
-        hwl_scale = ((torch.rand(3, device=box3d.device) - 0.5) / 0.5) * range_config[idx][1] + 1.0
-        angle_rot = ((torch.rand(1, device=box3d.device) - 0.5) / 0.5) * range_config[idx][2]
+        pos_shift = ((torch.rand(3, device=box3d.device) - 0.5) /
+                     0.5) * range_config[idx][0]
+        hwl_scale = ((torch.rand(3, device=box3d.device) - 0.5) /
+                     0.5) * range_config[idx][1] + 1.0
+        angle_rot = ((torch.rand(1, device=box3d.device) - 0.5) /
+                     0.5) * range_config[idx][2]
 
-        aug_box3d = torch.cat([box3d[0:3] + pos_shift, box3d[3:6] * hwl_scale, box3d[6:7] + angle_rot], dim=0)
+        aug_box3d = torch.cat([
+            box3d[0:3] + pos_shift, box3d[3:6] * hwl_scale,
+            box3d[6:7] + angle_rot
+        ],
+                              dim=0)
         return aug_box3d
 
     @staticmethod
@@ -1328,11 +1417,13 @@ class ProposalTargetLayer(nn.Module):
 
         raw_1 = torch.cat([cosa, -sina], dim=1)  # (N, 2)
         raw_2 = torch.cat([sina, cosa], dim=1)  # (N, 2)
-        R = torch.cat((raw_1.unsqueeze(dim=1), raw_2.unsqueeze(dim=1)), dim=1)  # (N, 2, 2)
+        R = torch.cat((raw_1.unsqueeze(dim=1), raw_2.unsqueeze(dim=1)),
+                      dim=1)  # (N, 2, 2)
 
         pc_temp = pc[:, :, [0, 2]]  # (N, 512, 2)
 
-        pc[:, :, [0, 2]] = torch.matmul(pc_temp, R.permute(0, 2, 1))  # (N, 512, 2)
+        pc[:, :, [0, 2]] = torch.matmul(pc_temp, R.permute(0, 2,
+                                                           1))  # (N, 512, 2)
 
         return pc
 
@@ -1346,50 +1437,65 @@ class ProposalTargetLayer(nn.Module):
         batch_size, boxes_num = pts.shape[0], pts.shape[1]
 
         # rotation augmentation
-        angles = (torch.rand((batch_size, boxes_num), device=pts.device) - 0.5 / 0.5) * (np.pi / self.aug_rot_range)
+        angles = (torch.rand((batch_size, boxes_num), device=pts.device) -
+                  0.5 / 0.5) * (np.pi / self.aug_rot_range)
 
         # calculate gt alpha from gt_of_rois
-        temp_x, temp_z, temp_ry = gt_of_rois[:, :, 0], gt_of_rois[:, :, 2], gt_of_rois[:, :, 6]
+        temp_x, temp_z, temp_ry = gt_of_rois[:, :,
+                                             0], gt_of_rois[:, :,
+                                                            2], gt_of_rois[:, :,
+                                                                           6]
         temp_beta = torch.atan2(temp_z, temp_x)
-        gt_alpha = -torch.sign(temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
+        gt_alpha = -torch.sign(
+            temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
 
         temp_x, temp_z, temp_ry = rois[:, :, 0], rois[:, :, 2], rois[:, :, 6]
         temp_beta = torch.atan2(temp_z, temp_x)
-        roi_alpha = -torch.sign(temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
+        roi_alpha = -torch.sign(
+            temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
 
         for k in range(batch_size):
-            pts[k] = ProposalTargetLayer.rotate_pc_along_y_torch(pts[k], angles[k]) 
-            gt_of_rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(gt_of_rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
-            rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
+            pts[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
+                pts[k], angles[k])
+            gt_of_rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
+                gt_of_rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
+            rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
+                rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
 
             # calculate the ry after rotation
             temp_x, temp_z = gt_of_rois[:, :, 0], gt_of_rois[:, :, 2]
             temp_beta = torch.atan2(temp_z, temp_x)
-            gt_of_rois[:, :, 6] = torch.sign(temp_beta) * np.pi / 2 + gt_alpha - temp_beta
+            gt_of_rois[:, :, 6] = torch.sign(
+                temp_beta) * np.pi / 2 + gt_alpha - temp_beta
 
             temp_x, temp_z = rois[:, :, 0], rois[:, :, 2]
             temp_beta = torch.atan2(temp_z, temp_x)
-            rois[:, :, 6] = torch.sign(temp_beta) * np.pi / 2 + roi_alpha - temp_beta
+            rois[:, :,
+                 6] = torch.sign(temp_beta) * np.pi / 2 + roi_alpha - temp_beta
 
         # scaling augmentation
-        scales = 1 + ((torch.rand((batch_size, boxes_num), device=pts.device) - 0.5) / 0.5) * 0.05
+        scales = 1 + ((torch.rand(
+            (batch_size, boxes_num), device=pts.device) - 0.5) / 0.5) * 0.05
         pts = pts * scales.unsqueeze(dim=2).unsqueeze(dim=3)
         gt_of_rois[:, :, 0:6] = gt_of_rois[:, :, 0:6] * scales.unsqueeze(dim=2)
         rois[:, :, 0:6] = rois[:, :, 0:6] * scales.unsqueeze(dim=2)
 
         # flip augmentation
-        flip_flag = torch.sign(torch.rand((batch_size, boxes_num), device=pts.device) - 0.5)
+        flip_flag = torch.sign(
+            torch.rand((batch_size, boxes_num), device=pts.device) - 0.5)
         pts[:, :, :, 0] = pts[:, :, :, 0] * flip_flag.unsqueeze(dim=2)
         gt_of_rois[:, :, 0] = gt_of_rois[:, :, 0] * flip_flag
         # flip orientation: ry > 0: pi - ry, ry < 0: -pi - ry
         src_ry = gt_of_rois[:, :, 6]
-        ry = (flip_flag == 1).float() * src_ry + (flip_flag == -1).float() * (torch.sign(src_ry) * np.pi - src_ry)
+        ry = (flip_flag == 1).float() * src_ry + (flip_flag == -1).float() * (
+            torch.sign(src_ry) * np.pi - src_ry)
         gt_of_rois[:, :, 6] = ry
 
         rois[:, :, 0] = rois[:, :, 0] * flip_flag
         # flip orientation: ry > 0: pi - ry, ry < 0: -pi - ry
         src_ry = rois[:, :, 6]
-        ry = (flip_flag == 1).float() * src_ry + (flip_flag == -1).float() * (torch.sign(src_ry) * np.pi - src_ry)
+        ry = (flip_flag == 1).float() * src_ry + (flip_flag == -1).float() * (
+            torch.sign(src_ry) * np.pi - src_ry)
         rois[:, :, 6] = ry
 
         return pts, rois, gt_of_rois

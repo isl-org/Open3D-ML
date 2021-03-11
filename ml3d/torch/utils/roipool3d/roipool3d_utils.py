@@ -41,8 +41,8 @@ def roipool3d_gpu(pts,
                                    pool_extra_width).view(batch_size, -1, 7)
 
     pooled_features, pooled_empty_flag = roi_pool(pts.contiguous(),
-                                                   pooled_boxes3d.contiguous(),
-                                                   pts_feature.contiguous(),
-                                                   sampled_pt_num)
+                                                  pooled_boxes3d.contiguous(),
+                                                  pts_feature.contiguous(),
+                                                  sampled_pt_num)
 
     return pooled_features, pooled_empty_flag
