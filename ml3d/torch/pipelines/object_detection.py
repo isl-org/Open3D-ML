@@ -257,7 +257,6 @@ class ObjectDetection(BasePipeline):
             process_bar = tqdm(range(len(train_loader)), desc='training')
             for i in process_bar:
                 data = train_loader[i]['data']
-
                 results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
@@ -315,16 +314,7 @@ class ObjectDetection(BasePipeline):
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
 
-        keys = ckpt["model_state"].keys()
-        keys2 = self.model.state_dict().keys()
-
-        ckpt2 = {"model_state_dict": {}}
-
-        for k0, k1 in zip(keys, keys2):
-            ckpt2["model_state_dict"][k1] = ckpt["model_state"][k0]
-        ckpt = ckpt2
-
-        self.model.load_state_dict(ckpt['model_state_dict'])
+        self.model.load_state_dict(ckpt['model_state_dict'], strict=False)
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
             log.info(f'Loading checkpoint optimizer_state_dict')
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])

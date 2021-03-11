@@ -29,15 +29,15 @@ class PointRCNN(BaseModel):
                  name="PointRCNN",
                  device="cuda",
                  classes=['Car'],
-                 use_rpn=True,
-                 use_rcnn=True,
                  score_thres=0.3,
                  rpn={},
                  rcnn={},
+                 mode=None,
                  **kwargs):
         super().__init__(name=name, device=device, **kwargs)
-        self.use_rpn = use_rpn
-        self.use_rcnn = use_rcnn
+        assert mode == "RPN" or mode == "RCNN" or mode == None
+        self.mode = mode
+
         self.classes = classes
         self.name2lbl = {n: i for i, n in enumerate(classes)}
         self.lbl2name = {i: n for i, n in enumerate(classes)}
@@ -50,18 +50,14 @@ class PointRCNN(BaseModel):
         self.to(device)
 
     def forward(self, inputs):
-
-        #inputs = torch.tensor(np.load("pts_input.npy"), device="cuda")
-        #gt_boxes3d = torch.tensor(np.load("gt_boxes3d.npy"), device='cuda')
-
-        with torch.set_grad_enabled(self.training and self.use_rpn):
-            if not self.use_rpn:
+        with torch.set_grad_enabled(self.training and self.mode == "RPN"):
+            if not self.mode == "RPN":
                 self.rpn.eval()
             rois = None
             cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(inputs['point'])
             output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
-        if self.use_rcnn:
+        if self.mode == "RCNN":
             with torch.no_grad():
                 rpn_scores_raw = cls_score[:, :, 0]
                 rpn_scores_norm = torch.sigmoid(rpn_scores_raw)
@@ -95,7 +91,7 @@ class PointRCNN(BaseModel):
         )
 
         # fix rpn: do this since we use customized optimizer.step
-        if self.use_rcnn:
+        if self.mode == "RCNN":
             for param in self.rpn.parameters():
                 param.requires_grad = False
 
@@ -119,7 +115,7 @@ class PointRCNN(BaseModel):
         return optimizer, lr_scheduler#, bnm_scheduler
 
     def loss(self, results, inputs):
-        if self.use_rpn:
+        if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
         else: 
             return self.rcnn.loss(results, inputs)
@@ -184,7 +180,7 @@ class PointRCNN(BaseModel):
 
         bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
 
-        if self.use_rpn:
+        if self.mode == "RPN":
             labels, bboxes = PointRCNN.generate_rpn_training_labels(points, bboxes)
 
 
@@ -314,9 +310,9 @@ def get_reg_loss(pred_reg, reg_label, loc_scope, loc_bin_size, num_head_bin, anc
         x_res_norm_label = x_res_label / loc_bin_size
         z_res_norm_label = z_res_label / loc_bin_size
 
-        x_bin_onehot = torch.zeros(x_bin_label.size(0), per_loc_bin_num).zero_()
+        x_bin_onehot = torch.zeros((x_bin_label.size(0), per_loc_bin_num), device=anchor_size.device, dtype=torch.float32)
         x_bin_onehot.scatter_(1, x_bin_label.view(-1, 1).long(), 1)
-        z_bin_onehot = torch.cuda.FloatTensor(z_bin_label.size(0), per_loc_bin_num).zero_()
+        z_bin_onehot = torch.zeros((z_bin_label.size(0), per_loc_bin_num), device=anchor_size.device, dtype=torch.float32)
         z_bin_onehot.scatter_(1, z_bin_label.view(-1, 1).long(), 1)
 
         loss_x_res = F.smooth_l1_loss((pred_reg[:, x_res_l: x_res_r] * x_bin_onehot).sum(dim=1), x_res_norm_label)
@@ -507,8 +503,7 @@ class RPN(nn.Module):
         cls_weights = pos + neg
         pos_normalizer = pos.sum()
         cls_weights = cls_weights / torch.clamp(pos_normalizer, min=1.0)
-        rpn_loss_cls = self.loss_cls(rpn_cls_flat.view(-1, 1), rpn_cls_target, cls_weights)
-        rpn_loss_cls = rpn_loss_cls.sum()
+        rpn_loss_cls = self.loss_cls(rpn_cls_flat, rpn_cls_target, cls_weights, avg_factor=1.0)
 
         # RPN regression loss
         point_num = rpn_reg.size(0) * rpn_reg.size(1)
@@ -525,7 +520,7 @@ class RPN(nn.Module):
                                         get_y_by_bin=False,
                                         get_ry_fine=False)
 
-            loss_size = 3 * loss_size  # consistent with old codes
+            loss_size = 3 * loss_size 
             rpn_loss_reg = loss_loc + loss_angle + loss_size
         else:
             loss_loc = loss_angle = loss_size = rpn_loss_reg = rpn_loss_cls * 0
@@ -728,7 +723,7 @@ class RCNN(nn.Module):
         fg_sum = fg_mask.long().sum().item()
         if fg_sum != 0:
             all_anchor_size = roi_size
-            anchor_size = all_anchor_size[fg_mask] if self.proposal_layer.size_res_on_roi else self.proposal_layer.mean_size
+            anchor_size = self.proposal_layer.mean_size
 
             loss_loc, loss_angle, loss_size, reg_loss_dict = \
                 get_reg_loss(rcnn_reg.view(batch_size, -1)[fg_mask],
@@ -737,7 +732,7 @@ class RCNN(nn.Module):
                                         loc_bin_size=self.proposal_layer.loc_bin_size,
                                         num_head_bin=self.proposal_layer.num_head_bin,
                                         anchor_size=anchor_size,
-                                        get_xz_fine=True, get_y_by_bin=self.proposal_layer.loc_y_by_bin,
+                                        get_xz_fine=True, get_y_by_bin=self.proposal_layer.get_y_by_bin,
                                         loc_y_scope=self.proposal_layer.loc_y_scope, loc_y_bin_size=self.proposal_layer.loc_y_bin_size,
                                         get_ry_fine=True)
 
@@ -1159,7 +1154,7 @@ class ProposalTargetLayer(nn.Module):
             cur_gt = cur_gt[:k + 1]
 
             # include gt boxes in the candidate rois
-            iou3d = iou_3d(cur_roi.detach().cpu().numpy(), cur_gt[:, 0:7].detach().cpu().numpy())  # (M, N)
+            iou3d = iou_3d(cur_roi.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]], cur_gt[:, 0:7].detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]])  # (M, N)
             iou3d = torch.tensor(iou3d, device=cur_roi.device)
 
             max_overlaps, gt_assignment = torch.max(iou3d, dim=1)
@@ -1289,7 +1284,7 @@ class ProposalTargetLayer(nn.Module):
                     keep = False
                 aug_box3d = aug_box3d.view((1, 7))
 
-                iou3d = iou_3d(aug_box3d.detach().cpu().numpy(), gt_box3d.detach().cpu().numpy())  
+                iou3d = iou_3d(aug_box3d.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]], gt_box3d.detach().cpu().numpy()[:, [0, 1, 2, 5, 3, 4, 6]])  
                 iou3d = torch.tensor(iou3d, device=aug_box3d.device)
                 temp_iou = iou3d[0][0]
                 cnt += 1

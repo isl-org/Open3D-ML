@@ -44,13 +44,13 @@ model:
 
     head:
         # config of bin-based loss
-        loc_xz_fine: False #True
+        loc_xz_fine: True
         loc_scope: 3.0
         loc_bin_size: 0.5
         num_head_bin: 12
         nms_pre: 9000
-        nms_post: 100
-        nms_thres: 0.8
+        nms_post: 512 # 100
+        nms_thres: 0.85 # 0.8
         mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
 
   rcnn:
