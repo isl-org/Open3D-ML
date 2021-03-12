@@ -47,7 +47,7 @@ class ObjectDetection(BasePipeline):
 
     def run_inference(self, data):
         """
-        Run inference on a given data.
+        Run inference on given data.
 
         Args:
             data: A raw data.
@@ -56,9 +56,9 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
+        inputs, cnts_pts = data[:-2], data[-2]
 
-        results = model(inputs, training=False)
+        results = model(inputs, cnts=cnts_pts, training=False)
         boxes = model.inference_end(results, data)
 
         return boxes
@@ -79,11 +79,10 @@ class ObjectDetection(BasePipeline):
 
         test_dataset = dataset.get_split('test')
         test_split = TFDataloader(dataset=test_dataset,
-                                  preprocess=model.preprocess,
-                                  transform=None,
-                                  use_cache=False,
-                                  get_batch_gen=model.get_batch_gen,
-                                  shuffle=False)
+                                   model=model,
+                                   use_cache=False)
+
+        test_loader, len_test = test_split.get_loader(cfg.test_batch_size, transform=False)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -94,8 +93,9 @@ class ObjectDetection(BasePipeline):
         self.test_ious = []
 
         pred = []
-        for i in tqdm(range(len(test_split)), desc='testing'):
-            results = self.run_inference(test_split[i]['data'])
+        process_bar = tqdm(test_loader, total=len_test, desc='testing')
+        for data in process_bar:
+            results = self.run_inference(data)
             pred.append(results[0])
 
         #dataset.save_test_result(pred, attr)
@@ -112,14 +112,13 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         valid_dataset = dataset.get_split('validation')
-        valid_loader = TFDataloader(dataset=valid_dataset,
-                                    preprocess=model.preprocess,
-                                    transform=model.transform,
-                                    use_cache=False,
-                                    get_batch_gen=model.get_batch_gen,
-                                    shuffle=True,
-                                    steps_per_epoch=dataset.cfg.get(
-                                        'steps_per_epoch_valid', None))
+        valid_split = TFDataloader(dataset=valid_dataset,
+                                   model=model,
+                                   use_cache=False,
+                                   steps_per_epoch=dataset.cfg.get(
+                                       'steps_per_epoch_valid', None))
+
+        valid_loader, len_valid = valid_split.get_loader(cfg.val_batch_size, transform=False)
 
         log.info("Started validation")
 
@@ -127,10 +126,12 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         gt = []
-        for i in tqdm(range(len(valid_loader)), desc='validation'):
-            data = valid_loader[i]['data']
-            results = model(data['point'], training=False)
-            loss = model.loss(results, data)
+            
+        process_bar = tqdm(valid_loader, total=len_valid, desc='validation')
+        for i, data in enumerate(process_bar):
+            inputs, cnts_pts, cnts_lbs = data[:-2], data[-2], data[-1]
+            results = model(data, cnts=cnts_pts, training=False)
+            loss = model.loss(results, inputs, cnts=cnts_lbs)
             for l, v in loss.items():
                 if not l in self.valid_losses:
                     self.valid_losses[l] = []
@@ -138,8 +139,8 @@ class ObjectDetection(BasePipeline):
 
             # convert to bboxes for mAP evaluation
             boxes = model.inference_end(results, data)
-            pred.append(BEVBox3D.to_dicts(boxes[0]))
-            gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
+            pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
+            gt.extend([BEVBox3D.to_dicts(valid_split[i*cfg.val_batch_size + bi]["data"]["bbox_objs"]) for bi in range(cfg.val_batch_size)])
 
         sum_loss = 0
         desc = "validation - "
@@ -231,7 +232,7 @@ class ObjectDetection(BasePipeline):
             for data in process_bar:
                 inputs, cnts_pts, cnts_lbs = data[:-2], data[-2], data[-1]
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(inputs[0], cnts=cnts_pts)
+                    results = model(inputs, cnts=cnts_pts)
                     loss = model.loss(results, inputs, cnts=cnts_lbs)
                     loss_sum = tf.add_n(loss.values())
 

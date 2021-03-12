@@ -84,6 +84,8 @@ pipeline:
   name: ObjectDetection
   test_compute_metric: true
   batch_size: 6
+  val_batch_size: 1
+  test_batch_size: 1
   save_ckpt_freq: 5
   max_epoch: 200
   main_log_dir: ./logs

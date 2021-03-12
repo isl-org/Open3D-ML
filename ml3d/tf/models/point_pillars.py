@@ -135,7 +135,7 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def call(self, inputs, training=True, cnts=None):
-        inputs = unpack(inputs, cnts)
+        inputs = unpack(inputs[0], cnts)
         x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
 
@@ -158,11 +158,7 @@ class PointPillars(BaseModel):
     def loss(self, results, inputs, cnts=None):
         scores, bboxes, dirs = results
 
-        if isinstance(inputs, dict):
-            gt_bboxes, gt_labels = inputs['bboxes'], inputs['labels']
-        else:
-            gt_bboxes, gt_labels = inputs[1:]
-    
+        gt_bboxes, gt_labels = inputs[1:3]
         gt_bboxes = unpack(gt_bboxes, cnts)
         gt_labels = unpack(gt_labels, cnts)
 
@@ -244,9 +240,11 @@ class PointPillars(BaseModel):
 
         new_data = {
             'point': points,
-            'bbox_objs': data['bounding_boxes'],
             'calib': data['calib']
         }
+
+        if attr['split'] not in ['test', 'testing']:
+            new_data['bbox_objs'] = data['bounding_boxes']
 
         if 'full_point' in data:
             points = np.array(data['full_point'][:, 0:4], dtype=np.float32)
@@ -311,21 +309,23 @@ class PointPillars(BaseModel):
             data = self.augment_data(data, attr)
 
         points = tf.constant(data['point'], dtype=tf.float32)
-        labels = tf.constant([
-            self.name2lbl.get(bb.label_class, len(self.classes))
-            for bb in data['bbox_objs']
-        ],
-                             dtype=tf.int32)
-        bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                             dtype=tf.float32)
 
-        return {
+        t_data =  {
             'point': points,
-            'bboxes': bboxes,
-            'labels': labels,
-            'bbox_objs': data['bbox_objs'],
             'calib': data['calib']
         }
+
+        if attr['split'] not in ['test', 'testing']:
+            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['labels'] = tf.constant([
+                self.name2lbl.get(bb.label_class, len(self.classes))
+                for bb in data['bbox_objs']
+            ],
+                                dtype=tf.int32)
+            t_data['bboxes'] = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
+                                dtype=tf.float32)
+
+        return t_data
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
         
@@ -334,15 +334,17 @@ class PointPillars(BaseModel):
             for i in np.arange(0, cnt, batch_size):
                 batch = [dataset[i+bi]['data'] for bi in range(batch_size)]
                 points = tf.concat([b['point'] for b in batch], axis=0)
-                bboxes = tf.concat([b['bboxes'] for b in batch], axis=0)
-                labels = tf.concat([b['labels'] for b in batch], axis=0)
-                cnt_pts = tf.constant([len(b['point'] ) for b in batch])
-                cnt_lbs = tf.constant([len(b['labels']) for b in batch])
-                yield (points, bboxes, labels, cnt_pts, cnt_lbs)
+                bboxes = tf.concat([b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32)) for b in batch], axis=0)
+                labels = tf.concat([b.get('labels', tf.zeros((0,), dtype=tf.int32)) for b in batch], axis=0)
+
+                calib = [tf.constant([b.get('calib', {}).get('world_cam', np.eye(4)), b.get('calib', {}).get('cam_img', np.eye(4))]) for b in batch]
+                cnt_pts = tf.constant([len(b['point']) for b in batch])
+                cnt_lbs = tf.constant([len(b.get('labels', tf.zeros((0,), dtype=tf.int32))) for b in batch])
+                yield (points, bboxes, labels, calib, cnt_pts, cnt_lbs)
 
         gen_func = batcher
-        gen_types = (tf.float32, tf.float32, tf.int32, tf.int32, tf.int32)
-        gen_shapes = ([None, 4], [None, 7], [None], [None], [None])
+        gen_types = (tf.float32, tf.float32, tf.int32, tf.float32, tf.int32, tf.int32)
+        gen_shapes = ([None, 4], [None, 7], [None], [batch_size, 2, 4, 4], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 
@@ -350,18 +352,13 @@ class PointPillars(BaseModel):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
-
-        world_cam, cam_img = None, None
-        if 'calib' in inputs and inputs['calib'] is not None:
-            calib = inputs['calib']
-            world_cam = calib.get('world_cam', None)
-            cam_img = calib.get('cam_img', None)
-
-        for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
+        for _calib, _bboxes, _scores, _labels in zip(inputs[3], bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
             labels = _labels.cpu().numpy()
             inference_result.append([])
+
+            world_cam, cam_img = _calib
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 dim = bbox[[3, 5, 4]]

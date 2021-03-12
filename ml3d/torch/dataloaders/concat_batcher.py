@@ -12,16 +12,14 @@ from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 from torch.utils.data import Sampler, get_worker_info
 
 
-class CustomBatch:
+class KPConvBatch:
     """Batched results for KPConv"""
 
     def __init__(self, batches):
         """
         Initialize
-
         Args:
             batches: A batch of data
-
         Returns:
             class: The corresponding class.
         """
@@ -407,32 +405,80 @@ class CustomBatch:
         return all_p_list
 
 
+class PointPillarsBatch:
+
+    def __init__(self, batches):
+        """
+        Initialize
+        Args:
+            batches: A batch of data
+        Returns:
+            class: The corresponding class.
+        """
+        self.point = []
+        self.labels = []
+        self.bboxes = []
+        self.bbox_objs = []
+        self.calib = []
+        for batch in batches:
+            data = batch['data']
+            self.point.append(data['point'])
+            self.labels.append(data.get('labels'))
+            self.bboxes.append(data.get('bboxes'))
+            self.bbox_objs.append(data.get('bbox_objs'))
+            self.calib.append(data.get('calib'))
+
+    def pin_memory(self):
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].pin_memory()
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].pin_memory()
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].pin_memory()
+
+    def to(self, device):
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].to(device)
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].to(device)
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].to(device)
+
+
 class ConcatBatcher(object):
     """ConcatBatcher for KPConv"""
 
-    def __init__(self, device):
+    def __init__(self, device, model='KPConv'):
         """
         Initialize
-
         Args:
             device: torch device 'gpu' or 'cpu'
-
         Returns:
             class: The corresponding class.
         """
         super(ConcatBatcher, self).__init__()
         self.device = device
+        self.model = model
 
     def collate_fn(self, batches):
         """
         collate_fn called by original PyTorch dataloader
-
         Args:
             batches: a batch of data
-
         Returns:
             class: the batched result
         """
-        batching_result = CustomBatch(batches)
-        batching_result.to(self.device)
-        return {'data': batching_result, 'attr': []}
+        if self.model == "KPConv":
+            batching_result = KPConvBatch(batches)
+            batching_result.to(self.device)
+            return {'data': batching_result, 'attr': []}
+
+        elif self.model == "PointPillars":
+            batching_result = PointPillarsBatch(batches)
+            batching_result.to(self.device)
+            return batching_result
+
+        else:
+            raise Exception(
+                f"Please define collate_fn for {self.model}, or use Default Batcher"
+            )

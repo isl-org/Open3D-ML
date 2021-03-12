@@ -42,22 +42,6 @@ from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
 
-def unpack(flat_t, cnts=None):
-    """
-    Converts flat tensor to list of tensors, 
-    with length according to cnts.
-    """
-    if cnts is None:
-        return [flat_t]
-        
-    data_list = []
-    idx0 = 0
-    for cnt in cnts:
-        idx1 = idx0 + cnt
-        data_list.append(flat_t[idx0:idx1])
-        idx0 = idx1
-    return data_list
-
 class PointPillars(BaseModel):
     """Object detection model. 
     Based on the PointPillars architecture 
@@ -146,7 +130,7 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def forward(self, inputs, cnts=None):
-        inputs = unpack(inputs, cnts)
+        inputs = inputs.point
         x = self.extract_feats(inputs)
         outs = self.bbox_head(x)
         return outs
@@ -157,14 +141,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs, cnts=None):
         scores, bboxes, dirs = results
-
-        if isinstance(inputs, dict):
-            gt_bboxes, gt_labels = inputs['bboxes'], inputs['labels']
-        else:
-            gt_bboxes, gt_labels = inputs[1:]
-    
-        gt_bboxes = unpack(gt_bboxes, cnts)
-        gt_labels = unpack(gt_labels, cnts)
+        gt_labels = inputs.labels
+        gt_bboxes = inputs.bboxes
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -240,9 +218,11 @@ class PointPillars(BaseModel):
 
         new_data = {
             'point': points,
-            'bbox_objs': data['bounding_boxes'],
             'calib': data['calib']
         }
+
+        if attr['split'] not in ['test', 'testing']:
+            new_data['bbox_objs'] = data['bounding_boxes']
 
         if 'full_point' in data:
             points = np.array(data['full_point'][:, 0:4], dtype=np.float32)
@@ -310,40 +290,39 @@ class PointPillars(BaseModel):
                               dtype=torch.float32,
                               device=self.device)
 
-        labels = torch.tensor([
-            self.name2lbl.get(bb.label_class, len(self.classes))
-            for bb in data['bbox_objs']
-        ],
-                              dtype=torch.int64,
-                              device=self.device)
-        bboxes = torch.tensor([bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                              dtype=torch.float32,
-                              device=self.device)
-
-        return {
+        t_data =  {
             'point': points,
-            'labels': labels,
-            'bboxes': bboxes,
-            'bbox_objs': data['bbox_objs'],
             'calib': data['calib']
         }
+
+        if attr['split'] not in ['test', 'testing']:
+            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['labels'] = torch.tensor([
+                self.name2lbl.get(bb.label_class, len(self.classes))
+                for bb in data['bbox_objs']
+            ],
+                                dtype=torch.int64,
+                                device=self.device)
+            t_data['bboxes'] = torch.tensor([bb.to_xyzwhlr() for bb in data['bbox_objs']],
+                                dtype=torch.float32,
+                                device=self.device)
+
+        return t_data
 
     def inference_end(self, results, inputs):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
-
-        world_cam, cam_img = None, None
-        if 'calib' in inputs and inputs['calib'] is not None:
-            calib = inputs['calib']
-            world_cam = calib.get('world_cam', None)
-            cam_img = calib.get('cam_img', None)
-
-        for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
+        for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b, scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
             labels = _labels.cpu().numpy()
             inference_result.append([])
+
+            world_cam, cam_img = None, None
+            if _calib is not None:
+                world_cam = _calib.get('world_cam', None)
+                cam_img = _calib.get('cam_img', None)
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 dim = bbox[[3, 5, 4]]
@@ -355,14 +334,6 @@ class PointPillars(BaseModel):
 
         return inference_result
 
-    def collate_fn(self, batch):
-        points = torch.cat([b['data']['point'] for b in batch], axis=0)
-        bboxes = torch.cat([b['data']['bboxes'] for b in batch], axis=0)
-        labels = torch.cat([b['data']['labels'] for b in batch], axis=0)
-        cnt_pts = torch.tensor([len(b['data']['point']) for b in batch], device=self.device)
-        cnt_lbs = torch.tensor([len(b['data']['labels']) for b in batch], device=self.device)
-
-        return (points, bboxes, labels, cnt_pts, cnt_lbs)
 
 
 MODEL._register_module(PointPillars, 'torch')
