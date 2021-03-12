@@ -12,16 +12,14 @@ from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 from torch.utils.data import Sampler, get_worker_info
 
 
-class CustomBatch:
+class KPConvBatch:
     """Batched results for KPConv"""
 
     def __init__(self, batches):
         """
         Initialize
-
         Args:
             batches: A batch of data
-
         Returns:
             class: The corresponding class.
         """
@@ -407,32 +405,70 @@ class CustomBatch:
         return all_p_list
 
 
+class PointPillarsBatch:
+
+    def __init__(self, batches):
+        """
+        Initialize
+        Args:
+            batches: A batch of data
+        Returns:
+            class: The corresponding class.
+        """
+        assert len(batches) == 1, "Only batch size 1 is supported."
+
+        data = batches[0]['data']
+        self.point = data['point']
+        self.labels = data['labels']
+        self.bboxes = data['bboxes']
+        self.bbox_objs = data['bbox_objs']
+        self.calib = None if 'calib' not in data else data['calib']
+
+    def pin_memory(self):
+        self.point = self.point.pin_memory()
+        self.labels = self.labels.pin_memory()
+        self.bboxes = self.bboxes.pin_memory()
+
+    def to(self, device):
+        self.point = self.point.to(device)
+        self.labels = self.labels.to(device)
+        self.bboxes = self.bboxes.to(device)
+
+
 class ConcatBatcher(object):
     """ConcatBatcher for KPConv"""
 
-    def __init__(self, device):
+    def __init__(self, device, model='KPConv'):
         """
         Initialize
-
         Args:
             device: torch device 'gpu' or 'cpu'
-
         Returns:
             class: The corresponding class.
         """
         super(ConcatBatcher, self).__init__()
         self.device = device
+        self.model = model
 
     def collate_fn(self, batches):
         """
         collate_fn called by original PyTorch dataloader
-
         Args:
             batches: a batch of data
-
         Returns:
             class: the batched result
         """
-        batching_result = CustomBatch(batches)
-        batching_result.to(self.device)
-        return {'data': batching_result, 'attr': []}
+        if self.model == "KPConv":
+            batching_result = KPConvBatch(batches)
+            batching_result.to(self.device)
+            return {'data': batching_result, 'attr': []}
+
+        elif self.model == "PointPillars":
+            batching_result = PointPillarsBatch(batches)
+            batching_result.to(self.device)
+            return batching_result
+
+        else:
+            raise Exception(
+                f"Please define collate_fn for {self.model}, or use Default Batcher"
+            )

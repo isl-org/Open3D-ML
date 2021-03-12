@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 
 from .base_pipeline import BasePipeline
-from ..dataloaders import TorchDataloader
+from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
@@ -131,14 +131,23 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         valid_dataset = dataset.get_split('train')
-        valid_loader = TorchDataloader(dataset=valid_dataset,
-                                       preprocess=model.preprocess,
-                                       transform=model.transform,
-                                       use_cache=dataset.cfg.use_cache,
-                                       shuffle=True,
-                                       steps_per_epoch=dataset.cfg.get(
-                                           'steps_per_epoch_valid', None))
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      shuffle=True,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+        valid_loader = DataLoader(
+            valid_split,
+            batch_size=cfg.val_batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=batcher.collate_fn,
+        )
 
         log.info("Started validation")
 
@@ -148,7 +157,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         no_bboxes = 0
         with torch.no_grad():
-            process_bar = tqdm(range(len(valid_loader)), desc='validation')
+        process_bar = tqdm(valid_loader, desc='validation')
             for i in process_bar:
                 data = valid_loader[i]['data']
                 if data['bboxes'].numel() == 0:
@@ -164,7 +173,7 @@ class ObjectDetection(BasePipeline):
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, data)
                 pred.append(BEVBox3D.to_dicts(boxes[0]))
-                gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
+                gt.append(BEVBox3D.to_dicts(data.bbox_objs))
 
         if no_bboxes > 0:
             log.warning("No bounding box labels in " +
@@ -233,13 +242,22 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         train_dataset = dataset.get_split('training')
-        train_loader = TorchDataloader(dataset=train_dataset,
-                                       preprocess=model.preprocess,
-                                       transform=model.transform,
-                                       use_cache=dataset.cfg.use_cache,
-                                       steps_per_epoch=dataset.cfg.get(
-                                           'steps_per_epoch_train', None))
+        train_split = TorchDataloader(dataset=train_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=batcher.collate_fn,
+        )
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -265,14 +283,12 @@ class ObjectDetection(BasePipeline):
 
             self.losses = {}
             no_bboxes = 0
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                data = train_loader[i]['data']
-                if data['bboxes'].numel() == 0:
+            process_bar = tqdm(train_loader, desc='training')
+            for data in process_bar:
+                if data.bbox_objs.numel() == 0:
                     no_bboxes += 1
                     continue
-
-                results = model(data['point'])
+                results = model(data.point)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
 
