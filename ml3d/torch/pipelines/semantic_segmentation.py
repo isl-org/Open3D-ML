@@ -348,6 +348,8 @@ class SemanticSegmentation(BasePipeline):
         train_loader = DataLoader(train_split,
                                   batch_size=cfg.batch_size,
                                   sampler=get_sampler(train_sampler),
+                                  num_workers=cfg.get('num_workers', 4),
+                                  pin_memory=cfg.get('pin_memory', True),
                                   collate_fn=self.batcher.collate_fn)
 
         valid_dataset = dataset.get_split('validation')
@@ -362,6 +364,8 @@ class SemanticSegmentation(BasePipeline):
         valid_loader = DataLoader(valid_split,
                                   batch_size=cfg.val_batch_size,
                                   sampler=get_sampler(valid_sampler),
+                                  num_workers=cfg.get('num_workers', 4),
+                                  pin_memory=cfg.get('pin_memory', True),
                                   collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
