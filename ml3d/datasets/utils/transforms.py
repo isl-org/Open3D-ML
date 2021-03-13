@@ -172,20 +172,20 @@ class ObjdetAugmentation():
             sampled_num = np.round(rate * sampled_num).astype(np.int64)
             sampled_num_dict[class_name] = sampled_num
 
-        sampled = []        
+        sampled = []
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
             if sampled_num < 0:
                 continue
 
-            sampled_cls = sample_class(class_name, sampled_num,
-                                       bboxes,
+            sampled_cls = sample_class(class_name, sampled_num, bboxes,
                                        db_boxes_dict[class_name])
             sampled += sampled_cls
             bboxes = bboxes + sampled_cls
 
         if len(sampled) != 0:
-            sampled_points = np.concatenate([box.points_inside_box for box in sampled], axis=0)
+            sampled_points = np.concatenate(
+                [box.points_inside_box for box in sampled], axis=0)
             points = remove_points_in_boxes(points, sampled)
             points = np.concatenate([sampled_points, points], axis=0)
 

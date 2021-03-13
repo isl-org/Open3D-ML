@@ -186,8 +186,8 @@ def test_pointpillars_tf():
     net = ml3d.models.PointPillars(**cfg.model, device='cpu')
 
     data = [
-        tf.constant(np.random.random((10000, 4)), dtype=tf.float32),
-        [None], [None], [[np.eye(4), np.eye(4)]]
+        tf.constant(np.random.random((10000, 4)), dtype=tf.float32), [None],
+        [None], [[np.eye(4), np.eye(4)]]
     ]
 
     results = net(data, training=False)

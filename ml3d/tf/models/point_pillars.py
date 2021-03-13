@@ -26,7 +26,7 @@ def unpack(flat_t, counts=None):
     """
     if counts is None:
         return [flat_t]
-        
+
     data_list = []
     idx0 = 0
     for count in counts:
@@ -34,6 +34,7 @@ def unpack(flat_t, counts=None):
         data_list.append(flat_t[idx0:idx1])
         idx0 = idx1
     return data_list
+
 
 class PointPillars(BaseModel):
     """Object detection model. 
@@ -87,7 +88,7 @@ class PointPillars(BaseModel):
 
         self.loss_cls = FocalLoss(**loss.get("focal_loss", {}))
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
-        self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))        
+        self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
 
     def extract_feats(self, points, training=False):
         """Extract features from points."""
@@ -189,7 +190,6 @@ class PointPillars(BaseModel):
         gt_label = tf.gather(tf.concat(gt_labels, axis=0), target_idx)
         target_labels = tf.tensor_scatter_nd_update(
             target_labels, tf.expand_dims(pos_idx, axis=-1), gt_label)
-            
 
         loss_cls = self.loss_cls(
             tf.gather(scores, tf.concat([pos_idx, neg_idx], axis=0)),
@@ -212,7 +212,7 @@ class PointPillars(BaseModel):
             # direction classification loss
             # to discrete bins
             target_dirs = tf.gather(tf.concat(gt_bboxes, axis=0),
-                        target_idx)[:, -1]
+                                    target_idx)[:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
             target_dirs = tf.cast(target_dirs / np.pi, tf.int32) % 2
 
@@ -250,10 +250,7 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        new_data = {
-            'point': points,
-            'calib': data['calib']
-        }
+        new_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             new_data['bbox_objs'] = data['bounding_boxes']
@@ -322,10 +319,7 @@ class PointPillars(BaseModel):
 
         points = tf.constant(data['point'], dtype=tf.float32)
 
-        t_data =  {
-            'point': points,
-            'calib': data['calib']
-        }
+        t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             t_data['bbox_objs'] = data['bbox_objs']
@@ -333,30 +327,48 @@ class PointPillars(BaseModel):
                 self.name2lbl.get(bb.label_class, len(self.classes))
                 for bb in data['bbox_objs']
             ],
-                                dtype=tf.int32)
-            t_data['bboxes'] = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                                dtype=tf.float32)
+                                           dtype=tf.int32)
+            t_data['bboxes'] = tf.constant(
+                [bb.to_xyzwhlr() for bb in data['bbox_objs']], dtype=tf.float32)
 
         return t_data
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
-        
+
         def batcher():
             count = len(dataset) if steps_per_epoch is None else steps_per_epoch
             for i in np.arange(0, count, batch_size):
-                batch = [dataset[i+bi]['data'] for bi in range(batch_size)]
+                batch = [dataset[i + bi]['data'] for bi in range(batch_size)]
                 points = tf.concat([b['point'] for b in batch], axis=0)
-                bboxes = tf.concat([b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32)) for b in batch], axis=0)
-                labels = tf.concat([b.get('labels', tf.zeros((0,), dtype=tf.int32)) for b in batch], axis=0)
+                bboxes = tf.concat([
+                    b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32))
+                    for b in batch
+                ],
+                                   axis=0)
+                labels = tf.concat([
+                    b.get('labels', tf.zeros((0,), dtype=tf.int32))
+                    for b in batch
+                ],
+                                   axis=0)
 
-                calib = [tf.constant([b.get('calib', {}).get('world_cam', np.eye(4)), b.get('calib', {}).get('cam_img', np.eye(4))]) for b in batch]
+                calib = [
+                    tf.constant([
+                        b.get('calib', {}).get('world_cam', np.eye(4)),
+                        b.get('calib', {}).get('cam_img', np.eye(4))
+                    ]) for b in batch
+                ]
                 count_pts = tf.constant([len(b['point']) for b in batch])
-                count_lbs = tf.constant([len(b.get('labels', tf.zeros((0,), dtype=tf.int32))) for b in batch])
+                count_lbs = tf.constant([
+                    len(b.get('labels', tf.zeros((0,), dtype=tf.int32)))
+                    for b in batch
+                ])
                 yield (points, bboxes, labels, calib, count_pts, count_lbs)
 
         gen_func = batcher
-        gen_types = (tf.float32, tf.float32, tf.int32, tf.float32, tf.int32, tf.int32)
-        gen_shapes = ([None, 4], [None, 7], [None], [batch_size, 2, 4, 4], [None], [None])
+        gen_types = (tf.float32, tf.float32, tf.int32, tf.float32, tf.int32,
+                     tf.int32)
+        gen_shapes = ([None, 4], [None, 7], [None], [batch_size, 2, 4,
+                                                     4], [None], [None])
 
         return gen_func, gen_types, gen_shapes
 
@@ -364,7 +376,8 @@ class PointPillars(BaseModel):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
-        for _calib, _bboxes, _scores, _labels in zip(inputs[3], bboxes_b, scores_b, labels_b):
+        for _calib, _bboxes, _scores, _labels in zip(inputs[3], bboxes_b,
+                                                     scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
             labels = _labels.cpu().numpy()
@@ -1000,7 +1013,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
 
         # compute size of anchors for each given class
         anchors_count = tf.cast(tf.reduce_prod(anchors[0].shape[:-1]),
-                              dtype=tf.int64)
+                                dtype=tf.int64)
         rot_angles = anchors[0].shape[-2]
 
         # init the tensors for the final result
@@ -1012,7 +1025,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
             x = idx % rot_angles
 
             return z * self.num_classes * rot_angles + j * rot_angles + x
-                        
+
         idx_off = 0
         for i in range(len(target_bboxes)):
             for j, (neg_th, pos_th) in enumerate(self.iou_thr):
@@ -1061,7 +1074,6 @@ class Anchor3DHead(tf.keras.layers.Layer):
         return (tf.concat(assigned_bboxes,
                           axis=0), tf.concat(target_idxs, axis=0),
                 tf.concat(pos_idxs, axis=0), tf.concat(neg_idxs, axis=0))
-
 
     def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
         """Get bboxes of anchor head.

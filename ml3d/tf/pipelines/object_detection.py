@@ -79,10 +79,11 @@ class ObjectDetection(BasePipeline):
 
         test_dataset = dataset.get_split('test')
         test_split = TFDataloader(dataset=test_dataset,
-                                   model=model,
-                                   use_cache=False)
+                                  model=model,
+                                  use_cache=False)
 
-        test_loader, len_test = test_split.get_loader(cfg.test_batch_size, transform=False)
+        test_loader, len_test = test_split.get_loader(cfg.test_batch_size,
+                                                      transform=False)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -118,7 +119,8 @@ class ObjectDetection(BasePipeline):
                                    steps_per_epoch=dataset.cfg.get(
                                        'steps_per_epoch_valid', None))
 
-        valid_loader, len_valid = valid_split.get_loader(cfg.val_batch_size, transform=False)
+        valid_loader, len_valid = valid_split.get_loader(cfg.val_batch_size,
+                                                         transform=False)
 
         log.info("Started validation")
 
@@ -126,7 +128,7 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         gt = []
-            
+
         process_bar = tqdm(valid_loader, total=len_valid, desc='validation')
         for i, data in enumerate(process_bar):
             inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
@@ -140,7 +142,11 @@ class ObjectDetection(BasePipeline):
             # convert to bboxes for mAP evaluation
             boxes = model.inference_end(results, data)
             pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
-            gt.extend([BEVBox3D.to_dicts(valid_split[i*cfg.val_batch_size + bi]["data"]["bbox_objs"]) for bi in range(cfg.val_batch_size)])
+            gt.extend([
+                BEVBox3D.to_dicts(valid_split[i * cfg.val_batch_size +
+                                              bi]["data"]["bbox_objs"])
+                for bi in range(cfg.val_batch_size)
+            ])
 
         sum_loss = 0
         desc = "validation - "
@@ -201,11 +207,12 @@ class ObjectDetection(BasePipeline):
 
         train_dataset = dataset.get_split('training')
         train_split = TFDataloader(dataset=train_dataset,
-                                    model=model,
-                                    use_cache=dataset.cfg.use_cache,
-                                    steps_per_epoch=dataset.cfg.get(
-                                        'steps_per_epoch_train', None))
-        train_loader, len_train = train_split.get_loader(cfg.batch_size, transform=False)
+                                   model=model,
+                                   use_cache=dataset.cfg.use_cache,
+                                   steps_per_epoch=dataset.cfg.get(
+                                       'steps_per_epoch_train', None))
+        train_loader, len_train = train_split.get_loader(cfg.batch_size,
+                                                         transform=False)
 
         self.optimizer = model.get_optimizer(cfg.optimizer)
 

@@ -216,10 +216,7 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        new_data = {
-            'point': points,
-            'calib': data['calib']
-        }
+        new_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             new_data['bbox_objs'] = data['bounding_boxes']
@@ -290,10 +287,7 @@ class PointPillars(BaseModel):
                               dtype=torch.float32,
                               device=self.device)
 
-        t_data =  {
-            'point': points,
-            'calib': data['calib']
-        }
+        t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             t_data['bbox_objs'] = data['bbox_objs']
@@ -301,11 +295,12 @@ class PointPillars(BaseModel):
                 self.name2lbl.get(bb.label_class, len(self.classes))
                 for bb in data['bbox_objs']
             ],
-                                dtype=torch.int64,
-                                device=self.device)
-            t_data['bboxes'] = torch.tensor([bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                                dtype=torch.float32,
-                                device=self.device)
+                                            dtype=torch.int64,
+                                            device=self.device)
+            t_data['bboxes'] = torch.tensor(
+                [bb.to_xyzwhlr() for bb in data['bbox_objs']],
+                dtype=torch.float32,
+                device=self.device)
 
         return t_data
 
@@ -313,7 +308,8 @@ class PointPillars(BaseModel):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
-        for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b, scores_b, labels_b):
+        for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
+                                                     scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
             labels = _labels.cpu().numpy()
@@ -333,7 +329,6 @@ class PointPillars(BaseModel):
                     BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
 
         return inference_result
-
 
 
 MODEL._register_module(PointPillars, 'torch')
@@ -946,11 +941,10 @@ class Anchor3DHead(nn.Module):
 
             # compute offset for index computation
             idx_off += len(target_bboxes[i])
-            
+
         return (torch.cat(assigned_bboxes,
                           axis=0), torch.cat(target_idxs, axis=0),
                 torch.cat(pos_idxs, axis=0), torch.cat(neg_idxs, axis=0))
-
 
     def get_bboxes(self, cls_scores, bbox_preds, dir_preds):
         """Get bboxes of anchor head.

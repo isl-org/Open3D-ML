@@ -182,8 +182,9 @@ class DataProcessing:
         points = np.hstack(
             (points, np.ones((points.shape[0], 1), dtype=np.float32)))
 
-        for i in range(len(points)//10000 + 1):
-            points[i*10000:(i+1)*10000] = np.matmul(points[i*10000:(i+1)*10000], world_cam)
+        for i in range(len(points) // 10000 + 1):
+            points[i * 10000:(i + 1) * 10000] = np.matmul(
+                points[i * 10000:(i + 1) * 10000], world_cam)
 
         return points[..., :3]
 
@@ -192,8 +193,9 @@ class DataProcessing:
         # transform in image space
         points = np.hstack(
             (points, np.ones((points.shape[0], 1), dtype=np.float32)))
-        for i in range(len(points)//10000 + 1):
-            points[i*10000:(i+1)*10000] = np.matmul(points[i*10000:(i+1)*10000], cam_img)
+        for i in range(len(points) // 10000 + 1):
+            points[i * 10000:(i + 1) * 10000] = np.matmul(
+                points[i * 10000:(i + 1) * 10000], cam_img)
         pts_img = (points[:, :2].T / points[:, 3]).T  # (N, 2)
         depth = points[:, 2] - cam_img[3, 2]  # depth in rect camera coord
         return pts_img, depth
