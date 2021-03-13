@@ -1,5 +1,41 @@
 #!/usr/bin/env python
 
+###############################################################################
+# The MIT License (MIT)
+#
+# Open3D: www.open3d.org
+# Copyright (c) 2020 www.open3d.org
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+###############################################################################
+"""
+Online 3D object detection pipeline
+
+- Connects to a RGBD camera or RGBD video file or
+  folder (currently RealSense camera, file format and folder with depth and
+  color iamges are supported)
+- Captures / reads color and depth frames
+- Convert frames to point cloud
+- Run object detector on point cloud
+- Visualize point cloud video and results
+"""
+
 import json
 import time
 import logging as log
@@ -16,8 +52,6 @@ from open3d.ml import datasets
 BEVBox3D = datasets.utils.bev_box.BEVBox3D
 
 import gtimer as gt
-import ipdb
-import numpy as np
 
 
 class PipelineViewer(object):
@@ -39,6 +73,7 @@ class PipelineViewer(object):
         self.vfov = vfov
         self.material = o3d.visualization.rendering.Material()
         self.material.shader = "defaultLit"
+        self.material.point_size = 8
         self.lut = LabelLUT()
 
         gui.Application.instance.initialize()
@@ -54,7 +89,12 @@ class PipelineViewer(object):
             True)  # makes UI _much_ more responsive
         self.pcdview.scene = rendering.Open3DScene(self.window.renderer)
         self.pcdview.scene.set_background([1, 1, 1, 1])  # White brackground
+        self.pcdview.scene.set_lighting(
+            rendering.Open3DScene.LightingProfile.SOFT_SHADOWS, [0, -6, 0])
         self.pcdview.scene.show_axes(True)
+        # Point cloud bounds, depend on the sensor range
+        self.pcd_bounds = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0],
+                                                              [3, 3, 6])
         self._camera_view()
         self.pcd_name = pcd_name
         self.max_pcd_vertices = max_pcd_vertices
@@ -103,10 +143,14 @@ class PipelineViewer(object):
         """
         if self.flag_gui_empty:
             # Set dummy point cloud to allocate graphics memory
-            dummy_pcd = o3d.t.geometry.PointCloud(
-                points=o3d.core.Tensor.zeros((self.max_pcd_vertices,
-                                              3), o3d.core.Dtype.Float32))
-            dummy_pcd.point['points'][0] = [1., 1., 1.]
+            dummy_pcd = o3d.t.geometry.PointCloud({
+                'points':
+                    o3d.core.Tensor.zeros((self.max_pcd_vertices, 3),
+                                          o3d.core.Dtype.Float32),
+                'colors':
+                    o3d.core.Tensor.zeros((self.max_pcd_vertices, 3),
+                                          o3d.core.Dtype.Float32)
+            })
             self.pcdview.scene.add_geometry(self.pcd_name, dummy_pcd,
                                             self.material)
             self.flag_gui_empty = False
@@ -120,7 +164,8 @@ class PipelineViewer(object):
                                             self.material)
         self.pcdview.scene.scene.update_geometry(
             self.pcd_name, frame_elements[self.pcd_name].cpu(),
-            rendering.Scene.UPDATE_POINTS_FLAG)
+            rendering.Scene.UPDATE_POINTS_FLAG |
+            rendering.Scene.UPDATE_COLORS_FLAG)
         self.pcdview.force_redraw()
         gt.stamp(name="GUI", unique=False)
 
@@ -154,20 +199,14 @@ class PipelineViewer(object):
 
     def _camera_view(self):
         """ Callback to reset point cloud view to the camera """
-        # Point cloud bounds, depend on the sensor range
-        pcd_bounds = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0], [3, 3, 6])
-        self.pcdview.setup_camera(self.vfov, pcd_bounds, [0, 0, 0])
+        self.pcdview.setup_camera(self.vfov, self.pcd_bounds, [0, 0, 0])
         # Look at [0, 0, 1] from an eye placed at [0, 0, 0] with Y axis
         # pointing at [0, -1, 0]
         self.pcdview.scene.camera.look_at([0, 0, 1], [0, 0, 0], [0, -1, 0])
 
     def _birds_eye_view(self):
         """ Callback to reset point cloud view to birds eye (overhead) view """
-        # Point cloud bounds, depend on the sensor range
-        pcd_bounds = o3d.geometry.AxisAlignedBoundingBox([-3, -3, 0], [3, 3, 6])
-        self.pcdview.setup_camera(self.vfov, pcd_bounds, [0, 0, 0])
-        # Look at [0, 0, 1] from an eye placed at [0, 0, 0] with Y axis
-        # pointing at [0, -1, 0]
+        self.pcdview.setup_camera(self.vfov, self.pcd_bounds, [0, 0, 0])
         self.pcdview.scene.camera.look_at([0, 0, 1.5], [0, 3, 1.5], [0, -1, 0])
 
 
@@ -176,9 +215,20 @@ class DetectorPipeline(object):
     bounding boxes overlayed on the Point Cloud"""
 
     def __init__(self,
-                 detector_config_file,
-                 device=None,
-                 camera_config_file=None):
+                 detector_config_file=None,
+                 camera_config_file=None,
+                 rgbd_video=None,
+                 device=None):
+        """
+        Args:
+            detector_config_file: Optional YAML config file for detector
+                pipeline
+            camera_config_file: Optional JSON camera configuration file
+            rgbd_video: Optional RGBD video file (RS bag) or folder of images.
+                        This will be used over a camera if provided.
+            device: Optional compute device in the format '{cpu|cuda}:DEVICE_ID', e.g.
+                'cpu:0'
+        """
 
         # Detector
         if device:
@@ -186,10 +236,13 @@ class DetectorPipeline(object):
         else:
             self.device = 'cuda:0' if o3d.core.cuda.is_available() else 'cpu:0'
         self.o3d_device = o3d.core.Device(self.device)
+        self.run_detector = None
         if detector_config_file:
             self.detector_config = Config.load_from_file(detector_config_file)
             ckpt_path = self.detector_config['model']['ckpt_path']
-            if ckpt_path.endswith('.pth'):
+            if ckpt_path is None:
+                pass
+            elif ckpt_path.endswith('.pth'):
                 import open3d.ml.torch as ml3d
                 import torch
                 self.run_detector = self._run_detector_torch
@@ -213,23 +266,30 @@ class DetectorPipeline(object):
                 ckpt = tf.train.Checkpoint(step=tf.Variable(1), model=self.net)
                 ckpt.restore(ckpt_path).expect_partial()
 
+        if self.run_detector is None:
+            log.info("No model checkpoint provided. Detector disabled.")
+        else:
             log.info(
                 f"Loaded model from {self.detector_config['model']['ckpt_path']}"
             )
-        else:
-            self.run_detector = None
-            log.info("No model provided. Detector disabled.")
         self.det_inputs = None
 
-        # Depth camera
-        self.rscam = o3d.t.io.RealSenseSensor()
-        if camera_config_file:
-            with open(camera_config_file) as ccf:
-                self.rscam.init_sensor(
-                    o3d.t.io.RealSenseSensorConfig(json.load(ccf)))
+        self.video = None
+        self.camera = None
+        if rgbd_video:  # VIdeo file or folder of images
+            self.video = o3d.t.io.RGBDVideoReader.create(rgbd_video)
+            self.rgbd_metadata = self.video.metadata
 
-        self.rscam.start_capture()
-        self.rgbd_metadata = self.rscam.get_metadata()
+        else:  # Depth camera
+            self.camera = o3d.t.io.RealSenseSensor()
+            if camera_config_file:
+                with open(camera_config_file) as ccf:
+                    self.camera.init_sensor(
+                        o3d.t.io.RealSenseSensorConfig(json.load(ccf)))
+
+            self.camera.start_capture()
+            self.rgbd_metadata = self.camera.get_metadata()
+
         self.max_points = self.rgbd_metadata.width * self.rgbd_metadata.height
         log.info(self.rgbd_metadata)
 
@@ -245,7 +305,6 @@ class DetectorPipeline(object):
                 np.block([[self.intrinsic_matrix.numpy(),
                            np.zeros((3, 1))], [np.zeros((1, 3)), 1]]).T
         }
-        print(f"cam_img: {self.calib['cam_img']}")
         self.depth_max = 3.0  # m
         self.pcd_stride = 1  # downsample point cloud
 
@@ -327,21 +386,29 @@ class DetectorPipeline(object):
             n_pts = 0
             frame_id = 0
             t1 = time.perf_counter()
-            rgbd_frame = self.rscam.capture_frame(wait=True,
-                                                  align_depth_to_color=True)
+            if self.video:
+                rgbd_frame = self.video.next_frame()
+            else:
+                rgbd_frame = self.camera.capture_frame(
+                    wait=True, align_depth_to_color=True)
+
             pcd_errors = 0
-            while frame_id < 1000 and not self.gui.flag_exit:
-                future_rgbd_frame = executor.submit(self.rscam.capture_frame,
-                                                    wait=True,
-                                                    align_depth_to_color=True)
+            while (frame_id < 1000 and not self.gui.flag_exit and
+                   (self.video and not self.video.is_eof())):
+                if self.video:
+                    future_rgbd_frame = executor.submit(self.video.next_frame)
+                else:
+                    future_rgbd_frame = executor.submit(
+                        self.camera.capture_frame,
+                        wait=True,
+                        align_depth_to_color=True)
                 gt.stamp("SubmitCapture", unique=False)
 
                 try:
-                    pcd_frame = o3d.t.geometry.PointCloud.create_from_depth_image(
-                        rgbd_frame.depth.to(self.o3d_device),
-                        self.intrinsic_matrix, self.extrinsics,
-                        self.rgbd_metadata.depth_scale, self.depth_max,
-                        self.pcd_stride)
+                    pcd_frame = o3d.t.geometry.PointCloud.create_from_rgbd_image(
+                        rgbd_frame.to(self.o3d_device), self.intrinsic_matrix,
+                        self.extrinsics, self.rgbd_metadata.depth_scale,
+                        self.depth_max, self.pcd_stride)
                 except RuntimeError:
                     pcd_errors += 1
 
@@ -365,7 +432,7 @@ class DetectorPipeline(object):
                 gt.stamp("GetCapture", unique=False)
                 if frame_id % 30 == 0:
                     t0, t1 = t1, time.perf_counter()
-                    print(
+                    log.debug(
                         f"\nframe_id = {frame_id}, \t {(t1-t0)*1000./30:0.2f}"
                         f"ms/frame \t {(t1-t0)*1e9/n_pts} ms/Mp\t",
                         end='')
@@ -378,8 +445,11 @@ class DetectorPipeline(object):
                 gt.stamp("UserWait", unique=False)
                 frame_id += 1
 
-        self.rscam.stop_capture()
-        log.info(f"create_from_depth_image() errors = {pcd_errors}")
+        if self.camera:
+            self.camera.stop_capture()
+        else:
+            self.video.close()
+        log.debug(f"create_from_depth_image() errors = {pcd_errors}")
         log.info(gt.report())
 
 
@@ -387,24 +457,27 @@ if __name__ == "__main__":
 
     log.basicConfig(level=log.DEBUG)
     parser = argparse.ArgumentParser(
-        description="""Online 3D object detection pipeline
-    - Connects to a depth camera (currently RealSense)
-    - Captures color and depth frames
-    - Convert frames to point cloud
-    - Run object detector on point cloud
-    - Visualize results""",
+        description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--camera-config',
-                        help='Depth camera configuration JSON file')
+                        help='RGBD camera configuration JSON file')
+    parser.add_argument(
+        '--rgbd-video',
+        help=
+        'RGBD video file (RealSense bag) or folder with color and depth images')
     parser.add_argument('--detector-config',
                         required=False,
                         help='Detector configuration YAML file')
     parser.add_argument(
         '--device',
-        help='Device to run model inference. e.g. cpu:0 or cuda:0'
+        help='Device to run model inference. e.g. cpu:0 or cuda:0 '
         'Default is CUDA GPU if available, else CPU.')
 
     args = parser.parse_args()
-
-    DetectorPipeline(args.detector_config, args.device,
-                     args.camera_config).launch()
+    if args.camera_config and args.rgbd_video:
+        log.critical(
+            "Please provide only one of --camera-config and --rgbd-video arguments"
+        )
+    else:
+        DetectorPipeline(args.detector_config, args.camera_config,
+                         args.rgbd_video, args.device).launch()
