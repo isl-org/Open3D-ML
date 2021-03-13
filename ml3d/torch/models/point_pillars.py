@@ -129,7 +129,7 @@ class PointPillars(BaseModel):
         coors_batch = torch.cat(coors_batch, dim=0)
         return voxels, num_points, coors_batch
 
-    def forward(self, inputs, cnts=None):
+    def forward(self, inputs):
         inputs = inputs.point
         x = self.extract_feats(inputs)
         outs = self.bbox_head(x)
@@ -139,7 +139,7 @@ class PointPillars(BaseModel):
         optimizer = torch.optim.AdamW(self.parameters(), **cfg)
         return optimizer, None
 
-    def loss(self, results, inputs, cnts=None):
+    def loss(self, results, inputs):
         scores, bboxes, dirs = results
         gt_labels = inputs.labels
         gt_bboxes = inputs.bboxes

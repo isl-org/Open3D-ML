@@ -165,15 +165,13 @@ def test_pointpillars_torch():
         'calib': None,
         'bounding_boxes': [],
     }
-    data = net.preprocess(data, {})
+    data = net.preprocess(data, {'split': 'test'})
     data = net.transform(data, {'split': 'test'})
     data = batcher.collate_fn([{'data': data}])
 
     net.eval()
     with torch.no_grad():
-        inputs = torch.tensor(data.point, dtype=torch.float32, device='cpu')
-        inputs = torch.reshape(inputs, (1, -1, inputs.shape[-1]))
-        results = net(inputs)
+        results = net(data)
         boxes = net.inference_end(results, data)
         assert type(boxes) == list
 
@@ -187,15 +185,12 @@ def test_pointpillars_tf():
 
     net = ml3d.models.PointPillars(**cfg.model, device='cpu')
 
-    data = {
-        'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
-        'calib': None
-    }
+    data = [
+        tf.constant(np.random.random((10000, 4)), dtype=tf.float32),
+        [None], [None], [[np.eye(4), np.eye(4)]]
+    ]
 
-    inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
-    inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
-
-    results = net(inputs, training=False)
+    results = net(data, training=False)
     boxes = net.inference_end(results, data)
 
     assert type(boxes) == list

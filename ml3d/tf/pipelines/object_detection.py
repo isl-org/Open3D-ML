@@ -56,9 +56,9 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs, cnts_pts = data[:-2], data[-2]
+        inputs, counts_pts = data[:-2], data[-2]
 
-        results = model(inputs, cnts=cnts_pts, training=False)
+        results = model(inputs, counts=counts_pts, training=False)
         boxes = model.inference_end(results, data)
 
         return boxes
@@ -129,9 +129,9 @@ class ObjectDetection(BasePipeline):
             
         process_bar = tqdm(valid_loader, total=len_valid, desc='validation')
         for i, data in enumerate(process_bar):
-            inputs, cnts_pts, cnts_lbs = data[:-2], data[-2], data[-1]
-            results = model(data, cnts=cnts_pts, training=False)
-            loss = model.loss(results, inputs, cnts=cnts_lbs)
+            inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
+            results = model(data, counts=counts_pts, training=False)
+            loss = model.loss(results, inputs, counts=counts_lbs)
             for l, v in loss.items():
                 if not l in self.valid_losses:
                     self.valid_losses[l] = []
@@ -230,10 +230,10 @@ class ObjectDetection(BasePipeline):
             self.losses = {}
             process_bar = tqdm(train_loader, total=len_train, desc='training')
             for data in process_bar:
-                inputs, cnts_pts, cnts_lbs = data[:-2], data[-2], data[-1]
+                inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(inputs, cnts=cnts_pts)
-                    loss = model.loss(results, inputs, cnts=cnts_lbs)
+                    results = model(inputs, counts=counts_pts)
+                    loss = model.loss(results, inputs, counts=counts_lbs)
                     loss_sum = tf.add_n(loss.values())
 
                 grads = tape.gradient(loss_sum, model.trainable_weights)

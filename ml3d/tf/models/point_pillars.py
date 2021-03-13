@@ -19,18 +19,18 @@ from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
 
-def unpack(flat_t, cnts=None):
+def unpack(flat_t, counts=None):
     """
     Converts flat tensor to list of tensors, 
-    with length according to cnts.
+    with length according to counts.
     """
-    if cnts is None:
+    if counts is None:
         return [flat_t]
         
     data_list = []
     idx0 = 0
-    for cnt in cnts:
-        idx1 = idx0 + cnt
+    for count in counts:
+        idx1 = idx0 + count
         data_list.append(flat_t[idx0:idx1])
         idx0 = idx1
     return data_list
@@ -134,8 +134,14 @@ class PointPillars(BaseModel):
 
         return voxels, num_points, coors_batch
 
-    def call(self, inputs, training=True, cnts=None):
-        inputs = unpack(inputs[0], cnts)
+    def call(self, inputs, training=True, counts=None):
+        """
+        Forward pass
+        :param inputs: tuple/list of inputs (points, bboxes, labels, calib)
+        :param training: toggle training run
+        :param counts: split flat input into batch list
+        """
+        inputs = unpack(inputs[0], counts)
         x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
 
@@ -155,12 +161,18 @@ class PointPillars(BaseModel):
         #                            beta_1=beta1,
         #                            beta_2=beta2)
 
-    def loss(self, results, inputs, cnts=None):
+    def loss(self, results, inputs, counts=None):
+        """
+        Computes loss
+        :param results: results of forward pass (scores, bboxes, dirs)
+        :param inputs: tuple/list of gt inputs (points, bboxes, labels, calib)
+        :param counts: split flat input into batch list
+        """
         scores, bboxes, dirs = results
 
         gt_bboxes, gt_labels = inputs[1:3]
-        gt_bboxes = unpack(gt_bboxes, cnts)
-        gt_labels = unpack(gt_labels, cnts)
+        gt_bboxes = unpack(gt_bboxes, counts)
+        gt_labels = unpack(gt_labels, counts)
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -330,17 +342,17 @@ class PointPillars(BaseModel):
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
         
         def batcher():
-            cnt = len(dataset) if steps_per_epoch is None else steps_per_epoch
-            for i in np.arange(0, cnt, batch_size):
+            count = len(dataset) if steps_per_epoch is None else steps_per_epoch
+            for i in np.arange(0, count, batch_size):
                 batch = [dataset[i+bi]['data'] for bi in range(batch_size)]
                 points = tf.concat([b['point'] for b in batch], axis=0)
                 bboxes = tf.concat([b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32)) for b in batch], axis=0)
                 labels = tf.concat([b.get('labels', tf.zeros((0,), dtype=tf.int32)) for b in batch], axis=0)
 
                 calib = [tf.constant([b.get('calib', {}).get('world_cam', np.eye(4)), b.get('calib', {}).get('cam_img', np.eye(4))]) for b in batch]
-                cnt_pts = tf.constant([len(b['point']) for b in batch])
-                cnt_lbs = tf.constant([len(b.get('labels', tf.zeros((0,), dtype=tf.int32))) for b in batch])
-                yield (points, bboxes, labels, calib, cnt_pts, cnt_lbs)
+                count_pts = tf.constant([len(b['point']) for b in batch])
+                count_lbs = tf.constant([len(b.get('labels', tf.zeros((0,), dtype=tf.int32))) for b in batch])
+                yield (points, bboxes, labels, calib, count_pts, count_lbs)
 
         gen_func = batcher
         gen_types = (tf.float32, tf.float32, tf.int32, tf.float32, tf.int32, tf.int32)
@@ -987,7 +999,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
         ]
 
         # compute size of anchors for each given class
-        anchors_cnt = tf.cast(tf.reduce_prod(anchors[0].shape[:-1]),
+        anchors_count = tf.cast(tf.reduce_prod(anchors[0].shape[:-1]),
                               dtype=tf.int64)
         rot_angles = anchors[0].shape[-2]
 
@@ -1038,8 +1050,8 @@ class Anchor3DHead(tf.keras.layers.Layer):
                 target_idxs.append(max_idx + idx_off)
 
                 # store global indices in list
-                pos_idx = flatten_idx(pos_idx, j) + i * anchors_cnt
-                neg_idx = flatten_idx(neg_idx, j) + i * anchors_cnt
+                pos_idx = flatten_idx(pos_idx, j) + i * anchors_count
+                neg_idx = flatten_idx(neg_idx, j) + i * anchors_count
                 pos_idxs.append(pos_idx)
                 neg_idxs.append(neg_idx)
 
