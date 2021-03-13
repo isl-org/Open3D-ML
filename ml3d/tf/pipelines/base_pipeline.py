@@ -20,7 +20,7 @@ class BasePipeline(ABC):
         Args:
             model: network
             dataset: dataset, or None for inference model
-            devce: 'gpu' or 'cpu'
+            device: 'gpu' or 'cpu'
             kwargs:
         Returns:
             class: The corresponding class.
@@ -57,7 +57,7 @@ class BasePipeline(ABC):
     def run_test(self):
         """
         Run testing on test sets.
-            
+
         """
         return
 
