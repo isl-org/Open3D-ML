@@ -50,7 +50,7 @@ class Scannet(BaseDataset):
         self.classes = [
             'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
             'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-            'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
+            'refrigerator', 'showercurtain', 'toilet', 'sink', 'bathtub',
             'garbagebin'
         ]
         self.cat2label = {cat: self.classes.index(cat) for cat in self.classes}

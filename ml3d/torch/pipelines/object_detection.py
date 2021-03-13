@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 
 class ObjectDetection(BasePipeline):
     """
-    Pipeline for object detection. 
+    Pipeline for object detection.
     """
 
     def __init__(self,
@@ -73,7 +73,8 @@ class ObjectDetection(BasePipeline):
 
     def run_test(self):
         """
-        Run test with test data split, computes mean average precision of the prediction results.
+        Run test with test data split, computes mean average precision of the
+        prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -113,7 +114,8 @@ class ObjectDetection(BasePipeline):
 
     def run_valid(self):
         """
-        Run validation with validation data split, computes mean average precision and the loss of the prediction results.
+        Run validation with validation data split, computes mean average
+        precision and the loss of the prediction results.
         """
         model = self.model
         dataset = self.dataset

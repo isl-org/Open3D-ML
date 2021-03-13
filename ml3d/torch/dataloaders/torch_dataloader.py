@@ -11,17 +11,15 @@ from ...utils import Cache, get_hash
 class TorchDataloader(Dataset):
     """
     This class allows you to load datasets for a PyTorch framework.
-	**Example:** 
+	**Example:**
         This example loads the SemanticKITTI dataset using the Torch dataloader:
-			
-			
+
+
             import torch
-			
+
 			from torch.utils.data import Dataset, DataLoader
-					
+
 			train_split = TorchDataloader(dataset=dataset.get_split('training'))
-	
-	
     """
 
     def __init__(self,
@@ -36,11 +34,14 @@ class TorchDataloader(Dataset):
         Initialize
 
         Args:
-            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            dataset: The 3D ML dataset class. You can use the base dataset,
+                        sample datasets, or a custom dataset.
             preprocess: The model's preprocess method.
             transform: The model's transform method.
             use_cache: Indicates if preprocessed data should be cached.
-            steps_per_epoch: The number of steps per epoch that indicates the bactches of samples to train. If it is None, then the step number will be the number of samples in the data.
+            steps_per_epoch: The number of steps per epoch that indicates the
+                        batches of samples to train. If it is None, then the
+                        step number will be the number of samples in the data.
         Returns:
             class: The corresponding class.
         """
@@ -80,7 +81,7 @@ class TorchDataloader(Dataset):
 
     def __getitem__(self, index):
         """
-		Returns the item at index position (idx). 	
+		Returns the item at index position (idx).
 		"""
         dataset = self.dataset
         index = index % len(dataset)

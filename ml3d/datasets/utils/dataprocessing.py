@@ -210,7 +210,7 @@ class DataProcessing:
             points (np.ndarray, shape=[N, 3+dims]): Total points.
             world_cam (np.ndarray, shape=[4, 4]): Matrix to project points in
                 lidar coordinates to camera coordinates.
-            cam_img (p.array, shape=[4, 4]): Matrix to project points in
+            cam_img (np.array, shape=[4, 4]): Matrix to project points in
                 camera coordinates to image coordinates.
             image_shape (list[int]): Shape of image.
         Returns:
