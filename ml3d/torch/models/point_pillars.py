@@ -140,8 +140,8 @@ class PointPillars(BaseModel):
 
     def loss(self, results, inputs):
         scores, bboxes, dirs = results
-        gt_labels = inputs['labels']
-        gt_bboxes = inputs['bboxes']
+        gt_labels = inputs.labels
+        gt_bboxes = inputs.bboxes
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -280,7 +280,7 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         #Augment data
-        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
+        if False and attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
         points = torch.tensor([data['point']],
@@ -311,8 +311,8 @@ class PointPillars(BaseModel):
         inference_result = []
 
         world_cam, cam_img = None, None
-        if 'calib' in inputs and inputs['calib'] is not None:
-            calib = inputs['calib']
+        if inputs.calib is not None:
+            calib = inputs.calib
             world_cam = calib.get('world_cam', None)
             cam_img = calib.get('cam_img', None)
 
