@@ -53,26 +53,25 @@ class PointRCNN(BaseModel):
         with torch.set_grad_enabled(self.training and self.mode == "RPN"):
             if not self.mode == "RPN":
                 self.rpn.eval()
-            rois = None
             cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
                 inputs['point'])
+
+            with torch.no_grad():
+                rpn_scores_raw = cls_score[:, :, 0]
+                rois, roi_scores_raw = self.rpn.proposal_layer(
+                    rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
+
             output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         if self.mode == "RCNN":
             with torch.no_grad():
-                rpn_scores_raw = cls_score[:, :, 0]
                 rpn_scores_norm = torch.sigmoid(rpn_scores_raw)
                 seg_mask = (rpn_scores_norm > self.score_thres).float()
                 pts_depth = torch.norm(backbone_xyz, p=2, dim=2)
 
-                # proposal layer
-                rois, roi_scores_raw = self.rpn.proposal_layer(
-                    rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
-
-            output = self.rcnn(rois,
-                               inputs['bboxes'] if self.training else None,
-                               backbone_xyz, backbone_features.permute(
-                                   (0, 2, 1)), seg_mask, pts_depth)
+            output = self.rcnn(rois, inputs.get('bboxes', None), backbone_xyz,
+                               backbone_features.permute((0, 2, 1)), seg_mask,
+                               pts_depth)
 
         return output
 
@@ -123,6 +122,8 @@ class PointRCNN(BaseModel):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
         else:
+            if not self.training:
+                return {}
             return self.rcnn.loss(results, inputs)
 
     def preprocess(self, data, attr):
@@ -194,6 +195,9 @@ class PointRCNN(BaseModel):
         labels = torch.tensor([labels], dtype=torch.int64, device=self.device)
         bboxes = torch.tensor([bboxes], dtype=torch.float32, device=self.device)
 
+        if self.mode == "RCNN" and not self.training:
+            bboxes = None
+
         return {
             'point': points,
             'labels': labels,
@@ -203,6 +207,9 @@ class PointRCNN(BaseModel):
         }
 
     def inference_end(self, results, inputs):
+        if self.mode == 'RPN':
+            return [[]]
+
         roi_boxes3d = results['rois']  # (B, M, 7)
         batch_size = roi_boxes3d.shape[0]
 
@@ -587,17 +594,16 @@ class RCNN(nn.Module):
             reg_out_ch=[256, 256],
             db_ratio=0.5,
             use_xyz=True,
-            pool_extra_width=1.0,
-            num_points=512,
             xyz_up_layer=[128, 128],
             head={},
+            target_head={},
             loss={}):
 
         super().__init__()
         self.rcnn_input_channel = 5
 
-        self.pool_extra_width = pool_extra_width
-        self.num_points = num_points
+        self.pool_extra_width = target_head.get("pool_extra_width", 1.0)
+        self.num_points = target_head.get("num_points", 512)
 
         self.proposal_layer = ProposalLayer(device=device, **head)
 
@@ -656,8 +662,7 @@ class RCNN(nn.Module):
 
         self.reg_blocks = nn.Sequential(*layers)
 
-        self.proposal_target_layer = ProposalTargetLayer(
-            self.pool_extra_width, self.num_points)
+        self.proposal_target_layer = ProposalTargetLayer(**target_head)
         self.init_weights()
 
     def init_weights(self):
@@ -682,13 +687,13 @@ class RCNN(nn.Module):
         pts_extra_input = torch.cat(pts_extra_input_list, dim=2)
         pts_feature = torch.cat((pts_extra_input, rpn_features), dim=2)
 
-        if self.training:
+        if gt_boxes3d is not None:
             with torch.no_grad():
                 target = self.proposal_target_layer(
                     [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
-                pts_input = torch.cat(
-                    (target['sampled_pts'], target['pts_feature']), dim=2)
-                target['pts_input'] = pts_input
+            pts_input = torch.cat(
+                (target['sampled_pts'], target['pts_feature']), dim=2)
+            target['pts_input'] = pts_input
         else:
             pooled_features, pooled_empty_flag = roipool3d_utils.roipool3d_gpu(
                 rpn_xyz,
@@ -731,15 +736,15 @@ class RCNN(nn.Module):
         rcnn_reg = self.reg_blocks(l_features[-1]).transpose(
             1, 2).contiguous().squeeze(dim=1)  # (B, C)
 
-        ret_dict = {'rcnn_cls': rcnn_cls, 'rcnn_reg': rcnn_reg}
+        ret_dict = {'rois': roi_boxes3d, 'cls': rcnn_cls, 'reg': rcnn_reg}
 
-        if self.training:
+        if gt_boxes3d is not None:
             ret_dict.update(target)
         return ret_dict
 
     def loss(self, results, inputs):
-        rcnn_cls = results['rcnn_cls']
-        rcnn_reg = results['rcnn_reg']
+        rcnn_cls = results['cls']
+        rcnn_reg = results['reg']
 
         cls_label = results['cls_label'].float()
         reg_valid_mask = results['reg_valid_mask']

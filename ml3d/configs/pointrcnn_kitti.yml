@@ -55,8 +55,6 @@ model:
 
   rcnn:
     in_channels: 128
-    pool_extra_width: 1.0
-    num_points: 512
     xyz_up_layer: [128, 128]
     cls_out_ch: [256, 256]
     reg_out_ch: [256, 256]
@@ -83,6 +81,19 @@ model:
       post_process: False
       nms_thres: 0.1
 
+    target_head:
+      pool_extra_width: 1.0
+      num_points: 512
+      reg_fg_thresh: 0.55
+      cls_fg_thresh: 0.6
+      cls_bg_thresh: 0.45
+      cls_bg_thresh_lo: 0.05
+      fg_ratio: 0.5
+      roi_per_image: 64
+      aug_rot_range: 18
+      hard_bg_ratio: 0.8
+      roi_fg_aug_times: 10
+      
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
