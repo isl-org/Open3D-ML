@@ -87,9 +87,9 @@ class PipelineViewer(object):
         self.pcd_material.point_size = 8 * self.window.scaling
 
         self.box_material = o3d.visualization.rendering.Material()
-        self.box_material.shader = "defaultLine"
+        self.box_material.shader = "unlitLine"
         # Bounding box line width
-        self.box_material.line_width = 8 * self.window.scaling
+        self.box_material.line_width = 2 * self.window.scaling
 
         # 3D scene
         self.pcdview = gui.SceneWidget()
