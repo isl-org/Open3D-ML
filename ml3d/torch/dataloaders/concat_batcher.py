@@ -422,9 +422,11 @@ class PointPillarsBatch:
         self.calib = []
         for batch in batches:
             data = batch['data']
-            self.point.append(data['point'])
-            self.labels.append(data.get('labels'))
-            self.bboxes.append(data.get('bboxes'))
+            self.point.append(torch.tensor(data['point'], dtype=torch.float32))
+            self.labels.append(
+                torch.tensor(data.get('labels'), dtype=torch.int64))
+            self.bboxes.append(
+                torch.tensor(data.get('bboxes'), dtype=torch.float32))
             self.bbox_objs.append(data.get('bbox_objs'))
             self.calib.append(data.get('calib'))
 
@@ -475,7 +477,7 @@ class ConcatBatcher(object):
 
         elif self.model == "PointPillars":
             batching_result = PointPillarsBatch(batches)
-            batching_result.to(self.device)
+            # batching_result.to(self.device)
             return batching_result
 
         else:

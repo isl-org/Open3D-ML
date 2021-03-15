@@ -96,7 +96,7 @@ class ObjectDetection(BasePipeline):
             test_split,
             batch_size=cfg.test_batch_size,
             num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', True),
+            pin_memory=cfg.get('pin_memory', False),
             collate_fn=batcher.collate_fn,
         )
 
@@ -160,6 +160,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         with torch.no_grad():
             for data in tqdm(valid_loader, desc='validation'):
+                data.to(device)
                 results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
@@ -279,6 +280,7 @@ class ObjectDetection(BasePipeline):
 
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
+                data.to(device)
                 results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())

@@ -283,24 +283,17 @@ class PointPillars(BaseModel):
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
-        points = torch.tensor(data['point'],
-                              dtype=torch.float32,
-                              device=self.device)
-
-        t_data = {'point': points, 'calib': data['calib']}
+        t_data = {'point': data['point'], 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             t_data['bbox_objs'] = data['bbox_objs']
-            t_data['labels'] = torch.tensor([
+            t_data['labels'] = np.array([
                 self.name2lbl.get(bb.label_class, len(self.classes))
                 for bb in data['bbox_objs']
             ],
-                                            dtype=torch.int64,
-                                            device=self.device)
-            t_data['bboxes'] = torch.tensor(
-                [bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                dtype=torch.float32,
-                device=self.device)
+                                        dtype=np.int64)
+            t_data['bboxes'] = np.array(
+                [bb.to_xyzwhlr() for bb in data['bbox_objs']], dtype=np.float32)
 
         return t_data
 
