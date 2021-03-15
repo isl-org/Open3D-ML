@@ -77,6 +77,24 @@ class BoundingBox3D:
         return s
 
     @staticmethod
+    def create_labels(boxes, show_class=True, show_confidence=True):
+        """ Create text labels for rendering with the line sets
+
+            boxes: the list of bounding boxes
+        """
+        label_text = []
+        label_position = []
+        for box in boxes:
+            label_position.append(box.center - 0.5 * box.size[0] * box.left -
+                                  0.5 * box.size[1] * box.up -
+                                  0.5 * box.size[0] * box.front)
+            label_text.append(
+                str(box.identifier) +
+                ((':' + box.label_class) if show_class else '') +
+                (f':{box.confidence:0.2f}' if show_confidence else ''))
+        return label_position, label_text
+
+    @staticmethod
     def create_lines(boxes, lut=None):
         """Creates and returns an open3d.geometry.LineSet that can be used to
         render the boxes.

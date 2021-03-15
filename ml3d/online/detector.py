@@ -58,7 +58,8 @@ class PipelineViewer(object):
                  labels=None,
                  vfov=60,
                  pcd_name='points',
-                 max_pcd_vertices=1 << 20):
+                 max_pcd_vertices=1 << 20,
+                 score_threshold=0.1):
         """ Initialize GUI.
 
         Args:
@@ -67,18 +68,28 @@ class PipelineViewer(object):
             pcd_name: Name for displayed point cloud.
             max_pcd_vertices: max vertices allowed in the point cloud display
                 (default 2^20).
+            score_threshold: Initial detector score threshold for valid
+                detections
         """
         self.vfov = vfov
-        self.material = o3d.visualization.rendering.Material()
-        self.material.shader = "defaultLit"
-        self.material.point_size = 8
         self.lut = LabelLUT()
 
         gui.Application.instance.initialize()
         self.window = gui.Application.instance.create_window(
             "Open3D || 3D Object Detection", 1024, 768)
-        self.window.set_on_layout(self._on_layout)  # Window resize callback
-        self.window.set_on_close(self._on_window_close)  # Window close callback
+        # Called on window layout (eg: resize)
+        self.window.set_on_layout(self._on_layout)
+        self.window.set_on_close(self._on_window_close)  # Call on window close
+
+        self.pcd_material = o3d.visualization.rendering.Material()
+        self.pcd_material.shader = "defaultLit"
+        # Set n_pixels displayed for each 3D point, accounting for HiDPI scaling
+        self.pcd_material.point_size = 8 * self.window.scaling
+
+        self.box_material = o3d.visualization.rendering.Material()
+        self.box_material.shader = "defaultLine"
+        # Bounding box line width
+        self.box_material.line_width = 8 * self.window.scaling
 
         # 3D scene
         self.pcdview = gui.SceneWidget()
@@ -86,7 +97,7 @@ class PipelineViewer(object):
         self.pcdview.enable_scene_caching(
             True)  # makes UI _much_ more responsive
         self.pcdview.scene = rendering.Open3DScene(self.window.renderer)
-        self.pcdview.scene.set_background([1, 1, 1, 1])  # White brackground
+        self.pcdview.scene.set_background([1, 1, 1, 1])  # White background
         self.pcdview.scene.set_lighting(
             rendering.Open3DScene.LightingProfile.SOFT_SHADOWS, [0, -6, 0])
         self.pcdview.scene.show_axes(True)
@@ -105,12 +116,13 @@ class PipelineViewer(object):
 
         self.flag_capture = False
         self.cv_capture = threading.Condition()
-        toggle_capture = gui.Checkbox("Capture")
+        toggle_capture = gui.Checkbox("Capture / Play")
         toggle_capture.checked = self.flag_capture
         toggle_capture.set_on_checked(self._on_toggle_capture)  # callback
         self.panel.add_child(toggle_capture)
 
         self.flag_detector = False
+        self.score_threshold = score_threshold
         if labels:
             for val in sorted(labels):
                 self.lut.add_label(val, val)
@@ -118,6 +130,12 @@ class PipelineViewer(object):
             toggle_detect.checked = self.flag_detector
             toggle_detect.set_on_checked(self._on_toggle_detector)  # callback
             self.panel.add_child(toggle_detect)
+            self.panel.add_child(gui.Label("Detector score threshold"))
+            slider_score_thr = gui.Slider(gui.Slider.DOUBLE)
+            slider_score_thr.set_limits(0., 1.)
+            slider_score_thr.double_value = self.score_threshold
+            slider_score_thr.set_on_value_changed(self._on_score_thr_changed)
+            self.panel.add_child(slider_score_thr)
 
         camera_view = gui.Button("Camera view")
         camera_view.set_on_clicked(self._camera_view)  # callback
@@ -134,15 +152,17 @@ class PipelineViewer(object):
 
         self.flag_exit = False
         self.flag_gui_empty = True
+        self.label_list = []  # List of 3D text labels currently shown
 
     def update(self, frame_elements):
         """Update visualization with point cloud and bounding boxes
         Must run in main thread since this makes GUI calls.
 
         Args:
-            frame_elements: dict {label: geometry element}.
-                Dictionary of labels to geometry elements to be updated in the
-                GUI.
+            frame_elements: dict {element_type: geometry element}.
+                Dictionary of element types to geometry elements to be updated
+                in the GUI: (self.pcd_name: point cloud, 'boxes':lineset,
+                'labels': bbox description, 'status_message': message)
         """
         if self.flag_gui_empty:
             # Set dummy point cloud to allocate graphics memory
@@ -155,16 +175,23 @@ class PipelineViewer(object):
                                           o3d.core.Dtype.Float32)
             })
             self.pcdview.scene.add_geometry(self.pcd_name, dummy_pcd,
-                                            self.material)
+                                            self.pcd_material)
             self.flag_gui_empty = False
         else:
-            if self.pcdview.scene.has_geometry('Boxes'):
-                self.pcdview.scene.remove_geometry('Boxes')
+            if self.pcdview.scene.has_geometry('boxes'):
+                self.pcdview.scene.remove_geometry('boxes')
+                for label in self.label_list:
+                    self.pcdview.remove_3d_label(label)
 
         # Update point cloud and add bounding boxes
-        if 'Boxes' in frame_elements and not frame_elements['Boxes'].is_empty():
-            self.pcdview.scene.add_geometry('Boxes', frame_elements['Boxes'],
-                                            self.material)
+        if 'boxes' in frame_elements and not frame_elements['boxes'].is_empty():
+            self.pcdview.scene.add_geometry('boxes', frame_elements['boxes'],
+                                            self.box_material)
+            self.label_list = [
+                self.pcdview.add_3d_label(pos, text)
+                for pos, text in zip(*frame_elements['labels'])
+            ]
+
         if 'status_message' in frame_elements:
             self.status_message.text = frame_elements["status_message"]
 
@@ -214,6 +241,10 @@ class PipelineViewer(object):
         """ Callback to reset point cloud view to birds eye (overhead) view. """
         self.pcdview.setup_camera(self.vfov, self.pcd_bounds, [0, 0, 0])
         self.pcdview.scene.camera.look_at([0, 0, 1.5], [0, 3, 1.5], [0, -1, 0])
+
+    def _on_score_thr_changed(self, new_threshold_value):
+        """ Callback to update detector model score threshold """
+        self.score_threshold = new_threshold_value
 
 
 class DetectorPipeline(object):
@@ -322,11 +353,13 @@ class DetectorPipeline(object):
         self.gui = PipelineViewer(labels=labels,
                                   vfov=vfov,
                                   pcd_name=self.rgbd_metadata.serial_number,
-                                  max_pcd_vertices=self.max_points)
+                                  max_pcd_vertices=self.max_points,
+                                  score_threshold=self.net.bbox_head.score_thr
+                                  if self.run_detector else 0.1)
 
     class _calib_wrapper(object):
-        """FIXME: torch version of PointPillars.inference_end() needs calib as a
-        property instead of attribute"""
+        """FIXME: torch version of PointPillars.inference_end() needs calib as
+        an attribute instead of dict key"""
 
         def __init__(self, calib):
             self.calib = calib
@@ -347,10 +380,11 @@ class DetectorPipeline(object):
                 0, :pcd_points.shape[0], :3] = torch_dlpack.from_dlpack(
                     pcd_points.to_dlpack())
 
+            self.net.bbox_head.score_thr = self.gui.score_threshold
             results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
             boxes = self.net.inference_end(results,
                                            self._calib_wrapper(self.calib))
-        return boxes[0]
+            return boxes[0]
 
     def _run_detector_tf(self, pcd_frame):
         """ Run Tensorflow 3D detector. """
@@ -360,7 +394,6 @@ class DetectorPipeline(object):
         with tf.device(self.device.replace('cuda', 'gpu').upper()):
             if self.det_inputs is None:
                 # Detector model requires 4 channel (XYZ+reflectance) input
-                # Use mutable tf.Variable for memory reuse when copying Open3D data
                 self.det_inputs = tf.Variable(tf.ones((1, self.max_points, 4),
                                                       dtype=tf.float32),
                                               trainable=False)
@@ -368,6 +401,7 @@ class DetectorPipeline(object):
             self.det_inputs[0, :pcd_points.shape[0], :3].assign(
                 tf_dlpack.from_dlpack(pcd_points.to_dlpack()))
 
+            self.net.bbox_head.score_thr = self.gui.score_threshold
             results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
             boxes = self.net.inference_end(results, {
                 'point': pcd_points,
@@ -419,8 +453,12 @@ class DetectorPipeline(object):
                     continue
                 if self.gui.flag_detector:
                     bboxes = self.run_detector(pcd_frame)
-                    frame_elements['Boxes'] = BoundingBox3D.create_lines(
+                    for box in bboxes:
+                        box.arrow_length = 0  # disable showing arrows
+                    frame_elements['boxes'] = BoundingBox3D.create_lines(
                         bboxes, self.gui.lut)
+                    frame_elements['labels'] = BoundingBox3D.create_labels(
+                        bboxes, show_class=True, show_confidence=True)
                     log.debug(repr(bboxes))
                     frame_elements[
                         'status_message'] = f"{len(bboxes)} detections."
