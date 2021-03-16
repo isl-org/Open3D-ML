@@ -60,7 +60,7 @@ class Pointnet2MSG(nn.Module):
 
         return xyz, features
 
-    def forward(self, pointcloud: torch.cuda.FloatTensor):
+    def forward(self, pointcloud):
         xyz, features = self._break_up_pc(pointcloud)
 
         l_xyz, l_features = [xyz], [features]

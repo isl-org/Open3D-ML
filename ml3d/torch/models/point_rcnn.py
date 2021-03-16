@@ -31,6 +31,7 @@ class PointRCNN(BaseModel):
                  device="cuda",
                  classes=['Car'],
                  score_thres=0.3,
+                 npoints=16384,
                  rpn={},
                  rcnn={},
                  mode=None,
@@ -39,6 +40,7 @@ class PointRCNN(BaseModel):
         assert mode == "RPN" or mode == "RCNN" or mode == None
         self.mode = mode
 
+        self.npoints = npoints
         self.classes = classes
         self.name2lbl = {n: i for i, n in enumerate(classes)}
         self.lbl2name = {i: n for i, n in enumerate(classes)}
@@ -51,11 +53,12 @@ class PointRCNN(BaseModel):
         self.to(device)
 
     def forward(self, inputs):
+        points = torch.stack(inputs.point)
         with torch.set_grad_enabled(self.training and self.mode == "RPN"):
             if not self.mode == "RPN":
                 self.rpn.eval()
             cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
-                inputs.point)
+                points)
 
             with torch.no_grad():
                 rpn_scores_raw = cls_score[:, :, 0]
@@ -70,7 +73,7 @@ class PointRCNN(BaseModel):
                 seg_mask = (rpn_scores_norm > self.score_thres).float()
                 pts_depth = torch.norm(backbone_xyz, p=2, dim=2)
 
-            output = self.rcnn(rois, inputs.get('bboxes', None), backbone_xyz,
+            output = self.rcnn(rois, inputs.bboxes, backbone_xyz,
                                backbone_features.permute((0, 2, 1)), seg_mask,
                                pts_depth)
 
@@ -135,11 +138,12 @@ class PointRCNN(BaseModel):
         # transform in cam space
         points = DataProcessing.world2cam(points, calib['world_cam'])
 
-        return {
-            'point': points,
-            'bbox_objs': data['bounding_boxes'],
-            'calib': data['calib']
-        }
+        new_data = {'point': points, 'calib': calib}
+
+        if attr['split'] not in ['test', 'testing']:
+            new_data['bbox_objs'] = data['bounding_boxes']
+
+        return new_data
 
     @staticmethod
     def generate_rpn_training_labels(points, bboxes):
@@ -181,27 +185,60 @@ class PointRCNN(BaseModel):
     def transform(self, data, attr):
         points = data['point']
 
-        labels = np.stack([
-            self.name2lbl.get(bb.label_class, len(self.classes))
-            for bb in data['bbox_objs']
-        ])
+        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
+            if self.npoints < len(points):
+                pts_depth = points[:, 2]
+                pts_near_flag = pts_depth < 40.0
+                far_idxs_choice = np.where(pts_near_flag == 0)[0]
+                near_idxs = np.where(pts_near_flag == 1)[0]
+                near_idxs_choice = np.random.choice(near_idxs,
+                                                    self.npoints -
+                                                    len(far_idxs_choice),
+                                                    replace=False)
 
-        bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
+                choice = np.concatenate((near_idxs_choice, far_idxs_choice), axis=0) \
+                    if len(far_idxs_choice) > 0 else near_idxs_choice
+                np.random.shuffle(choice)
+            else:
+                choice = np.arange(0, len(points), dtype=np.int32)
+                if self.npoints > len(points):
+                    extra_choice = np.random.choice(choice,
+                                                    self.npoints - len(points),
+                                                    replace=False)
+                    choice = np.concatenate((choice, extra_choice), axis=0)
+                np.random.shuffle(choice)
 
-        if self.mode == "RPN":
-            labels, bboxes = PointRCNN.generate_rpn_training_labels(
-                points, bboxes)
+            points = points[choice, :]
 
-        if self.mode == "RCNN" and not self.training:
-            bboxes = None
+        t_data = {'point': data['point'], 'calib': data['calib']}
 
-        return {
-            'point': points,
-            'labels': labels,
-            'bboxes': bboxes,
-            'bbox_objs': data['bbox_objs'],
-            'calib': data['calib']
-        }
+        if attr['split'] not in ['test', 'testing']:
+            labels = np.stack([
+                self.name2lbl.get(bb.label_class, len(self.classes))
+                for bb in data['bbox_objs']
+            ])
+
+            bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
+
+            if self.mode == "RPN":
+                labels, bboxes = PointRCNN.generate_rpn_training_labels(
+                    points, bboxes)
+            else:
+                max_gt = 0
+                for bbox in bboxes:
+                    max_gt = max(max_gt, bbox.shape[0])
+                pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
+                                      dtype=np.float32)
+                for i in range(len(bboxes)):
+                    pad_bboxes[i, :bboxes[i].shape[0], :] = bboxes[i]
+                bboxes = pad_bboxes
+
+            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['labels'] = labels
+            if self.training or self.mode == "RPN":
+                t_data['bboxes'] = bboxes
+
+        return t_data
 
     def inference_end(self, results, inputs):
         if self.mode == 'RPN':
@@ -524,8 +561,8 @@ class RPN(nn.Module):
         rpn_cls = results['cls']
         rpn_reg = results['reg']
 
-        rpn_cls_label = inputs.labels
-        rpn_reg_label = inputs.bboxes
+        rpn_cls_label = torch.stack(inputs.labels)
+        rpn_reg_label = torch.stack(inputs.bboxes)
 
         rpn_cls_label_flat = rpn_cls_label.view(-1)
         rpn_cls_flat = rpn_cls.view(-1)
@@ -679,7 +716,8 @@ class RCNN(nn.Module):
         pts_extra_input = torch.cat(pts_extra_input_list, dim=2)
         pts_feature = torch.cat((pts_extra_input, rpn_features), dim=2)
 
-        if gt_boxes3d is not None:
+        if gt_boxes3d[0] is not None:
+            gt_boxes3d = torch.cat(gt_boxes3d, dim=0)
             with torch.no_grad():
                 target = self.proposal_target_layer(
                     [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
@@ -730,7 +768,7 @@ class RCNN(nn.Module):
 
         ret_dict = {'rois': roi_boxes3d, 'cls': rcnn_cls, 'reg': rcnn_reg}
 
-        if gt_boxes3d is not None:
+        if gt_boxes3d[0] is not None:
             ret_dict.update(target)
         return ret_dict
 
@@ -970,7 +1008,7 @@ def decode_bbox_target(roi_box3d,
     :param get_ry_fine:
     :return:
     """
-    anchor_size = anchor_size.to(roi_box3d.get_device())
+    anchor_size = anchor_size.to(roi_box3d.device)
     per_loc_bin_num = int(loc_scope / loc_bin_size) * 2
     loc_y_bin_num = int(loc_y_scope / loc_y_bin_size) * 2
 
