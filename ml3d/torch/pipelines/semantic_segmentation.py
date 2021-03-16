@@ -338,35 +338,37 @@ class SemanticSegmentation(BasePipeline):
 
         train_dataset = dataset.get_split('train')
         # train_sampler = train_dataset.sampler
-        train_split = TorchDataloader(dataset=train_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                    #   sampler=train_sampler,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                          'steps_per_epoch_train', None))
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size,
-                                #   sampler=get_sampler(train_sampler),
-                                  num_workers=cfg.get('num_workers', 4),
-                                  pin_memory=cfg.get('pin_memory', True),
-                                  collate_fn=self.batcher.collate_fn)
+        train_split = TorchDataloader(
+            dataset=train_dataset,
+            preprocess=model.preprocess,
+            transform=model.transform,
+            #   sampler=train_sampler,
+            use_cache=dataset.cfg.use_cache,
+            steps_per_epoch=dataset.cfg.get('steps_per_epoch_train', None))
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            #   sampler=get_sampler(train_sampler),
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=self.batcher.collate_fn)
 
         valid_dataset = dataset.get_split('validation')
         # valid_sampler = valid_dataset.sampler
-        valid_split = TorchDataloader(dataset=valid_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                    #   sampler=valid_sampler,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                          'steps_per_epoch_valid', None))
-        valid_loader = DataLoader(valid_split,
-                                  batch_size=cfg.val_batch_size,
-                                #   sampler=get_sampler(valid_sampler),
-                                  num_workers=cfg.get('num_workers', 4),
-                                  pin_memory=cfg.get('pin_memory', True),
-                                  collate_fn=self.batcher.collate_fn)
+        valid_split = TorchDataloader(
+            dataset=valid_dataset,
+            preprocess=model.preprocess,
+            transform=model.transform,
+            #   sampler=valid_sampler,
+            use_cache=dataset.cfg.use_cache,
+            steps_per_epoch=dataset.cfg.get('steps_per_epoch_valid', None))
+        valid_loader = DataLoader(
+            valid_split,
+            batch_size=cfg.val_batch_size,
+            #   sampler=get_sampler(valid_sampler),
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
@@ -398,6 +400,8 @@ class SemanticSegmentation(BasePipeline):
             # model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
                 self.optimizer.zero_grad()
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(

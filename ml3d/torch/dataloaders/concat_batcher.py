@@ -405,26 +405,40 @@ class KPConvBatch:
         return all_p_list
 
 
-def SparseConvUnetBatch(batches, device):
-    pc = []
-    feat = []
-    label = []
-    lengths = []
+class SparseConvUnetBatch:
 
-    for batch in batches:
-        data = batch['data']
-        pc.append(data['point'])
-        feat.append(data['feat'])
-        label.append(data['label'])
-        lengths.append(data['point'].shape[0])
+    def __init__(self, batches):
+        pc = []
+        feat = []
+        label = []
+        lengths = []
 
-    pc = torch.cat(pc, 0).to(device)
-    feat = torch.cat(feat, 0).to(device)
-    label = torch.cat(label, 0).to(device)
+        for batch in batches:
+            data = batch['data']
+            pc.append(data['point'])
+            feat.append(data['feat'])
+            label.append(data['label'])
+            lengths.append(data['point'].shape[0])
 
-    data = {'point': pc, 'feat': feat, 'label': label, 'batch_lengths': lengths}
+        pc = torch.cat(pc, 0)
+        feat = torch.cat(feat, 0)
+        label = torch.cat(label, 0)
 
-    return {'data': data, 'attr': {}}
+        self.point = pc
+        self.feat = feat
+        self.label = label
+        self.batch_lengths = lengths
+
+    def pin_memory(self):
+        self.point = self.point.pin_memory()
+        self.feat = self.feat.pin_memory()
+        self.label = self.label.pin_memory()
+
+    def to(self, device):
+        self.point = self.point.to(device)
+        self.feat = self.feat.to(device)
+        self.label = self.label.to(device)
+
 
 class PointPillarsBatch:
 
@@ -499,7 +513,8 @@ class ConcatBatcher(object):
             return {'data': batching_result, 'attr': []}
 
         elif self.model == "SparseConvUnet":
-            return SparseConvUnetBatch(batches, self.device)
+            return {'data': SparseConvUnetBatch(batches), 'attr': {}}
+
         elif self.model == "PointPillars":
             batching_result = PointPillarsBatch(batches)
             # batching_result.to(self.device)

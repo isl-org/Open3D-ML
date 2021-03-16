@@ -44,9 +44,9 @@ class SparseConvUnet(BaseModel):
     def forward(self, inputs):
         output = []
         start_idx = 0
-        for length in inputs['batch_lengths']:
-            pos = inputs['point'][start_idx:start_idx + length]
-            feat = inputs['feat'][start_idx:start_idx + length]
+        for length in inputs.batch_lengths:
+            pos = inputs.point[start_idx:start_idx + length]
+            feat = inputs.feat[start_idx:start_idx + length]
 
             feat, pos, rev = self.inp(feat, pos)
             feat = self.ssc(feat, pos, voxel_size=1.0)
@@ -140,7 +140,7 @@ class SparseConvUnet(BaseModel):
         :return: loss
         """
         cfg = self.cfg
-        labels = inputs['data']['label']
+        labels = inputs['data'].label
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
