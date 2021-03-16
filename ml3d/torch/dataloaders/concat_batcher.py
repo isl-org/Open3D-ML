@@ -18,10 +18,8 @@ class KPConvBatch:
     def __init__(self, batches):
         """
         Initialize
-
         Args:
             batches: A batch of data
-
         Returns:
             class: The corresponding class.
         """
@@ -428,6 +426,49 @@ def SparseConvUnetBatch(batches, device):
 
     return {'data': data, 'attr': {}}
 
+class PointPillarsBatch:
+
+    def __init__(self, batches):
+        """
+        Initialize
+        Args:
+            batches: A batch of data
+        Returns:
+            class: The corresponding class.
+        """
+        self.point = []
+        self.labels = []
+        self.bboxes = []
+        self.bbox_objs = []
+        self.calib = []
+        for batch in batches:
+            data = batch['data']
+            self.point.append(torch.tensor(data['point'], dtype=torch.float32))
+            self.labels.append(
+                torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
+                data else None)
+            self.bboxes.append(
+                torch.tensor(data['bboxes'], dtype=torch.float32) if 'bboxes' in
+                data else None)
+            self.bbox_objs.append(data.get('bbox_objs'))
+            self.calib.append(data.get('calib'))
+
+    def pin_memory(self):
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].pin_memory()
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].pin_memory()
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].pin_memory()
+
+    def to(self, device):
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].to(device)
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].to(device)
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].to(device)
+
 
 class ConcatBatcher(object):
     """ConcatBatcher for KPConv"""
@@ -435,10 +476,8 @@ class ConcatBatcher(object):
     def __init__(self, device, model='KPConv'):
         """
         Initialize
-
         Args:
             device: torch device 'gpu' or 'cpu'
-
         Returns:
             class: The corresponding class.
         """
@@ -449,10 +488,8 @@ class ConcatBatcher(object):
     def collate_fn(self, batches):
         """
         collate_fn called by original PyTorch dataloader
-
         Args:
             batches: a batch of data
-
         Returns:
             class: the batched result
         """
@@ -463,6 +500,10 @@ class ConcatBatcher(object):
 
         elif self.model == "SparseConvUnet":
             return SparseConvUnetBatch(batches, self.device)
+        elif self.model == "PointPillars":
+            batching_result = PointPillarsBatch(batches)
+            # batching_result.to(self.device)
+            return batching_result
 
         else:
             raise Exception(
