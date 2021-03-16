@@ -280,7 +280,7 @@ class PointPillars(BaseModel):
 
     def transform(self, data, attr):
         #Augment data
-        if False and attr['split'] not in ['test', 'testing', 'val', 'validation']:
+        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
         t_data = {'point': data['point'], 'calib': data['calib']}
