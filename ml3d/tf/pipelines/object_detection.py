@@ -47,7 +47,7 @@ class ObjectDetection(BasePipeline):
 
     def run_inference(self, data):
         """
-        Run inference on a given data.
+        Run inference on given data.
 
         Args:
             data: A raw data.
@@ -56,10 +56,9 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs = tf.convert_to_tensor(data, dtype=np.float32)
-        inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
+        inputs, counts_pts = data[:-2], data[-2]
 
-        results = model(inputs, training=False)
+        results = model(inputs, counts=counts_pts, training=False)
         boxes = model.inference_end(results, data)
 
         return boxes
@@ -80,11 +79,11 @@ class ObjectDetection(BasePipeline):
 
         test_dataset = dataset.get_split('test')
         test_split = TFDataloader(dataset=test_dataset,
-                                  preprocess=model.preprocess,
-                                  transform=None,
-                                  use_cache=False,
-                                  get_batch_gen=model.get_batch_gen,
-                                  shuffle=False)
+                                  model=model,
+                                  use_cache=False)
+
+        test_loader, len_test = test_split.get_loader(cfg.test_batch_size,
+                                                      transform=False)
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -95,8 +94,9 @@ class ObjectDetection(BasePipeline):
         self.test_ious = []
 
         pred = []
-        for i in tqdm(range(len(test_split)), desc='testing'):
-            results = self.run_inference(test_split[i]['data'])
+        process_bar = tqdm(test_loader, total=len_test, desc='testing')
+        for data in process_bar:
+            results = self.run_inference(data)
             pred.append(results[0])
 
         #dataset.save_test_result(pred, attr)
@@ -113,14 +113,14 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         valid_dataset = dataset.get_split('validation')
-        valid_loader = TFDataloader(dataset=valid_dataset,
-                                    preprocess=model.preprocess,
-                                    transform=model.transform,
-                                    use_cache=False,
-                                    get_batch_gen=model.get_batch_gen,
-                                    shuffle=True,
-                                    steps_per_epoch=dataset.cfg.get(
-                                        'steps_per_epoch_valid', None))
+        valid_split = TFDataloader(dataset=valid_dataset,
+                                   model=model,
+                                   use_cache=False,
+                                   steps_per_epoch=dataset.cfg.get(
+                                       'steps_per_epoch_valid', None))
+
+        valid_loader, len_valid = valid_split.get_loader(cfg.val_batch_size,
+                                                         transform=False)
 
         log.info("Started validation")
 
@@ -128,10 +128,12 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         gt = []
-        for i in tqdm(range(len(valid_loader)), desc='validation'):
-            data = valid_loader[i]['data']
-            results = model(data, training=False)
-            loss = model.loss(results, data)
+
+        process_bar = tqdm(valid_loader, total=len_valid, desc='validation')
+        for i, data in enumerate(process_bar):
+            inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
+            results = model(data, counts=counts_pts, training=False)
+            loss = model.loss(results, inputs, counts=counts_lbs)
             for l, v in loss.items():
                 if not l in self.valid_losses:
                     self.valid_losses[l] = []
@@ -139,8 +141,12 @@ class ObjectDetection(BasePipeline):
 
             # convert to bboxes for mAP evaluation
             boxes = model.inference_end(results, data)
-            pred.append(BEVBox3D.to_dicts(boxes[0]))
-            gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
+            pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
+            gt.extend([
+                BEVBox3D.to_dicts(valid_split[i * cfg.val_batch_size +
+                                              bi]["data"]["bbox_objs"])
+                for bi in range(cfg.val_batch_size)
+            ])
 
         sum_loss = 0
         desc = "validation - "
@@ -200,11 +206,13 @@ class ObjectDetection(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         train_dataset = dataset.get_split('training')
-        train_loader = TFDataloader(dataset=train_dataset,
-                                    model=model,
-                                    use_cache=dataset.cfg.use_cache,
-                                    steps_per_epoch=dataset.cfg.get(
-                                        'steps_per_epoch_train', None))
+        train_split = TFDataloader(dataset=train_dataset,
+                                   model=model,
+                                   use_cache=dataset.cfg.use_cache,
+                                   steps_per_epoch=dataset.cfg.get(
+                                       'steps_per_epoch_train', None))
+        train_loader, len_train = train_split.get_loader(cfg.batch_size,
+                                                         transform=False)
 
         self.optimizer = model.get_optimizer(cfg.optimizer)
 
@@ -227,12 +235,12 @@ class ObjectDetection(BasePipeline):
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                data = train_loader[i]['data']
+            process_bar = tqdm(train_loader, total=len_train, desc='training')
+            for data in process_bar:
+                inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(data)
-                    loss = model.loss(results, data)
+                    results = model(inputs, counts=counts_pts)
+                    loss = model.loss(results, inputs, counts=counts_lbs)
                     loss_sum = tf.add_n(loss.values())
 
                 grads = tape.gradient(loss_sum, model.trainable_weights)

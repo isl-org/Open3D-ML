@@ -146,7 +146,7 @@ class TFDataloader():
             steps_per_epoch = len(self.dataset)
         return steps_per_epoch
 
-    def get_loader(self, batch_size=1, num_threads=3):
+    def get_loader(self, batch_size=1, num_threads=3, transform=True):
         """
         This constructs the tensorflow dataloader.
 
@@ -162,8 +162,9 @@ class TFDataloader():
 
         loader = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
 
-        loader = loader.map(map_func=self.transform,
-                            num_parallel_calls=num_threads)
+        if transform:
+            loader = loader.map(map_func=self.transform,
+                                num_parallel_calls=num_threads)
 
         if (self.model is None or 'batcher' not in self.model_cfg.keys() or
                 self.model_cfg.batcher == 'DefaultBatcher'):

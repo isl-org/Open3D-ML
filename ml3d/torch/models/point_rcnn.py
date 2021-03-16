@@ -192,10 +192,6 @@ class PointRCNN(BaseModel):
             labels, bboxes = PointRCNN.generate_rpn_training_labels(
                 points, bboxes)
 
-        points = torch.tensor([points], dtype=torch.float32, device=self.device)
-        labels = torch.tensor([labels], dtype=torch.int64, device=self.device)
-        bboxes = torch.tensor([bboxes], dtype=torch.float32, device=self.device)
-
         if self.mode == "RCNN" and not self.training:
             bboxes = None
 

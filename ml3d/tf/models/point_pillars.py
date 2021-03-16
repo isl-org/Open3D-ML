@@ -19,6 +19,23 @@ from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
 
+def unpack(flat_t, counts=None):
+    """
+    Converts flat tensor to list of tensors, 
+    with length according to counts.
+    """
+    if counts is None:
+        return [flat_t]
+
+    data_list = []
+    idx0 = 0
+    for count in counts:
+        idx1 = idx0 + count
+        data_list.append(flat_t[idx0:idx1])
+        idx0 = idx1
+    return data_list
+
+
 class PointPillars(BaseModel):
     """Object detection model. 
     Based on the PointPillars architecture 
@@ -118,8 +135,15 @@ class PointPillars(BaseModel):
 
         return voxels, num_points, coors_batch
 
-    def call(self, inputs, training=True):
-        x = self.extract_feats(inputs['point'], training=training)
+    def call(self, inputs, training=True, counts=None):
+        """
+        Forward pass
+        :param inputs: tuple/list of inputs (points, bboxes, labels, calib)
+        :param training: toggle training run
+        :param counts: split flat input into batch list
+        """
+        inputs = unpack(inputs[0], counts)
+        x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
 
         return outs
@@ -138,10 +162,18 @@ class PointPillars(BaseModel):
         #                            beta_1=beta1,
         #                            beta_2=beta2)
 
-    def loss(self, results, inputs):
+    def loss(self, results, inputs, counts=None):
+        """
+        Computes loss
+        :param results: results of forward pass (scores, bboxes, dirs)
+        :param inputs: tuple/list of gt inputs (points, bboxes, labels, calib)
+        :param counts: split flat input into batch list
+        """
         scores, bboxes, dirs = results
-        gt_labels = inputs['labels']
-        gt_bboxes = inputs['bboxes']
+
+        gt_bboxes, gt_labels = inputs[1:3]
+        gt_bboxes = unpack(gt_bboxes, counts)
+        gt_labels = unpack(gt_labels, counts)
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -154,8 +186,8 @@ class PointPillars(BaseModel):
                             (-1, self.bbox_head.num_classes))
         target_labels = tf.fill((scores.shape[0],),
                                 tf.constant(self.bbox_head.num_classes,
-                                            dtype=gt_labels.dtype))
-        gt_label = tf.gather(gt_labels, target_idx)
+                                            dtype=gt_labels[0].dtype))
+        gt_label = tf.gather(tf.concat(gt_labels, axis=0), target_idx)
         target_labels = tf.tensor_scatter_nd_update(
             target_labels, tf.expand_dims(pos_idx, axis=-1), gt_label)
 
@@ -179,7 +211,8 @@ class PointPillars(BaseModel):
         if len(pos_idx) > 0:
             # direction classification loss
             # to discrete bins
-            target_dirs = tf.gather(gt_bboxes, target_idx)[:, -1]
+            target_dirs = tf.gather(tf.concat(gt_bboxes, axis=0),
+                                    target_idx)[:, -1]
             target_dirs = limit_period(target_dirs, 0, 2 * np.pi)
             target_dirs = tf.cast(target_dirs / np.pi, tf.int32) % 2
 
@@ -217,11 +250,10 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        new_data = {
-            'point': points,
-            'bbox_objs': data['bounding_boxes'],
-            'calib': data['calib']
-        }
+        new_data = {'point': points, 'calib': data['calib']}
+
+        if attr['split'] not in ['test', 'testing']:
+            new_data['bbox_objs'] = data['bounding_boxes']
 
         if 'full_point' in data:
             points = np.array(data['full_point'][:, 0:4], dtype=np.float32)
@@ -285,42 +317,73 @@ class PointPillars(BaseModel):
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
-        points = tf.constant([data['point']], dtype=tf.float32)
-        labels = tf.constant([
-            self.name2lbl.get(bb.label_class, len(self.classes))
-            for bb in data['bbox_objs']
-        ],
-                             dtype=tf.int32)
-        bboxes = tf.constant([bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                             dtype=tf.float32)
+        points = tf.constant(data['point'], dtype=tf.float32)
 
-        return {
-            'point': points,
-            'bboxes': bboxes,
-            'labels': labels,
-            'bbox_objs': data['bbox_objs'],
-            'calib': data['calib']
-        }
+        t_data = {'point': points, 'calib': data['calib']}
+
+        if attr['split'] not in ['test', 'testing']:
+            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['labels'] = tf.constant([
+                self.name2lbl.get(bb.label_class, len(self.classes))
+                for bb in data['bbox_objs']
+            ],
+                                           dtype=tf.int32)
+            t_data['bboxes'] = tf.constant(
+                [bb.to_xyzwhlr() for bb in data['bbox_objs']], dtype=tf.float32)
+
+        return t_data
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
-        return None
+
+        def batcher():
+            count = len(dataset) if steps_per_epoch is None else steps_per_epoch
+            for i in np.arange(0, count, batch_size):
+                batch = [dataset[i + bi]['data'] for bi in range(batch_size)]
+                points = tf.concat([b['point'] for b in batch], axis=0)
+                bboxes = tf.concat([
+                    b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32))
+                    for b in batch
+                ],
+                                   axis=0)
+                labels = tf.concat([
+                    b.get('labels', tf.zeros((0,), dtype=tf.int32))
+                    for b in batch
+                ],
+                                   axis=0)
+
+                calib = [
+                    tf.constant([
+                        b.get('calib', {}).get('world_cam', np.eye(4)),
+                        b.get('calib', {}).get('cam_img', np.eye(4))
+                    ]) for b in batch
+                ]
+                count_pts = tf.constant([len(b['point']) for b in batch])
+                count_lbs = tf.constant([
+                    len(b.get('labels', tf.zeros((0,), dtype=tf.int32)))
+                    for b in batch
+                ])
+                yield (points, bboxes, labels, calib, count_pts, count_lbs)
+
+        gen_func = batcher
+        gen_types = (tf.float32, tf.float32, tf.int32, tf.float32, tf.int32,
+                     tf.int32)
+        gen_shapes = ([None, 4], [None, 7], [None], [batch_size, 2, 4,
+                                                     4], [None], [None])
+
+        return gen_func, gen_types, gen_shapes
 
     def inference_end(self, results, inputs):
         bboxes_b, scores_b, labels_b = self.bbox_head.get_bboxes(*results)
 
         inference_result = []
-
-        world_cam, cam_img = None, None
-        if 'calib' in inputs and inputs['calib'] is not None:
-            calib = inputs['calib']
-            world_cam = calib.get('world_cam', None)
-            cam_img = calib.get('cam_img', None)
-
-        for _bboxes, _scores, _labels in zip(bboxes_b, scores_b, labels_b):
+        for _calib, _bboxes, _scores, _labels in zip(inputs[3], bboxes_b,
+                                                     scores_b, labels_b):
             bboxes = _bboxes.cpu().numpy()
             scores = _scores.cpu().numpy()
             labels = _labels.cpu().numpy()
             inference_result.append([])
+
+            world_cam, cam_img = _calib
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 dim = bbox[[3, 5, 4]]
@@ -943,8 +1006,14 @@ class Anchor3DHead(tf.keras.layers.Layer):
         """
 
         # compute all anchors
-        anchors = self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:])
+        anchors = [
+            self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:])
+            for _ in range(len(target_bboxes))
+        ]
 
+        # compute size of anchors for each given class
+        anchors_count = tf.cast(tf.reduce_prod(anchors[0].shape[:-1]),
+                                dtype=tf.int64)
         rot_angles = anchors[0].shape[-2]
 
         # init the tensors for the final result
@@ -957,44 +1026,50 @@ class Anchor3DHead(tf.keras.layers.Layer):
 
             return z * self.num_classes * rot_angles + j * rot_angles + x
 
-        for i, (neg_th, pos_th) in enumerate(self.iou_thr):
-            anchors_stride = tf.reshape(anchors[..., i, :, :],
-                                        (-1, self.box_code_size))
+        idx_off = 0
+        for i in range(len(target_bboxes)):
+            for j, (neg_th, pos_th) in enumerate(self.iou_thr):
+                anchors_stride = tf.reshape(anchors[i][..., j, :, :],
+                                            (-1, self.box_code_size))
 
-            # compute a fast approximation of IoU
-            overlaps = bbox_overlaps(box3d_to_bev2d(target_bboxes),
-                                     box3d_to_bev2d(anchors_stride))
+                # compute a fast approximation of IoU
+                overlaps = bbox_overlaps(box3d_to_bev2d(target_bboxes[i]),
+                                         box3d_to_bev2d(anchors_stride))
 
-            # for each anchor the gt with max IoU
-            argmax_overlaps = tf.argmax(overlaps, axis=0)
-            max_overlaps = tf.reduce_max(overlaps, axis=0)
-            # for each gt the anchor with max IoU
-            gt_max_overlaps = tf.reduce_max(overlaps, axis=1)
+                # for each anchor the gt with max IoU
+                argmax_overlaps = tf.argmax(overlaps, axis=0)
+                max_overlaps = tf.reduce_max(overlaps, axis=0)
+                # for each gt the anchor with max IoU
+                gt_max_overlaps = tf.reduce_max(overlaps, axis=1)
 
-            pos_idx = max_overlaps >= pos_th
-            neg_idx = (max_overlaps >= 0) & (max_overlaps < neg_th)
+                pos_idx = max_overlaps >= pos_th
+                neg_idx = (max_overlaps >= 0) & (max_overlaps < neg_th)
 
-            # low-quality matching
-            for k in range(len(target_bboxes)):
-                if gt_max_overlaps[k] >= neg_th:
-                    pos_idx = tf.where(overlaps[k, :] == gt_max_overlaps[k],
-                                       True, pos_idx)
+                # low-quality matching
+                for k in range(len(target_bboxes[i])):
+                    if gt_max_overlaps[k] >= neg_th:
+                        pos_idx = tf.where(overlaps[k, :] == gt_max_overlaps[k],
+                                           True, pos_idx)
 
-            pos_idx = tf.where(pos_idx)[:, 0]
-            neg_idx = tf.where(neg_idx)[:, 0]
-            max_idx = tf.gather(argmax_overlaps, pos_idx)
+                pos_idx = tf.where(pos_idx)[:, 0]
+                neg_idx = tf.where(neg_idx)[:, 0]
+                max_idx = tf.gather(argmax_overlaps, pos_idx)
 
-            # encode bbox for positive matches
-            assigned_bboxes.append(
-                self.bbox_coder.encode(tf.gather(anchors_stride, pos_idx),
-                                       tf.gather(target_bboxes, max_idx)))
-            target_idxs.append(max_idx)
+                # encode bbox for positive matches
+                assigned_bboxes.append(
+                    self.bbox_coder.encode(tf.gather(anchors_stride, pos_idx),
+                                           tf.gather(target_bboxes[i],
+                                                     max_idx)))
+                target_idxs.append(max_idx + idx_off)
 
-            # store global indices in list
-            pos_idx = flatten_idx(pos_idx, i)
-            neg_idx = flatten_idx(neg_idx, i)
-            pos_idxs.append(pos_idx)
-            neg_idxs.append(neg_idx)
+                # store global indices in list
+                pos_idx = flatten_idx(pos_idx, j) + i * anchors_count
+                neg_idx = flatten_idx(neg_idx, j) + i * anchors_count
+                pos_idxs.append(pos_idx)
+                neg_idxs.append(neg_idx)
+
+            # compute offset for index computation
+            idx_off += len(target_bboxes[i])
 
         return (tf.concat(assigned_bboxes,
                           axis=0), tf.concat(target_idxs, axis=0),
