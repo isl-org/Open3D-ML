@@ -119,7 +119,7 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def call(self, inputs, training=True):
-        x = self.extract_feats(inputs, training=training)
+        x = self.extract_feats(inputs['point'], training=training)
         outs = self.bbox_head(x, training=training)
 
         return outs

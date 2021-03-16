@@ -8,7 +8,7 @@ from ...utils import MODEL
 from ..utils.pointnet import pointnet2_utils
 
 
-class Pointnet2MSG(nn.Module):
+class Pointnet2MSG(tf.keras.layers.Layer):
 
     def __init__(
             self,
@@ -53,24 +53,23 @@ class Pointnet2MSG(nn.Module):
 
     def _break_up_pc(self, pc):
         xyz = pc[..., 0:3]
-        features = tf.transpose((pc[..., 3:], (1, 2))
-                    if pc.size(-1) > 3 else None)
+        features = tf.transpose(pc[..., 3:], (0, 2, 1)) if pc.shape[-1] > 3 else None
 
         return xyz, features
 
-    def forward(self, pointcloud):
+    def call(self, pointcloud, training=True):
         xyz, features = self._break_up_pc(pointcloud)
 
         l_xyz, l_features = [xyz], [features]
         for i in range(len(self.SA_modules)):
-            li_xyz, li_features = self.SA_modules[i](l_xyz[i], l_features[i])
+            li_xyz, li_features = self.SA_modules[i](l_xyz[i], l_features[i], training=training)
             l_xyz.append(li_xyz)
             l_features.append(li_features)
 
         for i in range(-1, -(len(self.FP_modules) + 1), -1):
             l_features[i - 1] = self.FP_modules[i](l_xyz[i - 1], l_xyz[i],
                                                    l_features[i - 1],
-                                                   l_features[i])
+                                                   l_features[i], training=training)
 
         return l_xyz[0], l_features[0]
 
@@ -78,7 +77,7 @@ class Pointnet2MSG(nn.Module):
 MODEL._register_module(Pointnet2MSG, 'tf')
 
 
-class _PointnetSAModuleBase(nn.Module):
+class _PointnetSAModuleBase(tf.keras.layers.Layer):
 
     def __init__(self):
         super().__init__()
@@ -87,10 +86,11 @@ class _PointnetSAModuleBase(nn.Module):
         self.mlps = None
         self.pool_method = 'max_pool'
 
-    def forward(self,
+    def call(self,
                 xyz,
                 features=None,
-                new_xyz=None):
+                new_xyz=None,
+                training=True):
         """
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
@@ -101,33 +101,26 @@ class _PointnetSAModuleBase(nn.Module):
         """
         new_features_list = []
 
-        xyz_flipped = tf.tranpose(xyz, (1, 2))
+        xyz_flipped = tf.transpose(xyz, (0, 2, 1))
         if new_xyz is None:
             new_xyz = tf.transpose(pointnet2_utils.gather_operation(
                 xyz_flipped,
                 pointnet2_utils.furthest_point_sample(
-                    xyz, self.npoint)), (1, 2)) if self.npoint is not None else None
+                    xyz, self.npoint)), (0, 2, 1)) if self.npoint is not None else None
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,
                                             features)  # (B, C, npoint, nsample)
 
             new_features = self.mlps[i](
-                new_features)  # (B, mlp[-1], npoint, nsample)
+                new_features, training=training)  # (B, mlp[-1], npoint, nsample)
             if self.pool_method == 'max_pool':
-                new_features = tf.nn.max_pool2d(new_features,
-                                            kernel_size=[
-                                                1, new_features.size(3)
-                                            ])  # (B, mlp[-1], npoint, 1)
+                new_features = tf.reduce_max(new_features, axis=-1)  # (B, mlp[-1], npoint)
             elif self.pool_method == 'avg_pool':
-                new_features = tf.nn.avg_pool2d(new_features,
-                                            kernel_size=[
-                                                1, new_features.size(3)
-                                            ])  # (B, mlp[-1], npoint, 1)
+                new_features = tf.reduce_mean(new_features, axis=-1)  # (B, mlp[-1], npoint)
             else:
                 raise NotImplementedError
 
-            new_features = tf.squeeze(new_features, axis=-1)  # (B, mlp[-1], npoint)
             new_features_list.append(new_features)
 
         return new_xyz, tf.concat(new_features_list, axis=1)
@@ -146,7 +139,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
                  use_xyz: bool = True,
                  pool_method='max_pool',
                  instance_norm=None,
-                 bias=False):
+                 use_bias=False):
         """
         :param npoint: int
         :param radii: list of float, list of radii to group with
@@ -162,8 +155,8 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
         assert len(radii) == len(nsamples) == len(mlps)
 
         self.npoint = npoint
-        self.groupers = nn.ModuleList()
-        self.mlps = nn.ModuleList()
+        self.groupers = []
+        self.mlps = []
         for i in range(len(radii)):
             radius = radii[i]
             nsample = nsamples[i]
@@ -176,10 +169,10 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
 
             self.mlps.append(
                 gen_CNN(mlp_spec,
-                        conv=tf.keras.layers.Conv2d,
+                        conv=tf.keras.layers.Conv2D,
                         batch_norm=batch_norm,
                         instance_norm=instance_norm,
-                        bias=bias))
+                        use_bias=use_bias))
 
         self.pool_method = pool_method
 
@@ -197,7 +190,7 @@ class PointnetSAModule(PointnetSAModuleMSG):
                  use_xyz: bool = True,
                  pool_method='max_pool',
                  instance_norm=None,
-                 bias=False):
+                 use_bias=False):
         """
         :param mlp: list of int, spec of the pointnet before the global max_pool
         :param npoint: int, number of features
@@ -216,7 +209,7 @@ class PointnetSAModule(PointnetSAModuleMSG):
                          use_xyz=use_xyz,
                          pool_method=pool_method,
                          instance_norm=instance_norm,
-                         bias=bias)
+                         use_bias=use_bias)
 
 
 MODEL._register_module(PointnetSAModule, 'tf')
@@ -225,20 +218,20 @@ MODEL._register_module(PointnetSAModule, 'tf')
 class PointnetFPModule(tf.keras.layers.Layer):
     r"""Propigates the features of one set to another"""
 
-    def __init__(self, *, mlp: List[int], batch_norm=None, bias=False):
+    def __init__(self, *, mlp: List[int], batch_norm=None, use_bias=False):
         """
         :param mlp: list of int
         :param bn: whether to use batchnorm
         """
         super().__init__()
         self.mlp = gen_CNN(mlp,
-                           conv=tf.keras.layers.Conv2d,
+                           conv=tf.keras.layers.Conv2D,
                            batch_norm=batch_norm,
-                           bias=bias)
+                           use_bias=use_bias)
 
-    def forward(self, unknown, known,
+    def call(self, unknown, known,
                 unknow_feats,
-                known_feats):
+                known_feats, training=True):
         """
         :param unknown: (B, n, 3) tensor of the xyz positions of the unknown features
         :param known: (B, m, 3) tensor of the xyz positions of the known features
@@ -250,14 +243,14 @@ class PointnetFPModule(tf.keras.layers.Layer):
         if known is not None:
             dist, idx = pointnet2_utils.three_nn_gpu(unknown, known)
             dist_recip = 1.0 / (dist + 1e-8)
-            norm = tf.sum(dist_recip, axis=2, keepdim=True)
+            norm = tf.reduce_sum(dist_recip, axis=2, keepdims=True)
             weight = dist_recip / norm
 
             interpolated_feats = pointnet2_utils.three_interpolate_gpu(
                 known_feats, idx, weight)
         else:
-            interpolated_feats = known_feats.expand(*known_feats.size()[0:2],
-                                                    unknown.size(1))
+            interpolated_feats = known_feats.expand(*known_feats.shape[0:2],
+                                                    unknown.shape[1])
 
         if unknow_feats is not None:
             new_features = tf.concat([interpolated_feats, unknow_feats],
@@ -266,7 +259,7 @@ class PointnetFPModule(tf.keras.layers.Layer):
             new_features = interpolated_feats
 
         new_features = tf.expand_dims(new_features, axis=-1)
-        new_features = self.mlp(new_features)
+        new_features = self.mlp(new_features, training=training)
 
         return tf.squeeze(new_features, axis=-1)
 

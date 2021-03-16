@@ -14,10 +14,11 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
         self.mlps = None
         self.pool_method = 'max_pool'
 
-    def forward(self,
+    def call(self,
                 xyz,
                 features=None,
-                new_xyz=None):
+                new_xyz=None,
+                training=True):
         """
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
@@ -28,19 +29,19 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
         """
         new_features_list = []
 
-        xyz_flipped = tf.transpose(xyz, (1, 2))
+        xyz_flipped = tf.transpose(xyz, (0, 2, 1))
         if new_xyz is None:
             new_xyz = tf.transpose(pointnet2_utils.gather_operation(
                 xyz_flipped,
                 pointnet2_utils.furthest_point_sample(
-                    xyz, self.npoint)), (1, 2)) if self.npoint is not None else None
+                    xyz, self.npoint)), (0, 2, 1)) if self.npoint is not None else None
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,
                                             features)  # (B, C, npoint, nsample)
 
             new_features = self.mlps[i](
-                new_features)  # (B, mlp[-1], npoint, nsample)
+                new_features, training=training)  # (B, mlp[-1], npoint, nsample)
             if self.pool_method == 'max_pool':
                 new_features = tf.nn.max_pool2d(new_features,
                                             kernel_size=[
@@ -150,9 +151,9 @@ class PointnetFPModule(tf.keras.layers.Layer):
         super().__init__()
         self.mlp = tf_utils.SharedMLP(mlp, bn=bn)
 
-    def forward(self, unknown, known,
+    def call(self, unknown, known,
                 unknow_feats,
-                known_feats):
+                known_feats, training=True):
         """
         :param unknown: (B, n, 3) tensor of the xyz positions of the unknown features
         :param known: (B, m, 3) tensor of the xyz positions of the known features
@@ -180,7 +181,7 @@ class PointnetFPModule(tf.keras.layers.Layer):
             new_features = interpolated_feats
 
         new_features = tf.expand_dims(new_features, axis=-1)
-        new_features = self.mlp(new_features)
+        new_features = self.mlp(new_features, training=training)
 
         return tf.squeeze(new_features, axis=-1)
 

@@ -8,9 +8,6 @@ model:
   name: PointRCNN
   ckpt_path: # path/to/your/checkpoint
   
-  use_rpn: False
-  use_rcnn: True
-
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
   classes: ['Car']
 

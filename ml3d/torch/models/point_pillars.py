@@ -284,18 +284,15 @@ class PointPillars(BaseModel):
             data = self.augment_data(data, attr)
 
         points = torch.tensor([data['point']],
-                              dtype=torch.float32,
-                              device=self.device)
+                              dtype=torch.float32)
 
         labels = torch.tensor([
             self.name2lbl.get(bb.label_class, len(self.classes))
             for bb in data['bbox_objs']
         ],
-                              dtype=torch.int64,
-                              device=self.device)
+                              dtype=torch.int64)
         bboxes = torch.tensor([bb.to_xyzwhlr() for bb in data['bbox_objs']],
-                              dtype=torch.float32,
-                              device=self.device)
+                              dtype=torch.float32)
 
         return {
             'point': points,

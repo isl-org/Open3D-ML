@@ -40,19 +40,19 @@ class _ConvBase(tf.keras.Sequential):
                  init,
                  conv=None,
                  batch_norm=None,
-                 bias=True,
+                 use_bias=True,
                  preact=False,
                  instance_norm=False,
                  instance_norm_func=None):
         super().__init__()
 
-        bias = bias and (not bn)
+        use_bias = use_bias and (not bn)
         conv_unit = conv(in_size,
                          out_size,
                          kernel_size=kernel_size,
                          stride=stride,
                          padding=padding,
-                         bias=bias,
+                         use_bias=use_bias,
                          bias_initializer=tf.keras.initializers.Constant(0.0))
 
         if bn:
@@ -121,7 +121,7 @@ class Conv1d(_ConvBase):
                  activation=tf.keras.layers.ReLU(),
                  bn: bool = False,
                  init=tf.keras.initializers.he_normal(),
-                 bias: bool = True,
+                 use_bias: bool = True,
                  preact: bool = False,
                  instance_norm=False):
         super().__init__(in_size,
@@ -134,7 +134,7 @@ class Conv1d(_ConvBase):
                          init,
                          conv=nn.Conv1d,
                          batch_norm=BatchNorm1d,
-                         bias=bias,
+                         use_bias=use_bias,
                          preact=preact,
                          instance_norm=instance_norm,
                          instance_norm_func=nn.InstanceNorm1d)
@@ -152,7 +152,7 @@ class Conv2d(_ConvBase):
                  activation=tf.keras.layers.ReLU(),
                  bn: bool = False,
                  init=tf.keras.initializers.he_normal(),
-                 bias: bool = True,
+                 use_bias: bool = True,
                  preact: bool = False,
                  instance_norm=False):
         super().__init__(in_size,
@@ -165,7 +165,7 @@ class Conv2d(_ConvBase):
                          init,
                          conv=nn.Conv2d,
                          batch_norm=BatchNorm2d,
-                         bias=bias,
+                         use_bias=use_bias,
                          preact=preact,
                          instance_norm=instance_norm,
                          instance_norm_func=nn.InstanceNorm2d)
@@ -180,14 +180,15 @@ class FC(tf.keras.Sequential):
                  activation=tf.keras.layers.ReLU(),
                  bn: bool = False,
                  init=None,
-                 preact: bool = False):
+                 preact: bool = False,
+                 training=True):
         super().__init__()
 
-        fc = tf.keras.layers.Linear(in_size, out_size, bias=not bn, kernel_initializer=init, bias_initializer=tf.keras.initializers.Constant(0.0))
+        fc = tf.keras.layers.Linear(in_size, out_size, use_bias=not bn, kernel_initializer=init, bias_initializer=tf.keras.initializers.Constant(0.0))
 
         if preact:
             if bn:
-                self.add(tf.keras.layers.BatchNormalization(in_size))
+                self.add(tf.keras.layers.BatchNormalization(in_size, training=training))
 
             if activation is not None:
                 self.add(activation)
@@ -196,7 +197,7 @@ class FC(tf.keras.Sequential):
 
         if not preact:
             if bn:
-                self.add(BatchNorm1d(out_size))
+                self.add(BatchNorm1d(out_size, training=training))
 
             if activation is not None:
                 self.add(activation)

@@ -12,17 +12,17 @@ def natural_keys(text):
     
 
 def gen_CNN(channels,
-            conv=tf.keras.layers.Conv1d,
-            bias=True,
+            conv=tf.keras.layers.Conv1D,
+            use_bias=True,
             activation=tf.keras.layers.ReLU,
             batch_norm=None,
             instance_norm=None):
     layers = []
     for i in range(len(channels) - 1):
         in_size, out_size = channels[i:i + 2]
-        layers.append(conv(in_size, out_size, 1, bias=bias))
+        layers.append(conv(out_size, 1, use_bias=use_bias))
         if batch_norm is not None:
-            layers.append(batch_norm(out_size))
+            layers.append(batch_norm)
         if activation is not None:
             layers.append(activation())
         if instance_norm is not None:
@@ -30,4 +30,4 @@ def gen_CNN(channels,
                 instance_norm(out_size, affine=False,
                               track_running_stats=False))
 
-    return tf.keras.Sequential(*layers)
+    return tf.keras.Sequential(layers)

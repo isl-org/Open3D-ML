@@ -122,7 +122,7 @@ def _grouping_operation_gradient(op, grad_out):
     return grad_features, None
 
 
-def ball_query(radius, nsample, xyz, new_xyz):
+def ball_query_gpu(radius, nsample, xyz, new_xyz):
         """
         :param radius: float, radius of the balls
         :param nsample: int, maximum number of features in the balls
@@ -166,10 +166,10 @@ class QueryAndGroup(tf.keras.layers.Layer):
             raise NotImplementedError
 
         idx = ball_query_gpu(self.radius, self.nsample, xyz, new_xyz)
-        xyz_trans = tf.transpose(xyz, (1, 2))
+        xyz_trans = tf.transpose(xyz, (0, 2, 1))
         grouped_xyz = grouping_operation(xyz_trans,
                                          idx)  # (B, 3, npoint, nsample)
-        grouped_xyz -= tf.expand_dims(tf.tranpose(new_xyz, (1, 2)), axis=-1)
+        grouped_xyz -= tf.expand_dims(tf.transpose(new_xyz, (0, 2, 1)), axis=-1)
 
         if features is not None:
             grouped_features = grouping_operation(features, idx)
@@ -205,7 +205,7 @@ class GroupAll(tf.keras.layers.Layer):
         if not open3d.core.cuda.device_count() > 0:
             raise NotImplementedError
 
-        grouped_xyz = tf.expand_dims(tf.tranpose(xyz, (1, 2)), axis=2)
+        grouped_xyz = tf.expand_dims(tf.tranpose(xyz, (0, 2, 1)), axis=2)
         if features is not None:
             grouped_features = tf.expand_dims(features, axis=2)
             if self.use_xyz:

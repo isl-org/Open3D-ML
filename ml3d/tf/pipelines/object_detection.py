@@ -56,7 +56,7 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs = tf.convert_to_tensor(data['point'], dtype=np.float32)
+        inputs = tf.convert_to_tensor(data, dtype=np.float32)
         inputs = tf.reshape(inputs, (1, -1, inputs.shape[-1]))
 
         results = model(inputs, training=False)
@@ -130,7 +130,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         for i in tqdm(range(len(valid_loader)), desc='validation'):
             data = valid_loader[i]['data']
-            results = model(data['point'], training=False)
+            results = model(data, training=False)
             loss = model.loss(results, data)
             for l, v in loss.items():
                 if not l in self.valid_losses:
@@ -231,7 +231,7 @@ class ObjectDetection(BasePipeline):
             for i in process_bar:
                 data = train_loader[i]['data']
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(data['point'])
+                    results = model(data)
                     loss = model.loss(results, data)
                     loss_sum = tf.add_n(loss.values())
 

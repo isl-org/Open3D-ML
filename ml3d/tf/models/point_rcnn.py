@@ -5,12 +5,12 @@ from functools import partial
 
 from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
-from ..modules.losses.focal_loss import FocalLoss, one_hot
+from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 from . import Pointnet2MSG, PointnetSAModule, PointnetFPModule
 from ..utils.objdet_helper import xywhr_to_xyxyr, box3d_to_bev
 from open3d.ml.tf.ops import nms
-from ..utils.torch_utils import gen_CNN
+from ..utils.tf_utils import gen_CNN
 from ...datasets.utils import DataProcessing, BEVBox3D
 from ...datasets.utils.operations import points_in_box, rotation_3d_in_axis
 
@@ -43,43 +43,41 @@ class PointRCNN(BaseModel):
         self.rpn = RPN(**rpn)
         self.rcnn = RCNN(num_classes=len(self.classes), **rcnn)
 
-    def forward(self, inputs):
-        with torch.set_grad_enabled(self.training and self.mode == "RPN"):
-            if not self.mode == "RPN":
-                self.rpn.eval()
-            cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
-                inputs['point'])
+    def call(self, inputs, training=True):
+        #with torch.set_grad_enabled(self.training and self.mode == "RPN"):
+        cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
+            inputs['point'], training=self.mode=="RPN" and training)
 
-            with torch.no_grad():
-                rpn_scores_raw = cls_score[:, :, 0]
-                rois, roi_scores_raw = self.rpn.proposal_layer(
-                    rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
+        #with torch.no_grad():
+        rpn_scores_raw = cls_score[:, :, 0]
+        rois, roi_scores_raw = self.rpn.proposal_layer(
+            rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
 
-            output = {"rois": rois, "cls": cls_score, "reg": reg_score}
+        output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         if self.mode == "RCNN":
-            with torch.no_grad():
-                rpn_scores_norm = tf.sigmoid(rpn_scores_raw)
-                seg_mask = (rpn_scores_norm > self.score_thres).float()
-                pts_depth = tf.norm(backbone_xyz, p=2, axis=2)
+            #with torch.no_grad():
+            rpn_scores_norm = tf.sigmoid(rpn_scores_raw)
+            seg_mask = (rpn_scores_norm > self.score_thres).float()
+            pts_depth = tf.norm(backbone_xyz, p=2, axis=2)
 
             output = self.rcnn(rois, inputs.get('bboxes', None), backbone_xyz,
                                tf.tranpose(backbone_features, (0, 2, 1)), seg_mask,
-                               pts_depth)
+                               pts_depth, training=training)
 
         return output
 
     def get_optimizer(self, cfg):
 
-        def children(m: nn.Module):
+        def children(m):
             return list(m.children())
 
-        def num_children(m: nn.Module) -> int:
+        def num_children(m) -> int:
             return len(children(m))
 
         flatten_model = lambda m: sum(map(flatten_model, m.children()), []
                                      ) if num_children(m) else [m]
-        get_layer_groups = lambda m: [nn.Sequential(*flatten_model(m))]
+        get_layer_groups = lambda m: [tf.keras.Sequential(*flatten_model(m))]
 
         optimizer_func = partial(tf.optimizers.Adam, betas=tuple(cfg.betas))
         optimizer = OptimWrapper.create(optimizer_func,
@@ -189,7 +187,7 @@ class PointRCNN(BaseModel):
         labels = tf.constant([labels], dtype=tf.int64)
         bboxes = tf.constant([bboxes], dtype=tf.float32)
 
-        if self.mode == "RCNN" and not self.training:
+        if self.mode == "RCNN" and attr['split'] not in ['train', 'training']:
             bboxes = None
 
         return {
@@ -254,6 +252,9 @@ class PointRCNN(BaseModel):
                     BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
 
         return inference_result
+        
+    def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
+        return None
 
 
 MODEL._register_module(PointRCNN, 'tf')
@@ -324,10 +325,10 @@ def get_reg_loss(pred_reg,
         x_res_norm_label = x_res_label / loc_bin_size
         z_res_norm_label = z_res_label / loc_bin_size
 
-        x_bin_onehot = tf.zeros((x_bin_label.size(0), per_loc_bin_num),
+        x_bin_onehot = tf.zeros((x_bin_label.shape[0], per_loc_bin_num),
                                    dtype=tf.float32)
         x_bin_onehot.scatter_(1, x_bin_label.view(-1, 1).long(), 1)
-        z_bin_onehot = tf.zeros((z_bin_label.size(0), per_loc_bin_num),
+        z_bin_onehot = tf.zeros((z_bin_label.shape[0], per_loc_bin_num),
                                    dtype=tf.float32)
         z_bin_onehot.scatter_(1, z_bin_label.view(-1, 1).long(), 1)
 
@@ -354,7 +355,7 @@ def get_reg_loss(pred_reg,
                                  loc_y_bin_size / 2)
         y_res_norm_label = y_res_label / loc_y_bin_size
 
-        y_bin_onehot = one_hot(y_bin_label, loc_y_bin_num)
+        y_bin_onehot = tf.one_hot(y_bin_label, loc_y_bin_num)
 
         loss_y_bin = CrossEntropyLoss()(pred_reg[:, y_bin_l:y_bin_r], y_bin_label)
         loss_y_res = SmoothL1Loss()(
@@ -411,7 +412,7 @@ def get_reg_loss(pred_reg,
                                       angle_per_class / 2)
         ry_res_norm_label = ry_res_label / (angle_per_class / 2)
 
-    ry_bin_onehot = one_hot(ry_bin_label, num_head_bin)
+    ry_bin_onehot = tf.one_hot(ry_bin_label, num_head_bin)
     loss_ry_bin = CrossEntropyLoss()(pred_reg[:, ry_bin_l:ry_bin_r], ry_bin_label)
     loss_ry_res = SmoothL1Loss()(
         (pred_reg[:, ry_res_l:ry_res_r] * ry_bin_onehot).sum(axis=1),
@@ -463,14 +464,14 @@ class RPN(tf.keras.layers.Layer):
         layers = []
         for i in range(len(cls_out_ch)):
             layers.extend([
-                tf.keras.layers.Conv1d(in_filters[i], cls_out_ch[i], 1, bias=False),
+                tf.keras.layers.Conv1D(cls_out_ch[i], 1, use_bias=False),
                 tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Dropout(db_ratio)
             ])
-        layers.append(tf.keras.layers.Conv1d(cls_out_ch[-1], 1, 1, bias=True, bias_initializer=tf.keras.initializers.Constant(-np.log((1 - 0.01) / 0.01))))
+        layers.append(tf.keras.layers.Conv1D(1, 1, use_bias=True, bias_initializer=tf.keras.initializers.Constant(-np.log((1 - 0.01) / 0.01))))
 
-        self.cls_blocks = tf.keras.Sequential(*layers)
+        self.cls_blocks = tf.keras.Sequential(layers)
 
         # regression branch
         per_loc_bin_num = int(self.proposal_layer.loc_scope /
@@ -485,26 +486,24 @@ class RPN(tf.keras.layers.Layer):
         layers = []
         for i in range(len(reg_out_ch)):
             layers.extend([
-                tf.keras.layers.Conv1d(in_filters[i], reg_out_ch[i], 1, bias=False),
-                tf.keras.layers.BatchNorm1d(),
+                tf.keras.layers.Conv1D(reg_out_ch[i], 1, use_bias=False),
+                tf.keras.layers.BatchNormalization(),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Dropout(db_ratio)
             ])
-        layers.append(tf.keras.layers.Conv1d(reg_out_ch[-1], reg_channel, 1, bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.001)))
+        layers.append(tf.keras.layers.Conv1D(reg_channel, 1, use_bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.001)))
 
-        self.reg_blocks = tf.keras.Sequential(*layers)
+        self.reg_blocks = tf.keras.Sequential(layers)
 
         self.loss_cls = FocalLoss(**focal_loss)
         self.loss_weight = loss_weight
 
-    def forward(self, x):
+    def call(self, x, training=True):
         backbone_xyz, backbone_features = self.backbone(
-            x)  # (B, N, 3), (B, C, N)
+            x, training=training)  # (B, N, 3), (B, C, N)
 
-        rpn_cls = tf.transpose(self.cls_blocks(backbone_features), (
-            1, 2))  # (B, N, 1)
-        rpn_reg = tf.transpose(self.reg_blocks(backbone_features), 
-            1, 2))  # (B, N, C)
+        rpn_cls = tf.transpose(self.cls_blocks(backbone_features, training=training), (0, 2, 1))  # (B, N, 1)
+        rpn_reg = tf.transpose(self.reg_blocks(backbone_features, training=training), (0, 2, 1))  # (B, N, C)
 
         return rpn_cls, rpn_reg, backbone_xyz, backbone_features
 
@@ -532,7 +531,7 @@ class RPN(tf.keras.layers.Layer):
                                      avg_factor=1.0)
 
         # RPN regression loss
-        point_num = rpn_reg.size(0) * rpn_reg.size(1)
+        point_num = rpn_reg.shape[0] * rpn_reg.shape[1]
         fg_sum = fg_mask.long().sum().item()
         if fg_sum != 0:
             loss_loc, loss_angle, loss_size, reg_loss_dict = \
@@ -556,8 +555,7 @@ class RPN(tf.keras.layers.Layer):
             "reg": rpn_loss_reg * self.loss_weight[1]
         }
 
-
-class RCNN(nn.Module):
+class RCNN(tf.keras.layers.Layer):
 
     def __init__(
             self,
@@ -597,13 +595,13 @@ class RCNN(nn.Module):
                                  nsample=SA_config["nsample"][i],
                                  mlp=mlps,
                                  use_xyz=use_xyz,
-                                 bias=True))
+                                 use_bias=True))
             in_channels = mlps[-1]
 
         self.xyz_up_layer = gen_CNN([self.rcnn_input_channel] + xyz_up_layer,
-                                    conv=tf.keras.layers.Conv2d)
+                                    conv=tf.keras.layers.Conv2D)
         c_out = xyz_up_layer[-1]
-        self.merge_down_layer = gen_CNN([c_out * 2, c_out], conv=tf.keras.layers.Conv2d)
+        self.merge_down_layer = gen_CNN([c_out * 2, c_out], conv=tf.keras.layers.Conv2D)
 
         # classification layer
         cls_channel = 1 if num_classes == 2 else num_classes
@@ -612,12 +610,12 @@ class RCNN(nn.Module):
         layers = []
         for i in range(len(cls_out_ch)):
             layers.extend([
-                tf.keras.layers.Conv1d(in_filters[i], cls_out_ch[i], 1, bias=True, kernel_initializer=tf.keras.initializers.GlorotNormal(), bias_initializer=tf.keras.initializers.Constant(0.0)),
+                tf.keras.layers.Conv1D(cls_out_ch[i], 1, use_bias=True, kernel_initializer=tf.keras.initializers.GlorotNormal(), bias_initializer=tf.keras.initializers.Constant(0.0)),
                 tf.keras.layers.ReLU()
             ])
-        layers.append(tf.keras.layers.Conv1d(cls_out_ch[-1], cls_channel, 1, bias=True, kernel_initializer=tf.keras.initializers.GlorotNormal(), bias_initializer=tf.keras.initializers.Constant(0.0)))
+        layers.append(tf.keras.layers.Conv1D(cls_channel, 1, use_bias=True, kernel_initializer=tf.keras.initializers.GlorotNormal(), bias_initializer=tf.keras.initializers.Constant(0.0)))
 
-        self.cls_blocks = tf.keras.Sequential(*layers)
+        self.cls_blocks = tf.keras.Sequential(layers)
 
         self.loss_cls = tf.keras.losses.BinaryCrossentropy()
 
@@ -634,33 +632,33 @@ class RCNN(nn.Module):
         layers = []
         for i in range(len(reg_out_ch)):
             layers.extend([
-                tf.keras.layers.Conv1d(in_filters[i], reg_out_ch[i], 1, bias=True, kernel_initializer=tf.keras.initializers.GlorotNormal(), bias_initializer=tf.keras.initializers.Constant(0.0)),
+                tf.keras.layers.Conv1D(reg_out_ch[i], 1, use_bias=True, kernel_initializer=tf.keras.initializers.GlorotNormal(), bias_initializer=tf.keras.initializers.Constant(0.0)),
                 tf.keras.layers.ReLU()
             ])
-        layers.append(tf.keras.layers.Conv1d(reg_out_ch[-1], reg_channel, 1, bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.001), bias_initializer=tf.keras.initializers.Constant(0.0)))
+        layers.append(tf.keras.layers.Conv1D(reg_channel, 1, use_bias=True, kernel_initializer=tf.keras.initializers.RandomNormal(stddev=0.001), bias_initializer=tf.keras.initializers.Constant(0.0)))
 
-        self.reg_blocks = tf.keras.Sequential(*layers)
+        self.reg_blocks = tf.keras.Sequential(layers)
 
         self.proposal_target_layer = ProposalTargetLayer(**target_head)
 
     def _break_up_pc(self, pc):
         xyz = pc[..., 0:3]
-        features = (tf.transpose(pc[..., 3:], (1, 2))
-                    if pc.size(-1) > 3 else None)
+        features = (tf.transpose(pc[..., 3:], (0, 2, 1))
+                    if pc.shape[-1] > 3 else None)
 
         return xyz, features
 
-    def forward(self, roi_boxes3d, gt_boxes3d, rpn_xyz, rpn_features, seg_mask,
-                pts_depth):
+    def call(self, roi_boxes3d, gt_boxes3d, rpn_xyz, rpn_features, seg_mask,
+                pts_depth, training=True):
         pts_extra_input_list = [tf.expand_dims(seg_mask, axis=2)]
         pts_extra_input_list.append(tf.expand_dims(pts_depth / 70.0 - 0.5, axis=2))
         pts_extra_input = tf.concat(pts_extra_input_list, axis=2)
         pts_feature = tf.concat((pts_extra_input, rpn_features), axis=2)
 
         if gt_boxes3d is not None:
-            with torch.no_grad():
-                target = self.proposal_target_layer(
-                    [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
+            #with torch.no_grad():
+            target = self.proposal_target_layer(
+                [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
             pts_input = tf.concat(
                 (target['sampled_pts'], target['pts_feature']), axis=2)
             target['pts_input'] = pts_input
@@ -685,23 +683,23 @@ class RCNN(nn.Module):
 
         xyz, features = self._break_up_pc(pts_input)
 
-        xyz_input = tf.expand_dims(tf.transpose(pts_input[..., 0:self.rcnn_input_channel], (1, 2)), axis=3)
-        xyz_feature = self.xyz_up_layer(xyz_input)
+        xyz_input = tf.expand_dims(tf.transpose(pts_input[..., 0:self.rcnn_input_channel], (0, 2, 1)), axis=3)
+        xyz_feature = self.xyz_up_layer(xyz_input, training=training)
 
-        rpn_feature = tf.expand_dims(tf.transpose(pts_input[..., self.rcnn_input_channel:], (1, 2)), axis=3)
+        rpn_feature = tf.expand_dims(tf.transpose(pts_input[..., self.rcnn_input_channel:], (0, 2, 1)), axis=3)
 
         merged_feature = tf.concat((xyz_feature, rpn_feature), axis=1)
-        merged_feature = self.merge_down_layer(merged_feature)
+        merged_feature = self.merge_down_layer(merged_feature, training=training)
         l_xyz, l_features = [xyz], [tf.squeeze(merged_feature, axis=3)]
 
         for i in range(len(self.SA_modules)):
-            li_xyz, li_features = self.SA_modules[i](l_xyz[i], l_features[i])
+            li_xyz, li_features = self.SA_modules[i](l_xyz[i], l_features[i], training=training)
             l_xyz.append(li_xyz)
             l_features.append(li_features)
 
-        rcnn_cls = tf.squeeze(tf.tranpose(self.cls_blocks(l_features[-1]), (
+        rcnn_cls = tf.squeeze(tf.tranpose(self.cls_blocks(l_features[-1], training=training), (
             1, 2)), axis=1)  # (B, 1 or 2)
-        rcnn_reg = tf.squeeze(tf.tranpose(self.reg_blocks(l_features[-1]), (
+        rcnn_reg = tf.squeeze(tf.tranpose(self.reg_blocks(l_features[-1], training=training), (
             1, 2)), axis=1)  # (B, C)
 
         ret_dict = {'rois': roi_boxes3d, 'cls': rcnn_cls, 'reg': rcnn_reg}
@@ -772,7 +770,7 @@ def rotate_pc_along_y(pc, rot_angle):
     return pc
 
 
-class ProposalLayer(nn.Module):
+class ProposalLayer(tf.keras.layers.Layer):
 
     def __init__(self,
                  nms_pre=9000,
@@ -803,7 +801,7 @@ class ProposalLayer(nn.Module):
         self.loc_y_bin_size = loc_y_bin_size
         self.post_process = post_process
 
-    def forward(self, rpn_scores, rpn_reg, xyz):
+    def call(self, rpn_scores, rpn_reg, xyz):
         batch_size = xyz.shape[0]
         proposals = decode_bbox_target(
             xyz.view(-1, xyz.shape[-1]),
@@ -1003,7 +1001,7 @@ def decode_bbox_target(roi_box3d,
     ry_bin = tf.argmax(pred_reg[:, ry_bin_l:ry_bin_r], axis=1)
     ry_res_norm = tf.squeeze(tf.gather_nd(pred_reg[:, ry_res_l:ry_res_r],
                                axis=1,
-                               index=tf.expand_dims(ry_bin, axis=1)), (axis=1)
+                               index=tf.expand_dims(ry_bin, axis=1)), axis=1)
     if get_ry_fine:
         # divide pi/2 into several bins
         angle_per_class = (np.pi / 2) / num_head_bin
@@ -1062,7 +1060,7 @@ def rotate_pc_along_y_torch(pc, rot_angle):
     return pc
 
 
-class ProposalTargetLayer(nn.Module):
+class ProposalTargetLayer(tf.keras.layers.Layer):
 
     def __init__(self,
                  pool_extra_width=1.0,
@@ -1089,7 +1087,7 @@ class ProposalTargetLayer(nn.Module):
         self.hard_bg_ratio = hard_bg_ratio
         self.roi_fg_aug_times = roi_fg_aug_times
 
-    def forward(self, x):
+    def call(self, x):
         roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature = x
         batch_rois, batch_gt_of_rois, batch_roi_iou = self.sample_rois_for_rcnn(
             roi_boxes3d, gt_boxes3d)
@@ -1162,7 +1160,7 @@ class ProposalTargetLayer(nn.Module):
             batch_gt_of_rois: (B, N, 8)
             batch_roi_iou: (B, N)
         """
-        batch_size = roi_boxes3d.size(0)
+        batch_size = roi_boxes3d.shape[0]
 
         fg_rois_per_image = int(np.round(self.fg_ratio * self.roi_per_image))
 
@@ -1425,11 +1423,11 @@ class ProposalTargetLayer(nn.Module):
             temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
 
         for k in range(batch_size):
-            pts[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
+            pts[k] = ProposalTargetLayer.rotate_pc_along_y_tf(
                 pts[k], angles[k])
-            gt_of_rois[k] = tf.squeeze(ProposalTargetLayer.rotate_pc_along_y_torch(
+            gt_of_rois[k] = tf.squeeze(ProposalTargetLayer.rotate_pc_along_y_tf(
                 tf.expand_dims(gt_of_rois[k], axis=1), angles[k]), axis=1)
-            rois[k] = tf.squeeze(ProposalTargetLayer.rotate_pc_along_y_torch(
+            rois[k] = tf.squeeze(ProposalTargetLayer.rotate_pc_along_y_tf(
                 tf.expand_dims(rois[k], axis=1), angles[k]), axis=1)
 
             # calculate the ry after rotation
