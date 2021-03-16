@@ -55,7 +55,7 @@ class PointRCNN(BaseModel):
             if not self.mode == "RPN":
                 self.rpn.eval()
             cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
-                inputs['point'])
+                inputs.point)
 
             with torch.no_grad():
                 rpn_scores_raw = cls_score[:, :, 0]
@@ -216,14 +216,8 @@ class PointRCNN(BaseModel):
         pred_boxes3d, rcnn_cls = self.rcnn.proposal_layer(
             rcnn_cls, rcnn_reg, roi_boxes3d)
 
-        world_cam, cam_img = None, None
-        if 'calib' in inputs and inputs['calib'] is not None:
-            calib = inputs['calib']
-            world_cam = calib.get('world_cam', None)
-            cam_img = calib.get('cam_img', None)
-
         inference_result = []
-        for bboxes, scores in zip(pred_boxes3d, rcnn_cls):
+        for calib, bboxes, scores in zip(inputs.calib, pred_boxes3d, rcnn_cls):
             # scoring
             if scores.shape[-1] == 1:
                 scores = torch.sigmoid(scores)
@@ -242,6 +236,11 @@ class PointRCNN(BaseModel):
             scores = scores.cpu().numpy()
             labels = labels.cpu().numpy()
             inference_result.append([])
+
+            world_cam, cam_img = None, None
+            if calib is not None:
+                world_cam = calib.get('world_cam', None)
+                cam_img = calib.get('cam_img', None)
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 pos = bbox[:3]
@@ -525,8 +524,8 @@ class RPN(nn.Module):
         rpn_cls = results['cls']
         rpn_reg = results['reg']
 
-        rpn_cls_label = inputs['labels']
-        rpn_reg_label = inputs['bboxes']
+        rpn_cls_label = inputs.labels
+        rpn_reg_label = inputs.bboxes
 
         rpn_cls_label_flat = rpn_cls_label.view(-1)
         rpn_cls_flat = rpn_cls.view(-1)
