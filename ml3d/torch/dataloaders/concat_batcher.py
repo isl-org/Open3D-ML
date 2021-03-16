@@ -424,9 +424,11 @@ class PointPillarsBatch:
             data = batch['data']
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(
-                torch.tensor(data.get('labels'), dtype=torch.int64))
+                torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
+                data else None)
             self.bboxes.append(
-                torch.tensor(data.get('bboxes'), dtype=torch.float32))
+                torch.tensor(data['bboxes'], dtype=torch.float32) if 'bboxes' in
+                data else None)
             self.bbox_objs.append(data.get('bbox_objs'))
             self.calib.append(data.get('calib'))
 

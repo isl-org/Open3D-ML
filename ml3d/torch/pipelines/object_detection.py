@@ -61,6 +61,8 @@ class ObjectDetection(BasePipeline):
 
         model.eval()
 
+        data.to(self.device)
+
         with torch.no_grad():
             results = model(data)
             boxes = model.inference_end(results, data)
