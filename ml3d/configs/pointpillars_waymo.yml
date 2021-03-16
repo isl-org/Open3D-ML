@@ -8,6 +8,8 @@ model:
   name: PointPillars
   ckpt_path: # path/to/your/checkpoint
 
+  batcher: "ignore"
+
   point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
   classes: ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
 
@@ -85,8 +87,9 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 1
+  batch_size: 6
   val_batch_size: 1
+  test_batch_size: 1
   save_ckpt_freq: 5
   max_epoch: 200
   main_log_dir: ./logs
