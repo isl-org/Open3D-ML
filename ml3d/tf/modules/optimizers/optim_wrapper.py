@@ -2,6 +2,7 @@ import tensorflow as tf
 
 from collections import Iterable
 
+
 def split_bn_bias(layer_groups):
     "Split the layers in `layer_groups` into batchnorm (`bn_types`) and non-batchnorm groups."
     split_groups = []

@@ -18,8 +18,9 @@ class BNMomentumScheduler(object):
                  last_epoch=-1,
                  setter=set_bn_momentum_default):
         if not isinstance(model, tf.keras.layers.Layer):
-            raise RuntimeError("Class '{}' is not a Tensorflow Keras Layer".format(
-                type(model).__name__))
+            raise RuntimeError(
+                "Class '{}' is not a Tensorflow Keras Layer".format(
+                    type(model).__name__))
 
         self.model = model
         self.setter = setter

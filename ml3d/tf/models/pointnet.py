@@ -37,7 +37,7 @@ class Pointnet2MSG(tf.keras.layers.Layer):
                                     nsamples=SA_config["nsample"][i],
                                     mlps=mlps,
                                     use_xyz=use_xyz,
-                                    batch_norm=tf.keras.layers.BatchNormalization(axis=1)))
+                                    batch_norm=True))
             in_channels = out_channels
             skip_channel_list.append(out_channels)
 
@@ -49,11 +49,11 @@ class Pointnet2MSG(tf.keras.layers.Layer):
             self.FP_modules.append(
                 PointnetFPModule(mlp=[pre_channel + skip_channel_list[i]] +
                                  fp_mlps[i],
-                                 batch_norm=tf.keras.layers.BatchNormalization(axis=1)))
+                                 batch_norm=True))
 
     def _break_up_pc(self, pc):
         xyz = pc[..., 0:3]
-        features = tf.transpose(pc[..., 3:], (0, 2, 1)) if pc.shape[-1] > 3 else None
+        features = pc[..., 3:] if pc.shape[-1] > 3 else None
 
         return xyz, features
 
@@ -62,14 +62,18 @@ class Pointnet2MSG(tf.keras.layers.Layer):
 
         l_xyz, l_features = [xyz], [features]
         for i in range(len(self.SA_modules)):
-            li_xyz, li_features = self.SA_modules[i](l_xyz[i], l_features[i], training=training)
+            li_xyz, li_features = self.SA_modules[i](l_xyz[i],
+                                                     l_features[i],
+                                                     training=training)
             l_xyz.append(li_xyz)
             l_features.append(li_features)
 
         for i in range(-1, -(len(self.FP_modules) + 1), -1):
-            l_features[i - 1] = self.FP_modules[i](l_xyz[i - 1], l_xyz[i],
+            l_features[i - 1] = self.FP_modules[i](l_xyz[i - 1],
+                                                   l_xyz[i],
                                                    l_features[i - 1],
-                                                   l_features[i], training=training)
+                                                   l_features[i],
+                                                   training=training)
 
         return l_xyz[0], l_features[0]
 
@@ -86,11 +90,7 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
         self.mlps = None
         self.pool_method = 'max_pool'
 
-    def call(self,
-                xyz,
-                features=None,
-                new_xyz=None,
-                training=True):
+    def call(self, xyz, features=None, new_xyz=None, training=True):
         """
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
@@ -103,21 +103,25 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
 
         xyz_flipped = tf.transpose(xyz, (0, 2, 1))
         if new_xyz is None:
-            new_xyz = tf.transpose(pointnet2_utils.gather_operation(
-                xyz_flipped,
-                pointnet2_utils.furthest_point_sample(
-                    xyz, self.npoint)), (0, 2, 1)) if self.npoint is not None else None
+            new_xyz = tf.transpose(
+                pointnet2_utils.gather_operation(
+                    xyz_flipped,
+                    pointnet2_utils.furthest_point_sample(xyz, self.npoint)),
+                (0, 2, 1)) if self.npoint is not None else None
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,
                                             features)  # (B, C, npoint, nsample)
 
             new_features = self.mlps[i](
-                new_features, training=training)  # (B, mlp[-1], npoint, nsample)
+                new_features,
+                training=training)  # (B, mlp[-1], npoint, nsample)
             if self.pool_method == 'max_pool':
-                new_features = tf.reduce_max(new_features, axis=-1)  # (B, mlp[-1], npoint)
+                new_features = tf.reduce_max(new_features,
+                                             axis=-1)  # (B, mlp[-1], npoint)
             elif self.pool_method == 'avg_pool':
-                new_features = tf.reduce_mean(new_features, axis=-1)  # (B, mlp[-1], npoint)
+                new_features = tf.reduce_mean(new_features,
+                                              axis=-1)  # (B, mlp[-1], npoint)
             else:
                 raise NotImplementedError
 
@@ -135,10 +139,9 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
                  radii: List[float],
                  nsamples: List[int],
                  mlps: List[List[int]],
-                 batch_norm=None,
+                 batch_norm=False,
                  use_xyz: bool = True,
                  pool_method='max_pool',
-                 instance_norm=None,
                  use_bias=False):
         """
         :param npoint: int
@@ -148,7 +151,6 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
         :param bn: whether to use batchnorm
         :param use_xyz:
         :param pool_method: max_pool / avg_pool
-        :param instance_norm: whether to use instance_norm
         """
         super().__init__()
 
@@ -171,7 +173,6 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
                 gen_CNN(mlp_spec,
                         conv=tf.keras.layers.Conv2D,
                         batch_norm=batch_norm,
-                        instance_norm=instance_norm,
                         use_bias=use_bias))
 
         self.pool_method = pool_method
@@ -186,10 +187,9 @@ class PointnetSAModule(PointnetSAModuleMSG):
                  npoint: int = None,
                  radius: float = None,
                  nsample: int = None,
-                 batch_norm=None,
+                 batch_norm=False,
                  use_xyz: bool = True,
                  pool_method='max_pool',
-                 instance_norm=None,
                  use_bias=False):
         """
         :param mlp: list of int, spec of the pointnet before the global max_pool
@@ -199,7 +199,6 @@ class PointnetSAModule(PointnetSAModuleMSG):
         :param bn: whether to use batchnorm
         :param use_xyz:
         :param pool_method: max_pool / avg_pool
-        :param instance_norm: whether to use instance_norm
         """
         super().__init__(mlps=[mlp],
                          npoint=npoint,
@@ -208,7 +207,6 @@ class PointnetSAModule(PointnetSAModuleMSG):
                          batch_norm=batch_norm,
                          use_xyz=use_xyz,
                          pool_method=pool_method,
-                         instance_norm=instance_norm,
                          use_bias=use_bias)
 
 
@@ -218,7 +216,7 @@ MODEL._register_module(PointnetSAModule, 'tf')
 class PointnetFPModule(tf.keras.layers.Layer):
     r"""Propigates the features of one set to another"""
 
-    def __init__(self, *, mlp: List[int], batch_norm=None, use_bias=False):
+    def __init__(self, *, mlp: List[int], batch_norm=False, use_bias=False):
         """
         :param mlp: list of int
         :param bn: whether to use batchnorm
@@ -229,9 +227,7 @@ class PointnetFPModule(tf.keras.layers.Layer):
                            batch_norm=batch_norm,
                            use_bias=use_bias)
 
-    def call(self, unknown, known,
-                unknow_feats,
-                known_feats, training=True):
+    def call(self, unknown, known, unknow_feats, known_feats, training=True):
         """
         :param unknown: (B, n, 3) tensor of the xyz positions of the unknown features
         :param known: (B, m, 3) tensor of the xyz positions of the known features

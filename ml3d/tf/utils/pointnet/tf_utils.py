@@ -12,7 +12,6 @@ class SharedMLP(tf.keras.Sequential):
         activation=tf.keras.layers.ReLU(),
         preact: bool = False,
         first: bool = False,
-        instance_norm: bool = False,
     ):
         super().__init__()
 
@@ -23,8 +22,7 @@ class SharedMLP(tf.keras.Sequential):
                        bn=(not first or not preact or (i != 0)) and bn,
                        activation=activation if (not first or not preact or
                                                  (i != 0)) else None,
-                       preact=preact,
-                       instance_norm=instance_norm))
+                       preact=preact))
 
 
 class _ConvBase(tf.keras.Sequential):
@@ -39,11 +37,8 @@ class _ConvBase(tf.keras.Sequential):
                  bn,
                  init,
                  conv=None,
-                 batch_norm=None,
                  use_bias=True,
-                 preact=False,
-                 instance_norm=False,
-                 instance_norm_func=None):
+                 preact=False):
         super().__init__()
 
         use_bias = use_bias and (not bn)
@@ -53,19 +48,11 @@ class _ConvBase(tf.keras.Sequential):
                          stride=stride,
                          padding=padding,
                          use_bias=use_bias,
-                         bias_initializer=tf.keras.initializers.Constant(0.0))
+                         bias_initializer=tf.keras.initializers.Constant(0.0),
+                         data_format="channels_first")
 
         if bn:
-            bn_unit = batch_norm()
-        if instance_norm:
-            if not preact:
-                in_unit = instance_norm_func(out_size,
-                                             affine=False,
-                                             track_running_stats=False)
-            else:
-                in_unit = instance_norm_func(in_size,
-                                             affine=False,
-                                             track_running_stats=False)
+            bn_unit = tf.keras.layers.BatchNormalization(axis=1)
 
         if preact:
             if bn:
@@ -73,9 +60,6 @@ class _ConvBase(tf.keras.Sequential):
 
             if activation is not None:
                 self.add(activation)
-
-            if not bn and instance_norm:
-                self.add(in_unit)
 
         self.add(conv_unit)
 
@@ -85,28 +69,6 @@ class _ConvBase(tf.keras.Sequential):
 
             if activation is not None:
                 self.add(activation)
-
-            if not bn and instance_norm:
-                self.add(in_unit)
-
-
-class _BNBase(tf.keras.Sequential):
-
-    def __init__(self, in_size, batch_norm=None):
-        super().__init__()
-        self.add(batch_norm(kernel_initializer=tf.keras.initializers.Constant(1.0), bias_initializer=tf.keras.initializers.Constant(0.0)))
-
-
-class BatchNorm1d(_BNBase):
-
-    def __init__(self, in_size: int):
-        super().__init__(in_size, batch_norm=tf.keras.layers.BatchNormalization())
-
-
-class BatchNorm2d(_BNBase):
-
-    def __init__(self, in_size: int):
-        super().__init__(in_size, batch_norm=tf.keras.layers.BatchNormalization(axis=1))
 
 
 class Conv1d(_ConvBase):
@@ -122,8 +84,7 @@ class Conv1d(_ConvBase):
                  bn: bool = False,
                  init=tf.keras.initializers.he_normal(),
                  use_bias: bool = True,
-                 preact: bool = False,
-                 instance_norm=False):
+                 preact: bool = False):
         super().__init__(in_size,
                          out_size,
                          kernel_size,
@@ -132,12 +93,9 @@ class Conv1d(_ConvBase):
                          activation,
                          bn,
                          init,
-                         conv=nn.Conv1d,
-                         batch_norm=BatchNorm1d,
+                         conv=tf.keras.layers.Conv1D,
                          use_bias=use_bias,
-                         preact=preact,
-                         instance_norm=instance_norm,
-                         instance_norm_func=nn.InstanceNorm1d)
+                         preact=preact)
 
 
 class Conv2d(_ConvBase):
@@ -153,8 +111,7 @@ class Conv2d(_ConvBase):
                  bn: bool = False,
                  init=tf.keras.initializers.he_normal(),
                  use_bias: bool = True,
-                 preact: bool = False,
-                 instance_norm=False):
+                 preact: bool = False):
         super().__init__(in_size,
                          out_size,
                          kernel_size,
@@ -163,12 +120,9 @@ class Conv2d(_ConvBase):
                          activation,
                          bn,
                          init,
-                         conv=nn.Conv2d,
-                         batch_norm=BatchNorm2d,
+                         conv=tf.keras.layers.Conv2D,
                          use_bias=use_bias,
-                         preact=preact,
-                         instance_norm=instance_norm,
-                         instance_norm_func=nn.InstanceNorm2d)
+                         preact=preact)
 
 
 class FC(tf.keras.Sequential):
@@ -184,11 +138,16 @@ class FC(tf.keras.Sequential):
                  training=True):
         super().__init__()
 
-        fc = tf.keras.layers.Linear(in_size, out_size, use_bias=not bn, kernel_initializer=init, bias_initializer=tf.keras.initializers.Constant(0.0))
+        fc = tf.keras.layers.Linear(
+            in_size,
+            out_size,
+            use_bias=not bn,
+            kernel_initializer=init,
+            bias_initializer=tf.keras.initializers.Constant(0.0))
 
         if preact:
             if bn:
-                self.add(tf.keras.layers.BatchNormalization(in_size, training=training))
+                self.add(tf.keras.layers.BatchNormalization(axis=1))
 
             if activation is not None:
                 self.add(activation)
@@ -197,7 +156,7 @@ class FC(tf.keras.Sequential):
 
         if not preact:
             if bn:
-                self.add(BatchNorm1d(out_size, training=training))
+                self.add(tf.keras.layers.BatchNormalization(axis=1))
 
             if activation is not None:
                 self.add(activation)

@@ -9,13 +9,11 @@ def enlarge_box3d(boxes3d, extra_width):
     """
     :param boxes3d: (N, 7) [x, y, z, h, w, l, ry]
     """
-    if isinstance(boxes3d, np.ndarray):
-        large_boxes3d = boxes3d.copy()
-    else:
-        large_boxes3d = boxes3d.clone()
-    large_boxes3d[:, 3:6] += extra_width * 2
-    large_boxes3d[:, 1] += extra_width
-    return large_boxes3d
+    trans = np.zeros((boxes3d.shape[-1],))
+    trans[1] = extra_width
+    trans[3:6] = extra_width * 2
+
+    return boxes3d + trans
 
 
 def roipool3d_gpu(pts,
@@ -37,13 +35,11 @@ def roipool3d_gpu(pts,
         raise NotImplementedError
 
     batch_size = pts.shape[0]
-    pooled_boxes3d = enlarge_box3d(boxes3d.view(-1, 7),
-                                   pool_extra_width).view(batch_size, -1, 7)
+    pooled_boxes3d = tf.reshape(
+        enlarge_box3d(tf.reshape(boxes3d, (-1, 7)), pool_extra_width),
+        (batch_size, -1, 7))
 
-    pooled_features, pooled_empty_flag = roi_pool(pts,
-                                                  pooled_boxes3d,
-                                                  pts_feature,
-                                                  sampled_pt_num)
+    pooled_features, pooled_empty_flag = roi_pool(pts, pooled_boxes3d,
+                                                  pts_feature, sampled_pt_num)
 
     return pooled_features, pooled_empty_flag
-

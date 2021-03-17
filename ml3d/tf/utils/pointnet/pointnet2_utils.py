@@ -22,26 +22,29 @@ def furthest_point_sample(xyz, npoint):
     output = ml_ops.furthest_point_sampling(xyz, npoint)
     return output
 
+
 ops.NoGradient('Open3DFurthestPointSampling')
 
+
 def gather_operation(features, idx):
-        """
+    """
         :param features: (B, C, N)
         :param idx: (B, npoint) index tensor of the features to gather
         :return:
             output: (B, C, npoint)
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+    if not open3d.core.cuda.device_count() > 0:
+        raise NotImplementedError
 
-        output = ml_ops.gather_points(features, idx)
+    output = ml_ops.gather_points(features, idx)
 
-        return output
+    return output
+
 
 @tf.RegisterGradient('Open3DGatherPoint')
 def _gather_operation_grad(op, out_g):
-    inp=op.inputs[0]
-    idx=op.inputs[1]
+    inp = op.inputs[0]
+    idx = op.inputs[1]
     C, N = inp.shape[1:3]
     return [ml_ops.gather_points_grad(out_g, idx, C, N), None]
 
@@ -66,7 +69,7 @@ ops.NoGradient("Open3DTreeNN")
 
 
 def three_interpolate_gpu(features, idx, weight):
-        """
+    """
         Performs weight linear interpolation on 3 features
         :param features: (B, C, M) Features descriptors to be interpolated from
         :param idx: (B, n, 3) three nearest neighbors of the target features in features
@@ -74,11 +77,12 @@ def three_interpolate_gpu(features, idx, weight):
         :return:
             output: (B, C, N) tensor of the interpolated features
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+    if not open3d.core.cuda.device_count() > 0:
+        raise NotImplementedError
 
-        output = ml_ops.three_interpolate(features, idx, weight)
-        return output
+    output = ml_ops.three_interpolate(features, idx, weight)
+    return output
+
 
 @tf.RegisterGradient("Open3DTreeInterpolate")
 def _tree_interpolate_gradient(op, grad_out):
@@ -108,6 +112,7 @@ def grouping_operation(features, idx):
     output = ml_ops.group_points(features, idx)
     return output
 
+
 @tf.RegisterGradient("Open3DGroupingPoints")
 def _grouping_operation_gradient(op, grad_out):
     if not open3d.core.cuda.device_count() > 0:
@@ -123,7 +128,7 @@ def _grouping_operation_gradient(op, grad_out):
 
 
 def ball_query_gpu(radius, nsample, xyz, new_xyz):
-        """
+    """
         :param radius: float, radius of the balls
         :param nsample: int, maximum number of features in the balls
         :param xyz: (B, N, 3) xyz coordinates of the features
@@ -131,11 +136,12 @@ def ball_query_gpu(radius, nsample, xyz, new_xyz):
         :return:
             idx: (B, npoint, nsample) tensor with the indicies of the features that form the query balls
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+    if not open3d.core.cuda.device_count() > 0:
+        raise NotImplementedError
 
-        idx = ml_ops.ball_query(xyz, new_xyz, radius, nsample)
-        return idx
+    idx = ml_ops.ball_query(xyz, new_xyz, radius, nsample)
+    return idx
+
 
 ops.NoGradient("Open3DBallQuery")
 
@@ -151,10 +157,7 @@ class QueryAndGroup(tf.keras.layers.Layer):
         super().__init__()
         self.radius, self.nsample, self.use_xyz = radius, nsample, use_xyz
 
-    def call(self,
-                xyz,
-                new_xyz,
-                features=None):
+    def call(self, xyz, new_xyz, features=None):
         """
         :param xyz: (B, N, 3) xyz coordinates of the features
         :param new_xyz: (B, npoint, 3) centroids
@@ -191,10 +194,7 @@ class GroupAll(tf.keras.layers.Layer):
         super().__init__()
         self.use_xyz = use_xyz
 
-    def call(self,
-                xyz,
-                new_xyz,
-                features=None):
+    def call(self, xyz, new_xyz, features=None):
         """
         :param xyz: (B, N, 3) xyz coordinates of the features
         :param new_xyz: ignored
@@ -205,7 +205,7 @@ class GroupAll(tf.keras.layers.Layer):
         if not open3d.core.cuda.device_count() > 0:
             raise NotImplementedError
 
-        grouped_xyz = tf.expand_dims(tf.tranpose(xyz, (0, 2, 1)), axis=2)
+        grouped_xyz = tf.expand_dims(tf.transpose(xyz, (0, 2, 1)), axis=2)
         if features is not None:
             grouped_features = tf.expand_dims(features, axis=2)
             if self.use_xyz:

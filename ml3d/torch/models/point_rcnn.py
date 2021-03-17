@@ -397,7 +397,8 @@ def get_reg_loss(pred_reg,
 
         y_bin_onehot = one_hot(y_bin_label, loc_y_bin_num)
 
-        loss_y_bin = CrossEntropyLoss()(pred_reg[:, y_bin_l:y_bin_r], y_bin_label)
+        loss_y_bin = CrossEntropyLoss()(pred_reg[:, y_bin_l:y_bin_r],
+                                        y_bin_label)
         loss_y_res = SmoothL1Loss()(
             (pred_reg[:, y_res_l:y_res_r] * y_bin_onehot).sum(dim=1),
             y_res_norm_label)
@@ -453,7 +454,8 @@ def get_reg_loss(pred_reg,
         ry_res_norm_label = ry_res_label / (angle_per_class / 2)
 
     ry_bin_onehot = one_hot(ry_bin_label, num_head_bin)
-    loss_ry_bin = CrossEntropyLoss()(pred_reg[:, ry_bin_l:ry_bin_r], ry_bin_label)
+    loss_ry_bin = CrossEntropyLoss()(pred_reg[:, ry_bin_l:ry_bin_r],
+                                     ry_bin_label)
     loss_ry_res = SmoothL1Loss()(
         (pred_reg[:, ry_res_l:ry_res_r] * ry_bin_onehot).sum(dim=1),
         ry_res_norm_label)
@@ -1440,28 +1442,6 @@ class ProposalTargetLayer(nn.Module):
                               dim=0)
         return aug_box3d
 
-    @staticmethod
-    def rotate_pc_along_y_torch(pc, rot_angle):
-        """
-        :param pc: (N, 512, 3 + C)
-        :param rot_angle: (N)
-        :return:
-        """
-        cosa = torch.cos(rot_angle).view(-1, 1)  # (N, 1)
-        sina = torch.sin(rot_angle).view(-1, 1)  # (N, 1)
-
-        raw_1 = torch.cat([cosa, -sina], dim=1)  # (N, 2)
-        raw_2 = torch.cat([sina, cosa], dim=1)  # (N, 2)
-        R = torch.cat((raw_1.unsqueeze(dim=1), raw_2.unsqueeze(dim=1)),
-                      dim=1)  # (N, 2, 2)
-
-        pc_temp = pc[:, :, [0, 2]]  # (N, 512, 2)
-
-        pc[:, :, [0, 2]] = torch.matmul(pc_temp, R.permute(0, 2,
-                                                           1))  # (N, 512, 2)
-
-        return pc
-
     def data_augmentation(self, pts, rois, gt_of_rois):
         """
         :param pts: (B, M, 512, 3)
@@ -1490,23 +1470,23 @@ class ProposalTargetLayer(nn.Module):
             temp_beta) * np.pi / 2 + temp_beta + temp_ry  # (B, M)
 
         for k in range(batch_size):
-            pts[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
-                pts[k], angles[k])
-            gt_of_rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
+            pts[k] = rotate_pc_along_y_torch(pts[k], angles[k])
+            gt_of_rois[k] = rotate_pc_along_y_torch(
                 gt_of_rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
-            rois[k] = ProposalTargetLayer.rotate_pc_along_y_torch(
-                rois[k].unsqueeze(dim=1), angles[k]).squeeze(dim=1)
+            rois[k] = rotate_pc_along_y_torch(rois[k].unsqueeze(dim=1),
+                                              angles[k]).squeeze(dim=1)
 
-            # calculate the ry after rotation
-            temp_x, temp_z = gt_of_rois[:, :, 0], gt_of_rois[:, :, 2]
-            temp_beta = torch.atan2(temp_z, temp_x)
-            gt_of_rois[:, :, 6] = torch.sign(
-                temp_beta) * np.pi / 2 + gt_alpha - temp_beta
+        # bug in reference?! (was inside batch loop)
+        # calculate the ry after rotation
+        temp_x, temp_z = gt_of_rois[:, :, 0], gt_of_rois[:, :, 2]
+        temp_beta = torch.atan2(temp_z, temp_x)
+        gt_of_rois[:, :,
+                   6] = torch.sign(temp_beta) * np.pi / 2 + gt_alpha - temp_beta
 
-            temp_x, temp_z = rois[:, :, 0], rois[:, :, 2]
-            temp_beta = torch.atan2(temp_z, temp_x)
-            rois[:, :,
-                 6] = torch.sign(temp_beta) * np.pi / 2 + roi_alpha - temp_beta
+        temp_x, temp_z = rois[:, :, 0], rois[:, :, 2]
+        temp_beta = torch.atan2(temp_z, temp_x)
+        rois[:, :,
+             6] = torch.sign(temp_beta) * np.pi / 2 + roi_alpha - temp_beta
 
         # scaling augmentation
         scales = 1 + ((torch.rand(
