@@ -135,14 +135,13 @@ class PointPillars(BaseModel):
 
         return voxels, num_points, coors_batch
 
-    def call(self, inputs, training=True, counts=None):
+    def call(self, inputs, training=True):
         """
         Forward pass
         :param inputs: tuple/list of inputs (points, bboxes, labels, calib)
         :param training: toggle training run
-        :param counts: split flat input into batch list
         """
-        inputs = unpack(inputs[0], counts)
+        inputs = unpack(inputs[0], inputs[-2])
         x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
 
@@ -162,18 +161,17 @@ class PointPillars(BaseModel):
         #                            beta_1=beta1,
         #                            beta_2=beta2)
 
-    def loss(self, results, inputs, counts=None):
+    def loss(self, results, inputs):
         """
         Computes loss
         :param results: results of forward pass (scores, bboxes, dirs)
         :param inputs: tuple/list of gt inputs (points, bboxes, labels, calib)
-        :param counts: split flat input into batch list
         """
         scores, bboxes, dirs = results
 
         gt_bboxes, gt_labels = inputs[1:3]
-        gt_bboxes = unpack(gt_bboxes, counts)
-        gt_labels = unpack(gt_labels, counts)
+        gt_bboxes = unpack(gt_bboxes, inputs[-1])
+        gt_labels = unpack(gt_labels, inputs[-1])
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(

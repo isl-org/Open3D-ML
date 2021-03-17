@@ -223,15 +223,6 @@ class PointRCNN(BaseModel):
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes)
-            else:
-                max_gt = 0
-                for bbox in bboxes:
-                    max_gt = max(max_gt, bbox.shape[0])
-                pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
-                                      dtype=np.float32)
-                for i in range(len(bboxes)):
-                    pad_bboxes[i, :bboxes[i].shape[0], :] = bboxes[i]
-                bboxes = pad_bboxes
 
             t_data['bbox_objs'] = data['bbox_objs']
             t_data['labels'] = labels
@@ -719,7 +710,15 @@ class RCNN(nn.Module):
         pts_feature = torch.cat((pts_extra_input, rpn_features), dim=2)
 
         if gt_boxes3d[0] is not None:
-            gt_boxes3d = torch.cat(gt_boxes3d, dim=0)
+            max_gt = 0
+            for bbox in gt_boxes3d:
+                max_gt = max(max_gt, bbox.shape[0])
+            pad_bboxes = torch.zeros((len(gt_boxes3d), max_gt, 7),
+                                     dtype=torch.float32)
+            for i in range(len(bboxes)):
+                pad_bboxes[i, :gt_boxes3d[i].shape[0], :] = gt_boxes3d[i]
+            gt_boxes3d = pad_bboxes
+
             with torch.no_grad():
                 target = self.proposal_target_layer(
                     [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])

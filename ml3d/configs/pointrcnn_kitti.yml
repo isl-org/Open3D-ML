@@ -8,6 +8,8 @@ model:
   name: PointRCNN
   ckpt_path: # path/to/your/checkpoint
   
+  batcher: "ignore"
+
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
   classes: ['Car']
 
@@ -100,7 +102,7 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 16
+  batch_size: 1
   max_epoch: 200
   val_batch_size: 1
   test_batch_size: 1

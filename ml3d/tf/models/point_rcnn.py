@@ -28,6 +28,7 @@ class PointRCNN(BaseModel):
                  name="PointRCNN",
                  classes=['Car'],
                  score_thres=0.3,
+                 npoints=16384,
                  rpn={},
                  rcnn={},
                  mode=None,
@@ -36,6 +37,7 @@ class PointRCNN(BaseModel):
         assert mode == "RPN" or mode == "RCNN" or mode == None
         self.mode = mode
 
+        self.npoints = npoints
         self.classes = classes
         self.name2lbl = {n: i for i, n in enumerate(classes)}
         self.lbl2name = {i: n for i, n in enumerate(classes)}
@@ -64,7 +66,7 @@ class PointRCNN(BaseModel):
 
             gt_boxes = None
             if training or self.mode == "RPN":
-                gt_boxes = inputs[2]
+                gt_boxes = inputs[1]
 
             output = self.rcnn(rois,
                                gt_boxes,
@@ -78,60 +80,64 @@ class PointRCNN(BaseModel):
 
     def get_optimizer(self, cfg):
 
-        def children(m):
-            return list(m.children())
+        beta1, beta2 = cfg.get('betas', [0.9, 0.99])
+        return tf.optimizers.Adam(learning_rate=cfg['lr'],
+                                  beta_1=beta1,
+                                  beta_2=beta2)
 
-        def num_children(m) -> int:
-            return len(children(m))
+        # def children(m):
+        #     return list(m.children())
 
-        flatten_model = lambda m: sum(map(flatten_model, m.children()), []
-                                     ) if num_children(m) else [m]
-        get_layer_groups = lambda m: [tf.keras.Sequential(*flatten_model(m))]
+        # def num_children(m) -> int:
+        #     return len(children(m))
 
-        optimizer_func = partial(tf.optimizers.Adam, betas=tuple(cfg.betas))
-        optimizer = OptimWrapper.create(optimizer_func,
-                                        3e-3,
-                                        get_layer_groups(self),
-                                        wd=cfg.weight_decay,
-                                        true_wd=True,
-                                        bn_wd=True)
+        # flatten_model = lambda m: sum(map(flatten_model, m.children()), []
+        #                              ) if num_children(m) else [m]
+        # get_layer_groups = lambda m: [tf.keras.Sequential(*flatten_model(m))]
 
-        # fix rpn: do this since we use customized optimizer.step
-        if self.mode == "RCNN":
-            for param in self.rpn.parameters():
-                param.requires_grad = False
+        # optimizer_func = partial(tf.optimizers.Adam, betas=tuple(cfg.betas))
+        # optimizer = OptimWrapper.create(optimizer_func,
+        #                                 3e-3,
+        #                                 get_layer_groups(self),
+        #                                 wd=cfg.weight_decay,
+        #                                 true_wd=True,
+        #                                 bn_wd=True)
 
-        def bnm_lmbd(cur_epoch):
-            cur_decay = 1
-            for decay_step in cfg.bn_decay_step_list:
-                if cur_epoch >= decay_step:
-                    cur_decay = cur_decay * cfg.bn_decay
-            return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
+        # # fix rpn: do this since we use customized optimizer.step
+        # if self.mode == "RCNN":
+        #     for param in self.rpn.parameters():
+        #         param.requires_grad = False
 
-        lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
-                                         list(cfg.moms), cfg.div_factor,
-                                         cfg.pct_start)
+        # def bnm_lmbd(cur_epoch):
+        #     cur_decay = 1
+        #     for decay_step in cfg.bn_decay_step_list:
+        #         if cur_epoch >= decay_step:
+        #             cur_decay = cur_decay * cfg.bn_decay
+        #     return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
 
-        # bnm_scheduler = BNMomentumScheduler(self.model, bnm_lmbd, last_epoch=last_epoch)
+        # lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
+        #                                  list(cfg.moms), cfg.div_factor,
+        #                                  cfg.pct_start)
 
-        # lr_warmup_scheduler = CosineWarmupLR(optimizer, T_max=cfg.warmup_epoch * len(train_loader),
-        #                                               eta_min=cfg.warmup_min)
+        # # bnm_scheduler = BNMomentumScheduler(self.model, bnm_lmbd, last_epoch=last_epoch)
 
-        return optimizer, lr_scheduler  #, bnm_scheduler
+        # # lr_warmup_scheduler = CosineWarmupLR(optimizer, T_max=cfg.warmup_epoch * len(train_loader),
+        # #                                               eta_min=cfg.warmup_min)
 
-    def loss(self, results, inputs):
+        # return optimizer, lr_scheduler  #, bnm_scheduler
+
+    def loss(self, results, inputs, training=True):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
         else:
-            if not self.training:
-                return {}
+            if not training:
+                return {"loss": 0.0}
             return self.rcnn.loss(results, inputs)
 
     def preprocess(self, data, attr):
         # remove intensity
         points = np.array(data['point'][..., :3], dtype=np.float32)
         calib = data['calib']
-
         # transform in cam space
         points = DataProcessing.world2cam(points, calib['world_cam'])
 
@@ -207,7 +213,7 @@ class PointRCNN(BaseModel):
 
             points = points[choice, :]
 
-        t_data = {'point': data['point'], 'calib': data['calib']}
+        t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             labels = np.stack([
@@ -220,19 +226,10 @@ class PointRCNN(BaseModel):
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes)
-            else:
-                max_gt = 0
-                for bbox in bboxes:
-                    max_gt = max(max_gt, bbox.shape[0])
-                pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
-                                      dtype=np.float32)
-                for i in range(len(bboxes)):
-                    pad_bboxes[i, :bboxes[i].shape[0], :] = bboxes[i]
-                bboxes = pad_bboxes
+                t_data['labels'] = labels
 
             t_data['bbox_objs'] = data['bbox_objs']
-            t_data['labels'] = labels
-            if self.training or self.mode == "RPN":
+            if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
 
         return t_data
@@ -297,11 +294,20 @@ class PointRCNN(BaseModel):
             for i in np.arange(0, count, batch_size):
                 batch = [dataset[i + bi]['data'] for bi in range(batch_size)]
                 points = tf.stack([b['point'] for b in batch], axis=0)
-                bboxes = tf.stack([
+
+                bboxes = [
                     b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32))
                     for b in batch
-                ],
-                                  axis=0)
+                ]
+                max_gt = 0
+                for bbox in bboxes:
+                    max_gt = max(max_gt, bbox.shape[0])
+                pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
+                                      dtype=np.float32)
+                for i in range(len(bboxes)):
+                    pad_bboxes[i, :bboxes[i].shape[0], :] = bboxes[i]
+                bboxes = tf.constant(pad_bboxes)
+
                 labels = tf.stack([
                     b.get('labels', tf.zeros((0,), dtype=tf.int32))
                     for b in batch
@@ -318,7 +324,7 @@ class PointRCNN(BaseModel):
 
         gen_func = batcher
         gen_types = (tf.float32, tf.float32, tf.int32, tf.float32)
-        gen_shapes = ([batch_size, None, 4], [batch_size, None,
+        gen_shapes = ([batch_size, None, 3], [batch_size, None,
                                               7], [batch_size,
                                                    None], [batch_size, 2, 4, 4])
 
@@ -867,16 +873,16 @@ class RCNN(tf.keras.layers.Layer):
         gt_boxes3d_ct = results['gt_of_rois']
         pts_input = results['pts_input']
 
-        cls_label_flat = tf.flatten(cls_label, (-1))
+        cls_label_flat = tf.reshape(cls_label, (-1))
 
         # binary cross entropy
-        rcnn_cls_flat = tf.flatten(rcnn_cls, (-1))
-        batch_loss_cls = tf.keras.losses.BinaryCrossentropy()(
-            tf.sigmoid(rcnn_cls_flat), cls_label, reduction='none')
+        rcnn_cls_flat = tf.reshape(rcnn_cls, (-1))
+        batch_loss_cls = tf.keras.losses.BinaryCrossentropy(reduction="none")(
+            tf.sigmoid(rcnn_cls_flat), cls_label)
         cls_valid_mask = tf.cast((cls_label_flat >= 0), tf.float32)
         rcnn_loss_cls = tf.reduce_sum(
-            batch_loss_cls * cls_valid_mask) / tf.clip_by_value(
-                tf.reduce_sum(cls_valid_mask), min=1.0)
+            batch_loss_cls * cls_valid_mask) / tf.maximum(
+                tf.reduce_sum(cls_valid_mask), 1.0)
 
         # rcnn regression loss
         batch_size = pts_input.shape[0]
@@ -1301,11 +1307,11 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
         sampled_pts = tf.unstack(sampled_pts)
         batch_gt_of_rois = tf.unstack(batch_gt_of_rois)
         for k in range(batch_size):
-            sampled_pts = rotate_pc_along_y_tf(sampled_pts[k], batch_rois[k, :,
-                                                                          6])
-            batch_gt_of_rois = tf.squeeze(rotate_pc_along_y_tf(
+            sampled_pts[k] = rotate_pc_along_y_tf(sampled_pts[k],
+                                                  batch_rois[k, :, 6])
+            batch_gt_of_rois[k] = tf.squeeze(rotate_pc_along_y_tf(
                 tf.expand_dims(batch_gt_of_rois[k], axis=1), roi_ry[k]),
-                                          axis=1)
+                                             axis=1)
         sampled_pts = tf.stack(sampled_pts)
         batch_gt_of_rois = tf.stack(batch_gt_of_rois)
 
@@ -1625,7 +1631,8 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
         temp_beta = tf.atan2(temp_z, temp_x)
         gt_of_rois = tf.concat([
             gt_of_rois[:, :, :6],
-            tf.sign(temp_beta) * np.pi / 2 + gt_alpha - temp_beta
+            tf.sign(temp_beta) * np.pi / 2 + tf.expand_dims(gt_alpha, axis=-1) -
+            temp_beta
         ],
                                axis=2)
 
@@ -1633,7 +1640,8 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
         temp_beta = tf.atan2(temp_z, temp_x)
         rois = tf.concat([
             rois[:, :, :6],
-            tf.sign(temp_beta) * np.pi / 2 + roi_alpha - temp_beta
+            tf.sign(temp_beta) * np.pi / 2 +
+            tf.expand_dims(roi_alpha, axis=-1) - temp_beta
         ],
                          axis=2)
 

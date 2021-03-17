@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.python.framework import ops
 import open3d
 if open3d.core.cuda.device_count() > 0:
     from open3d.ml.tf.ops import roi_pool
@@ -43,3 +44,6 @@ def roipool3d_gpu(pts,
                                                   pts_feature, sampled_pt_num)
 
     return pooled_features, pooled_empty_flag
+
+
+ops.NoGradient('Open3DRoiPool')

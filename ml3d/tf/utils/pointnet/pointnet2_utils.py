@@ -5,7 +5,6 @@ from typing import Tuple
 import open3d
 
 import open3d.ml.tf.ops as ml_ops
-#    furthest_point_sampling, gather_points, gather_points_grad, three_nn, three_interpolate, three_interpolate_grad, group_points, group_points_grad, ball_query
 
 
 def furthest_point_sample(xyz, npoint):
@@ -41,7 +40,7 @@ def gather_operation(features, idx):
     return output
 
 
-@tf.RegisterGradient('Open3DGatherPoint')
+@tf.RegisterGradient('Open3DGatherPoints')
 def _gather_operation_grad(op, out_g):
     inp = op.inputs[0]
     idx = op.inputs[1]
@@ -84,14 +83,14 @@ def three_interpolate_gpu(features, idx, weight):
     return output
 
 
-@tf.RegisterGradient("Open3DTreeInterpolate")
+@tf.RegisterGradient("Open3DThreeInterpolate")
 def _tree_interpolate_gradient(op, grad_out):
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
-    features = op.input[0]
-    idx = op.input[1]
-    weight = op.input[2]
+    features = op.inputs[0]
+    idx = op.inputs[1]
+    weight = op.inputs[2]
 
     m = features.shape[2]
 
@@ -113,17 +112,16 @@ def grouping_operation(features, idx):
     return output
 
 
-@tf.RegisterGradient("Open3DGroupingPoints")
+@tf.RegisterGradient("Open3DGroupPoints")
 def _grouping_operation_gradient(op, grad_out):
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
-    features, idx = op.input
+    features, idx = op.inputs
 
     N = features.shape[2]
 
-    grad_out_data = grad_out.data.contiguous()
-    grad_features = group_points_grad(grad_out_data, idx, N)
+    grad_features = ml_ops.group_points_grad(grad_out, idx, N)
     return grad_features, None
 
 
