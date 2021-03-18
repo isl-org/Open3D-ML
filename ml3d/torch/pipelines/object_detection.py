@@ -19,6 +19,10 @@ from ...datasets.utils import BEVBox3D
 
 from ...metrics.mAP import mAP
 
+# import torch.cuda.profiler as profiler
+# import pyprof
+# pyprof.init(enable_function_stack=True)
+
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
     level=logging.INFO,
@@ -166,7 +170,7 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             process_bar = tqdm(valid_loader, desc='validation')
             for data in process_bar:
-                if data.numel() == 0:
+                if any([bbox.numel() == 0 for bbox in data.bboxes]):
                     no_bboxes += 1
                     continue
                 data.to(device)
@@ -284,50 +288,51 @@ class ObjectDetection(BasePipeline):
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
-        for epoch in range(start_ep, cfg.max_epoch + 1):
-            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-            model.train()
+        with torch.autograd.profiler.emit_nvtx(enable=False):
+            for epoch in range(start_ep, cfg.max_epoch + 1):
+                log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+                model.train()
 
-            self.losses = {}
-            no_bboxes = 0
-            process_bar = tqdm(train_loader, desc='training')
-            for data in process_bar:
-                if data.bbox_objs.numel() == 0:
-                    no_bboxes += 1
-                    continue
-                data.to(device)
-                results = model(data)
-                loss = model.loss(results, data)
-                loss_sum = sum(loss.values())
+                self.losses = {}
+                no_bboxes = 0
+                process_bar = tqdm(train_loader, desc='training')
+                for data in process_bar:
+                    if any([bbox.numel() == 0 for bbox in data.bboxes]):
+                        no_bboxes += 1
+                        continue
+                    data.to(device)
+                    results = model(data)
+                    loss = model.loss(results, data)
+                    loss_sum = sum(loss.values())
 
-                self.optimizer.zero_grad()
-                loss_sum.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
-                self.optimizer.step()
-                desc = "training - "
-                for l, v in loss.items():
-                    if not l in self.losses:
-                        self.losses[l] = []
-                    self.losses[l].append(v.cpu().item())
-                    desc += " %s: %.03f" % (l, v.cpu().item())
-                desc += " > loss: %.03f" % loss_sum.cpu().item()
-                process_bar.set_description(desc)
-                process_bar.refresh()
+                    self.optimizer.zero_grad()
+                    loss_sum.backward()
+                    if model.cfg.get('grad_clip_norm', -1) > 0:
+                        torch.nn.utils.clip_grad_value_(
+                            model.parameters(), model.cfg.grad_clip_norm)
+                    self.optimizer.step()
+                    desc = "training - "
+                    for l, v in loss.items():
+                        if not l in self.losses:
+                            self.losses[l] = []
+                        self.losses[l].append(v.cpu().item())
+                        desc += " %s: %.03f" % (l, v.cpu().item())
+                    desc += " > loss: %.03f" % loss_sum.cpu().item()
+                    process_bar.set_description(desc)
+                    process_bar.refresh()
 
-            if no_bboxes > 0:
-                log.warning("No bounding box labels in " +
-                            f"{no_bboxes}/{len(process_bar)} cases.")
-            #self.scheduler.step()
+                if no_bboxes > 0:
+                    log.warning("No bounding box labels in " +
+                                f"{no_bboxes}/{len(process_bar)} cases.")
+                #self.scheduler.step()
 
-            # --------------------- validation
-            self.run_valid()
+                # --------------------- validation
+                self.run_valid()
 
-            self.save_logs(writer, epoch)
+                self.save_logs(writer, epoch)
 
-            if epoch % cfg.save_ckpt_freq == 0:
-                self.save_ckpt(epoch)
+                if epoch % cfg.save_ckpt_freq == 0:
+                    self.save_ckpt(epoch)
 
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():

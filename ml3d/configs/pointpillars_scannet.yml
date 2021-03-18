@@ -2,8 +2,7 @@ dataset:
   name: Scannet
   # path/to/your/dataset
   dataset_path: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/Datasets/ScanNet-cache
-  cache_dir: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/Datasets/logs/cache
-  steps_per_epoch_train: 500
+  cache_dir: ./logs/cache
 
 model:
   name: PointPillars
@@ -130,12 +129,13 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 32
-  val_batch_size: 32
+  batch_size: 3
+  val_batch_size: 3
   save_ckpt_freq: 5
+  pin_memory: false
   max_epoch: 200
-  main_log_dir: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/logs
-  train_sum_dir: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/logs/train_log
+  main_log_dir: ./logs
+  train_sum_dir: ./logs/train_log
   grad_clip_norm: 2
 
   optimizer:

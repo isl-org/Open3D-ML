@@ -117,7 +117,6 @@ class PointPillars(BaseModel):
         voxels, coors, num_points = [], [], []
         for res in points:
             res_voxels, res_coors, res_num_points = self.voxel_layer(res)
-            #print('res_coors.shape={}\t unique res_coors.shape={}\n', res_coors.shape, torch.unique(res_coors).shape)
             voxels.append(res_voxels)
             coors.append(res_coors)
             num_points.append(res_num_points)
