@@ -226,14 +226,11 @@ class LyftSplit():
         calib = {'world_cam': world_cam.T}
 
         pc = self.dataset.read_lidar(lidar_path)
-        label = self.dataset.read_label(info, calib)
 
-        data = {
-            'point': pc,
-            'feat': None,
-            'calib': calib,
-            'bounding_boxes': label,
-        }
+        data = {'point': pc, 'feat': None, 'calib': calib}
+
+        if self.split not in ["test", "testing"]:
+            data['bounding_boxes'] = self.dataset.read_label(info, calib)
 
         return data
 
