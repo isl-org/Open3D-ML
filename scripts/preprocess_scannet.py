@@ -281,12 +281,19 @@ class ScannetProcess():
     def compute_dataset_statistics(self):
 
         def get_scene_stats(scan):
-            mesh_vertices = np.load(f'{join(self.out_path, scan)}_vert.npy')
-            semantic_labels = np.load(
-                f'{join(self.out_path, scan)}_sem_label.npy')
-            instance_labels = np.load(
-                f'{join(self.out_path, scan)}_ins_label.npy')
-            instance_bboxes = np.load(f'{join(self.out_path, scan)}_bbox.npy')
+            try:
+                mesh_vertices = np.load(f'{join(self.out_path, scan)}_vert.npy')
+                semantic_labels = np.load(
+                    f'{join(self.out_path, scan)}_sem_label.npy')
+                instance_labels = np.load(
+                    f'{join(self.out_path, scan)}_ins_label.npy')
+                instance_bboxes = np.load(
+                    f'{join(self.out_path, scan)}_bbox.npy')
+            except FileNotFoundError:
+                log.warning(
+                    f"Some files are missing: {join(self.out_path, scan)}_*.npy."
+                    + " Please re-run preprocessing.")
+                return None
             return utils.statistics.compute_scene_stats(mesh_vertices,
                                                         semantic_labels,
                                                         instance_labels,
@@ -294,10 +301,13 @@ class ScannetProcess():
 
         # ProcessPoolExecutor deadlocks
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            scene_stats = executor.map(get_scene_stats, self.scans)
+            scene_stats = list(
+                tqdm(executor.map(get_scene_stats, self.scans),
+                     total=len(self.scans),
+                     desc="scene_stats",
+                     unit="scene"))
 
-        dataset_stats = utils.statistics.compute_dataset_stats(
-            list(scene_stats))
+        dataset_stats = utils.statistics.compute_dataset_stats(scene_stats)
         with open(join(self.out_path, 'summary.yaml'), 'w') as sumfile:
             yaml.dump(dataset_stats, sumfile)
 

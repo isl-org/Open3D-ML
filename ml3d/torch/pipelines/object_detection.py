@@ -288,7 +288,7 @@ class ObjectDetection(BasePipeline):
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
-        with torch.autograd.profiler.emit_nvtx(enable=False):
+        with torch.autograd.profiler.emit_nvtx(enabled=False):
             for epoch in range(start_ep, cfg.max_epoch + 1):
                 log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
                 model.train()
