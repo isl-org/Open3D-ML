@@ -9,6 +9,5 @@ from .pointnet import Pointnet2MSG, PointnetFPModule, PointnetSAModule
 
 __all__ = [
     'RandLANet', 'KPFCNN', 'PointPillars', 'Pointnet2MSG', 'PointnetFPModule',
-    'PointnetSAModule', 'SparseConvUnet'
-    #'PointnetSAModule', 'PointRCNN', 'SparseConvUnet'
+    'PointnetSAModule'#, 'PointRCNN', 'SparseConvUnet'
 ]

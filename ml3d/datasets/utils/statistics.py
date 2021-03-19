@@ -55,6 +55,7 @@ def compute_dataset_stats(scene_stats):
     Returns:
         data_stats(dict):
     """
+    scene_stats = list(filter(None, scene_stats))  # Remove empty scenes
     data_stats = {}
     if len(scene_stats) == 0:
         return data_stats

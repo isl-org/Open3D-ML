@@ -19,6 +19,10 @@ from ...datasets.utils import BEVBox3D
 
 from ...metrics.mAP import mAP
 
+# import torch.cuda.profiler as profiler
+# import pyprof
+# pyprof.init(enable_function_stack=True)
+
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
     level=logging.INFO,
@@ -61,12 +65,10 @@ class ObjectDetection(BasePipeline):
 
         model.eval()
 
+        data.to(self.device)
+
         with torch.no_grad():
-            inputs = torch.tensor(data['point'],
-                                  dtype=torch.float32,
-                                  device=self.device)
-            inputs = torch.reshape(inputs, (1, -1, inputs.shape[-1]))
-            results = model(inputs)
+            results = model(data)
             boxes = model.inference_end(results, data)
 
         return boxes
@@ -90,11 +92,20 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
-                                     transform=None,
+                                     transform=model.transform,
                                      use_cache=False,
                                      shuffle=False)
+        test_loader = DataLoader(
+            test_split,
+            batch_size=cfg.test_batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=batcher.collate_fn,
+        )
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -106,8 +117,8 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         with torch.no_grad():
-            for i in tqdm(range(len(test_split)), desc='testing'):
-                results = self.run_inference(test_split[i]['data'])
+            for data in tqdm(test_loader, desc='testing'):
+                results = self.run_inference(data)
                 pred.append(results[0])
 
         #dataset.save_test_result(results, attr)
@@ -133,7 +144,7 @@ class ObjectDetection(BasePipeline):
 
         batcher = ConcatBatcher(device, model.cfg.name)
 
-        valid_dataset = dataset.get_split('train')
+        valid_dataset = dataset.get_split('validation')
         valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
@@ -157,13 +168,13 @@ class ObjectDetection(BasePipeline):
         gt = []
         no_bboxes = 0
         with torch.no_grad():
-        process_bar = tqdm(valid_loader, desc='validation')
-            for i in process_bar:
-                data = valid_loader[i]['data']
-                if data['bboxes'].numel() == 0:
+            process_bar = tqdm(valid_loader, desc='validation')
+            for data in process_bar:
+                if any([bbox.numel() == 0 for bbox in data.bboxes]):
                     no_bboxes += 1
                     continue
-                results = model(data['point'])
+                data.to(device)
+                results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
@@ -172,12 +183,12 @@ class ObjectDetection(BasePipeline):
 
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, data)
-                pred.append(BEVBox3D.to_dicts(boxes[0]))
-                gt.append(BEVBox3D.to_dicts(data.bbox_objs))
+                pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
+                gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
 
-        if no_bboxes > 0:
-            log.warning("No bounding box labels in " +
-                        f"{no_bboxes}/{len(process_bar)} cases.")
+            if no_bboxes > 0:
+                log.warning("No bounding box labels in " +
+                            f"{no_bboxes}/{len(process_bar)} cases.")
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -277,49 +288,51 @@ class ObjectDetection(BasePipeline):
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
-        for epoch in range(start_ep, cfg.max_epoch + 1):
-            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-            model.train()
+        with torch.autograd.profiler.emit_nvtx(enabled=False):
+            for epoch in range(start_ep, cfg.max_epoch + 1):
+                log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+                model.train()
 
-            self.losses = {}
-            no_bboxes = 0
-            process_bar = tqdm(train_loader, desc='training')
-            for data in process_bar:
-                if data.bbox_objs.numel() == 0:
-                    no_bboxes += 1
-                    continue
-                results = model(data.point)
-                loss = model.loss(results, data)
-                loss_sum = sum(loss.values())
+                self.losses = {}
+                no_bboxes = 0
+                process_bar = tqdm(train_loader, desc='training')
+                for data in process_bar:
+                    if any([bbox.numel() == 0 for bbox in data.bboxes]):
+                        no_bboxes += 1
+                        continue
+                    data.to(device)
+                    results = model(data)
+                    loss = model.loss(results, data)
+                    loss_sum = sum(loss.values())
 
-                self.optimizer.zero_grad()
-                loss_sum.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
-                self.optimizer.step()
-                desc = "training - "
-                for l, v in loss.items():
-                    if not l in self.losses:
-                        self.losses[l] = []
-                    self.losses[l].append(v.cpu().item())
-                    desc += " %s: %.03f" % (l, v.cpu().item())
-                desc += " > loss: %.03f" % loss_sum.cpu().item()
-                process_bar.set_description(desc)
-                process_bar.refresh()
+                    self.optimizer.zero_grad()
+                    loss_sum.backward()
+                    if model.cfg.get('grad_clip_norm', -1) > 0:
+                        torch.nn.utils.clip_grad_value_(
+                            model.parameters(), model.cfg.grad_clip_norm)
+                    self.optimizer.step()
+                    desc = "training - "
+                    for l, v in loss.items():
+                        if not l in self.losses:
+                            self.losses[l] = []
+                        self.losses[l].append(v.cpu().item())
+                        desc += " %s: %.03f" % (l, v.cpu().item())
+                    desc += " > loss: %.03f" % loss_sum.cpu().item()
+                    process_bar.set_description(desc)
+                    process_bar.refresh()
 
-            if no_bboxes > 0:
-                log.warning("No bounding box labels in " +
-                            f"{no_bboxes}/{len(process_bar)} cases.")
-            #self.scheduler.step()
+                if no_bboxes > 0:
+                    log.warning("No bounding box labels in " +
+                                f"{no_bboxes}/{len(process_bar)} cases.")
+                #self.scheduler.step()
 
-            # --------------------- validation
-            self.run_valid()
+                # --------------------- validation
+                self.run_valid()
 
-            self.save_logs(writer, epoch)
+                self.save_logs(writer, epoch)
 
-            if epoch % cfg.save_ckpt_freq == 0:
-                self.save_ckpt(epoch)
+                if epoch % cfg.save_ckpt_freq == 0:
+                    self.save_ckpt(epoch)
 
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():
@@ -347,15 +360,6 @@ class ObjectDetection(BasePipeline):
 
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
-
-        # keys = ckpt["model_state"].keys()
-        # keys2 = self.model.state_dict().keys()
-
-        # ckpt2 = {"model_state_dict": {}}
-
-        # for k0, k1 in zip(keys, keys2):
-        #     ckpt2["model_state_dict"][k1] = ckpt["model_state"][k0]
-        # ckpt = ckpt2
 
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
