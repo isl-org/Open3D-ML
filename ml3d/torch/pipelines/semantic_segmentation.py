@@ -350,7 +350,7 @@ class SemanticSegmentation(BasePipeline):
             batch_size=cfg.batch_size,
             #   sampler=get_sampler(train_sampler),
             num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', False),
+            pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn)
 
         valid_dataset = dataset.get_split('validation')
@@ -367,7 +367,7 @@ class SemanticSegmentation(BasePipeline):
             batch_size=cfg.val_batch_size,
             #   sampler=get_sampler(valid_sampler),
             num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', False),
+            pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn)
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
@@ -438,6 +438,8 @@ class SemanticSegmentation(BasePipeline):
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
+                    if hasattr(inputs['data'], 'to'):
+                        inputs['data'].to(device)
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)

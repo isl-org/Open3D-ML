@@ -433,6 +433,7 @@ class SparseConvUnetBatch:
         self.point = self.point.pin_memory()
         self.feat = self.feat.pin_memory()
         self.label = self.label.pin_memory()
+        return self
 
     def to(self, device):
         self.point = self.point.to(device)
