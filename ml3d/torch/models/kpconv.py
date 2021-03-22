@@ -551,7 +551,7 @@ class KPFCNN(BaseModel):
     def update_probs(self, inputs, results, test_probs, test_labels):
         self.test_smooth = 0.95
         stk_probs = torch.nn.functional.softmax(results, dim=-1)
-        stk_probs = results.cpu().data.numpy()
+        stk_probs = stk_probs.cpu().data.numpy()
 
         batch = inputs['data']
         stk_labels = batch.labels.cpu().data.numpy()
