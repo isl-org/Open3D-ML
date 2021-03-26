@@ -218,14 +218,25 @@ class QueryAndGroup(nn.Module):
         if not open3d.core.cuda.device_count() > 0:
             raise NotImplementedError
 
+        batch_size = xyz.shape[0]
+
         idx = ball_query_gpu(self.radius, self.nsample, xyz, new_xyz)
+        idx_stacked = torch.stack([idx] * 3, dim=1).view(batch_size, 3,
+                                                         -1).long()
+
         xyz_trans = xyz.transpose(1, 2).contiguous()
-        grouped_xyz = grouping_operation(xyz_trans,
-                                         idx)  # (B, 3, npoint, nsample)
+        grouped_xyz = torch.gather(xyz_trans, dim=2, index=idx_stacked).view(
+            batch_size, 3, -1, self.nsample)  # (B, 3, npoint, nsample)
         grouped_xyz -= new_xyz.transpose(1, 2).unsqueeze(-1)
 
         if features is not None:
-            grouped_features = grouping_operation(features, idx)
+            idx_stacked = torch.stack([idx] * features.shape[1],
+                                      dim=1).view(batch_size, features.shape[1],
+                                                  -1).long()
+            grouped_features = torch.gather(features, dim=2,
+                                            index=idx_stacked).view(
+                                                batch_size, features.shape[1],
+                                                -1, self.nsample)
             if self.use_xyz:
                 new_features = torch.cat([grouped_xyz, grouped_features],
                                          dim=1)  # (B, C + 3, npoint, nsample)

@@ -185,7 +185,7 @@ class PointRCNN(BaseModel):
     def transform(self, data, attr):
         points = data['point']
 
-        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
+        if attr['split'] not in ['test', 'testing']:  #, 'val', 'validation']:
             if self.npoints < len(points):
                 pts_depth = points[:, 2]
                 pts_near_flag = pts_depth < 40.0
@@ -210,7 +210,7 @@ class PointRCNN(BaseModel):
 
             points = points[choice, :]
 
-        t_data = {'point': data['point'], 'calib': data['calib']}
+        t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             labels = np.stack([
@@ -223,10 +223,10 @@ class PointRCNN(BaseModel):
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes)
+                t_data['labels'] = labels
 
             t_data['bbox_objs'] = data['bbox_objs']
-            t_data['labels'] = labels
-            if self.training or self.mode == "RPN":
+            if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
 
         return t_data
