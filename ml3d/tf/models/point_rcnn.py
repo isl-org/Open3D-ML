@@ -46,23 +46,36 @@ class PointRCNN(BaseModel):
         self.rpn = RPN(**rpn)
         self.rcnn = RCNN(num_classes=len(self.classes), **rcnn)
 
+        if self.mode == "RCNN":
+            self.rpn.trainable = False
+        else:
+            self.rcnn.trainable = False
+
     def call(self, inputs, training=True):
-        #with torch.set_grad_enabled(self.training and self.mode == "RPN"):
         cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
             inputs[0], training=self.mode == "RPN" and training)
 
-        #with torch.no_grad():
-        rpn_scores_raw = cls_score[:, :, 0]
-        rois, roi_scores_raw = self.rpn.proposal_layer(
-            rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
+        if self.mode != "RPN":
+            cls_score = tf.stop_gradient(cls_score)
+            reg_score = tf.stop_gradient(reg_score)
+            backbone_xyz = tf.stop_gradient(backbone_xyz)
+            backbone_features = tf.stop_gradient(backbone_features)
+
+        rpn_scores_raw = tf.stop_gradient(cls_score[:, :, 0])
+        rois, _ = self.rpn.proposal_layer(rpn_scores_raw, reg_score,
+                                          backbone_xyz)  # (B, M, 7)
+        rois = tf.stop_gradient(rois)
 
         output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
         if self.mode == "RCNN":
-            #with torch.no_grad():
             rpn_scores_norm = tf.sigmoid(rpn_scores_raw)
             seg_mask = tf.cast((rpn_scores_norm > self.score_thres), tf.float32)
             pts_depth = tf.norm(backbone_xyz, ord=2, axis=2)
+
+            rpn_scores_norm = tf.stop_gradient(rpn_scores_norm)
+            seg_mask = tf.stop_gradient(seg_mask)
+            pts_depth = tf.stop_gradient(pts_depth)
 
             gt_boxes = None
             if training or self.mode == "RPN":
@@ -131,7 +144,7 @@ class PointRCNN(BaseModel):
             return self.rpn.loss(results, inputs)
         else:
             if not training:
-                return {"loss": 0.0}
+                return {"loss": tf.constant(0.0)}
             return self.rcnn.loss(results, inputs)
 
     def preprocess(self, data, attr):
@@ -188,7 +201,7 @@ class PointRCNN(BaseModel):
     def transform(self, data, attr):
         points = data['point']
 
-        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
+        if attr['split'] not in ['test', 'testing']:  #, 'val', 'validation']:
             if self.npoints < len(points):
                 pts_depth = points[:, 2]
                 pts_near_flag = pts_depth < 40.0
@@ -270,7 +283,7 @@ class PointRCNN(BaseModel):
             labels = labels.numpy()
             inference_result.append([])
 
-            world_cam, cam_img = calib
+            world_cam, cam_img = calib.numpy()
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 pos = bbox[:3]
@@ -549,7 +562,9 @@ class RPN(tf.keras.layers.Layer):
                                        1,
                                        use_bias=False,
                                        data_format="channels_first"),
-                tf.keras.layers.BatchNormalization(axis=1),
+                tf.keras.layers.BatchNormalization(axis=1,
+                                                   momentum=0.9,
+                                                   epsilon=1e-05),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Dropout(db_ratio)
             ])
@@ -580,7 +595,9 @@ class RPN(tf.keras.layers.Layer):
                                        1,
                                        use_bias=False,
                                        data_format="channels_first"),
-                tf.keras.layers.BatchNormalization(axis=1),
+                tf.keras.layers.BatchNormalization(axis=1,
+                                                   momentum=0.9,
+                                                   epsilon=1e-05),
                 tf.keras.layers.ReLU(),
                 tf.keras.layers.Dropout(db_ratio)
             ])
@@ -615,20 +632,20 @@ class RPN(tf.keras.layers.Layer):
         rpn_cls = results['cls']
         rpn_reg = results['reg']
 
-        rpn_cls_label = inputs[1]
-        rpn_reg_label = inputs[2]
+        rpn_reg_label = inputs[1]
+        rpn_cls_label = inputs[2]
 
         rpn_cls_label_flat = tf.reshape(rpn_cls_label, (-1))
         rpn_cls_flat = tf.reshape(rpn_cls, (-1))
         fg_mask = (rpn_cls_label_flat > 0)
 
         # focal loss
-        rpn_cls_target = tf.cast((rpn_cls_label_flat > 0), tf.float32)
+        rpn_cls_target = tf.cast((rpn_cls_label_flat > 0), tf.int32)
         pos = tf.cast((rpn_cls_label_flat > 0), tf.float32)
         neg = tf.cast((rpn_cls_label_flat == 0), tf.float32)
         cls_weights = pos + neg
         pos_normalizer = tf.reduce_sum(pos)
-        cls_weights = cls_weights / tf.clip_by_value(pos_normalizer, min=1.0)
+        cls_weights = cls_weights / tf.maximum(pos_normalizer, 1.0)
         rpn_loss_cls = self.loss_cls(rpn_cls_flat,
                                      rpn_cls_target,
                                      cls_weights,
@@ -652,7 +669,7 @@ class RPN(tf.keras.layers.Layer):
             loss_size = 3 * loss_size
             rpn_loss_reg = loss_loc + loss_angle + loss_size
         else:
-            loss_loc = loss_angle = loss_size = rpn_loss_reg = rpn_loss_cls * 0
+            rpn_loss_reg = tf.reduce_mean(rpn_reg * 0)
 
         return {
             "cls": rpn_loss_cls * self.loss_weight[0],
@@ -712,7 +729,6 @@ class RCNN(tf.keras.layers.Layer):
         # classification layer
         cls_channel = 1 if num_classes == 2 else num_classes
 
-        in_filters = [in_channels, *cls_out_ch[:-1]]
         layers = []
         for i in range(len(cls_out_ch)):
             layers.extend([
@@ -747,7 +763,6 @@ class RCNN(tf.keras.layers.Layer):
         reg_channel += (1 if not self.proposal_layer.get_y_by_bin else
                         loc_y_bin_num * 2)
 
-        in_filters = [in_channels, *reg_out_ch[:-1]]
         layers = []
         for i in range(len(reg_out_ch)):
             layers.extend([
@@ -796,9 +811,10 @@ class RCNN(tf.keras.layers.Layer):
         pts_feature = tf.concat((pts_extra_input, rpn_features), axis=2)
 
         if gt_boxes3d is not None:
-            #with torch.no_grad():
             target = self.proposal_target_layer(
                 [roi_boxes3d, gt_boxes3d, rpn_xyz, pts_feature])
+            for k in target:
+                target[k] = tf.stop_gradient(target[k])
             pts_input = tf.concat(
                 (target['sampled_pts'], target['pts_feature']), axis=2)
             target['pts_input'] = pts_input
@@ -889,7 +905,6 @@ class RCNN(tf.keras.layers.Layer):
         fg_mask = (reg_valid_mask > 0)
         fg_sum = tf.reduce_sum(tf.cast(fg_mask, tf.int64)).numpy()
         if fg_sum != 0:
-            all_anchor_size = roi_size
             anchor_size = self.proposal_layer.mean_size
 
             loss_loc, loss_angle, loss_size, reg_loss_dict = \
@@ -906,7 +921,7 @@ class RCNN(tf.keras.layers.Layer):
             loss_size = 3 * loss_size  # consistent with old codes
             rcnn_loss_reg = loss_loc + loss_angle + loss_size
         else:
-            loss_loc = loss_angle = loss_size = rcnn_loss_reg = rcnn_loss_cls * 0
+            rcnn_loss_reg = tf.reduce_mean(rcnn_reg * 0)
 
         return {"cls": rcnn_loss_cls, "reg": rcnn_loss_reg}
 
@@ -1012,11 +1027,13 @@ class ProposalLayer(tf.keras.layers.Layer):
             ret_bbox3d = []
             ret_scores = []
             for k in range(batch_size):
-                bev = xywhr_to_xyxyr(proposals[k, :, [0, 2, 3, 5, 6]])
-                keep_idx = nms(bev, rpn_scores[k], self.nms_thres)
+                bev = xywhr_to_xyxyr(
+                    tf.stack([proposals[k, :, i] for i in [0, 2, 3, 5, 6]],
+                             axis=-1))
+                keep_idx = nms(bev, rpn_scores[k, :, 0], self.nms_thres)
 
-                ret_bbox3d.append(proposals[k, keep_idx])
-                ret_scores.append(rpn_scores[k, keep_idx])
+                ret_bbox3d.append(tf.gather(proposals[k], keep_idx))
+                ret_scores.append(tf.gather(rpn_scores[k], keep_idx))
 
         return ret_bbox3d, ret_scores
 
@@ -1205,10 +1222,9 @@ def decode_bbox_target(roi_box3d,
         axis=1)
     ret_box3d = shift_ret_box3d
     if roi_box3d.shape[1] == 7:
-        roi_ry = roi_box3d[:, 6]
+        roi_ry = roi_box3d[:, 6:7]
         ret_box3d = rotate_pc_along_y_tf(shift_ret_box3d, -roi_ry)
-        ret_box3d = tf.concat(ret_box3d[:, :5],
-                              ret_box3d[:, 5:6] + roi_ry,
+        ret_box3d = tf.concat([ret_box3d[:, :6], ret_box3d[:, 6:7] + roi_ry],
                               axis=1)
     ret_box3d = tf.concat([
         ret_box3d[:, :1] + roi_center[:, :1], ret_box3d[:, 1:2],
@@ -1237,8 +1253,7 @@ def rotate_pc_along_y_tf(pc, rot_angle):
     pc_temp = tf.reshape(tf.stack([pc[..., 0], pc[..., 2]], axis=-1),
                          ((pc.shape[0], -1, 2)))  # (N, 512, 2)
     pc_temp = tf.matmul(pc_temp, tf.transpose(R, (0, 2, 1)))
-    pc_temp = tf.reshape(tf.matmul(pc_temp, tf.transpose(R, (0, 2, 1))),
-                         (pc.shape[:-1] + (2,)))  # (N, 512, 2)
+    pc_temp = tf.reshape(pc_temp, (pc.shape[:-1] + (2,)))  # (N, 512, 2)
 
     pc = tf.concat(
         [pc_temp[..., :1], pc[..., 1:2], pc_temp[..., 1:2], pc[..., 3:]],

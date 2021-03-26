@@ -25,29 +25,6 @@ def furthest_point_sample(xyz, npoint):
 ops.NoGradient('Open3DFurthestPointSampling')
 
 
-def gather_operation(features, idx):
-    """
-        :param features: (B, C, N)
-        :param idx: (B, npoint) index tensor of the features to gather
-        :return:
-            output: (B, C, npoint)
-        """
-    if not open3d.core.cuda.device_count() > 0:
-        raise NotImplementedError
-
-    output = ml_ops.gather_points(features, idx)
-
-    return output
-
-
-@tf.RegisterGradient('Open3DGatherPoints')
-def _gather_operation_grad(op, out_g):
-    inp = op.inputs[0]
-    idx = op.inputs[1]
-    C, N = inp.shape[1:3]
-    return [ml_ops.gather_points_grad(out_g, idx, C, N), None]
-
-
 def three_nn_gpu(query_pts, data_pts):
     """
     Find the three nearest neighbors of query_pts in data_pts
@@ -98,33 +75,6 @@ def _tree_interpolate_gradient(op, grad_out):
     return grad_features, None, None
 
 
-def grouping_operation(features, idx):
-    """
-    :param features: (B, C, N) tensor of features to group
-    :param idx: (B, npoint, nsample) tensor containing the indicies of features to group with
-    :return:
-        output: (B, C, npoint, nsample) tensor
-    """
-    if not open3d.core.cuda.device_count() > 0:
-        raise NotImplementedError
-
-    output = ml_ops.group_points(features, idx)
-    return output
-
-
-@tf.RegisterGradient("Open3DGroupPoints")
-def _grouping_operation_gradient(op, grad_out):
-    if not open3d.core.cuda.device_count() > 0:
-        raise NotImplementedError
-
-    features, idx = op.inputs
-
-    N = features.shape[2]
-
-    grad_features = ml_ops.group_points_grad(grad_out, idx, N)
-    return grad_features, None
-
-
 def ball_query_gpu(radius, nsample, xyz, new_xyz):
     """
         :param radius: float, radius of the balls
@@ -167,13 +117,18 @@ class QueryAndGroup(tf.keras.layers.Layer):
             raise NotImplementedError
 
         idx = ball_query_gpu(self.radius, self.nsample, xyz, new_xyz)
-        xyz_trans = tf.transpose(xyz, (0, 2, 1))
-        grouped_xyz = grouping_operation(xyz_trans,
-                                         idx)  # (B, 3, npoint, nsample)
+        grouped_xyz = tf.gather(xyz, idx, batch_dims=1)
+        grouped_xyz = tf.transpose(grouped_xyz,
+                                   (0, 3, 1, 2))  # (B, 3, npoint, nsample)
+
         grouped_xyz -= tf.expand_dims(tf.transpose(new_xyz, (0, 2, 1)), axis=-1)
 
         if features is not None:
-            grouped_features = grouping_operation(features, idx)
+            grouped_features = tf.gather(tf.transpose(features, (0, 2, 1)),
+                                         idx,
+                                         batch_dims=1)
+            grouped_features = tf.transpose(
+                grouped_features, (0, 3, 1, 2))  # (B, 3, npoint, nsample)
             if self.use_xyz:
                 new_features = tf.concat([grouped_xyz, grouped_features],
                                          axis=1)  # (B, C + 3, npoint, nsample)

@@ -240,6 +240,9 @@ class ObjectDetection(BasePipeline):
                     loss_sum = tf.add_n(loss.values())
 
                 grads = tape.gradient(loss_sum, model.trainable_weights)
+                for (grad, var) in zip(grads, model.trainable_weights):
+                    if grad is None:
+                        print(var.shape, var.name, grad)
 
                 norm = cfg.get('grad_clip_norm', -1)
                 if model.cfg.get('grad_clip_norm', -1) > 0:

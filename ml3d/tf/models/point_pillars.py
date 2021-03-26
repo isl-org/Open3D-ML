@@ -381,7 +381,7 @@ class PointPillars(BaseModel):
             labels = _labels.cpu().numpy()
             inference_result.append([])
 
-            world_cam, cam_img = _calib
+            world_cam, cam_img = _calib.numpy()
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 dim = bbox[[3, 5, 4]]

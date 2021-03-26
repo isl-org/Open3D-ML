@@ -30,13 +30,10 @@ class _PointnetSAModuleBase(nn.Module):
         """
         new_features_list = []
 
-        xyz_flipped = xyz.transpose(1, 2).contiguous()
-        if new_xyz is None:
-            new_xyz = pointnet2_utils.gather_operation(
-                xyz_flipped,
-                pointnet2_utils.furthest_point_sample(
-                    xyz, self.npoint)).transpose(
-                        1, 2).contiguous() if self.npoint is not None else None
+        if new_xyz is None and self.npoint is not None:
+            sampling = pointnet2_utils.furthest_point_sample(xyz, self.npoint)
+            new_xyz = torch.gather(xyz, 1,
+                                   torch.stack([sampling] * 3, -1).long())
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,

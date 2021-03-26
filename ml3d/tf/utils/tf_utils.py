@@ -22,7 +22,10 @@ def gen_CNN(channels,
         layers.append(
             conv(out_size, 1, use_bias=use_bias, data_format="channels_first"))
         if batch_norm:
-            layers.append(tf.keras.layers.BatchNormalization(axis=1))
+            layers.append(
+                tf.keras.layers.BatchNormalization(axis=1,
+                                                   momentum=0.9,
+                                                   epsilon=1e-05))
         if activation is not None:
             layers.append(activation())
 

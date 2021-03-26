@@ -562,7 +562,7 @@ class RPN(nn.Module):
         fg_mask = (rpn_cls_label_flat > 0)
 
         # focal loss
-        rpn_cls_target = (rpn_cls_label_flat > 0).float()
+        rpn_cls_target = (rpn_cls_label_flat > 0).int()
         pos = (rpn_cls_label_flat > 0).float()
         neg = (rpn_cls_label_flat == 0).float()
         cls_weights = pos + neg

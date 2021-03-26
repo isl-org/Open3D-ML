@@ -37,43 +37,6 @@ class FurthestPointSampling(Function):
 furthest_point_sample = FurthestPointSampling.apply
 
 
-class GatherOperation(Function):
-
-    @staticmethod
-    def forward(ctx, features: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
-        """
-        :param ctx:
-        :param features: (B, C, N)
-        :param idx: (B, npoint) index tensor of the features to gather
-        :return:
-            output: (B, C, npoint)
-        """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        assert features.is_contiguous()
-        assert idx.is_contiguous()
-
-        _, C, N = features.size()
-        output = gather_points(features, idx)
-
-        ctx.for_backwards = (idx, C, N)
-        return output
-
-    @staticmethod
-    def backward(ctx, grad_out):
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        idx, C, N = ctx.for_backwards
-        grad_out_data = grad_out.data.contiguous()
-        grad_features = gather_points_grad(grad_out_data, idx, C, N)
-        return grad_features, None
-
-
-gather_operation = GatherOperation.apply
-
-
 class ThreeNN(Function):
 
     @staticmethod

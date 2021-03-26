@@ -101,13 +101,11 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
         """
         new_features_list = []
 
-        xyz_flipped = tf.transpose(xyz, (0, 2, 1))
-        if new_xyz is None:
-            new_xyz = tf.transpose(
-                pointnet2_utils.gather_operation(
-                    xyz_flipped,
-                    pointnet2_utils.furthest_point_sample(xyz, self.npoint)),
-                (0, 2, 1)) if self.npoint is not None else None
+        if new_xyz is None and self.npoint is not None:
+            sampling = tf.expand_dims(pointnet2_utils.furthest_point_sample(
+                xyz, self.npoint),
+                                      axis=-1)
+            new_xyz = tf.gather_nd(xyz, sampling, batch_dims=1)
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,

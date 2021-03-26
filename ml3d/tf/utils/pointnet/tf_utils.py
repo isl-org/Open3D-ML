@@ -52,7 +52,9 @@ class _ConvBase(tf.keras.Sequential):
                          data_format="channels_first")
 
         if bn:
-            bn_unit = tf.keras.layers.BatchNormalization(axis=1)
+            bn_unit = tf.keras.layers.BatchNormalization(axis=1,
+                                                         momentum=0.9,
+                                                         epsilon=1e-05)
 
         if preact:
             if bn:
@@ -147,7 +149,10 @@ class FC(tf.keras.Sequential):
 
         if preact:
             if bn:
-                self.add(tf.keras.layers.BatchNormalization(axis=1))
+                self.add(
+                    tf.keras.layers.BatchNormalization(axis=1,
+                                                       momentum=0.9,
+                                                       epsilon=1e-05))
 
             if activation is not None:
                 self.add(activation)
@@ -156,7 +161,10 @@ class FC(tf.keras.Sequential):
 
         if not preact:
             if bn:
-                self.add(tf.keras.layers.BatchNormalization(axis=1))
+                self.add(
+                    tf.keras.layers.BatchNormalization(axis=1,
+                                                       momentum=0.9,
+                                                       epsilon=1e-05))
 
             if activation is not None:
                 self.add(activation)
