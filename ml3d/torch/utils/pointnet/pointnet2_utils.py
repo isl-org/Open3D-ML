@@ -7,7 +7,7 @@ from typing import Tuple
 import open3d
 
 if open3d.core.cuda.device_count() > 0:
-    from open3d.ml.torch.ops import furthest_point_sampling, gather_points, gather_points_grad, three_nn, three_interpolate, three_interpolate_grad, group_points, group_points_grad, ball_query
+    from open3d.ml.torch.ops import furthest_point_sampling, three_nn, three_interpolate, three_interpolate_grad, ball_query
 
 
 class FurthestPointSampling(Function):
@@ -116,50 +116,6 @@ class ThreeInterpolate(Function):
 
 
 three_interpolate_gpu = ThreeInterpolate.apply
-
-
-class GroupingOperation(Function):
-
-    @staticmethod
-    def forward(ctx, features: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
-        """
-        :param ctx:
-        :param features: (B, C, N) tensor of features to group
-        :param idx: (B, npoint, nsample) tensor containing the indicies of features to group with
-        :return:
-            output: (B, C, npoint, nsample) tensor
-        """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        assert features.is_contiguous()
-        assert idx.is_contiguous()
-
-        output = group_points(features, idx)
-
-        ctx.for_backwards = (idx, features.size()[2])
-        return output
-
-    @staticmethod
-    def backward(ctx,
-                 grad_out: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        :param ctx:
-        :param grad_out: (B, C, npoint, nsample) tensor of the gradients of the output from forward
-        :return:
-            grad_features: (B, C, N) gradient of the features
-        """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        idx, N = ctx.for_backwards
-
-        grad_out_data = grad_out.data.contiguous()
-        grad_features = group_points_grad(grad_out_data, idx, N)
-        return grad_features, None
-
-
-grouping_operation = GroupingOperation.apply
 
 
 class BallQuery(Function):
