@@ -1,8 +1,10 @@
 import numpy as np
 import random
 
+
 class SemsegAugmentation():
     """Class consisting different augmentation methods for Semantic Segmentation"""
+
     def __init__(self, cfg):
         self.cfg = cfg
 
@@ -18,22 +20,22 @@ class SemsegAugmentation():
                 pc /= (pc.max(0) - pc.min(0)).max()
 
             data['point'] = pc
-        
+
         if 'feat' in cfg.keys() and data['feat'] is not None:
             cfg_f = cfg['feat']
             feat = data['feat']
             if cfg_f.get('recentering', False):
                 feat -= feat.mean(0)
-            if cfg_f.get('method', 'linear') == 'linear'
+            if cfg_f.get('method', 'linear') == 'linear':
                 bias = cfg_f.get('bias', 0)
                 scale = cfg_f.get('scale', 1)
                 feat -= bias
                 feat /= scale
 
             data['feat'] = feat
-        
+
         return data
-    
+
     @staticmethod
     def rotate(pc, cfg):
         # Initialize rotation matrix
@@ -66,11 +68,11 @@ class SemsegAugmentation():
             # Create the rotation matrix with this vector and angle
             R = create_3D_rotations(np.reshape(u, (1, -1)),
                                     np.reshape(alpha, (1, -1)))[0]
-        
+
         R = R.astype(np.float32)
 
         return np.matmul(pc, R)
-    
+
     @staticmethod
     def scale(pc, cfg):
 
@@ -83,31 +85,29 @@ class SemsegAugmentation():
             scale = np.random.rand(pc.shape[1]) * (max_s - min_s) + min_s
         else:
             scale = np.random.rand() * (max_s - min_s) + min_s
-        
+
         return pc * scale
-    
+
     @staticmethod
     def noise(pc, cfg):
         noise_level = cfg.get('noise_level', 0.001)
         noise = (np.random.randn(pc.shape[0], pc.shape[1]) *
-                    noise_level).astype(np.float32)
-        
+                 noise_level).astype(np.float32)
+
         return pc + noise
 
     def augment(self, data, cfg):
         if 'normalize' in cfg.keys():
             data = self.normalize(data, cfg['normalize'])
-        
+
         if 'rotate' in cfg.keys():
             data['point'] = self.rotate(data['point'], cfg['rotate'])
-        
+
         if 'scale' in cfg.keys():
             data['point'] = self.scale(data['point'], cfg['scale'])
-        
+
         if 'noise' in cfg.keys():
             data['point'] = self.noise(data['point'], cfg['noise'])
-
-        
 
 
 class ObjdetAugmentation():
