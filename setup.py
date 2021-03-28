@@ -13,7 +13,7 @@ assert torch_ver >= [1, 4], "Requires PyTorch >= 1.4"
 if __name__ == '__main__':
     setup(
         name='ml3d',
-        description='Open MMLab Detection Toolbox and Benchmark',
+        description='An extension of Open3D for 3D machine learning tasks',
         author='yi',
         packages=find_packages(exclude=('configs', 'tools', 'demo')),
     )

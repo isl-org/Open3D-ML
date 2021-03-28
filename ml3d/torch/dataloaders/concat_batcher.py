@@ -415,24 +415,40 @@ class PointPillarsBatch:
         Returns:
             class: The corresponding class.
         """
-        assert len(batches) == 1, "Only batch size 1 is supported."
-
-        data = batches[0]['data']
-        self.point = data['point']
-        self.labels = data['labels']
-        self.bboxes = data['bboxes']
-        self.bbox_objs = data['bbox_objs']
-        self.calib = None if 'calib' not in data else data['calib']
+        self.point = []
+        self.labels = []
+        self.bboxes = []
+        self.bbox_objs = []
+        self.calib = []
+        for batch in batches:
+            data = batch['data']
+            self.point.append(torch.tensor(data['point'], dtype=torch.float32))
+            self.labels.append(
+                torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
+                data else None)
+            self.bboxes.append(
+                torch.tensor(data['bboxes'], dtype=torch.float32) if 'bboxes' in
+                data else None)
+            self.bbox_objs.append(data.get('bbox_objs'))
+            self.calib.append(data.get('calib'))
 
     def pin_memory(self):
-        self.point = self.point.pin_memory()
-        self.labels = self.labels.pin_memory()
-        self.bboxes = self.bboxes.pin_memory()
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].pin_memory()
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].pin_memory()
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].pin_memory()
+
+        return self
 
     def to(self, device):
-        self.point = self.point.to(device)
-        self.labels = self.labels.to(device)
-        self.bboxes = self.bboxes.to(device)
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].to(device)
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].to(device)
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].to(device)
 
 
 class ConcatBatcher(object):
@@ -465,7 +481,7 @@ class ConcatBatcher(object):
 
         elif self.model == "PointPillars":
             batching_result = PointPillarsBatch(batches)
-            batching_result.to(self.device)
+            # batching_result.to(self.device)
             return batching_result
 
         else:
