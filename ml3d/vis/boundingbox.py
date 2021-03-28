@@ -77,10 +77,17 @@ class BoundingBox3D:
         return s
 
     @staticmethod
-    def create_labels(boxes, show_class=True, show_confidence=True):
+    def create_labels(boxes,
+                      show_id=True,
+                      show_class=True,
+                      show_confidence=True):
         """ Create text labels for rendering with the line sets
 
-            boxes: the list of bounding boxes
+            Args:
+                boxes (list): the list of bounding boxes
+                show_id (bool): Show box identifier
+                show_class (bool): Show detection class label
+                show_confidence (bool): Show detector confidence
         """
         label_text = []
         label_position = []
@@ -88,10 +95,13 @@ class BoundingBox3D:
             label_position.append(box.center - 0.5 * box.size[0] * box.left -
                                   0.5 * box.size[1] * box.up -
                                   0.5 * box.size[0] * box.front)
-            label_text.append(
-                str(box.identifier) +
-                ((':' + box.label_class) if show_class else '') +
-                (f':{box.confidence:0.2f}' if show_confidence else ''))
+            box_label_text = [
+                (str(box.identifier) if show_id else None),
+                (box.label_class if show_class else None),
+                (f'{box.confidence:0.2f}' if show_confidence else None)
+            ]
+            label_text.append(":".join(bl for bl in box_label_text if bl))
+
         return label_position, label_text
 
     @staticmethod

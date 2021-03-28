@@ -59,7 +59,8 @@ class PipelineViewer(object):
                  vfov=60,
                  pcd_name='points',
                  max_pcd_vertices=1 << 20,
-                 score_threshold=0.1):
+                 score_threshold=0.1,
+                 depth_scale_8bit=16):
         """ Initialize GUI.
 
         Args:
@@ -70,7 +71,9 @@ class PipelineViewer(object):
                 (default 2^20).
             score_threshold: Initial detector score threshold for valid
                 detections
+            depth_scale_8bit: Scale factor to rescale depth image to 8 bits
         """
+        self.labels = labels
         self.vfov = vfov
         self.lut = LabelLUT()
 
@@ -116,19 +119,19 @@ class PipelineViewer(object):
 
         self.flag_capture = False
         self.cv_capture = threading.Condition()
-        toggle_capture = gui.Checkbox("Capture / Play")
-        toggle_capture.checked = self.flag_capture
-        toggle_capture.set_on_checked(self._on_toggle_capture)  # callback
+        toggle_capture = gui.ToggleSwitch("Capture / Play")
+        toggle_capture.is_on = self.flag_capture
+        toggle_capture.set_on_clicked(self._on_toggle_capture)  # callback
         self.panel.add_child(toggle_capture)
 
         self.flag_detector = False
         self.score_threshold = score_threshold
-        if labels:
+        if self.labels:
             for val in sorted(labels):
                 self.lut.add_label(val, val)
-            toggle_detect = gui.Checkbox("Run Detector")
-            toggle_detect.checked = self.flag_detector
-            toggle_detect.set_on_checked(self._on_toggle_detector)  # callback
+            toggle_detect = gui.ToggleSwitch("Run Detector")
+            toggle_detect.is_on = self.flag_detector
+            toggle_detect.set_on_clicked(self._on_toggle_detector)  # callback
             self.panel.add_child(toggle_detect)
             self.panel.add_child(gui.Label("Detector score threshold"))
             slider_score_thr = gui.Slider(gui.Slider.DOUBLE)
@@ -143,9 +146,29 @@ class PipelineViewer(object):
         birds_eye_view = gui.Button("Bird's eye view")
         birds_eye_view.set_on_clicked(self._birds_eye_view)  # callback
         self.panel.add_child(birds_eye_view)
-        self.panel.add_fixed(em)  # bottom spacing
+        self.panel.add_fixed(em)  # spacing
 
-        if labels:
+        self.video_width = 640
+        self.video_height = 480
+        self.constraints = gui.Widget.Constraints()
+        self.constraints.width = self.video_width
+        self.constraints.height = self.video_height
+        self.panel.add_child(gui.Label("Color image"))
+        self.color_video = gui.ImageWidget(
+            o3d.geometry.Image(
+                np.zeros((self.video_height, self.video_width, 3),
+                         dtype=np.uint8)))
+        self.panel.add_child(self.color_video)
+        self.depth_scale_8bit = depth_scale_8bit
+        self.panel.add_child(gui.Label("Depth image"))
+        self.depth_video = gui.ImageWidget(
+            o3d.geometry.Image(
+                np.zeros((self.video_height, self.video_width),
+                         dtype=np.uint8)))
+        self.panel.add_child(self.depth_video)
+        self.panel.add_fixed(em)  # spacing
+
+        if self.labels:
             self.status_message = gui.Label("No detections")
             self.panel.add_child(self.status_message)
             self.panel.add_fixed(em)  # bottom spacing
@@ -161,8 +184,13 @@ class PipelineViewer(object):
         Args:
             frame_elements: dict {element_type: geometry element}.
                 Dictionary of element types to geometry elements to be updated
-                in the GUI: (self.pcd_name: point cloud, 'boxes':lineset,
-                'labels': bbox description, 'status_message': message)
+                in the GUI:
+                    self.pcd_name: point cloud,
+                    'boxes': lineset,
+                    'color': rgb image (3 channel, uint8),
+                    'depth': depth image (uint8),
+                    'labels': bbox description,
+                    'status_message': message
         """
         if self.flag_gui_empty:
             # Set dummy point cloud to allocate graphics memory
@@ -182,6 +210,16 @@ class PipelineViewer(object):
                 self.pcdview.scene.remove_geometry('boxes')
                 for label in self.label_list:
                     self.pcdview.remove_3d_label(label)
+
+        # Update color and depth images
+        if 'color' in frame_elements:
+            self.color_video.update_image(
+                frame_elements['color'].to_legacy_image())
+        if 'depth' in frame_elements:
+            self.depth_video.update_image(
+                o3d.geometry.Image(
+                    (np.asarray(frame_elements['depth'].to_legacy_image()) /
+                     self.depth_scale_8bit).astype(np.uint8)))
 
         # Update point cloud and add bounding boxes
         if 'boxes' in frame_elements and not frame_elements['boxes'].is_empty():
@@ -205,10 +243,9 @@ class PipelineViewer(object):
         """ Callback on window initialize / resize. """
         frame = self.window.content_rect
         em = theme.font_size
-        panel_size = self.panel.calc_preferred_size(theme)
-        panel_rect = gui.Rect(frame.get_right() - panel_size.width - 2 * em,
-                              frame.y + 2 * em, panel_size.width,
-                              panel_size.height)
+        panel_size = self.panel.calc_preferred_size(theme, self.constraints)
+        panel_rect = gui.Rect(frame.get_right() - panel_size.width - em,
+                              frame.y + em, panel_size.width, panel_size.height)
         self.panel.frame = panel_rect
         self.pcdview.frame = frame
 
@@ -337,13 +374,16 @@ class DetectorPipeline(object):
             dtype=o3d.core.Dtype.Float32)
         self.calib = {
             'world_cam':
-                self.extrinsics.numpy(),
+                self.extrinsics.numpy().astype(np.float32),
             'cam_img':
                 np.block([[self.intrinsic_matrix.numpy(),
-                           np.zeros((3, 1))], [np.zeros((1, 3)), 1]]).T
+                           np.zeros((3, 1))], [np.zeros((1, 3)),
+                                               1]]).astype(np.float32).T
         }
         self.depth_max = 3.0  # m
         self.pcd_stride = 1  # downsample point cloud
+        depth_scale_8bit = int(self.depth_max * self.rgbd_metadata.depth_scale /
+                               255)
 
         # GUI
         labels = self.detector_config['model'][
@@ -355,10 +395,11 @@ class DetectorPipeline(object):
                                   pcd_name=self.rgbd_metadata.serial_number,
                                   max_pcd_vertices=self.max_points,
                                   score_threshold=self.net.bbox_head.score_thr
-                                  if self.run_detector else 0.1)
+                                  if self.run_detector else 0.1,
+                                  depth_scale_8bit=depth_scale_8bit)
 
     class _calib_wrapper(object):
-        """FIXME: torch version of PointPillars.inference_end() needs calib as
+        """PyTorch version of PointPillars.inference_end() needs calib as
         an attribute instead of dict key"""
 
         def __init__(self, calib):
@@ -384,6 +425,9 @@ class DetectorPipeline(object):
             results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
             boxes = self.net.inference_end(results,
                                            self._calib_wrapper(self.calib))
+            boxes[0].append(
+                BEVBox3D([-0.1, 0., 0.7], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
+                         self.calib['world_cam'], self.calib['cam_img']))
             return boxes[0]
 
     def _run_detector_tf(self, pcd_frame):
@@ -403,10 +447,14 @@ class DetectorPipeline(object):
 
             self.net.bbox_head.score_thr = self.gui.score_threshold
             results = self.net(self.det_inputs[:, :pcd_points.shape[0], :])
+            boxes = [[]]
             boxes = self.net.inference_end(results, {
                 'point': pcd_points,
                 'calib': self.calib
             })
+            boxes[0].append(
+                BEVBox3D([-0.1, 0., 0.7], [0.3, 0.3, 0.3], 0, 'Pedestrian', 1,
+                         self.calib['world_cam'], self.calib['cam_img']))
             return boxes[0]
 
     def launch(self):
@@ -447,21 +495,30 @@ class DetectorPipeline(object):
                     pcd_errors += 1
 
                 n_pts += pcd_frame.point['points'].shape[0]
-                frame_elements = {self.rgbd_metadata.serial_number: pcd_frame}
+                frame_elements = {
+                    'rgb': rgbd_frame.color,
+                    'depth': rgbd_frame.depth,
+                    self.rgbd_metadata.serial_number: pcd_frame
+                }
                 if pcd_frame.is_empty():
                     log.warning(f"No valid depth data in frame {frame_id})")
                     continue
                 if self.gui.flag_detector:
                     bboxes = self.run_detector(pcd_frame)
+                    bboxes.sort(
+                        key=lambda box: (box.label_class, box.confidence))
                     for box in bboxes:
                         box.arrow_length = 0  # disable showing arrows
                     frame_elements['boxes'] = BoundingBox3D.create_lines(
                         bboxes, self.gui.lut)
                     frame_elements['labels'] = BoundingBox3D.create_labels(
-                        bboxes, show_class=True, show_confidence=True)
-                    log.debug(repr(bboxes))
-                    frame_elements[
-                        'status_message'] = f"{len(bboxes)} detections."
+                        bboxes,
+                        show_id=False,
+                        show_class=True,
+                        show_confidence=True)
+                    frame_elements['status_message'] = (
+                        f"{len(bboxes)} detections:\n" +
+                        "\n".join(frame_elements['labels'][1]))
 
                 gui.Application.instance.post_to_main_thread(
                     self.gui.window, lambda: self.gui.update(frame_elements))
@@ -490,7 +547,7 @@ class DetectorPipeline(object):
 
 if __name__ == "__main__":
 
-    log.basicConfig(level=log.INFO)
+    log.basicConfig(level=log.DEBUG)
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
