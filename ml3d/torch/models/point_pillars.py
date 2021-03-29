@@ -379,9 +379,9 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
- #       assert (points.le(self.points_range_max.to(device=points.device)).all() and
- #               points.ge(self.points_range_min.to(device=points.device)).all()), \
- #               "Input point cloud exceeds pre-defined point cloud range!"
+        # assert (points.le(self.points_range_max.to(device=points.device)).all() and
+        #         points.ge(self.points_range_min.to(device=points.device)).all()), \
+        #         "Input point cloud exceeds pre-defined point cloud range!"
 
         ans = voxelize(points, self.voxel_size, self.points_range_min,
                        self.points_range_max, self.max_num_points, max_voxels)

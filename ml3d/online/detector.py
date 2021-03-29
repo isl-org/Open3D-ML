@@ -113,16 +113,17 @@ class PipelineViewer(object):
         em = self.window.theme.font_size
 
         # Options panel
-        self.panel = gui.Vert(em / 2, gui.Margins(em, 0, em, 0))
+        self.panel = gui.Vert(em / 2, gui.Margins(em, em, em, em))
         self.window.add_child(self.panel)
-        self.panel.add_fixed(em)  # top spacing
+        toggles = gui.Horiz(2 * em)
+        self.panel.add_child(toggles)
 
         self.flag_capture = False
         self.cv_capture = threading.Condition()
         toggle_capture = gui.ToggleSwitch("Capture / Play")
         toggle_capture.is_on = self.flag_capture
         toggle_capture.set_on_clicked(self._on_toggle_capture)  # callback
-        self.panel.add_child(toggle_capture)
+        toggles.add_child(toggle_capture)
 
         self.flag_detector = False
         self.score_threshold = score_threshold
@@ -132,46 +133,47 @@ class PipelineViewer(object):
             toggle_detect = gui.ToggleSwitch("Run Detector")
             toggle_detect.is_on = self.flag_detector
             toggle_detect.set_on_clicked(self._on_toggle_detector)  # callback
-            self.panel.add_child(toggle_detect)
-            self.panel.add_child(gui.Label("Detector score threshold"))
+            toggles.add_child(toggle_detect)
+
+            options = gui.Horiz(2 * em)
+            self.panel.add_child(options)
+            options.add_child(gui.Label("Detector threshold"))
             slider_score_thr = gui.Slider(gui.Slider.DOUBLE)
             slider_score_thr.set_limits(0., 1.)
             slider_score_thr.double_value = self.score_threshold
             slider_score_thr.set_on_value_changed(self._on_score_thr_changed)
-            self.panel.add_child(slider_score_thr)
+            options.add_child(slider_score_thr)
 
+        buttons = gui.Horiz(2 * em)
+        self.panel.add_child(buttons)
         camera_view = gui.Button("Camera view")
         camera_view.set_on_clicked(self._camera_view)  # callback
-        self.panel.add_child(camera_view)
+        buttons.add_child(camera_view)
         birds_eye_view = gui.Button("Bird's eye view")
         birds_eye_view.set_on_clicked(self._birds_eye_view)  # callback
-        self.panel.add_child(birds_eye_view)
+        buttons.add_child(birds_eye_view)
         self.panel.add_fixed(em)  # spacing
 
-        self.video_width = 640
-        self.video_height = 480
+        video_size = (320, 480, 3)
         self.constraints = gui.Widget.Constraints()
-        self.constraints.width = self.video_width
-        self.constraints.height = self.video_height
-        self.panel.add_child(gui.Label("Color image"))
+        self.constraints.width = video_size[1]
+        self.constraints.height = video_size[0]
+        self.show_color = gui.CollapsableVert("Color image")
+        self.panel.add_child(self.show_color)
         self.color_video = gui.ImageWidget(
-            o3d.geometry.Image(
-                np.zeros((self.video_height, self.video_width, 3),
-                         dtype=np.uint8)))
-        self.panel.add_child(self.color_video)
+            o3d.geometry.Image(np.zeros(video_size, dtype=np.uint8)))
+        self.show_color.add_child(self.color_video)
         self.depth_scale_8bit = depth_scale_8bit
-        self.panel.add_child(gui.Label("Depth image"))
+        self.show_depth = gui.CollapsableVert("Depth image")
+        self.panel.add_child(self.show_depth)
         self.depth_video = gui.ImageWidget(
-            o3d.geometry.Image(
-                np.zeros((self.video_height, self.video_width),
-                         dtype=np.uint8)))
-        self.panel.add_child(self.depth_video)
-        self.panel.add_fixed(em)  # spacing
+            o3d.geometry.Image(np.zeros(video_size, dtype=np.uint8)))
+        self.show_depth.add_child(self.depth_video)
 
         if self.labels:
+            self.panel.add_fixed(em)  # spacing
             self.status_message = gui.Label("No detections")
             self.panel.add_child(self.status_message)
-            self.panel.add_fixed(em)  # bottom spacing
 
         self.flag_exit = False
         self.flag_gui_empty = True
@@ -212,14 +214,20 @@ class PipelineViewer(object):
                     self.pcdview.remove_3d_label(label)
 
         # Update color and depth images
-        if 'color' in frame_elements:
+        em = self.window.theme.font_size
+        is_color_visible = self.show_color.frame.height > 2 * em
+        is_depth_visible = self.show_depth.frame.height > 2 * em
+        if is_color_visible and 'color' in frame_elements:
             self.color_video.update_image(
                 frame_elements['color'].to_legacy_image())
-        if 'depth' in frame_elements:
+        if is_depth_visible and 'depth' in frame_elements:
+            depth_array = (
+                np.asarray(frame_elements['depth'].to_legacy_image()) /
+                self.depth_scale_8bit).astype(np.uint8)
+            # Repeat depth to convert to 3 channels
             self.depth_video.update_image(
                 o3d.geometry.Image(
-                    (np.asarray(frame_elements['depth'].to_legacy_image()) /
-                     self.depth_scale_8bit).astype(np.uint8)))
+                    np.repeat(depth_array[:, :, np.newaxis], 3, axis=2)))
 
         # Update point cloud and add bounding boxes
         if 'boxes' in frame_elements and not frame_elements['boxes'].is_empty():
@@ -496,7 +504,7 @@ class DetectorPipeline(object):
 
                 n_pts += pcd_frame.point['points'].shape[0]
                 frame_elements = {
-                    'rgb': rgbd_frame.color,
+                    'color': rgbd_frame.color,
                     'depth': rgbd_frame.depth,
                     self.rgbd_metadata.serial_number: pcd_frame
                 }
