@@ -17,6 +17,7 @@ class SparseConvUnet(BaseModel):
                  device="cuda",
                  m=16,
                  scale=20,
+                 residual_blocks=False,
                  in_channels=3,
                  num_classes=20,
                  **kwargs):
@@ -35,7 +36,7 @@ class SparseConvUnet(BaseModel):
                                          filters=m,
                                          kernel_size=[3, 3, 3])
         self.unet = UNet(1, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
-                         False)
+                         residual_blocks)
         self.bn = nn.BatchNorm1d(m, eps=1e-4, momentum=0.01)
         self.relu = nn.ReLU()
         self.linear = nn.Linear(m, num_classes)
@@ -354,6 +355,52 @@ class JoinFeat(nn.Module):
         return torch.cat([feat_cat, feat], -1)
 
 
+class NetworkInNetwork(nn.Module):
+
+    def __init__(self, nIn, nOut, bias=False):
+        super(NetworkInNetwork, self).__init__()
+        if nIn == nOut:
+            self.linear = nn.Identity()
+        else:
+            self.linear = nn.Linear(nIn, nOut, bias=bias)
+
+    def forward(self, inputs):
+        return self.linear(inputs)
+
+
+class ResidualBlock(nn.Module):
+
+    def __init__(self, nIn, nOut):
+        super(ResidualBlock, self).__init__()
+
+        self.lin = NetworkInNetwork(nIn, nOut)
+
+        self.bn1 = nn.BatchNorm1d(nIn, eps=1e-4, momentum=0.01)
+        self.relu1 = nn.LeakyReLU(0)
+        self.scn1 = SubmanifoldSparseConv(in_channels=nIn,
+                                          filters=nOut,
+                                          kernel_size=[3, 3, 3])
+
+        self.bn2 = nn.BatchNorm1d(nOut, eps=1e-4, momentum=0.01)
+        self.relu2 = nn.LeakyReLU(0)
+        self.scn2 = SubmanifoldSparseConv(in_channels=nOut,
+                                          filters=nOut,
+                                          kernel_size=[3, 3, 3])
+
+    def forward(self, feat, pos):
+        out1 = self.lin(feat)
+
+        feat = self.relu1(self.bn1(feat))
+        feat = self.scn1(feat, pos)
+        feat = self.relu2(self.bn2(feat))
+        out2 = self.scn2(feat, pos)
+
+        return out1 + out2
+
+    def __name__(self):
+        return "ResidualBlock"
+
+
 class UNet(nn.Module):
 
     def __init__(self,
@@ -363,21 +410,26 @@ class UNet(nn.Module):
                  downsample=[2, 2],
                  leakiness=0):
         super(UNet, self).__init__()
-        self.net = nn.ModuleList(self.U(nPlanes))
+        self.net = nn.ModuleList(self.U(nPlanes, resudual_blocks))
+        self.resudual_blocks = resudual_blocks
 
     @staticmethod
-    def block(m, a, b):
-        m.append(nn.BatchNorm1d(a, eps=1e-4, momentum=0.01))
-        m.append(nn.LeakyReLU(0))
-        m.append(
-            SubmanifoldSparseConv(in_channels=a,
-                                  filters=b,
-                                  kernel_size=[3, 3, 3]))
+    def block(m, a, b, resudual_blocks):
+        if resudual_blocks:
+            m.append(ResidualBlock(a, b))
+
+        else:
+            m.append(nn.BatchNorm1d(a, eps=1e-4, momentum=0.01))
+            m.append(nn.LeakyReLU(0))
+            m.append(
+                SubmanifoldSparseConv(in_channels=a,
+                                      filters=b,
+                                      kernel_size=[3, 3, 3]))
 
     @staticmethod
-    def U(nPlanes):
+    def U(nPlanes, resudual_blocks):
         m = []
-        UNet.block(m, nPlanes[0], nPlanes[0])
+        UNet.block(m, nPlanes[0], nPlanes[0], resudual_blocks)
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
@@ -387,7 +439,7 @@ class UNet(nn.Module):
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
-            m = m + UNet.U(nPlanes[1:])
+            m = m + UNet.U(nPlanes[1:], resudual_blocks)
             m.append(nn.BatchNorm1d(nPlanes[1], eps=1e-4, momentum=0.01))
             m.append(nn.LeakyReLU(0))
             m.append(
@@ -397,7 +449,7 @@ class UNet(nn.Module):
 
             m.append(JoinFeat())
 
-            UNet.block(m, 2 * nPlanes[0], nPlanes[0])
+            UNet.block(m, 2 * nPlanes[0], nPlanes[0], resudual_blocks)
 
         return m
 
@@ -412,6 +464,9 @@ class UNet(nn.Module):
                     feat = module(feat)
             elif isinstance(module, nn.LeakyReLU):
                 feat = module(feat)
+
+            elif module.__name__() == "ResidualBlock":
+                feat = module(feat, pos)
 
             elif module.__name__() == "SubmanifoldSparseConv":
                 feat = module(feat, pos)
