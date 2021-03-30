@@ -161,7 +161,7 @@ class PointPillars(BaseModel):
         #                            beta_1=beta1,
         #                            beta_2=beta2)
 
-    def loss(self, results, inputs):
+    def loss(self, results, inputs, training=True):
         """
         Computes loss
         :param results: results of forward pass (scores, bboxes, dirs)
@@ -1027,6 +1027,9 @@ class Anchor3DHead(tf.keras.layers.Layer):
         idx_off = 0
         for i in range(len(target_bboxes)):
             for j, (neg_th, pos_th) in enumerate(self.iou_thr):
+                if target_bboxes[i].shape[0] == 0:
+                    continue
+
                 anchors_stride = tf.reshape(anchors[i][..., j, :, :],
                                             (-1, self.box_code_size))
 
