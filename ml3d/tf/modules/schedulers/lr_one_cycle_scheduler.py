@@ -2,13 +2,11 @@
 
 import numpy as np
 from functools import partial
-from ..optimizers import OptimWrapper
 
 
 class LRSchedulerStep(object):
 
-    def __init__(self, fai_optimizer: OptimWrapper, total_step, lr_phases,
-                 mom_phases):
+    def __init__(self, fai_optimizer, total_step, lr_phases, mom_phases):
         # if not isinstance(fai_optimizer, OptimWrapper):
         #     raise TypeError('{} is not a fastai OptimWrapper'.format(
         #         type(fai_optimizer).__name__))

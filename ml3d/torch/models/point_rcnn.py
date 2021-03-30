@@ -1,3 +1,30 @@
+#***************************************************************************************/
+#
+#    Based on PointRCNN Library (MIT license):
+#    https://github.com/sshaoshuai/PointRCNN
+#
+#    Copyright (c) 2019 Shaoshuai Shi
+
+#    Permission is hereby granted, free of charge, to any person obtaining a copy
+#    of this software and associated documentation files (the "Software"), to deal
+#    in the Software without restriction, including without limitation the rights
+#    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#    copies of the Software, and to permit persons to whom the Software is
+#    furnished to do so, subject to the following conditions:
+
+#    The above copyright notice and this permission notice shall be included in all
+#    copies or substantial portions of the Software.
+
+#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#    SOFTWARE.
+#
+#***************************************************************************************/
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -9,7 +36,7 @@ from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.focal_loss import FocalLoss, one_hot
 from ..modules.losses.cross_entropy import CrossEntropyLoss
-from . import Pointnet2MSG, PointnetSAModule, PointnetFPModule
+from ..modules.pointnet import Pointnet2MSG, PointnetSAModule, PointnetFPModule
 from ..utils.objdet_helper import xywhr_to_xyxyr, box3d_to_bev
 from open3d.ml.torch.ops import nms
 from ..utils.torch_utils import gen_CNN
@@ -25,6 +52,35 @@ from ...metrics import iou_3d
 
 
 class PointRCNN(BaseModel):
+    """Object detection model. 
+    Based on the PoinRCNN architecture 
+    https://github.com/sshaoshuai/PointRCNN.
+
+    The network is not trainable end-to-end, it requires pre-training of the RPN module, followed by training of the RCNN module. 
+    For this the mode must be set to 'RPN', with this, the network only outputs intermediate results. 
+    If the RPN module is trained, the mode can be set to 'RCNN' (default), with this, 
+    the second module can be trained and the output are the final predictions.
+
+    For inference use the 'RCNN' mode.
+
+    Args:
+        name (string): Name of model.
+            Default to "PointRCNN".
+        device (string): 'cuda' or 'cpu'.
+            Default to 'cuda'.
+        classes (string[]): List of classes used for object detection:
+            Default to ['Car'].
+        score_thres (float): Min confindence score for prediction.
+            Default to 0.3.
+        npoints (int): Number of processed input points.
+            Default to 16384.
+        rpn (dict): Config of RPN module.
+            Default to {}.
+        rcnn (dict): Config of RCNN module.
+            Default to {}.
+        mode (string): Execution mode, 'RPN', 'RCNN' or None.
+            Default to None.
+    """
 
     def __init__(self,
                  name="PointRCNN",
@@ -36,6 +92,7 @@ class PointRCNN(BaseModel):
                  rcnn={},
                  mode=None,
                  **kwargs):
+
         super().__init__(name=name, device=device, **kwargs)
         assert mode == "RPN" or mode == "RCNN" or mode == None
         self.mode = mode
@@ -714,8 +771,9 @@ class RCNN(nn.Module):
             for bbox in gt_boxes3d:
                 max_gt = max(max_gt, bbox.shape[0])
             pad_bboxes = torch.zeros((len(gt_boxes3d), max_gt, 7),
-                                     dtype=torch.float32)
-            for i in range(len(bboxes)):
+                                     dtype=torch.float32,
+                                     device=gt_boxes3d[0].device)
+            for i in range(len(gt_boxes3d)):
                 pad_bboxes[i, :gt_boxes3d[i].shape[0], :] = gt_boxes3d[i]
             gt_boxes3d = pad_bboxes
 
@@ -841,7 +899,9 @@ class ProposalLayer(nn.Module):
                  device,
                  nms_pre=9000,
                  nms_post=512,
-                 nms_thres=0.8,
+                 nms_thres=0.85,
+                 nms_post_val=None,
+                 nms_thres_val=None,
                  mean_size=[1.0],
                  loc_xz_fine=True,
                  loc_scope=3.0,
@@ -856,6 +916,8 @@ class ProposalLayer(nn.Module):
         self.nms_pre = nms_pre
         self.nms_post = nms_post
         self.nms_thres = nms_thres
+        self.nms_post_val = nms_post_val
+        self.nms_thres_val = nms_thres_val
         self.mean_size = torch.tensor(mean_size, device=device)
         self.loc_scope = loc_scope
         self.loc_bin_size = loc_bin_size
@@ -884,6 +946,14 @@ class ProposalLayer(nn.Module):
 
         proposals = proposals.view(batch_size, -1, 7)
 
+        nms_post = self.nms_post
+        nms_thres = self.nms_thres
+        if not self.training:
+            if self.nms_post_val is not None:
+                nms_post = self.nms_post_val
+            if self.nms_thres_val is not None:
+                nms_thres = self.nms_thres_val
+
         if self.post_process:
             proposals[...,
                       1] += proposals[...,
@@ -892,8 +962,8 @@ class ProposalLayer(nn.Module):
             _, sorted_idxs = torch.sort(scores, dim=1, descending=True)
 
             batch_size = scores.size(0)
-            ret_bbox3d = scores.new(batch_size, self.nms_post, 7).zero_()
-            ret_scores = scores.new(batch_size, self.nms_post).zero_()
+            ret_bbox3d = scores.new(batch_size, nms_post, 7).zero_()
+            ret_scores = scores.new(batch_size, nms_post).zero_()
             for k in range(batch_size):
                 scores_single = scores[k]
                 proposals_single = proposals[k]
@@ -911,7 +981,7 @@ class ProposalLayer(nn.Module):
             ret_scores = []
             for k in range(batch_size):
                 bev = xywhr_to_xyxyr(proposals[k, :, [0, 2, 3, 5, 6]])
-                keep_idx = nms(bev, rpn_scores[k], self.nms_thres)
+                keep_idx = nms(bev, rpn_scores[k], nms_thres)
 
                 ret_bbox3d.append(proposals[k, keep_idx])
                 ret_scores.append(rpn_scores[k, keep_idx])
@@ -925,14 +995,22 @@ class ProposalLayer(nn.Module):
         :param proposals: (N, 7)
         :param order: (N)
         """
+
+        nms_post = self.nms_post
+        nms_thres = self.nms_thres
+        if not self.training:
+            if self.nms_post_val is not None:
+                nms_post = self.nms_post_val
+            if self.nms_thres_val is not None:
+                nms_thres = self.nms_thres_val
+
         nms_range_list = [0, 40.0, 80.0]
         pre_top_n_list = [
             0,
             int(self.nms_pre * 0.7), self.nms_pre - int(self.nms_pre * 0.7)
         ]
         post_top_n_list = [
-            0,
-            int(self.nms_post * 0.7), self.nms_post - int(self.nms_post * 0.7)
+            0, int(nms_post * 0.7), nms_post - int(nms_post * 0.7)
         ]
 
         scores_single_list, proposals_single_list = [], []
@@ -971,7 +1049,7 @@ class ProposalLayer(nn.Module):
 
             # oriented nms
             bev = xywhr_to_xyxyr(cur_proposals[:, [0, 2, 3, 5, 6]])
-            keep_idx = nms(bev, cur_scores, self.nms_thres)
+            keep_idx = nms(bev, cur_scores, nms_thres)
 
             # Fetch post nms top k
             keep_idx = keep_idx[:post_top_n_list[i]]

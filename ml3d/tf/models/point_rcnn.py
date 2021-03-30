@@ -7,7 +7,7 @@ from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
-from . import Pointnet2MSG, PointnetSAModule, PointnetFPModule
+from ..modules.pointnet import Pointnet2MSG, PointnetSAModule, PointnetFPModule
 from ..utils.objdet_helper import xywhr_to_xyxyr, box3d_to_bev
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
@@ -15,7 +15,6 @@ from ...datasets.utils import DataProcessing, BEVBox3D
 from ...datasets.utils.operations import points_in_box, rotation_3d_in_axis
 
 from ...utils import MODEL
-from ..modules.optimizers import OptimWrapper
 from ..modules.schedulers import BNMomentumScheduler, OneCycleScheduler, CosineWarmupLR
 
 from ..utils.roipool3d import roipool3d_utils
@@ -23,6 +22,35 @@ from ...metrics import iou_3d
 
 
 class PointRCNN(BaseModel):
+    """Object detection model. 
+    Based on the PoinRCNN architecture 
+    https://github.com/sshaoshuai/PointRCNN.
+
+    The network is not trainable end-to-end, it requires pre-training of the RPN module, followed by training of the RCNN module. 
+    For this the mode must be set to 'RPN', with this, the network only outputs intermediate results. 
+    If the RPN module is trained, the mode can be set to 'RCNN' (default), with this, 
+    the second module can be trained and the output are the final predictions.
+
+    For inference use the 'RCNN' mode.
+
+    Args:
+        name (string): Name of model.
+            Default to "PointRCNN".
+        device (string): 'cuda' or 'cpu'.
+            Default to 'cuda'.
+        classes (string[]): List of classes used for object detection:
+            Default to ['Car'].
+        score_thres (float): Min confindence score for prediction.
+            Default to 0.3.
+        npoints (int): Number of processed input points.
+            Default to 16384.
+        rpn (dict): Config of RPN module.
+            Default to {}.
+        rcnn (dict): Config of RCNN module.
+            Default to {}.
+        mode (string): Execution mode, 'RPN' or 'RCNN'.
+            Default to 'RCNN'.
+    """
 
     def __init__(self,
                  name="PointRCNN",
@@ -31,10 +59,10 @@ class PointRCNN(BaseModel):
                  npoints=16384,
                  rpn={},
                  rcnn={},
-                 mode=None,
+                 mode="RCNN",
                  **kwargs):
         super().__init__(name=name, **kwargs)
-        assert mode == "RPN" or mode == "RCNN" or mode == None
+        assert mode == "RPN" or mode == "RCNN"
         self.mode = mode
 
         self.npoints = npoints
@@ -62,8 +90,10 @@ class PointRCNN(BaseModel):
             backbone_features = tf.stop_gradient(backbone_features)
 
         rpn_scores_raw = tf.stop_gradient(cls_score[:, :, 0])
-        rois, _ = self.rpn.proposal_layer(rpn_scores_raw, reg_score,
-                                          backbone_xyz)  # (B, M, 7)
+        rois, _ = self.rpn.proposal_layer(rpn_scores_raw,
+                                          reg_score,
+                                          backbone_xyz,
+                                          training=training)  # (B, M, 7)
         rois = tf.stop_gradient(rois)
 
         output = {"rois": rois, "cls": cls_score, "reg": reg_score}
@@ -94,50 +124,15 @@ class PointRCNN(BaseModel):
     def get_optimizer(self, cfg):
 
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
-        return tf.optimizers.Adam(learning_rate=cfg['lr'],
-                                  beta_1=beta1,
-                                  beta_2=beta2)
+        optimizer = tf.optimizers.Adam(learning_rate=cfg['lr'],
+                                       beta_1=beta1,
+                                       beta_2=beta2)
 
-        # def children(m):
-        #     return list(m.children())
+        lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
+                                         list(cfg.moms), cfg.div_factor,
+                                         cfg.pct_start)
 
-        # def num_children(m) -> int:
-        #     return len(children(m))
-
-        # flatten_model = lambda m: sum(map(flatten_model, m.children()), []
-        #                              ) if num_children(m) else [m]
-        # get_layer_groups = lambda m: [tf.keras.Sequential(*flatten_model(m))]
-
-        # optimizer_func = partial(tf.optimizers.Adam, betas=tuple(cfg.betas))
-        # optimizer = OptimWrapper.create(optimizer_func,
-        #                                 3e-3,
-        #                                 get_layer_groups(self),
-        #                                 wd=cfg.weight_decay,
-        #                                 true_wd=True,
-        #                                 bn_wd=True)
-
-        # # fix rpn: do this since we use customized optimizer.step
-        # if self.mode == "RCNN":
-        #     for param in self.rpn.parameters():
-        #         param.requires_grad = False
-
-        # def bnm_lmbd(cur_epoch):
-        #     cur_decay = 1
-        #     for decay_step in cfg.bn_decay_step_list:
-        #         if cur_epoch >= decay_step:
-        #             cur_decay = cur_decay * cfg.bn_decay
-        #     return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
-
-        # lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
-        #                                  list(cfg.moms), cfg.div_factor,
-        #                                  cfg.pct_start)
-
-        # # bnm_scheduler = BNMomentumScheduler(self.model, bnm_lmbd, last_epoch=last_epoch)
-
-        # # lr_warmup_scheduler = CosineWarmupLR(optimizer, T_max=cfg.warmup_epoch * len(train_loader),
-        # #                                               eta_min=cfg.warmup_min)
-
-        # return optimizer, lr_scheduler  #, bnm_scheduler
+        return optimizer, lr_scheduler
 
     def loss(self, results, inputs, training=True):
         if self.mode == "RPN":
@@ -259,8 +254,10 @@ class PointRCNN(BaseModel):
         rcnn_reg = tf.reshape(results['reg'],
                               (batch_size, -1, results['reg'].shape[1]))
 
-        pred_boxes3d, rcnn_cls = self.rcnn.proposal_layer(
-            rcnn_cls, rcnn_reg, roi_boxes3d)
+        pred_boxes3d, rcnn_cls = self.rcnn.proposal_layer(rcnn_cls,
+                                                          rcnn_reg,
+                                                          roi_boxes3d,
+                                                          training=False)
 
         inference_result = []
         for calib, bboxes, scores in zip(inputs[3], pred_boxes3d, rcnn_cls):
@@ -414,14 +411,8 @@ def get_reg_loss(pred_reg,
         x_res_norm_label = x_res_label / loc_bin_size
         z_res_norm_label = z_res_label / loc_bin_size
 
-        x_bin_onehot = tf.zeros((x_bin_label.shape[0], per_loc_bin_num),
-                                dtype=tf.float32)
-        x_bin_onehot.scatter_(
-            1, tf.cast(tf.reshape(x_bin_label, (-1, 1)), tf.int64), 1)
-        z_bin_onehot = tf.zeros((z_bin_label.shape[0], per_loc_bin_num),
-                                dtype=tf.float32)
-        z_bin_onehot.scatter_(
-            1, tf.cast(tf.reshape(z_bin_label, (-1, 1)), tf.int64), 1)
+        x_bin_onehot = tf.one_hot(x_bin_label, per_loc_bin_num)
+        z_bin_onehot = tf.one_hot(z_bin_label, per_loc_bin_num)
 
         loss_x_res = SmoothL1Loss()(tf.reduce_sum(pred_reg[:, x_res_l:x_res_r] *
                                                   x_bin_onehot,
@@ -478,14 +469,13 @@ def get_reg_loss(pred_reg,
         angle_per_class = (np.pi / 2) / num_head_bin
 
         ry_label = ry_label % (2 * np.pi)  # 0 ~ 2pi
-        opposite_flag = (ry_label > np.pi * 0.5) & (ry_label < np.pi * 1.5)
-        ry_label[opposite_flag] = (ry_label[opposite_flag] + np.pi) % (
-            2 * np.pi)  # (0 ~ pi/2, 3pi/2 ~ 2pi)
+        ry_label = tf.where((ry_label > np.pi * 0.5) & (ry_label < np.pi * 1.5),
+                            (ry_label + np.pi) % (2 * np.pi),
+                            ry_label)  # (0 ~ pi/2, 3pi/2 ~ 2pi)
         shift_angle = (ry_label + np.pi * 0.5) % (2 * np.pi)  # (0 ~ pi)
 
-        shift_angle = tf.clip_by_value(shift_angle - np.pi * 0.25,
-                                       min=1e-3,
-                                       max=np.pi * 0.5 - 1e-3)  # (0, pi/2)
+        shift_angle = tf.clip_by_value(shift_angle - np.pi * 0.25, 1e-3,
+                                       np.pi * 0.5 - 1e-3)  # (0, pi/2)
 
         # bin center is (5, 10, 15, ..., 85)
         ry_bin_label = tf.cast(tf.floor(shift_angle / angle_per_class),
@@ -884,8 +874,6 @@ class RCNN(tf.keras.layers.Layer):
 
         cls_label = tf.cast(results['cls_label'], tf.float32)
         reg_valid_mask = results['reg_valid_mask']
-        roi_boxes3d = results['roi_boxes3d']
-        roi_size = roi_boxes3d[:, 3:6]
         gt_boxes3d_ct = results['gt_of_rois']
         pts_input = results['pts_input']
 
@@ -944,7 +932,9 @@ class ProposalLayer(tf.keras.layers.Layer):
     def __init__(self,
                  nms_pre=9000,
                  nms_post=512,
-                 nms_thres=0.8,
+                 nms_thres=0.85,
+                 nms_post_val=None,
+                 nms_thres_val=None,
                  mean_size=[1.0],
                  loc_xz_fine=True,
                  loc_scope=3.0,
@@ -959,6 +949,8 @@ class ProposalLayer(tf.keras.layers.Layer):
         self.nms_pre = nms_pre
         self.nms_post = nms_post
         self.nms_thres = nms_thres
+        self.nms_post_val = nms_post_val
+        self.nms_thres_val = nms_thres_val
         self.mean_size = tf.constant(mean_size)
         self.loc_scope = loc_scope
         self.loc_bin_size = loc_bin_size
@@ -970,7 +962,7 @@ class ProposalLayer(tf.keras.layers.Layer):
         self.loc_y_bin_size = loc_y_bin_size
         self.post_process = post_process
 
-    def call(self, rpn_scores, rpn_reg, xyz):
+    def call(self, rpn_scores, rpn_reg, xyz, training=True):
         batch_size = xyz.shape[0]
         proposals = decode_bbox_target(
             tf.reshape(xyz, (-1, xyz.shape[-1])),
@@ -986,6 +978,14 @@ class ProposalLayer(tf.keras.layers.Layer):
             loc_y_bin_size=self.loc_y_bin_size)  # (N, 7)
 
         proposals = tf.reshape(proposals, (batch_size, -1, 7))
+
+        nms_post = self.nms_post
+        nms_thres = self.nms_thres
+        if not training:
+            if self.nms_post_val is not None:
+                nms_post = self.nms_post_val
+            if self.nms_thres_val is not None:
+                nms_thres = self.nms_thres_val
 
         if self.post_process:
             proposals = tf.concat([
@@ -1005,21 +1005,21 @@ class ProposalLayer(tf.keras.layers.Layer):
                 order_single = sorted_idxs[k]
 
                 scores_single, proposals_single = self.distance_based_proposal(
-                    scores_single, proposals_single, order_single)
+                    scores_single, proposals_single, order_single, training)
 
                 proposals_tot = proposals_single.shape[0]
+
                 ret_bbox3d.append(
                     tf.concat([
                         proposals_single,
-                        tf.zeros((self.nms_post - proposals_tot, 7))
+                        tf.zeros((nms_post - proposals_tot, 7))
                     ],
                               axis=0))
                 ret_scores.append(
-                    tf.concat([
-                        scores_single,
-                        tf.zeros((self.nms_post - proposals_tot,))
-                    ],
-                              axis=0))
+                    tf.concat(
+                        [scores_single,
+                         tf.zeros((nms_post - proposals_tot,))],
+                        axis=0))
             ret_bbox3d = tf.stack(ret_bbox3d)
             ret_scores = tf.stack(ret_scores)
         else:
@@ -1030,28 +1030,36 @@ class ProposalLayer(tf.keras.layers.Layer):
                 bev = xywhr_to_xyxyr(
                     tf.stack([proposals[k, :, i] for i in [0, 2, 3, 5, 6]],
                              axis=-1))
-                keep_idx = nms(bev, rpn_scores[k, :, 0], self.nms_thres)
+                keep_idx = nms(bev, rpn_scores[k, :, 0], nms_thres)
 
                 ret_bbox3d.append(tf.gather(proposals[k], keep_idx))
                 ret_scores.append(tf.gather(rpn_scores[k], keep_idx))
 
         return ret_bbox3d, ret_scores
 
-    def distance_based_proposal(self, scores, proposals, order):
+    def distance_based_proposal(self, scores, proposals, order, training=True):
         """
          propose rois in two area based on the distance
         :param scores: (N)
         :param proposals: (N, 7)
         :param order: (N)
         """
+
+        nms_post = self.nms_post
+        nms_thres = self.nms_thres
+        if not training:
+            if self.nms_post_val is not None:
+                nms_post = self.nms_post_val
+            if self.nms_thres_val is not None:
+                nms_thres = self.nms_thres_val
+
         nms_range_list = [0, 40.0, 80.0]
         pre_top_n_list = [
             0,
             int(self.nms_pre * 0.7), self.nms_pre - int(self.nms_pre * 0.7)
         ]
         post_top_n_list = [
-            0,
-            int(self.nms_post * 0.7), self.nms_post - int(self.nms_post * 0.7)
+            0, int(nms_post * 0.7), nms_post - int(nms_post * 0.7)
         ]
 
         scores_single_list, proposals_single_list = [], []
@@ -1091,7 +1099,7 @@ class ProposalLayer(tf.keras.layers.Layer):
             # oriented nms
             bev = xywhr_to_xyxyr(
                 tf.gather(cur_proposals, [0, 2, 3, 5, 6], axis=1))
-            keep_idx = nms(bev, cur_scores, self.nms_thres)
+            keep_idx = nms(bev, cur_scores, nms_thres)
 
             # Fetch post nms top k
             keep_idx = keep_idx[:post_top_n_list[i]]
