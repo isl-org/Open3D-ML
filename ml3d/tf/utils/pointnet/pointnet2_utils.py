@@ -4,7 +4,8 @@ from typing import Tuple
 
 import open3d
 
-import open3d.ml.tf.ops as ml_ops
+if open3d.core.cuda.device_count() > 0:
+    import open3d.ml.tf.ops as ml_ops
 
 
 def furthest_point_sample(xyz, npoint):
