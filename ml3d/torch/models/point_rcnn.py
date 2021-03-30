@@ -36,16 +36,16 @@ from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.focal_loss import FocalLoss, one_hot
 from ..modules.losses.cross_entropy import CrossEntropyLoss
-from ..modules.pointnet import Pointnet2MSG, PointnetSAModule, PointnetFPModule
-from ..utils.objdet_helper import xywhr_to_xyxyr, box3d_to_bev
+from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
+from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.torch.ops import nms
 from ..utils.torch_utils import gen_CNN
 from ...datasets.utils import DataProcessing, BEVBox3D
-from ...datasets.utils.operations import points_in_box, rotation_3d_in_axis
+from ...datasets.utils.operations import points_in_box
 
 from ...utils import MODEL
 from ..modules.optimizers import OptimWrapper
-from ..modules.schedulers import BNMomentumScheduler, OneCycleScheduler, CosineWarmupLR
+from ..modules.schedulers import OneCycleScheduler
 
 from ..utils.roipool3d import roipool3d_utils
 from ...metrics import iou_3d
@@ -78,8 +78,8 @@ class PointRCNN(BaseModel):
             Default to {}.
         rcnn (dict): Config of RCNN module.
             Default to {}.
-        mode (string): Execution mode, 'RPN', 'RCNN' or None.
-            Default to None.
+        mode (string): Execution mode, 'RPN' or 'RCNN'.
+            Default to 'RCNN'.
     """
 
     def __init__(self,
@@ -90,11 +90,11 @@ class PointRCNN(BaseModel):
                  npoints=16384,
                  rpn={},
                  rcnn={},
-                 mode=None,
+                 mode="RCNN",
                  **kwargs):
 
         super().__init__(name=name, device=device, **kwargs)
-        assert mode == "RPN" or mode == "RCNN" or mode == None
+        assert mode == "RPN" or mode == "RCNN"
         self.mode = mode
 
         self.npoints = npoints
@@ -119,8 +119,8 @@ class PointRCNN(BaseModel):
 
             with torch.no_grad():
                 rpn_scores_raw = cls_score[:, :, 0]
-                rois, roi_scores_raw = self.rpn.proposal_layer(
-                    rpn_scores_raw, reg_score, backbone_xyz)  # (B, M, 7)
+                rois, _ = self.rpn.proposal_layer(rpn_scores_raw, reg_score,
+                                                  backbone_xyz)  # (B, M, 7)
 
             output = {"rois": rois, "cls": cls_score, "reg": reg_score}
 
@@ -161,17 +161,16 @@ class PointRCNN(BaseModel):
             for param in self.rpn.parameters():
                 param.requires_grad = False
 
-        def bnm_lmbd(cur_epoch):
-            cur_decay = 1
-            for decay_step in cfg.bn_decay_step_list:
-                if cur_epoch >= decay_step:
-                    cur_decay = cur_decay * cfg.bn_decay
-            return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
-
         lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
                                          list(cfg.moms), cfg.div_factor,
                                          cfg.pct_start)
 
+        # def bnm_lmbd(cur_epoch):
+        #     cur_decay = 1
+        #     for decay_step in cfg.bn_decay_step_list:
+        #         if cur_epoch >= decay_step:
+        #             cur_decay = cur_decay * cfg.bn_decay
+        #     return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
         # bnm_scheduler = BNMomentumScheduler(self.model, bnm_lmbd, last_epoch=last_epoch)
 
         # lr_warmup_scheduler = CosineWarmupLR(optimizer, T_max=cfg.warmup_epoch * len(train_loader),
@@ -280,8 +279,7 @@ class PointRCNN(BaseModel):
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes)
-                t_data['labels'] = labels
-
+            t_data['labels'] = labels
             t_data['bbox_objs'] = data['bbox_objs']
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
@@ -648,7 +646,7 @@ class RPN(nn.Module):
             loss_size = 3 * loss_size
             rpn_loss_reg = loss_loc + loss_angle + loss_size
         else:
-            loss_loc = loss_angle = loss_size = rpn_loss_reg = rpn_loss_cls * 0
+            rpn_loss_reg = rpn_loss_cls * 0
 
         return {
             "cls": rpn_loss_cls * self.loss_weight[0],
@@ -858,10 +856,9 @@ class RCNN(nn.Module):
         fg_mask = (reg_valid_mask > 0)
         fg_sum = fg_mask.long().sum().item()
         if fg_sum != 0:
-            all_anchor_size = roi_size
             anchor_size = self.proposal_layer.mean_size
 
-            loss_loc, loss_angle, loss_size, reg_loss_dict = \
+            loss_loc, loss_angle, loss_size, _ = \
                 get_reg_loss(rcnn_reg.view(batch_size, -1)[fg_mask],
                                         gt_boxes3d_ct.view(batch_size, 7)[fg_mask],
                                         loc_scope=self.proposal_layer.loc_scope,
@@ -875,7 +872,7 @@ class RCNN(nn.Module):
             loss_size = 3 * loss_size  # consistent with old codes
             rcnn_loss_reg = loss_loc + loss_angle + loss_size
         else:
-            loss_loc = loss_angle = loss_size = rcnn_loss_reg = rcnn_loss_cls * 0
+            lrcnn_loss_reg = rcnn_loss_cls * 0
 
         return {"cls": rcnn_loss_cls, "reg": rcnn_loss_reg}
 

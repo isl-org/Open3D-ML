@@ -1,6 +1,5 @@
 import tensorflow as tf
 from tensorflow.python.framework import ops
-from typing import Tuple
 
 import open3d
 

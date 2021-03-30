@@ -1,21 +1,20 @@
 import tensorflow as tf
 
 import numpy as np
-from functools import partial
 
 from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
-from ..modules.pointnet import Pointnet2MSG, PointnetSAModule, PointnetFPModule
-from ..utils.objdet_helper import xywhr_to_xyxyr, box3d_to_bev
+from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
+from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
 from ...datasets.utils import DataProcessing, BEVBox3D
-from ...datasets.utils.operations import points_in_box, rotation_3d_in_axis
+from ...datasets.utils.operations import points_in_box
 
 from ...utils import MODEL
-from ..modules.schedulers import BNMomentumScheduler, OneCycleScheduler, CosineWarmupLR
+from ..modules.schedulers import OneCycleScheduler
 
 from ..utils.roipool3d import roipool3d_utils
 from ...metrics import iou_3d
@@ -100,10 +99,10 @@ class PointRCNN(BaseModel):
 
         if self.mode == "RCNN":
             rpn_scores_norm = tf.sigmoid(rpn_scores_raw)
+
             seg_mask = tf.cast((rpn_scores_norm > self.score_thres), tf.float32)
             pts_depth = tf.norm(backbone_xyz, ord=2, axis=2)
 
-            rpn_scores_norm = tf.stop_gradient(rpn_scores_norm)
             seg_mask = tf.stop_gradient(seg_mask)
             pts_depth = tf.stop_gradient(pts_depth)
 
@@ -234,8 +233,7 @@ class PointRCNN(BaseModel):
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes)
-                t_data['labels'] = labels
-
+            t_data['labels'] = labels
             t_data['bbox_objs'] = data['bbox_objs']
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
@@ -314,8 +312,8 @@ class PointRCNN(BaseModel):
                     max_gt = max(max_gt, bbox.shape[0])
                 pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
                                       dtype=np.float32)
-                for i in range(len(bboxes)):
-                    pad_bboxes[i, :bboxes[i].shape[0], :] = bboxes[i]
+                for j in range(len(bboxes)):
+                    pad_bboxes[i, :bboxes[j].shape[0], :] = bboxes[j]
                 bboxes = tf.constant(pad_bboxes)
 
                 labels = tf.stack([

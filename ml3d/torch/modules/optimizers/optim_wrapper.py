@@ -25,7 +25,6 @@
 #
 #***************************************************************************************/
 
-import torch
 from torch import nn
 
 from collections import Iterable
@@ -98,11 +97,6 @@ class OptimWrapper():
     def new(self, layer_groups):
         "Create a new `OptimWrapper` from `self` with another `layer_groups` but the same hyper-parameters."
         opt_func = getattr(self, 'opt_func', self.opt.__class__)
-        split_groups = split_bn_bias(layer_groups)
-        opt = opt_func([{
-            'params': trainable_params(l),
-            'lr': 0
-        } for l in split_groups])
         return self.create(opt_func,
                            self.lr,
                            layer_groups,
