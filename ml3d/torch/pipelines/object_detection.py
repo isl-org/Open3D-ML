@@ -297,9 +297,9 @@ class ObjectDetection(BasePipeline):
                 for l, v in loss.items():
                     if not l in self.losses:
                         self.losses[l] = []
-                    self.losses[l].append(v.cpu().numpy())
-                    desc += " %s: %.03f" % (l, v.cpu().numpy())
-                desc += " > loss: %.03f" % loss_sum.cpu().numpy()
+                    self.losses[l].append(v.cpu().detach().numpy())
+                    desc += " %s: %.03f" % (l, v.cpu().detach().numpy())
+                desc += " > loss: %.03f" % loss_sum.cpu().detach().numpy()
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
