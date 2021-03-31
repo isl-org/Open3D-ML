@@ -28,17 +28,21 @@ class SemSegMetric(object):
             -------
             confusion matrix of this batch
         """
-        num_classes = scores.size(-2)
-        predictions = torch.max(scores, dim=-2).indices.cpu().data.numpy()
-        labels = labels.cpu().data.numpy()
+        N = scores.size(-1)
+        C = scores.size(-2)
+        y_pred = scores.detach().cpu().numpy().reshape(-1, N)  # (C, N)
+        y_pred = np.argmax(y_pred, axis=0)  # (N,)
 
-        conf_m = np.zeros((num_classes, num_classes), dtype=np.int32)
+        y_true = labels.detach().cpu().numpy().reshape(-1,)
 
-        for label in range(num_classes):
-            for pred in range(num_classes):
-                conf_m[label][pred] = np.sum(
-                    np.logical_and(labels == label, predictions == pred))
-        return conf_m
+        y = np.bincount(C * y_true + y_pred)
+
+        if len(y) < C * C:
+            y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
+
+        y = y.reshape(C, C)
+
+        return y
 
     def acc(self, scores, labels):
         r"""
