@@ -1,14 +1,12 @@
-import open3d as o3d
-import numpy as np
-import os, argparse, pickle, sys
-from os.path import exists, join, isfile, dirname, abspath, split
+import os
+from os.path import join, isfile
 from pathlib import Path
 from glob import glob
 import logging
-import yaml
+import numpy as np
 
 from .base_dataset import BaseDataset
-from ..utils import Config, make_dir, DATASET
+from ..utils import DATASET
 from .utils import BEVBox3D
 
 logging.basicConfig(
@@ -45,6 +43,8 @@ class Scannet(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
+        # [scenes|frames] Use point clouds from entire scenes or individual frames
+        self.portion = cfg.portion
         self.num_classes = 18
 
         self.classes = [
@@ -83,13 +83,27 @@ class Scannet(BaseDataset):
         self.val_scenes = []
         self.test_scenes = []
 
-        for scene in available_scenes:
-            if scene in train_files:
-                self.train_scenes.append(join(self.dataset_path, scene))
-            elif scene in val_files:
-                self.val_scenes.append(join(self.dataset_path, scene))
-            elif scene in test_files:
-                self.test_scenes.append(join(self.dataset_path, scene))
+        if self.portion == 'scenes':
+            for scene in available_scenes:
+                if scene in train_files:
+                    self.train_scenes.append(join(self.dataset_path, scene))
+                elif scene in val_files:
+                    self.val_scenes.append(join(self.dataset_path, scene))
+                elif scene in test_files:
+                    self.test_scenes.append(join(self.dataset_path, scene))
+        elif self.portion == 'frames':
+            for scene in available_scenes:
+                vert_files = glob(join(self.dataset_path,
+                                       scene + '_*_vert.npy'))
+                if scene in train_files:
+                    self.train_scenes.extend(
+                        framefile[:-9] for framefile in vert_files)
+                elif scene in val_files:
+                    self.val_scenes.extend(
+                        framefile[:-9] for framefile in vert_files)
+                elif scene in test_files:
+                    self.test_scenes.extend(
+                        framefile[:-9] for framefile in vert_files)
 
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
@@ -107,9 +121,14 @@ class Scannet(BaseDataset):
         return data
 
     def read_label(self, scene):
-        instance_mask = np.load(scene + '_ins_label.npy')
-        semantic_mask = np.load(scene + '_sem_label.npy')
-        bboxes = np.load(scene + '_bbox.npy')
+        instance_mask = np.load(scene + '_ins_label.npy') if isfile(
+            scene + '_ins_label.npy') else np.array([], dtype=np.int32)
+        semantic_mask = np.load(scene + '_sem_label.npy') if isfile(
+            scene + '_ins_label.npy') else np.array([], dtype=np.int32)
+        bboxes = np.load(scene +
+                         '_bbox.npy') if isfile(scene +
+                                                '_ins_label.npy') else np.array(
+                                                    [])
 
         ## For filtering semantic labels to have same classes as object detection.
         # for i in range(semantic_mask.shape[0]):
