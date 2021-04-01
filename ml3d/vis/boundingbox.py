@@ -25,9 +25,9 @@ class BoundingBox3D:
         and must be normalized and mutually orthogonal.
 
         center: (x, y, z) that defines the center of the box
-        front: normalized (i, j, k) that defines the front direction of the box
-        up: normalized (i, j, k) that defines the up direction of the box
-        left: normalized (i, j, k) that defines the left direction of the box
+        front: normalized (i, j, k) that defines the front (Y) direction of the box
+        up: normalized (i, j, k) that defines the up (Z) direction of the box
+        left: normalized (i, j, k) that defines the left (X) direction of the box
         size: (width, height, depth) that defines the size of the box, as
             measured from edge to edge
         label_class: integer specifying the classification label. If an LUT is
@@ -75,6 +75,34 @@ class BoundingBox3D:
             s = s + ", meta=" + str(self.meta)
         s = s + ")"
         return s
+
+    def transform(self, transform):
+        """
+        Transform BoundingBox3D into another reference frame
+        Args:
+            transform ((4,4) array): Homogenous transform to apply on the right.
+        Returns:
+            self: Transformed BoundingBox3D
+        """
+        self.center = self.center @ transform[:3, :3] + transform[3, :3]
+        self.front = self.front @ transform[:3, :3]
+        self.up = self.up @ transform[:3, :3]
+        self.left = self.left @ transform[:3, :3]
+
+        return self
+
+    def inside(self, points):
+        """
+        Return indices of points inside the BoundingBox3D
+        Args:
+            points ((N,3) array): list of points
+        Returns: Indices of `points` inside the BoundingBox3D
+        """
+        obb = o3d.geometry.OrientedBoundingBox(
+            self.center,
+            np.vstack((self.left, self.front, self.up)).T, self.size)
+        return obb.get_point_indices_within_bounding_box(
+            o3d.utility.Vector3dVector(points))
 
     @staticmethod
     def create_lines(boxes, lut=None):

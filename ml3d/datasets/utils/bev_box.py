@@ -1,9 +1,11 @@
 from ...vis import BoundingBox3D
 import numpy as np
+from copy import copy
 
 
 class BEVBox3D(BoundingBox3D):
-    """Class that defines a special bounding box for object detection, with only one rotation axis (yaw)."""
+    """Class that defines a special bounding box for object detection, with only
+    one rotation axis (yaw)."""
 
     def __init__(self,
                  center,
@@ -26,7 +28,9 @@ class BEVBox3D(BoundingBox3D):
             of the box.
         confidence: confidence level of the box
         world_cam: world to camera transformation (shape = [4,4])
+            x_cam = x_world @ world_cam
         cam_img: camera to image transformation (shape = [4,4])
+            x_img = x_cam @ cam_img
         """
 
         self.yaw = yaw
@@ -45,12 +49,23 @@ class BEVBox3D(BoundingBox3D):
 
         self.points_inside_box = np.array([])
         self.level = self.get_difficulty()
-        self.dis_to_cam = np.linalg.norm(self.center)
+        self.dis_to_cam = np.linalg.norm(self.center @ self.world_cam[:3, :3] +
+                                         self.world_cam[3, :3])
+
+    def __repr__(self):
+        s = str(self.identifier) + " (class=" + str(
+            self.label_class) + ", conf=" + str(self.confidence)
+        if self.meta is not None:
+            s = s + ", meta=" + str(self.meta)
+        s = s + ")" + f" yaw={np.rad2deg(self.yaw):0.2f} size=" + str(self.size)
+        return s
 
     def generate_corners3d(self):
         """
-        generate corners3d representation for this object
-        :return corners_3d: (8, 3) corners of box3d in camera coord
+        Generate corners3d representation for this object.
+
+        Returns:
+            corners_3d: (8, 3) corners of box3d in camera coord
         """
         w, h, l = self.size
         x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
@@ -68,8 +83,10 @@ class BEVBox3D(BoundingBox3D):
 
     def to_xyzwhlr(self):
         """
-        Returns box in the common 7-sized vector representation.
-        :return box: (7,)
+        Returns box in the common (KITTI) 7-sized vector representation.
+
+        Returns:
+            box: (7,)
         """
         bbox = np.zeros((7,))
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
@@ -77,10 +94,31 @@ class BEVBox3D(BoundingBox3D):
         bbox[6] = self.yaw
         return bbox
 
+    def to_camera_bev(self):
+        """
+        Transforms box into camera space as a BEV box. This is an approximation
+        since the exact box is no longer parallel to the new XY plane.
+        new yaw = mean(angle between box X and camera X, angle between box Y and
+                camera Y)
+
+        Returns:
+            transformed BEVBox3D
+        """
+        if self.world_cam is None or np.allclose(self.world_cam, np.eye(4)):
+            return self
+        bb_cam = copy(self)
+        bb_cam.yaw = 0.5 * (np.arccos(self.left @ self.world_cam[:3, 0]) +
+                            np.arccos(self.front @ self.world_cam[:3, 1]))
+        bb_cam.transform(self.world_cam)
+        bb_cam.world_cam = None
+        return bb_cam
+
     def to_camera(self):
         """
         Transforms box into camera space.
-        :return transformed box: (7,)
+
+        Returns:
+            transformed box in KITTI representation: (7,)
         """
         if self.world_cam is None:
             return self.to_xyzwhlr()[[1, 2, 0, 4, 5, 3, 6]]
@@ -95,7 +133,9 @@ class BEVBox3D(BoundingBox3D):
     def to_img(self):
         """
         Transforms box into 2d box.
-        :return transformed box: (4,)
+
+        Returns:
+            transformed box [center_x, center_y, size_x, size_y]: (4,)
         """
         if self.cam_img is None:
             return None
@@ -114,6 +154,23 @@ class BEVBox3D(BoundingBox3D):
         center = minxy + size / 2
 
         return np.concatenate([center, size])
+
+    def is_visible(self, image_shape):
+        """
+        Test if bounding box center is visible in camera. It may still be
+        occluded by another object.
+
+        Args:
+            image_shape: (width, height) of the image
+        """
+        bb_img = self.to_img()
+        visible = (0 <= bb_img[0] < image_shape[0] and
+                   0 <= bb_img[1] < image_shape[1])
+        if self.world_cam is None:
+            return visible
+        z_cam = (np.array([*self.center, 1.0]) @ self.world_cam)[2]
+        in_front = z_cam > 0.1  # at least 0.1m in front of the camera
+        return visible and in_front
 
     def get_difficulty(self):
         """
