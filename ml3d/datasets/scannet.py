@@ -146,7 +146,7 @@ class Scannet(BaseDataset):
             center = box[:3]
             size = [box[3], box[5], box[4]]  # w, h, l
 
-            yaw = 0.0
+            yaw = box[-2] if len(box) == 8 else 0.0  # yaw is present in frames
             objects.append(Object3d(name, center, size, yaw))
 
         return objects, semantic_mask, instance_mask

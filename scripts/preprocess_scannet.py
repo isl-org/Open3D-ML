@@ -488,9 +488,11 @@ class ScannetProcess():
                 n_bbox += len(frame_instance_bboxes)
                 n_frames += 1
                 frame_pcd = f"{scan}_{frame_id:06}"
+                np_bboxes = np.vstack(
+                    list(box.to_xyzwlhyc() for box in frame_instance_bboxes))
                 self._runner.submit(
                     np.save, f'{join(self.out_frame_path, frame_pcd)}_bbox.npy',
-                    frame_instance_bboxes)
+                    np_bboxes)
                 self._runner.submit(
                     np.save, f'{join(self.out_frame_path, frame_pcd)}_vert.npy',
                     mesh_vertices)

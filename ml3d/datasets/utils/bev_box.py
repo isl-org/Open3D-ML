@@ -94,6 +94,15 @@ class BEVBox3D(BoundingBox3D):
         bbox[6] = self.yaw
         return bbox
 
+    def to_xyzwlhyc(self):
+        """
+        Convert box to [center (xyz), size (dx, dy, dz), yaw (rad),
+        label_class] representation for caching in a npy file
+
+        Returns: (numpy array (8,))
+        """
+        return np.hstack((self.center, self.size, self.yaw, self.label_class))
+
     def to_camera_bev(self):
         """
         Transforms box into camera space as a BEV box. This is an approximation
