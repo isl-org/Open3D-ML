@@ -124,6 +124,11 @@ def main():
         'pipeline': pprint.pformat(cfg_dict_pipeline, indent=2)
     }
 
+#    split = dataset.get_split('train')
+#     for idx in range(len(split)):
+#         data = split.get_data(idx)
+#         assert data['point'].size>0, f"Empty pcd for {split.path_list[idx]}"
+#         assert any(bbox.numel()>0 for bbox in data['bounding_boxes']), f"Missing bboxes: {data['bounding_boxes']} for {split.path_list[idx]}"
     if args.split == 'test':
         pipeline.run_test()
     else:

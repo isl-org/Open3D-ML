@@ -49,8 +49,11 @@ class BEVBox3D(BoundingBox3D):
 
         self.points_inside_box = np.array([])
         self.level = self.get_difficulty()
-        self.dis_to_cam = np.linalg.norm(self.center @ self.world_cam[:3, :3] +
+        if self.world_cam:
+            self.dis_to_cam = np.linalg.norm(self.center @ self.world_cam[:3, :3] +
                                          self.world_cam[3, :3])
+        else:
+            self.dis_to_cam = np.linalg.norm(self.center)
 
     def __repr__(self):
         s = str(self.identifier) + " (class=" + str(
@@ -93,6 +96,15 @@ class BEVBox3D(BoundingBox3D):
         bbox[3:6] = np.array(self.size)[[0, 2, 1]]
         bbox[6] = self.yaw
         return bbox
+
+    def to_xyzwlhyc(self):
+        """
+        Convert box to [center (xyz), size (dx, dy, dz), yaw (rad),
+        label_class] representation for caching in a npy file
+
+        Returns: (numpy array (8,))
+        """
+        return np.hstack((self.center, self.size, self.yaw, self.label_class))
 
     def to_camera_bev(self):
         """
