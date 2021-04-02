@@ -1,8 +1,10 @@
 """ Preprocess ScanNet dataset and cache in Numpy data files """
 import os
+import sys
 import struct
 from pathlib import Path
-from os.path import join
+from os.path import join, isfile
+import multiprocessing
 import concurrent.futures
 import argparse
 import json
@@ -275,7 +277,7 @@ class ScannetProcess():
                     self.process_scene(scan)
                     log.info("Pending tasks: %d",
                              self._runner._work_queue.qsize())
-                except FileNotFoundError:
+                except (FileNotFoundError, Exception):
                     errmsg = f'{scan}: ' + traceback.format_exc()
                     log.warning(errmsg)
                     errors.append(errmsg)
@@ -285,11 +287,11 @@ class ScannetProcess():
                     errfile.write("Processing failed:\n" + "\n".join(errors))
 
     def process_scene(self, scan):
-        # if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
-        #         isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
-        #         isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
-        #         isfile(f'{join(self.out_path, scan)}_bbox.npy')):
-        #     return
+        if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
+                isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
+                isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
+                isfile(f'{join(self.out_path, scan)}_bbox.npy')):
+            return
 
         log.info("Processing " + scan)
         in_path = join(self.dataset_path, scan)
@@ -432,8 +434,8 @@ class ScannetProcess():
         """
         # Assume color ref == camera ref
         # label_to_depth = color_to_depth @ np.linalg.inv( axis_align_matrix @ camera_to_world)
-        device = o3d.core.Device(
-            'cuda:0' if o3d.core.cuda.is_available() else 'cpu:0')
+        device = o3d.core.Device('cpu:0')
+        # 'cuda:0' if o3d.core.cuda.is_available() else 'cpu:0')
         frame_id = 0
         n_frames = 0  # frames with visible bboxes
         n_bbox = 0  # visible bboxes
@@ -523,6 +525,8 @@ class ScannetProcess():
         # Load axis alignment matrix
         lines = open(meta_file).readlines()
         read_lines = 0
+        axis_align_matrix = None
+        color_to_depth = None
         for line in lines:
             if read_lines == 2:
                 break
@@ -536,6 +540,12 @@ class ScannetProcess():
                     line.strip('colorToDepthExtrinsics = '), count=16,
                     sep=' ').reshape((4, 4))
                 read_lines += 1
+        if axis_align_matrix is None:
+            raise RuntimeError("axis_align_matrix could not be read from " +
+                               meta_file)
+        if color_to_depth is None:
+            log.warning("color_to_depth could not be read from " + meta_file)
+            color_to_depth = np.eye(4, dtype=np.float32)
         pts = np.ones((mesh_vertices.shape[0], 4))
         pts[:, 0:3] = mesh_vertices[:, 0:3]
         pts = np.dot(pts, axis_align_matrix.transpose())
@@ -715,12 +725,14 @@ class ScannetProcess():
 
 if __name__ == '__main__':
 
+    if sys.platform.startswith('linux'):
+        multiprocessing.set_start_method('forkserver')
     log.basicConfig(level=log.INFO)
     args = parse_args()
     if args.out_path is None:
         args.out_path = args.dataset_path
 
-    max_processes = 3
+    max_processes = 64
     if not args.only_stats:
         with concurrent.futures.ProcessPoolExecutor(
                 max_workers=max_processes) as executor:

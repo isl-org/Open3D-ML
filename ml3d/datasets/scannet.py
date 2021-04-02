@@ -127,18 +127,17 @@ class Scannet(BaseDataset):
             scene + '_ins_label.npy') else np.array([], dtype=np.int32)
         bboxes = np.load(scene +
                          '_bbox.npy') if isfile(scene +
-                                                '_ins_label.npy') else np.array(
-                                                    [])
+                                                '_bbox.npy') else np.array([])
 
         ## For filtering semantic labels to have same classes as object detection.
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)
 
-        remapper = np.ones(150) * (-100)
-        for i, x in enumerate(self.semantic_ids):
-            remapper[x] = i
-
-        semantic_mask = remapper[semantic_mask]
+        if semantic_mask.size > 0:
+            remapper = np.ones(150) * (-100)
+            for i, x in enumerate(self.semantic_ids):
+                remapper[x] = i
+            semantic_mask = remapper[semantic_mask]
 
         objects = []
         for box in bboxes:
