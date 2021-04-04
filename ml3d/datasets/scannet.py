@@ -94,7 +94,7 @@ class Scannet(BaseDataset):
         elif self.portion == 'frames':
             for scene in available_scenes:
                 vert_files = glob(join(self.dataset_path,
-                                       scene + '_*_vert.npy'))
+                                       scene + '_*_vert.np?'))
                 if scene in train_files:
                     self.train_scenes.extend(
                         framefile[:-9] for framefile in vert_files)
@@ -115,10 +115,11 @@ class Scannet(BaseDataset):
 
     @staticmethod
     def read_lidar(path):
-        assert Path(path).exists()
-        data = np.load(path)
-
-        return data
+        if Path(path + '.npz').exists():
+            with np.load(path + '.npz') as npzfile:
+                return npzfile['point']
+        else:  # npy
+            return np.load(path + 'npy')
 
     def read_label(self, scene):
         instance_mask = np.load(scene + '_ins_label.npy') if isfile(
@@ -189,7 +190,7 @@ class ScannetSplit():
     def get_data(self, idx):
         scene = self.path_list[idx]
 
-        pc = self.dataset.read_lidar(scene + '_vert.npy')
+        pc = self.dataset.read_lidar(scene + '_vert')
         feat = pc[:, 3:]
         pc = pc[:, :3]
 
