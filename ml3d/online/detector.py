@@ -376,7 +376,7 @@ class DetectorPipeline(object):
     def launch(self):
         """ Launch frame pipeline thread and start GUI """
         threading.Thread(name='FramePipeline', target=self._run).start()
-        gui.Application.instance.run()
+        gui.Application.instance.run()  # Returns when last window is closed
 
     def _run(self):
         """ Run pipeline """

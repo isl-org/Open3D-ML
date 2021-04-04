@@ -496,8 +496,9 @@ class ScannetProcess():
                     np.save, f'{join(self.out_frame_path, frame_pcd)}_bbox.npy',
                     np_bboxes)
                 self._runner.submit(
-                    np.save, f'{join(self.out_frame_path, frame_pcd)}_vert.npy',
-                    mesh_vertices)
+                    np.savez_compressed,
+                    f'{join(self.out_frame_path, frame_pcd)}_vert.npz',
+                    point=mesh_vertices)
             pcd_future[0] = pcd_future[1]
             label_to_depth[0] = label_to_depth[1]
             frame_id += self.frame_skip
@@ -509,8 +510,9 @@ class ScannetProcess():
                  pcd_future[0].result().point["colors"].cpu().numpy()))
             frame_pcd = f"{scan}_{frame_id:06}"
             self._runner.submit(
-                np.save, f'{join(self.out_frame_path, frame_pcd)}_vert.npy',
-                mesh_vertices)
+                np.savez_compressed,
+                f'{join(self.out_frame_path, frame_pcd)}_vert.npz',
+                point=mesh_vertices)
             self._runner.submit(
                 np.save, f'{join(self.out_frame_path, frame_pcd)}_bbox.npy',
                 frame_instance_bboxes)
