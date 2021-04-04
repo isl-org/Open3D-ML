@@ -225,5 +225,28 @@ class Object3d(BEVBox3D):
 
         self.occlusion = 0.0
 
+    def get_difficulty(self):
+        """
+        The method determines difficulty level of the object, such as Easy (0),
+        Moderate (1), Hard (2), VeryHard (3) or Unknown (4) depening on the
+        occlsion and the number of points inside the box.
+        """
+        if not (hasattr(self, 'occlusion') and
+                hasattr(self, 'n_points_inside')):
+            self.level_str = 'Unknown'
+            return 4
+        if self.occlusion > 0.75 or self.n_points_inside < 100:
+            self.level_str = 'VeryHard'
+            return 3
+        elif self.occlusion > 0.5 or self.n_points_inside < 1000:
+            self.level_str = 'Hard'
+            return 2
+        elif self.occlusion > 0.25 or self.n_points_inside < 10000:
+            self.level_str = 'Moderate'
+            return 1
+        else:
+            self.level_str = 'Easy'
+            return 0
+
 
 DATASET._register_module(Scannet)
