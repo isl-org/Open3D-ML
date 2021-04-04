@@ -36,7 +36,7 @@ mkdir -p "$LOCALDIR"
 echo Copying training data to $LOCALDIR
 # rsync -ah --info=progress2 --include='*_000100_*' --include='*/' --exclude='*' "$2/." "$LOCALDIR"
 rsync -ah --info=progress2 "$2/." "$LOCALDIR"
-LOCALDIR="$2"
+# LOCALDIR="$2"
 tensorboard --logdir /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/scannet-frames/train_logs \
   --bind_all --port=6036 &
 echo "Starting training..."
