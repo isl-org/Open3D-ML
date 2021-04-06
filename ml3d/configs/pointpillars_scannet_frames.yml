@@ -1,7 +1,7 @@
 dataset:
   name: Scannet
     # [scenes|frames] Use point clouds from entire scenes or individual frames
-  portion: scenes
+  portion: frames
   # path/to/your/dataset
   dataset_path: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/Datasets/ScanNet-cache
   cache_dir: ./logs/cache
@@ -12,7 +12,7 @@ model:
   # path/to/your/checkpoint
   ckpt_path:
 
-  point_cloud_range: [-6.2, -9.7, -1.5, 6.7, 9.2, 7.0]   # TBC
+  point_cloud_range: [-2, -1.5, 0, 2, 1.5, 3.5]   # TBC
   classes: [
     'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
     'bookshelf', 'picture', 'counter', 'desk', 'curtain',
@@ -32,10 +32,10 @@ model:
       loss_weight: 0.2
 
   voxelize:
-    max_num_points: 32
+    max_num_points: 8
     voxel_size: &vsize
       [0.025, 0.025, 4]             # TBC
-    max_voxels: [16000, 40000]      # [P_train, P_test]
+    max_voxels: [16000, 19200]      # [P_train, P_test]
 
   voxel_encoder:
     in_channels: 3
@@ -44,7 +44,7 @@ model:
 
   scatter:
     in_channels: 64
-    output_shape:  [758, 520]    # [ny, nx]: n = (pcr_max - mcr_min) / voxel_size; multiple of 8
+    output_shape: [120, 160]
 
   backbone:
     in_channels: 64
@@ -64,7 +64,7 @@ model:
     nms_pre: 100
     score_thr: 0.1
     ranges: [                   # TBC
-      [-6.2, -9.7, -1.5, 6.7, 9.2, 7.0]
+      [-2, -1.5, 0, 2, 1.5, 3.5]
     ]
     sizes: [
       [0.29932949, 0.33707996, 0.35533315],
@@ -118,8 +118,8 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 3
-  val_batch_size: 3
+  batch_size: 28
+  val_batch_size: 28
   save_ckpt_freq: 5
   max_epoch: 200
   main_log_dir: ./logs

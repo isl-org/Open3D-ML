@@ -1,14 +1,12 @@
-import open3d as o3d
-import numpy as np
-import os, argparse, pickle, sys
-from os.path import exists, join, isfile, dirname, abspath, split
+import os
+from os.path import join, isfile
 from pathlib import Path
 from glob import glob
 import logging
-import yaml
+import numpy as np
 
 from .base_dataset import BaseDataset
-from ..utils import Config, make_dir, DATASET
+from ..utils import DATASET
 from .utils import BEVBox3D
 
 logging.basicConfig(
@@ -45,6 +43,8 @@ class Scannet(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
+        # [scenes|frames] Use point clouds from entire scenes or individual frames
+        self.portion = cfg.portion
         self.num_classes = 18
 
         self.classes = [
@@ -83,13 +83,27 @@ class Scannet(BaseDataset):
         self.val_scenes = []
         self.test_scenes = []
 
-        for scene in available_scenes:
-            if scene in train_files:
-                self.train_scenes.append(join(self.dataset_path, scene))
-            elif scene in val_files:
-                self.val_scenes.append(join(self.dataset_path, scene))
-            elif scene in test_files:
-                self.test_scenes.append(join(self.dataset_path, scene))
+        if self.portion == 'scenes':
+            for scene in available_scenes:
+                if scene in train_files:
+                    self.train_scenes.append(join(self.dataset_path, scene))
+                elif scene in val_files:
+                    self.val_scenes.append(join(self.dataset_path, scene))
+                elif scene in test_files:
+                    self.test_scenes.append(join(self.dataset_path, scene))
+        elif self.portion == 'frames':
+            for scene in available_scenes:
+                vert_files = glob(join(self.dataset_path,
+                                       scene + '_*_vert.np?'))
+                if scene in train_files:
+                    self.train_scenes.extend(
+                        framefile[:-9] for framefile in vert_files)
+                elif scene in val_files:
+                    self.val_scenes.extend(
+                        framefile[:-9] for framefile in vert_files)
+                elif scene in test_files:
+                    self.test_scenes.extend(
+                        framefile[:-9] for framefile in vert_files)
 
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
@@ -101,25 +115,30 @@ class Scannet(BaseDataset):
 
     @staticmethod
     def read_lidar(path):
-        assert Path(path).exists()
-        data = np.load(path)
-
-        return data
+        if Path(path + '.npz').exists():
+            with np.load(path + '.npz') as npzfile:
+                return npzfile['point']
+        else:  # npy
+            return np.load(path + '.npy')
 
     def read_label(self, scene):
-        instance_mask = np.load(scene + '_ins_label.npy')
-        semantic_mask = np.load(scene + '_sem_label.npy')
-        bboxes = np.load(scene + '_bbox.npy')
+        instance_mask = np.load(scene + '_ins_label.npy') if isfile(
+            scene + '_ins_label.npy') else np.array([], dtype=np.int32)
+        semantic_mask = np.load(scene + '_sem_label.npy') if isfile(
+            scene + '_ins_label.npy') else np.array([], dtype=np.int32)
+        bboxes = np.load(scene +
+                         '_bbox.npy') if isfile(scene +
+                                                '_bbox.npy') else np.array([])
 
         ## For filtering semantic labels to have same classes as object detection.
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)
 
-        remapper = np.ones(150) * (-100)
-        for i, x in enumerate(self.semantic_ids):
-            remapper[x] = i
-
-        semantic_mask = remapper[semantic_mask]
+        if semantic_mask.size > 0:
+            remapper = np.ones(150) * (-100)
+            for i, x in enumerate(self.semantic_ids):
+                remapper[x] = i
+            semantic_mask = remapper[semantic_mask]
 
         objects = []
         for box in bboxes:
@@ -127,7 +146,7 @@ class Scannet(BaseDataset):
             center = box[:3]
             size = [box[3], box[5], box[4]]  # w, h, l
 
-            yaw = 0.0
+            yaw = box[-2] if len(box) == 8 else 0.0  # yaw is present in frames
             objects.append(Object3d(name, center, size, yaw))
 
         return objects, semantic_mask, instance_mask
@@ -171,7 +190,7 @@ class ScannetSplit():
     def get_data(self, idx):
         scene = self.path_list[idx]
 
-        pc = self.dataset.read_lidar(scene + '_vert.npy')
+        pc = self.dataset.read_lidar(scene + '_vert')
         feat = pc[:, 3:]
         pc = pc[:, :3]
 
