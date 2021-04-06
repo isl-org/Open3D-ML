@@ -119,7 +119,7 @@ class Scannet(BaseDataset):
             with np.load(path + '.npz') as npzfile:
                 return npzfile['point']
         else:  # npy
-            return np.load(path + 'npy')
+            return np.load(path + '.npy')
 
     def read_label(self, scene):
         instance_mask = np.load(scene + '_ins_label.npy') if isfile(
