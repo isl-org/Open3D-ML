@@ -32,10 +32,10 @@ model:
       loss_weight: 0.2
 
   voxelize:
-    max_num_points: 32
+    max_num_points: 8
     voxel_size: &vsize
       [0.025, 0.025, 4]             # TBC
-    max_voxels: [16000, 40000]      # [P_train, P_test]
+    max_voxels: [16000, 19200]      # [P_train, P_test]
 
   voxel_encoder:
     in_channels: 3
@@ -44,7 +44,7 @@ model:
 
   scatter:
     in_channels: 64
-    output_shape: [496, 432]
+    output_shape: [120, 160]
 
   backbone:
     in_channels: 64
@@ -64,7 +64,7 @@ model:
     nms_pre: 100
     score_thr: 0.1
     ranges: [                   # TBC
-      [-6, 0, 0, 6, 10, 2]
+      [-2, -1.5, 0, 2, 1.5, 3.5]
     ]
     sizes: [
       [0.29932949, 0.33707996, 0.35533315],
@@ -118,8 +118,8 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 3
-  val_batch_size: 3
+  batch_size: 28
+  val_batch_size: 28
   save_ckpt_freq: 5
   max_epoch: 200
   main_log_dir: ./logs

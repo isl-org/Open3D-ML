@@ -12,7 +12,7 @@ model:
   # path/to/your/checkpoint
   ckpt_path:
 
-  point_cloud_range: [-6, 0, 0, 6, 10, 4]   # TBC
+  point_cloud_range: [-6.2, -9.7, -1.5, 6.7, 9.2, 7.0]   # TBC
   classes: [
     'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
     'bookshelf', 'picture', 'counter', 'desk', 'curtain',
@@ -44,7 +44,7 @@ model:
 
   scatter:
     in_channels: 64
-    output_shape: [496, 432]
+    output_shape:  [758, 520]    # [ny, nx]: n = (pcr_max - mcr_min) / voxel_size; multiple of 8
 
   backbone:
     in_channels: 64
@@ -64,7 +64,7 @@ model:
     nms_pre: 100
     score_thr: 0.1
     ranges: [                   # TBC
-      [-6, 0, 0, 6, 10, 2]
+      [-6.2, -9.7, -1.5, 6.7, 9.2, 7.0]
     ]
     sizes: [
       [0.29932949, 0.33707996, 0.35533315],

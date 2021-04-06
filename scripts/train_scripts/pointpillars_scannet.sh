@@ -11,7 +11,7 @@ function term_handler()
 
 trap term_handler SIGTERM SIGINT ERR EXIT
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -lt 2 ]; then
     echo "Please, provide the the training framework: torch/tf and dataset path"
     exit 1
 fi
@@ -39,8 +39,9 @@ rsync -ah --info=progress2 "$2/." "$LOCALDIR"
 # LOCALDIR="$2"
 tensorboard --logdir /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/scannet-frames/train_logs \
   --bind_all --port=6036 &
+CONFIG_FILE=${3:-"ml3d/configs/pointpillars_scannet_frames.yml"}
 echo "Starting training..."
-python scripts/run_pipeline.py "$1" -c ml3d/configs/pointpillars_scannet_frames.yml \
+python scripts/run_pipeline.py "$1" -c "$CONFIG_FILE" \
     --dataset_path "$LOCALDIR" \
     --cache_dir "$LOCALDIR/cache" \
     --main_log_dir /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/scannet-frames/logs-$(date -I) \
