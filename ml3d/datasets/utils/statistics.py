@@ -3,7 +3,9 @@
 """
 
 import functools
+import logging as log
 import numpy as np
+from sklearn.cluster import KMeans
 
 
 def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
@@ -107,16 +109,24 @@ def compute_dataset_stats(scene_stats):
         ]).tolist()
 
         data_stats['bbox_shape'] = dict(zip(class_ids, [[]] * len(class_ids)))
+        class_bboxes = dict(zip(class_ids, [[]] * len(class_ids)))
         for class_id in class_ids:
-            class_bboxes = [
+            class_bboxes[class_id] = [
                 bbox for stats in scene_stats
                 for bbox in (stats['bbox_shape'][class_id] if class_id in
                              stats['bbox_shape'] else [])
             ]
             data_stats['bbox_shape'][class_id] = {
-                'mean': np.mean(class_bboxes, axis=0).tolist(),
-                'std': np.std(class_bboxes, axis=0).tolist()
+                'mean': np.mean(class_bboxes[class_id], axis=0).tolist(),
+                'std': np.std(class_bboxes[class_id], axis=0).tolist()
             }
+        anchor_boxes, mIoU = calc_anchor_boxes(
+            class_bboxes, range(len(class_ids) // 2,
+                                len(class_ids) // 2 + 1))
+        data_stats['anchor_boxes'] = {
+            'mIou': mIoU,
+            'anchor_boxes': anchor_boxes
+        }
 
     if 'n_pts_seg' in scene_stats[0]:
         data_stats['n_pts_seg'] = dict(zip(class_ids, [[]] * len(class_ids)))
@@ -132,3 +142,64 @@ def compute_dataset_stats(scene_stats):
             }
 
     return data_stats
+
+
+def calc_anchor_boxes(bbox_shapes, n_anchors):
+    """
+    Use k-means clustering on bounding boxes to estimate anchor boxes using
+    Euclidean distance on the boundin box size.
+
+    Args:
+        bbox_shapes (dict(class: list(bbox shape))): Bounding box shapes for
+            all instances of all classes
+        n_anchors (list): Number of anchor boxes to estimate.
+
+    Returns:
+        anchor_boxes (dict): The estimated anchor boxes for each n_anchor.
+        mIoU (dict): The mean IoU metric for each n_anchor.
+    """
+
+    all_bboxes = [
+        bbox for class_bboxes in bbox_shapes.values() for bbox in class_bboxes
+    ]
+    all_bbox_cls = [
+        cls for cls, class_bboxes in bbox_shapes.items()
+        for bbox in class_bboxes
+    ]
+    mIoU = {}
+    anchor_boxes = {}
+    for n_clusters in n_anchors:
+        kmeans = KMeans(n_clusters=n_clusters).fit(all_bboxes)
+        anchor_boxes[n_clusters] = kmeans.cluster_centers_.tolist()
+        assigned_anchor_box = kmeans.labels_
+        all_IoU = [
+            centered_bbox3d_IoU(bbox, anchor_boxes[n_clusters][k])
+            for bbox, k in zip(all_bboxes, assigned_anchor_box)
+        ]
+        mIoU[n_clusters] = float(np.mean(all_IoU))
+        class_mIoU = {
+            cls:
+            np.ma.mean(np.ma.array(all_IoU, mask=np.array(all_bbox_cls) == cls))
+            for cls in bbox_shapes.keys()
+        }
+        anchor_boxes[n_clusters].sort(key=lambda box: box[0] * box[1] * box[2])
+        log.info(f"{n_clusters} clusters:\n{anchor_boxes[n_clusters]}")
+        log.info(f"mIoU = {mIoU[n_clusters]}\nclass mIoU = {class_mIoU}")
+    return anchor_boxes, mIoU
+
+
+def centered_bbox3d_IoU(bbox_shape1, bbox_shape2):
+    """
+    Compute Intersection over Union for a pair of axis aligned 3D bounding boxes
+    centered at the origin.
+
+    Args:
+        bbox_shape2, bbox_shape1: [length, width, height] of each bounding box
+
+    Returns:
+        Intersection Volume / Union Volume
+    """
+    intersection_volume = np.prod(np.fmin(bbox_shape1, bbox_shape2))
+    union_volume = (np.prod(bbox_shape1) + np.prod(bbox_shape2) -
+                    intersection_volume)
+    return intersection_volume / union_volume

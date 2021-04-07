@@ -277,7 +277,7 @@ class ObjectDetection(BasePipeline):
 
         dataset_name = dataset.name if dataset is not None else ''
         if hasattr(dataset, 'portion'):
-           dataset_name += "_" + dataset.portion 
+            dataset_name += "_" + dataset.portion
         tensorboard_dir = join(
             self.cfg.train_sum_dir,
             model.__class__.__name__ + '_' + dataset_name + '_torch')
