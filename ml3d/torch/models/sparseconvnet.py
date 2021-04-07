@@ -6,6 +6,7 @@ from .base_model import BaseModel
 from ...utils import MODEL
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import trans_augment
+from ...datasets.augment import SemsegAugmentation
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
@@ -17,7 +18,7 @@ class SparseConvUnet(BaseModel):
             name="SparseConvUnet",
             device="cuda",
             m=16,
-            scale=20,
+            voxel_size=0.05,
             reps=1,  # Conv block repetitions.
             residual_blocks=False,
             in_channels=3,
@@ -26,12 +27,13 @@ class SparseConvUnet(BaseModel):
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
                                              m=m,
-                                             scale=scale,
+                                             voxel_size=voxel_size,
                                              in_channels=in_channels,
                                              num_classes=num_classes,
                                              **kwargs)
         cfg = self.cfg
         self.device = device
+        self.augment = SemsegAugmentation(cfg.augment)
         self.m = cfg.m
         self.inp = InputLayer()
         self.ssc = SubmanifoldSparseConv(in_channels=in_channels,
@@ -75,17 +77,19 @@ class SparseConvUnet(BaseModel):
             raise Exception(
                 "SparseConvnet doesn't work without feature values.")
 
-        feat = np.array(data['feat'], dtype=np.float32) / 127.5 - 1
+        feat = np.array(data['feat'], dtype=np.float32)
+
+        # Scale to voxel size.
+        points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
 
         if attr['split'] in ['training', 'train']:
-            t_augment = self.cfg.get('t_augment', None)
-            points = trans_augment(points, t_augment)
-            feat += np.random.randn(3) * 0.1
+            points, feat, labels = self.augment.augment(
+                points, feat, labels, self.cfg.get('augment', None))
 
-        points *= self.cfg.scale  # Scale = 1/voxel_size
-
-        offset = np.clip(4096 - points.max(0) + points.min(0) - 0.001, 0,
-                         None) / 2
+        m = points.min(0)
+        M = points.max(0)
+        offset = -m + np.clip(4096 - M + m - 0.001, 0, None) * np.random.rand(
+            3) + np.clip(4096 - M + m + 0.001, None, 0) * np.random.rand(3)
 
         points += offset
         idxs = (points.min(1) >= 0) * (points.max(1) < 4096)

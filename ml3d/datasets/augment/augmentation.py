@@ -9,21 +9,17 @@ class SemsegAugmentation():
         self.cfg = cfg
 
     @staticmethod
-    def normalize(data, cfg):
+    def normalize(pc, feat, cfg):
         if 'points' in cfg.keys():
             cfg_p = cfg['points']
-            pc = data['point']
             if cfg_p.get('recentering', False):
                 pc -= pc.mean(0)
             if cfg_p.get('method', 'linear') == 'linear':
                 pc -= pc.mean(0)
                 pc /= (pc.max(0) - pc.min(0)).max()
 
-            data['point'] = pc
-
-        if 'feat' in cfg.keys() and data['feat'] is not None:
+        if 'feat' in cfg.keys() and feat is not None:
             cfg_f = cfg['feat']
-            feat = data['feat']
             if cfg_f.get('recentering', False):
                 feat -= feat.mean(0)
             if cfg_f.get('method', 'linear') == 'linear':
@@ -32,16 +28,14 @@ class SemsegAugmentation():
                 feat -= bias
                 feat /= scale
 
-            data['feat'] = feat
-
-        return data
+        return pc, feat
 
     @staticmethod
     def rotate(pc, cfg):
         # Initialize rotation matrix
         R = np.eye(pc.shape[1])
 
-        method = cfg.get('method', None)
+        method = cfg.get('method', 'vertical')
 
         if method == 'vertical':
             # Create random rotations
@@ -96,18 +90,102 @@ class SemsegAugmentation():
 
         return pc + noise
 
-    def augment(self, data, cfg):
+    @staticmethod
+    def RandomDropout(pc, feats, labels, cfg):
+        dropout_ratio = cfg.get('dropout_ratio', 0.2)
+        if random.random() < dropout_ratio:
+            N = len(pc)
+            inds = np.random.choice(N,
+                                    int(N * (1 - dropout_ratio)),
+                                    replace=False)
+            return pc[inds], feats[inds], labels[inds]
+        return pc, feats, labels
+
+    @staticmethod
+    def RandomHorizontalFlip(pc, cfg):
+        axes = cfg.get('axes', [0, 1])
+        if random.random() < 0.95:
+            for curr_ax in axes:
+                if random.random() < 0.5:
+                    pc_max = np.max(pc[:, curr_ax])
+                    pc[:, curr_ax] = pc_max - pc[:, curr_ax]
+
+        return pc
+
+    @staticmethod
+    def ChromaticAutoContrast(feats, cfg):
+        randomize_blend_factor = cfg.get('randomize_blend_factor', True)
+        blend_factor = cfg.get('blend_factor', 0.5)
+        if random.random() < 0.2:
+            lo = feats[:, :3].min(0, keepdims=True)
+            hi = feats[:, :3].max(0, keepdims=True)
+
+            assert hi.max(
+            ) > 1, "Invalid color value. Color is supposed to be in [0-255] for ChromaticAutoContrast augmentation"
+
+            scale = 255 / (hi - lo)
+
+            contrast_feats = (feats[:, :3] - lo) * scale
+
+            blend_factor = random.random(
+            ) if randomize_blend_factor else blend_factor
+            feats[:, :3] = (
+                1 - blend_factor) * feats[:, :3] + blend_factor * contrast_feats
+
+        return feats
+
+    @staticmethod
+    def ChromaticTranslation(feats, cfg):
+        trans_range_ratio = cfg.get('trans_range_ratio', 0.1)
+        if random.random() < 0.95:
+            tr = (np.random.rand(1, 3) - 0.5) * 255 * 2 * trans_range_ratio
+            feats[:, :3] = np.clip(tr + feats[:, :3], 0, 255)
+        return feats
+
+    @staticmethod
+    def ChromaticJitter(feats, cfg):
+        std = cfg.get('std', 0.01)
+        if random.random() < 0.95:
+            noise = np.random.randn(feats.shape[0], 3)
+            noise *= std * 255
+            feats[:, :3] = np.clip(noise + feats[:, :3], 0, 255)
+        return feats
+
+    def augment(self, point, feat, labels, cfg):
+        if cfg is None:
+            return point, feat, labels
+
         if 'normalize' in cfg.keys():
-            data = self.normalize(data, cfg['normalize'])
+            point, feat = self.normalize(point, feat, cfg['normalize'])
 
         if 'rotate' in cfg.keys():
-            data['point'] = self.rotate(data['point'], cfg['rotate'])
+            point = self.rotate(point, cfg['rotate'])
 
         if 'scale' in cfg.keys():
-            data['point'] = self.scale(data['point'], cfg['scale'])
+            point = self.scale(point, cfg['scale'])
 
         if 'noise' in cfg.keys():
-            data['point'] = self.noise(data['point'], cfg['noise'])
+            point = self.noise(point, cfg['noise'])
+
+        if 'RandomDropout' in cfg.keys():
+            point, feat, labels = self.RandomDropout(point, feat, labels,
+                                                     cfg['RandomDropout'])
+
+        if 'RandomHorizontalFlip' in cfg.keys():
+            point = self.RandomHorizontalFlip(point,
+                                              cfg['RandomHorizontalFlip'])
+
+        if 'ChromaticAutoContrast' in cfg.keys():
+            feat = self.ChromaticAutoContrast(feat,
+                                              cfg['ChromaticAutoContrast'])
+
+        if 'ChromaticTranslation' in cfg.keys():
+            feat = self.ChromaticTranslation(feat, cfg['ChromaticTranslation'])
+
+        if 'ChromaticJitter' in cfg.keys():
+            feat = self.ChromaticJitter(feat, cfg['ChromaticJitter'])
+
+        return point, feat, labels
 
 
 class ObjdetAugmentation():
