@@ -34,9 +34,6 @@ def filter_valid_label(scores, labels, num_classes, ignored_label_inds, device):
     valid_labels = torch.gather(reducing_list.to(device), 0,
                                 valid_labels.long())
 
-    valid_labels = valid_labels.unsqueeze(0)
-    valid_scores = valid_scores.unsqueeze(0).transpose(-2, -1)
-
     return valid_scores, valid_labels
 
 
@@ -46,7 +43,8 @@ class SemSegLoss(object):
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegLoss, self).__init__()
         # weighted_CrossEntropyLoss
-        if 'class_weights' in dataset.cfg.keys():
+        if 'class_weights' in dataset.cfg.keys() and len(
+                dataset.cfg.class_weights) != 0:
             class_wt = DataProcessing.get_class_weights(
                 dataset.cfg.class_weights)
             weights = torch.tensor(class_wt, dtype=torch.float, device=device)

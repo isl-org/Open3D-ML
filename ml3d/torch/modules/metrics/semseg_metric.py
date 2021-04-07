@@ -5,21 +5,74 @@ import numpy as np
 class SemSegMetric(object):
     """Metrics for semantic segmentation"""
 
-    def __init__(self, pipeline, model, dataset, device):
+    def __init__(self):
         super(SemSegMetric, self).__init__()
-        # weighted_CrossEntropyLoss
-        self.pipeline = pipeline
-        self.model = model
-        self.dataset = dataset
-        self.device = device
+        self.conf_matrix = None
+        self.num_classes = None
 
-    def confusion_matrix(self, scores, labels):
+    def update(self, scores, labels):
+        conf = self.confusion_matrix(scores, labels)
+        if self.conf_matrix is None:
+            self.conf_matrix = conf.copy()
+            self.num_classes = conf.shape[0]
+        else:
+            assert self.conf_matrix.shape == conf.shape
+            self.conf_matrix += conf
+
+    def acc(self):
+        if self.conf_matrix is None:
+            return None
+
+        accs = []
+        for label in range(self.num_classes):
+            tp = np.longlong(self.conf_matrix[label, label])
+            fn = np.longlong(self.conf_matrix[label, :].sum()) - tp
+            fp = np.longlong(self.conf_matrix[:, label].sum()) - tp
+            tn = np.longlong(self.conf_matrix.sum()) - (tp + fp + fn)
+
+            if tp + tn + fp + fn == 0:
+                acc = float('nan')
+            else:
+                acc = (tp + tn) / (tp + tn + fp + fn)
+
+            accs.append(acc)
+
+        accs.append(np.nanmean(accs))
+
+        return accs
+
+    def iou(self):
+        if self.conf_matrix is None:
+            return None
+
+        ious = []
+        for label in range(self.num_classes):
+            tp = np.longlong(self.conf_matrix[label, label])
+            fn = np.longlong(self.conf_matrix[label, :].sum()) - tp
+            fp = np.longlong(self.conf_matrix[:, label].sum()) - tp
+
+            if tp + fp + fn == 0:
+                iou = float('nan')
+            else:
+                iou = (tp) / (tp + fp + fn)
+
+            ious.append(iou)
+
+        ious.append(np.nanmean(ious))
+
+        return ious
+
+    def reset(self):
+        self.conf_matrix = None
+
+    @staticmethod
+    def confusion_matrix(scores, labels):
         r"""
             Compute the confusion matrix of one batch
 
             Parameters
             ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
+            scores: torch.FloatTensor, shape (B?, N, C)
                 raw scores for each class
             labels: torch.LongTensor, shape (B?, N)
                 ground truth labels
@@ -28,14 +81,14 @@ class SemSegMetric(object):
             -------
             confusion matrix of this batch
         """
-        N = scores.size(-1)
-        C = scores.size(-2)
-        y_pred = scores.detach().cpu().numpy().reshape(-1, N)  # (C, N)
-        y_pred = np.argmax(y_pred, axis=0)  # (N,)
+        N = scores.size(-2)
+        C = scores.size(-1)
+        y_pred = scores.detach().cpu().numpy().reshape(-1, C)  # (N, C)
+        y_pred = np.argmax(y_pred, axis=1)  # (N,)
 
         y_true = labels.detach().cpu().numpy().reshape(-1,)
 
-        y = np.bincount(C * y_true + y_pred)
+        y = np.bincount(C * y_true + y_pred, minlength=C * C)
 
         if len(y) < C * C:
             y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
@@ -43,145 +96,3 @@ class SemSegMetric(object):
         y = y.reshape(C, C)
 
         return y
-
-    def acc(self, scores, labels):
-        r"""
-            Compute the per-class accuracies and the overall accuracy 
-
-            Parameters
-            ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
-                raw scores for each class
-            labels: torch.LongTensor, shape (B?, N)
-                ground truth labels
-
-            Returns
-            -------
-            list of floats of length num_classes+1 
-            (last item is overall accuracy)
-        """
-        num_classes = scores.size(-2)
-        predictions = torch.max(scores, dim=-2).indices
-
-        accuracies = []
-        accuracy_mask = predictions == labels
-
-        n_total = 0
-        n_correct = 0
-
-        for label in range(num_classes):
-            label_mask = labels == label
-            per_class_accuracy = (accuracy_mask & label_mask).float().sum()
-            n_correct += per_class_accuracy
-            per_class_accuracy /= label_mask.float().sum()
-            n_total += label_mask.float().sum()
-            accuracies.append(per_class_accuracy.cpu().item())
-
-        # overall accuracy
-        accuracies.append(np.nanmean(accuracies))
-        return accuracies
-
-    def iou(self, scores, labels):
-        r"""
-            Compute the per-class IoU and the mean IoU 
-
-            Parameters
-            ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
-                raw scores for each class
-            labels: torch.LongTensor, shape (B?, N)
-                ground truth labels
-
-            Returns
-            -------
-            list of floats of length num_classes+1 (last item is mIoU)
-        """
-        num_classes = scores.size(-2)
-        predictions = torch.max(scores, dim=-2).indices
-
-        ious = []
-
-        n_total = 0
-        n_correct = 0
-
-        for label in range(num_classes):
-            pred_mask = predictions == label
-            labels_mask = labels == label
-            iou = (pred_mask & labels_mask).float().sum()
-            n_correct += iou
-            iou = iou / (pred_mask | labels_mask).float().sum()
-            n_total += (pred_mask | labels_mask).float().sum()
-            ious.append(iou.cpu().item())
-
-        ious.append(np.nanmean(ious))
-        return ious
-
-    def filter_valid_label_np(self, pred, gt):
-        """filter out invalid points"""
-
-        ignored_label_inds = self.dataset.cfg.ignored_label_inds
-
-        ignored_bool = np.zeros_like(gt, dtype=np.bool)
-        for ign_label in ignored_label_inds:
-            ignored_bool = np.logical_or(ignored_bool, np.equal(gt, ign_label))
-
-        valid_idx = np.where(np.logical_not(ignored_bool))[0]
-
-        valid_pred = pred[valid_idx]
-        valid_gt = gt[valid_idx]
-
-        # Reduce label values in the range of logit shape
-        reducing_list = np.arange(0, self.dataset.num_classes, dtype=np.int64)
-        inserted_value = np.zeros([1], dtype=np.int64)
-
-        for ign_label in ignored_label_inds:
-            reducing_list = np.concatenate([
-                reducing_list[:ign_label], inserted_value,
-                reducing_list[ign_label:]
-            ], 0)
-
-        valid_gt = reducing_list[valid_gt]
-
-        return valid_pred, valid_gt
-
-    def iou_np_label(self, pred, gt):
-        valid_pred, valid_gt = self.filter_valid_label_np(pred, gt)
-        num_classes = self.dataset.num_classes
-
-        ious = []
-
-        n_total = 0
-        n_correct = 0
-
-        for label in range(num_classes):
-            pred_mask = valid_pred == label
-            labels_mask = valid_gt == label
-            iou = (pred_mask & labels_mask).sum()
-            n_correct += iou
-            iou = iou / (pred_mask | labels_mask).sum()
-            n_total += (pred_mask | labels_mask).sum()
-            ious.append(iou)
-
-        ious.append(np.nanmean(ious))
-        return ious
-
-    def acc_np_label(self, pred, gt):
-        valid_pred, valid_gt = self.filter_valid_label_np(pred, gt)
-        num_classes = self.dataset.num_classes
-
-        accuracies = []
-        accuracy_mask = valid_pred == valid_gt
-
-        n_total = 0
-        n_correct = 0
-
-        for label in range(num_classes):
-            label_mask = valid_gt == label
-            per_class_accuracy = (accuracy_mask & label_mask).sum()
-            n_correct += per_class_accuracy
-            per_class_accuracy /= label_mask.sum()
-            n_total += label_mask.sum()
-            accuracies.append(per_class_accuracy)
-
-        accuracies.append(np.nanmean(accuracies))
-        return accuracies
