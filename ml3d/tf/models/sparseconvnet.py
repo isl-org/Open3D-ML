@@ -47,34 +47,26 @@ class SparseConvUnet(BaseModel):
 
         self.linear = tf.keras.layers.Dense(num_classes)
         self.out = OutputLayer()
-        # tf.no_gradient("Open3DFixedRadiusSearch")
-        # tf.no_gradient("Open3DVoxelize")
-        # tf.no_gradient("Open3DReduceSubarraysSum")
 
-    # @tf.function
-    def graph_call(self, inputs, training):
-        output = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
+    def call(self, inputs, training=False):
+        output = []
         start_idx = 0
-        for i in range(inputs['batch_lengths'].shape[0]):
-            length = inputs['batch_lengths'][i]
+        for length in inputs['batch_lengths']:
             pos = inputs['point'][start_idx:start_idx + length]
             feat = inputs['feat'][start_idx:start_idx + length]
 
             feat, pos, rev = self.inp(feat, pos)
             feat = self.ssc(feat, pos, voxel_size=1.0)
-            feat = self.unet(pos, feat, training=training)
-            feat = self.bn(feat, training=training)
+            feat = self.unet(pos, feat)
+            feat = self.bn(feat)
             feat = self.relu(feat)
             feat = self.linear(feat)
             feat = self.out(feat, rev)
 
-            output = output.write(i, feat)
+            output.append(feat)
             start_idx += length
-        return output.stack()
 
-    def call(self, inputs, training=False):
-        output = self.graph_call(inputs, training)
-        return output
+        return tf.concat(output, 0)
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)

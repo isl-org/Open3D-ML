@@ -217,7 +217,7 @@ class SemanticSegmentation(BasePipeline):
         model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-        metric = SemSegMetric(self, model, dataset, device)
+        metric = SemSegMetric()
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')

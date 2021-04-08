@@ -20,6 +20,21 @@ class SemSegMetric(object):
             self.conf_matrix += conf
 
     def acc(self):
+        r"""
+            Compute the per-class accuracies and the overall accuracy 
+
+            Parameters
+            ----------
+            scores: torch.FloatTensor, shape (B?, C, N)
+                raw scores for each class
+            labels: torch.LongTensor, shape (B?, N)
+                ground truth labels
+
+            Returns
+            -------
+            list of floats of length num_classes+1 
+            (last item is overall accuracy)
+        """
         if self.conf_matrix is None:
             return None
 
@@ -40,6 +55,20 @@ class SemSegMetric(object):
         return accs
 
     def iou(self):
+        r"""
+            Compute the per-class IoU and the mean IoU 
+
+            Parameters
+            ----------
+            scores: torch.FloatTensor, shape (B?, C, N)
+                raw scores for each class
+            labels: torch.LongTensor, shape (B?, N)
+                ground truth labels
+
+            Returns
+            -------
+            list of floats of length num_classes+1 (last item is mIoU)
+        """
         if self.conf_matrix is None:
             return None
 

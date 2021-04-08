@@ -3,24 +3,31 @@ import numpy as np
 
 
 class SemSegMetric(object):
-    """docstring for SemSegLoss"""
+    """Metric class for Semantic Segmentation."""
 
-    def __init__(self, pipeline, model, dataset):
+    def __init__(self):
         super(SemSegMetric, self).__init__()
-        # weighted_CrossEntropyLoss
-        self.pipeline = pipeline
-        self.model = model
-        self.dataset = dataset
+        self.conf_matrix = None
+        self.num_classes = None
 
-    def acc(self, scores, labels):
+    def update(self, scores, labels):
+        conf = self.confusion_matrix(scores, labels)
+        if self.conf_matrix is None:
+            self.conf_matrix = conf.copy()
+            self.num_classes = conf.shape[0]
+        else:
+            assert self.conf_matrix.shape == conf.shape
+            self.conf_matrix += conf
+
+    def acc(self):
         r"""
             Compute the per-class accuracies and the overall accuracy 
 
             Parameters
             ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
+            scores: tf.FloatTensor, shape (B?, C, N)
                 raw scores for each class
-            labels: torch.LongTensor, shape (B?, N)
+            labels: tf.LongTensor, shape (B?, N)
                 ground truth labels
 
             Returns
@@ -28,61 +35,93 @@ class SemSegMetric(object):
             list of floats of length num_classes+1 
             (last item is overall accuracy)
         """
-        correct_prediction = tf.nn.in_top_k(labels, scores, 1)
-        acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-        num_classes = scores.shape[-1]
-        predictions = tf.argmax(scores, axis=-1)
+        if self.conf_matrix is None:
+            return None
 
-        accuracies = []
-        labels = tf.cast(labels, tf.int64)
-        accuracy_mask = predictions == labels
+        accs = []
+        for label in range(self.num_classes):
+            tp = np.longlong(self.conf_matrix[label, label])
+            fn = np.longlong(self.conf_matrix[label, :].sum()) - tp
 
-        for label in range(num_classes):
-            label_mask = labels == label
-            num_correct = (accuracy_mask & label_mask).numpy().sum()
-            num_label = label_mask.numpy().sum()
-            if num_label == 0:
-                per_class_accuracy = np.nan
+            if tp + fn == 0:
+                acc = float('nan')
             else:
-                per_class_accuracy = num_correct / num_label
-            accuracies.append(per_class_accuracy)
-        # overall accuracy
-        accuracies.append(np.nanmean(accuracies))
+                acc = tp / (tp + fn)
 
-        return accuracies
+            accs.append(acc)
 
-    def iou(self, scores, labels):
+        accs.append(np.nanmean(accs))
+
+        return accs
+
+    def iou(self):
         r"""
             Compute the per-class IoU and the mean IoU 
 
             Parameters
             ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
+            scores: tf.FloatTensor, shape (B?, C, N)
                 raw scores for each class
-            labels: torch.LongTensor, shape (B?, N)
+            labels: tf.LongTensor, shape (B?, N)
                 ground truth labels
 
             Returns
             -------
             list of floats of length num_classes+1 (last item is mIoU)
         """
-        num_classes = scores.shape[-1]
-        predictions = tf.argmax(scores, axis=-1).numpy()
-        labels = tf.cast(labels, tf.int64).numpy()
+
+        if self.conf_matrix is None:
+            return None
 
         ious = []
+        for label in range(self.num_classes):
+            tp = np.longlong(self.conf_matrix[label, label])
+            fn = np.longlong(self.conf_matrix[label, :].sum()) - tp
+            fp = np.longlong(self.conf_matrix[:, label].sum()) - tp
 
-        for label in range(num_classes):
-            pred_mask = predictions == label
-            labels_mask = labels == label
-            num_i = (pred_mask & labels_mask).sum()
-            num_u = (pred_mask | labels_mask).sum()
-            if num_u == 0:
-                iou = np.nan
+            if tp + fp + fn == 0:
+                iou = float('nan')
             else:
-                iou = num_i / num_u
+                iou = (tp) / (tp + fp + fn)
 
             ious.append(iou)
+
         ious.append(np.nanmean(ious))
+
         return ious
+
+    def reset(self):
+        self.conf_matrix = None
+
+    @staticmethod
+    def confusion_matrix(scores, labels):
+        r"""
+            Compute the confusion matrix of one batch
+
+            Parameters
+            ----------
+            scores: torch.FloatTensor, shape (B?, N, C)
+                raw scores for each class
+            labels: torch.LongTensor, shape (B?, N)
+                ground truth labels
+
+            Returns
+            -------
+            confusion matrix of this batch
+        """
+        N = scores.shape[-2]
+        C = scores.shape[-1]
+        y_pred = scores.cpu().numpy().reshape(-1, C)  # (N, C)
+        y_pred = np.argmax(y_pred, axis=1)  # (N,)
+
+        y_true = labels.cpu().numpy().reshape(-1,)
+
+        y = np.bincount(C * y_true + y_pred, minlength=C * C)
+
+        if len(y) < C * C:
+            y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
+
+        y = y.reshape(C, C)
+
+        return y
