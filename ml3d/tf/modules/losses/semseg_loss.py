@@ -11,21 +11,27 @@ class SemSegLoss(object):
         # weighted_CrossEntropyLoss
         self.num_classes = model.cfg.num_classes
         self.ignored_label_inds = model.cfg.ignored_label_inds
+        self.class_weights = None
 
-        if 'class_weights' in dataset.cfg.keys():
+        if 'class_weights' in dataset.cfg.keys() and len(
+                dataset.cfg.class_weights) != 0:
             weights = DP.get_class_weights(dataset.cfg.class_weights)
             self.class_weights = tf.convert_to_tensor(weights, dtype=tf.float32)
 
     def weighted_CrossEntropyLoss(self, logits, labels):
-        # calculate the weighted cross entropy according to the inverse frequency
-        one_hot_labels = tf.one_hot(labels, depth=self.num_classes)
-        weights = tf.reduce_sum(self.class_weights * one_hot_labels, axis=1)
-        unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(
-            logits=logits, labels=one_hot_labels)
-        weighted_losses = unweighted_losses * weights
-        output_loss = tf.reduce_mean(weighted_losses)
+        if self.class_weights is None:
+            return tf.reduce_mean(
+                tf.nn.sparse_softmax_cross_entropy_with_logits(labels, logits))
+        else:
+            # calculate the weighted cross entropy according to the inverse frequency
+            one_hot_labels = tf.one_hot(labels, depth=self.num_classes)
+            weights = tf.reduce_sum(self.class_weights * one_hot_labels, axis=1)
+            unweighted_losses = tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits, labels=one_hot_labels)
+            weighted_losses = unweighted_losses * weights
+            output_loss = tf.reduce_mean(weighted_losses)
 
-        return output_loss
+            return output_loss
 
     def filter_valid_label(self, scores, labels):
         """filter out invalid points"""

@@ -2,7 +2,7 @@ dataset:
   name: Scannet
   dataset_path:  # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  class_weights: []
   test_result_folder: ./test
   use_cache: False
   sampler:

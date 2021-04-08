@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from .base_model import BaseModel
 from ...utils import MODEL
+from ...datasets.augment import SemsegAugmentation
 
 from open3d.ml.tf.layers import SparseConv, SparseConvTranspose
 from open3d.ml.tf.ops import voxelize, reduce_subarrays_sum
@@ -10,29 +11,35 @@ from open3d.ml.tf.ops import voxelize, reduce_subarrays_sum
 
 class SparseConvUnet(BaseModel):
 
-    def __init__(self,
-                 name="SparseConvUnet",
-                 device="cuda",
-                 m=16,
-                 scale=20,
-                 in_channels=3,
-                 num_classes=20,
-                 **kwargs):
+    def __init__(
+            self,
+            name="SparseConvUnet",
+            device="cuda",
+            m=16,
+            voxel_size=0.05,
+            reps=1,  # Conv block repetitions.
+            residual_blocks=False,
+            in_channels=3,
+            num_classes=20,
+            **kwargs):
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
                                              m=m,
-                                             scale=scale,
+                                             voxel_size=voxel_size,
+                                             reps=reps,
+                                             residual_blocks=residual_blocks,
                                              in_channels=in_channels,
                                              num_classes=num_classes,
                                              **kwargs)
         cfg = self.cfg
         self.m = cfg.m
+        self.augment = SemsegAugmentation(cfg.augment)
         self.inp = InputLayer()
         self.ssc = SubmanifoldSparseConv(in_channels=in_channels,
                                          filters=m,
                                          kernel_size=[3, 3, 3])
-        self.unet = UNet(1, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
-                         False)
+        self.unet = UNet(reps, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
+                         residual_blocks)
 
         self.bn = tf.keras.layers.BatchNormalization(momentum=0.99,
                                                      epsilon=1e-4)
@@ -40,18 +47,17 @@ class SparseConvUnet(BaseModel):
 
         self.linear = tf.keras.layers.Dense(num_classes)
         self.out = OutputLayer()
-        tf.no_gradient("Open3DFixedRadiusSearch")
-        tf.no_gradient("Open3DVoxelize")
-        tf.no_gradient("Open3DReduceSubarraysSum")
+        # tf.no_gradient("Open3DFixedRadiusSearch")
+        # tf.no_gradient("Open3DVoxelize")
+        # tf.no_gradient("Open3DReduceSubarraysSum")
 
-    @tf.function
+    # @tf.function
     def graph_call(self, inputs, training):
         output = tf.TensorArray(tf.float32, size=0, dynamic_size=True)
         start_idx = 0
         for i in range(inputs['batch_lengths'].shape[0]):
             length = inputs['batch_lengths'][i]
             pos = inputs['point'][start_idx:start_idx + length]
-            tf.print(pos)
             feat = inputs['feat'][start_idx:start_idx + length]
 
             feat, pos, rev = self.inp(feat, pos)
@@ -82,12 +88,19 @@ class SparseConvUnet(BaseModel):
             raise Exception(
                 "SparseConvnet doesn't work without feature values.")
 
-        feat = np.array(data['feat'], dtype=np.float32) / 127.5 - 1
+        feat = np.array(data['feat'], dtype=np.float32)
 
-        points *= self.cfg.scale  # Scale = 1/voxel_size
+        # Scale to voxel size.
+        points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
 
-        offset = np.clip(4096 - points.max(0) + points.min(0) - 0.001, 0,
-                         None) / 2
+        if attr['split'] in ['training', 'train']:
+            points, feat, labels = self.augment.augment(
+                points, feat, labels, self.cfg.get('augment', None))
+
+        m = points.min(0)
+        M = points.max(0)
+        offset = -m + np.clip(4096 - M + m - 0.001, 0, None) * np.random.rand(
+            3) + np.clip(4096 - M + m + 0.001, None, 0) * np.random.rand(3)
 
         points += offset
         idxs = (points.min(1) >= 0) * (points.max(1) < 4096)
@@ -424,31 +437,85 @@ class JoinFeat(tf.keras.layers.Layer):
         return tf.concat([feat_cat, feat], -1)
 
 
+class NetworkInNetwork(tf.keras.layers.Layer):
+
+    def __init__(self, nIn, nOut, bias=False):
+        super(NetworkInNetwork, self).__init__()
+        if nIn == nOut:
+            self.linear = tf.keras.layers.Lambda(lambda x: x)
+        else:
+            self.linear = tf.keras.layers.Dense(nOut, use_bias=bias)
+
+    def call(self, inputs):
+        return self.linear(inputs)
+
+
+class ResidualBlock(tf.keras.layers.Layer):
+
+    def __init__(self, nIn, nOut):
+        super(ResidualBlock, self).__init__()
+
+        self.lin = NetworkInNetwork(nIn, nOut)
+
+        self.bn1 = tf.keras.layers.BatchNormalization(momentum=0.99,
+                                                      epsilon=1e-4)
+        self.relu1 = tf.keras.layers.LeakyReLU(0.)
+        self.scn1 = SubmanifoldSparseConv(in_channels=nIn,
+                                          filters=nOut,
+                                          kernel_size=[3, 3, 3])
+
+        self.bn2 = tf.keras.layers.BatchNormalization(momentum=0.99,
+                                                      epsilon=1e-4)
+        self.relu2 = tf.keras.layers.LeakyReLU(0.)
+        self.scn2 = SubmanifoldSparseConv(in_channels=nOut,
+                                          filters=nOut,
+                                          kernel_size=[3, 3, 3])
+
+    def call(self, feat, pos, training):
+        out1 = self.lin(feat)
+
+        feat = self.relu1(self.bn1(feat, training))
+        feat = self.scn1(feat, pos)
+
+        feat = self.relu2(self.bn2(feat, training))
+        out2 = self.scn2(feat, pos)
+
+        return out1 + out2
+
+    def __name__(self):
+        return "ResidualBlock"
+
+
 class UNet(tf.keras.layers.Layer):
 
     def __init__(self,
                  reps,
                  nPlanes,
-                 resudual_blocks=False,
+                 residual_blocks=False,
                  downsample=[2, 2],
                  leakiness=0):
         super(UNet, self).__init__()
-        self.net = self.U(nPlanes)
+        self.net = self.U(nPlanes, residual_blocks, reps)
+        self.residual_blocks = residual_blocks
 
     @staticmethod
-    def block(m, a, b):
-        m.append(tf.keras.layers.BatchNormalization(momentum=0.99,
-                                                    epsilon=1e-4))
-        m.append(tf.keras.layers.LeakyReLU(0.))
-        m.append(
-            SubmanifoldSparseConv(in_channels=a,
-                                  filters=b,
-                                  kernel_size=[3, 3, 3]))
+    def block(m, a, b, residual_blocks):
+        if residual_blocks:
+            m.append(ResidualBlock(a, b))
+        else:
+            m.append(
+                tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
+            m.append(tf.keras.layers.LeakyReLU(0.))
+            m.append(
+                SubmanifoldSparseConv(in_channels=a,
+                                      filters=b,
+                                      kernel_size=[3, 3, 3]))
 
     @staticmethod
-    def U(nPlanes):
+    def U(nPlanes, residual_blocks, reps):
         m = []
-        UNet.block(m, nPlanes[0], nPlanes[0])
+        for i in range(reps):
+            UNet.block(m, nPlanes[0], nPlanes[0], residual_blocks)
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
@@ -459,7 +526,7 @@ class UNet(tf.keras.layers.Layer):
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
-            m = m + UNet.U(nPlanes[1:])
+            m = m + UNet.U(nPlanes[1:], residual_blocks, reps)
             m.append(
                 tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
             m.append(tf.keras.layers.LeakyReLU(0.))
@@ -470,7 +537,9 @@ class UNet(tf.keras.layers.Layer):
 
             m.append(JoinFeat())
 
-            UNet.block(m, 2 * nPlanes[0], nPlanes[0])
+            for i in range(reps):
+                UNet.block(m, nPlanes[0] * (2 if i == 0 else 1), nPlanes[0],
+                           residual_blocks)
 
         return m
 
@@ -482,6 +551,9 @@ class UNet(tf.keras.layers.Layer):
                 feat = module(feat, training=training)
             elif isinstance(module, tf.keras.layers.LeakyReLU):
                 feat = module(feat)
+
+            elif module.__name__() == "ResidualBlock":
+                feat = module(feat, pos, training=training)
 
             elif module.__name__() == "SubmanifoldSparseConv":
                 feat = module(feat, pos)

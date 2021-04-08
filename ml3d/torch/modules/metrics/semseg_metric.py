@@ -27,13 +27,11 @@ class SemSegMetric(object):
         for label in range(self.num_classes):
             tp = np.longlong(self.conf_matrix[label, label])
             fn = np.longlong(self.conf_matrix[label, :].sum()) - tp
-            fp = np.longlong(self.conf_matrix[:, label].sum()) - tp
-            tn = np.longlong(self.conf_matrix.sum()) - (tp + fp + fn)
 
-            if tp + tn + fp + fn == 0:
+            if tp + fn == 0:
                 acc = float('nan')
             else:
-                acc = (tp + tn) / (tp + tn + fp + fn)
+                acc = tp / (tp + fn)
 
             accs.append(acc)
 

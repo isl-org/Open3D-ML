@@ -28,6 +28,8 @@ class SparseConvUnet(BaseModel):
                                              device=device,
                                              m=m,
                                              voxel_size=voxel_size,
+                                             reps=reps,
+                                             residual_blocks=residual_blocks,
                                              in_channels=in_channels,
                                              num_classes=num_classes,
                                              **kwargs)
@@ -396,9 +398,18 @@ class ResidualBlock(nn.Module):
     def forward(self, feat, pos):
         out1 = self.lin(feat)
 
-        feat = self.relu1(self.bn1(feat))
+        if feat.shape[0] == 1:
+            feat *= 0
+        else:
+            feat = self.relu1(self.bn1(feat))
+
         feat = self.scn1(feat, pos)
-        feat = self.relu2(self.bn2(feat))
+
+        if feat.shape[0] == 1:
+            feat *= 0
+        else:
+            feat = self.relu2(self.bn2(feat))
+
         out2 = self.scn2(feat, pos)
 
         return out1 + out2
@@ -412,16 +423,16 @@ class UNet(nn.Module):
     def __init__(self,
                  reps,
                  nPlanes,
-                 resudual_blocks=False,
+                 residual_blocks=False,
                  downsample=[2, 2],
                  leakiness=0):
         super(UNet, self).__init__()
-        self.net = nn.ModuleList(self.U(nPlanes, resudual_blocks, reps))
-        self.resudual_blocks = resudual_blocks
+        self.net = nn.ModuleList(self.U(nPlanes, residual_blocks, reps))
+        self.residual_blocks = residual_blocks
 
     @staticmethod
-    def block(m, a, b, resudual_blocks):
-        if resudual_blocks:
+    def block(m, a, b, residual_blocks):
+        if residual_blocks:
             m.append(ResidualBlock(a, b))
 
         else:
@@ -433,10 +444,10 @@ class UNet(nn.Module):
                                       kernel_size=[3, 3, 3]))
 
     @staticmethod
-    def U(nPlanes, resudual_blocks, reps):
+    def U(nPlanes, residual_blocks, reps):
         m = []
         for i in range(reps):
-            UNet.block(m, nPlanes[0], nPlanes[0], resudual_blocks)
+            UNet.block(m, nPlanes[0], nPlanes[0], residual_blocks)
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
@@ -446,7 +457,7 @@ class UNet(nn.Module):
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
-            m = m + UNet.U(nPlanes[1:], resudual_blocks, reps)
+            m = m + UNet.U(nPlanes[1:], residual_blocks, reps)
             m.append(nn.BatchNorm1d(nPlanes[1], eps=1e-4, momentum=0.01))
             m.append(nn.LeakyReLU(0))
             m.append(
@@ -458,7 +469,7 @@ class UNet(nn.Module):
 
             for i in range(reps):
                 UNet.block(m, nPlanes[0] * (2 if i == 0 else 1), nPlanes[0],
-                           resudual_blocks)
+                           residual_blocks)
 
         return m
 
