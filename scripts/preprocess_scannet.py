@@ -21,6 +21,7 @@ from tqdm import tqdm
 import open3d as o3d
 from open3d.core import Tensor
 from open3d.ml.datasets import utils
+from open3d.ml.datasets import Scannet
 PointCloud = o3d.t.geometry.PointCloud
 BEVBox3D = utils.bev_box.BEVBox3D
 
@@ -125,9 +126,7 @@ class RGBDFrame():
     def decompress_depth(self, compression_type):
         if compression_type == 'zlib_ushort':
             return self.decompress_depth_zlib()
-        else:
-            raise RuntimeError("Unknown depth compression type " +
-                               compression_type)
+        raise RuntimeError("Unknown depth compression type " + compression_type)
 
     def decompress_depth_zlib(self):
         return zlib.decompress(self.depth_data)
@@ -135,9 +134,7 @@ class RGBDFrame():
     def decompress_color(self, compression_type):
         if compression_type == 'jpeg':
             return self.decompress_color_jpeg()
-        else:
-            raise RuntimeError("Unknown color compression type " +
-                               compression_type)
+        raise RuntimeError("Unknown color compression type " + compression_type)
 
     def decompress_color_jpeg(self):
         return imageio.imread(self.color_data)
@@ -663,20 +660,17 @@ class ScannetProcess():
         return seg_to_verts, num_verts
 
     def compute_dataset_statistics(self):
+        """ Compute statistics on the dataset using the training and validation
+        splits. Statistics are generated separately for scenes and frames."""
 
         def get_scene_stats(scan):
             try:
-                mesh_vertices = np.load(f'{join(self.out_path, scan)}_vert.npy')
-                semantic_labels = np.load(
-                    f'{join(self.out_path, scan)}_sem_label.npy')
-                instance_labels = np.load(
-                    f'{join(self.out_path, scan)}_ins_label.npy')
-                instance_bboxes = np.load(
-                    f'{join(self.out_path, scan)}_bbox.npy')
+                mesh_vertices = dset.read_lidar(scan + '_vert')
+                instance_bboxes, semantic_labels, instance_labels = dset.read_label_files(
+                    scan)
             except FileNotFoundError:
-                log.warning(
-                    f"Some files are missing: {join(self.out_path, scan)}_*.npy."
-                    + " Please re-run preprocessing.")
+                log.warning(f"Some files are missing: {scan}_*.np[yz]." +
+                            " Please re-run preprocessing.")
                 return None
             return utils.statistics.compute_scene_stats(mesh_vertices,
                                                         semantic_labels,
@@ -685,24 +679,24 @@ class ScannetProcess():
 
         def get_frame_stats(frame):
             try:
-                mesh_vertices = np.load(
-                    f'{join(self.out_frame_path, frame)}_vert.npy')
-                instance_bboxes = np.load(
-                    f'{join(self.out_frame_path, frame)}_bbox.npy')
+                mesh_vertices = dset.read_lidar(frame + '_vert')
+                _, _, instance_bboxes = dset.read_label_files(frame)
             except FileNotFoundError:
-                log.warning(
-                    f"Some files are missing: {join(self.out_path, frame)}_*.npy."
-                    + " Please re-run preprocessing.")
+                log.warning(f"Some files are missing: {frame}_*.np[yz]." +
+                            " Please re-run preprocessing.")
                 return None
             return utils.statistics.compute_scene_stats(mesh_vertices, None,
                                                         None, instance_bboxes)
 
         with concurrent.futures.ThreadPoolExecutor(
-                max_workers=self.max_workers) as runner:
+                max_workers=os.cpu_count()) as runner:
             if self.scene_pcd:
+                dset = Scannet(self.out_path, portion='scenes')
+                scenes = dset.get_split_list('train') + dset.get_split_list(
+                    'val')
                 scene_stats = list(
-                    tqdm(runner.map(get_scene_stats, self.scans),
-                         total=len(self.scans),
+                    tqdm(runner.map(get_scene_stats, scenes),
+                         total=len(scenes),
                          desc="scene_stats",
                          unit="scene"))
 
@@ -711,18 +705,21 @@ class ScannetProcess():
                 with open(join(self.out_path, 'scene_summary.yaml'),
                           'w') as sumfile:
                     yaml.dump(dataset_stats, sumfile)
-            # if self.frame_pcd:
-            #     frame_stats = list(
-            #         tqdm(runner.map(get_frame_stats, self.scans),
-            #              total=len(self.scans),
-            #              desc="frame_stats",
-            #              unit="frame"))
+            if self.frame_pcd:
+                dset = Scannet(self.out_path, portion='frames')
+                frames = dset.get_split_list('train') + dset.get_split_list(
+                    'val')
+                frame_stats = list(
+                    tqdm(runner.map(get_frame_stats, frames),
+                         total=len(frames),
+                         desc="frame_stats",
+                         unit="frame"))
 
-            #     dataset_stats = utils.statistics.compute_dataset_stats(
-            #         frame_stats)
-            #     with open(join(self.out_path, 'frame_summary.yaml'),
-            #               'w') as sumfile:
-            #         yaml.dump(dataset_stats, sumfile)
+                dataset_stats = utils.statistics.compute_dataset_stats(
+                    frame_stats)
+                with open(join(self.out_path, 'frame_summary.yaml'),
+                          'w') as sumfile:
+                    yaml.dump(dataset_stats, sumfile)
 
 
 if __name__ == '__main__':
@@ -734,7 +731,7 @@ if __name__ == '__main__':
     if args.out_path is None:
         args.out_path = args.dataset_path
 
-    max_processes = 64
+    max_processes = os.cpu_count() // 2
     if not args.only_stats:
         with concurrent.futures.ProcessPoolExecutor(
                 max_workers=max_processes) as executor:

@@ -69,7 +69,7 @@ class Scannet(BaseDataset):
             if 'scene' in f and f.endswith('.npy'):
                 available_scenes.append(f[:12])
 
-        available_scenes = list(set(available_scenes))
+        available_scenes = set(available_scenes)
 
         resource_path = Path(__file__).parent / '_resources' / 'scannet'
         train_files = open(resource_path /
@@ -121,7 +121,8 @@ class Scannet(BaseDataset):
         else:  # npy
             return np.load(path + '.npy')
 
-    def read_label(self, scene):
+    @staticmethod
+    def read_label_files(scene):
         instance_mask = np.load(scene + '_ins_label.npy') if isfile(
             scene + '_ins_label.npy') else np.array([], dtype=np.int32)
         semantic_mask = np.load(scene + '_sem_label.npy') if isfile(
@@ -129,7 +130,10 @@ class Scannet(BaseDataset):
         bboxes = np.load(scene +
                          '_bbox.npy') if isfile(scene +
                                                 '_bbox.npy') else np.array([])
+        return instance_mask, semantic_mask, bboxes
 
+    def read_label(self, scene):
+        instance_mask, semantic_mask, bboxes = self.read_label_files(scene)
         ## For filtering semantic labels to have same classes as object detection.
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)

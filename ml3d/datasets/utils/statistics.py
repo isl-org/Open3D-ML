@@ -15,36 +15,39 @@ def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
         mesh_vertices: (n_pts, 6) array with each row XYZRGB of a vertex
         semantic_labels: (n_pts, ) array with class label ids
         instance_labels: (n_pts, ) array with instance label ids
-        instance_bboxes: (n_pts, 7) array with each row (xc, yc, zc, dx, dy,
-        dz, class_label)
+        instance_bboxes: (n_pts, 8) array with each row (xc, yc, zc, dx, dy,
+        dz, yaw, class_label)
     Returns:
         scene_stats(dict):
     """
     stats = {}
-    stats['points_per_scene'] = mesh_vertices.shape[0]
-    stats['vertices'] = {
-        'min': np.amin(mesh_vertices[:, :3], axis=0),
-        'max': np.amax(mesh_vertices[:, :3], axis=0)
-    }
-    class_id, class_bbox_count = np.unique(instance_bboxes[:, -1],
-                                           return_counts=True)
-    stats['class_count'] = dict(
-        zip(class_id.tolist(), class_bbox_count.tolist()))
+    if mesh_vertices is not None:
+        stats['points_per_scene'] = mesh_vertices.shape[0]
+        stats['vertices'] = {
+            'min': np.amin(mesh_vertices[:, :3], axis=0),
+            'max': np.amax(mesh_vertices[:, :3], axis=0)
+        }
+    if instance_bboxes is not None:
+        class_id, class_bbox_count = np.unique(instance_bboxes[:, -1],
+                                               return_counts=True)
+        stats['class_count'] = dict(
+            zip(class_id.tolist(), class_bbox_count.tolist()))
 
-    stats['bbox_shape'] = {
-        class_id: [] for class_id in np.unique(instance_bboxes[:, -1])
-    }
-    for bbox in instance_bboxes:
-        stats['bbox_shape'][bbox[-1]].append(bbox[3:6])
+        stats['bbox_shape'] = {
+            class_id: [] for class_id in np.unique(instance_bboxes[:, -1])
+        }
+        for bbox in instance_bboxes:
+            stats['bbox_shape'][bbox[-1]].append(bbox[3:6])
 
-    instance_id, n_pts_seg = np.unique(instance_labels, return_counts=True)
-    instance_to_class = dict(zip(instance_labels, semantic_labels))
-    stats['n_pts_seg'] = {
-        class_id: [] for class_id in instance_to_class.values()
-    }
-    stats['n_pts_seg'][0] = []  # Unlabeled
-    for instance, n_pts in zip(instance_id, n_pts_seg):
-        stats['n_pts_seg'][instance_to_class[instance]].append(n_pts)
+    if instance_labels is not None and semantic_labels is not None:
+        instance_id, n_pts_seg = np.unique(instance_labels, return_counts=True)
+        instance_to_class = dict(zip(instance_labels, semantic_labels))
+        stats['n_pts_seg'] = {
+            class_id: [] for class_id in instance_to_class.values()
+        }
+        stats['n_pts_seg'][0] = []  # Unlabeled
+        for instance, n_pts in zip(instance_id, n_pts_seg):
+            stats['n_pts_seg'][instance_to_class[instance]].append(n_pts)
 
     return stats
 
@@ -111,18 +114,17 @@ def compute_dataset_stats(scene_stats):
         data_stats['bbox_shape'] = dict(zip(class_ids, [[]] * len(class_ids)))
         class_bboxes = dict(zip(class_ids, [[]] * len(class_ids)))
         for class_id in class_ids:
-            class_bboxes[class_id] = [
+            class_bboxes[class_id] = np.array([
                 bbox for stats in scene_stats
                 for bbox in (stats['bbox_shape'][class_id] if class_id in
                              stats['bbox_shape'] else [])
-            ]
+            ])
             data_stats['bbox_shape'][class_id] = {
                 'mean': np.mean(class_bboxes[class_id], axis=0).tolist(),
                 'std': np.std(class_bboxes[class_id], axis=0).tolist()
             }
         anchor_boxes, mIoU = calc_anchor_boxes(
-            class_bboxes, range(len(class_ids) // 2,
-                                len(class_ids) // 2 + 1))
+            class_bboxes, range(len(class_ids) // 2, 2 * len(class_ids) + 1))
         data_stats['anchor_boxes'] = {
             'mIou': mIoU,
             'anchor_boxes': anchor_boxes

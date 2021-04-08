@@ -41,6 +41,9 @@ from ..modules.losses.cross_entropy import CrossEntropyLoss
 from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
+import matplotlib.pyplot as plt
+# from mpl_toolkits.axes_grid1 import ImageGrid
+
 
 class PointPillars(BaseModel):
     """Object detection model.
@@ -88,6 +91,9 @@ class PointPillars(BaseModel):
             point_cloud_range=point_cloud_range, **voxelize)
         self.voxel_encoder = PillarFeatureNet(
             point_cloud_range=point_cloud_range, **voxel_encoder)
+        # in_channels - cluster and voxel center (5)
+        self.in_channels = self.voxel_encoder.in_channels - 5
+        self.pi_ny, self.pi_nx = scatter['output_shape']  # pseudo image size
         self.middle_encoder = PointPillarsScatter(**scatter)
 
         self.backbone = SECOND(**backbone)
@@ -115,11 +121,28 @@ class PointPillars(BaseModel):
     def voxelize(self, points):
         """Apply hard voxelization to points."""
         voxels, coors, num_points = [], [], []
+        # fig = plt.figure(figsize=(14, 8))
+        # grid = ImageGrid(fig, 111, nrows_ncols=(4, 7), axes_pad=0.1)
+        # for res, ax in zip(points, grid):
         for res in points:
             res_voxels, res_coors, res_num_points = self.voxel_layer(res)
+
+            # avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
+            # vis_image = torch.zeros(self.pi_ny,
+            #                         self.pi_nx,
+            #                         dtype=torch.uint8,
+            #                         device=res_voxels.device)
+            # coords = res_coors.to(torch.long)
+            # vis_image[coords[:, 1],
+            #           coords[:, 2]] = (255 * avg_depth / 3.5).to(torch.uint8)
+            # ax.imshow(vis_image.cpu())
+
             voxels.append(res_voxels)
             coors.append(res_coors)
             num_points.append(res_num_points)
+
+        # plt.show()
+
         voxels = torch.cat(voxels, dim=0)
         num_points = torch.cat(num_points, dim=0)
         coors_batch = []
@@ -206,7 +229,8 @@ class PointPillars(BaseModel):
         }
 
     def preprocess(self, data, attr):
-        points = np.array(data['point'][:, 0:4], dtype=np.float32)
+        points = np.array(data['point'][:, 0:self.in_channels],
+                          dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
         max_val = np.array(self.point_cloud_range[3:])
@@ -535,8 +559,8 @@ class PillarFeatureNet(nn.Module):
 
         Args:
             features (torch.Tensor): Point features or raw points in shape
-                (N, M, C).
-            num_points (torch.Tensor): Number of points in each pillar.
+                (N, M, C) = (n_batch, max_pillars(P), in_channels(D)).
+            num_points (torch.Tensor): Number of points in each pillar (N).
             coors (torch.Tensor): Coordinates of each voxel.
 
         Returns:
