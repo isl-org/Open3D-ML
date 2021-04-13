@@ -98,7 +98,7 @@ class ObjectDetection(BasePipeline):
             test_split,
             batch_size=cfg.test_batch_size,
             num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', False),
+            pin_memory=cfg.get('pin_memory', True),
             collate_fn=batcher.collate_fn,
         )
 

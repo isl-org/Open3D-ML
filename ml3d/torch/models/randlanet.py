@@ -137,7 +137,7 @@ class RandLANet(BaseModel):
 
             result = torch.reshape(results[b], (-1, self.cfg.num_classes))
             probs = torch.nn.functional.softmax(result, dim=-1)
-            probs = result.cpu().data.numpy()
+            probs = probs.cpu().data.numpy()
             labels = np.argmax(probs, 1)
             inds = inputs['data']['point_inds'][b]
 

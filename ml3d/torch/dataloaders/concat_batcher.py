@@ -441,6 +441,8 @@ class PointPillarsBatch:
             if self.bboxes[i] is not None:
                 self.bboxes[i] = self.bboxes[i].pin_memory()
 
+        return self
+
     def to(self, device):
         for i in range(len(self.point)):
             self.point[i] = self.point[i].to(device)
