@@ -3,7 +3,6 @@ import logging
 from tqdm import tqdm
 import numpy as np
 import re
-import time
 
 from datetime import datetime
 
@@ -101,7 +100,8 @@ class ObjectDetection(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+            worker_init_fn=lambda x: np.random.seed(x + int(
+                torch.utils.data.get_worker_info().seed % 1000000)))
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -153,7 +153,8 @@ class ObjectDetection(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+            worker_init_fn=lambda x: np.random.seed(x + int(
+                torch.utils.data.get_worker_info().seed % 1000000)))
 
         log.info("Started validation")
 
@@ -255,7 +256,8 @@ class ObjectDetection(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+            worker_init_fn=lambda x: np.random.seed(x + int(
+                torch.utils.data.get_worker_info().seed % 1000000)))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 

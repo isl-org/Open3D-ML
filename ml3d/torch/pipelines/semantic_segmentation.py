@@ -4,7 +4,6 @@ import numpy as np
 import logging
 import sys
 import warnings
-import time
 
 from datetime import datetime
 from tqdm import tqdm
@@ -353,7 +352,8 @@ class SemanticSegmentation(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+            worker_init_fn=lambda x: np.random.seed(x + int(
+                torch.utils.data.get_worker_info().seed % 1000000)))
 
         valid_dataset = dataset.get_split('validation')
         valid_sampler = valid_dataset.sampler
@@ -371,7 +371,8 @@ class SemanticSegmentation(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(time.time())))
+            worker_init_fn=lambda x: np.random.seed(x + int(
+                torch.utils.data.get_worker_info().seed % 1000000)))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
