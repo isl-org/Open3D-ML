@@ -898,6 +898,9 @@ class Anchor3DHead(nn.Module):
                 anchors_stride = anchors[i][..., j, :, :].reshape(
                     -1, self.box_code_size)
 
+                if target_bboxes[i].shape[0] == 0:
+                    continue
+
                 # compute a fast approximation of IoU
                 overlaps = bbox_overlaps(box3d_to_bev2d(target_bboxes[i]),
                                          box3d_to_bev2d(anchors_stride))
@@ -905,7 +908,7 @@ class Anchor3DHead(nn.Module):
                 # for each anchor the gt with max IoU
                 max_overlaps, argmax_overlaps = overlaps.max(dim=0)
                 # for each gt the anchor with max IoU
-                gt_max_overlaps, gt_argmax_overlaps = overlaps.max(dim=1)
+                gt_max_overlaps, _ = overlaps.max(dim=1)
 
                 pos_idx = max_overlaps >= pos_th
                 neg_idx = (max_overlaps >= 0) & (max_overlaps < neg_th)

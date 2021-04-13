@@ -8,8 +8,7 @@ model:
   name: PointRCNN
   ckpt_path: # path/to/your/checkpoint
   
-  use_rpn: False
-  use_rcnn: True
+  batcher: "ignore" # for TF, does use the batcher of the model class
 
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
   classes: ['Car']
@@ -17,10 +16,10 @@ model:
   npoint: 16384
   score_thres: 0.3
 
-  rpn:
-    backbone:
+  rpn: # First module for bottom-up 3D proposal generation
+    backbone: # backbone based on PointNet++
       in_channels: 0 # only xyz, no features
-      SA_config:
+      SA_config: # multiscale pointnet config
           npoints: [4096, 1024, 256, 64]
           radius: [[0.1, 0.5], [0.5, 1.0], [1.0, 2.0], [2.0, 4.0]]
           nsample: [[16, 32], [16, 32], [16, 32], [16, 32]]
@@ -43,24 +42,25 @@ model:
 
     loss_weight: [1.0, 1.0]
 
-    head:
-        # config of bin-based loss
-        loc_xz_fine: True
+    head: # config of bin-based loss
+        loc_xz_fine: True # False for pre-trained
         loc_scope: 3.0
         loc_bin_size: 0.5
         num_head_bin: 12
         nms_pre: 9000
-        nms_post: 512 # 100
-        nms_thres: 0.85 # 0.8
+        nms_post: 512
+        nms_thres: 0.85
+        nms_post_val: 100
+        nms_thres_val: 0.8
         mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
 
-  rcnn:
+  rcnn: # Second module for refinement of result
     in_channels: 128
     xyz_up_layer: [128, 128]
     cls_out_ch: [256, 256]
     reg_out_ch: [256, 256]
 
-    SA_config:
+    SA_config: # multiscale pointnet config
       npoints: [128, 32, -1]
       radius: [0.2, 0.4, 100]
       nsample: [64, 64, 64]
@@ -82,7 +82,7 @@ model:
       post_process: False
       nms_thres: 0.1
 
-    target_head:
+    target_head: # mapping of gt to pred boxes
       pool_extra_width: 1.0
       num_points: 512
       reg_fg_thresh: 0.55
@@ -94,18 +94,14 @@ model:
       aug_rot_range: 18
       hard_bg_ratio: 0.8
       roi_fg_aug_times: 10
-      
-  augment:
-    PointShuffle: True
-    ObjectRangeFilter: True
 
 
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 16
+  batch_size: 1 #4
   max_epoch: 200
-  val_batch_size: 1
+  val_batch_size: 1 #4
   test_batch_size: 1
   save_ckpt_freq: 5
   main_log_dir: ./logs

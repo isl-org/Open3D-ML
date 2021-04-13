@@ -20,7 +20,7 @@ class BasePipeline(ABC):
         Args:
             model: network
             dataset: dataset, or None for inference model
-            devce: 'gpu' or 'cpu'
+            device: 'gpu' or 'cpu'
             kwargs:
         Returns:
             class: The corresponding class.
