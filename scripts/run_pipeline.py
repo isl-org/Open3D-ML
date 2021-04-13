@@ -31,6 +31,7 @@ def parse_args():
                         help='device to run the pipeline',
                         default='gpu')
     parser.add_argument('--split', help='train or test', default='train')
+    parser.add_argument('--mode', help='additional mode', default=None)
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
 
@@ -95,7 +96,7 @@ def main():
 
         dataset = Dataset(cfg_dict_dataset.pop('dataset_path', None),
                           **cfg_dict_dataset)
-        model = Model(**cfg_dict_model)
+        model = Model(**cfg_dict_model, mode=args.mode)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
     else:
         if (args.pipeline and args.model and args.dataset) is None:
@@ -111,7 +112,7 @@ def main():
                         _ml3d.utils.Config.merge_module_cfg_file(args, extra_dict)
 
         dataset = Dataset(**cfg_dict_dataset)
-        model = Model(**cfg_dict_model)
+        model = Model(**cfg_dict_model, mode=args.mode)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
 
     with open(Path(__file__).parent / 'README.md', 'r') as f:
