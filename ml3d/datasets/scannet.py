@@ -145,13 +145,21 @@ class Scannet(BaseDataset):
             semantic_mask = remapper[semantic_mask]
 
         objects = []
-        for box in bboxes:
-            name = self.label2cat[self.cat_ids2class[int(box[-1])]]
+        for box in bboxes:  # Boxes may be [xyz,wlh,c] or [xyz,wlh,y,c,t,n]
             center = box[:3]
             size = [box[3], box[5], box[4]]  # w, h, l
+            if len(box) > 7:  # yaw is present in frames
+                yaw = box[6]
+                cat_id = int(box[7])
+            else:
+                yaw = 0.0
+                cat_id = int(box[6])
+            name = self.label2cat[self.cat_ids2class[cat_id]]
 
-            yaw = box[-2] if len(box) == 8 else 0.0  # yaw is present in frames
-            objects.append(Object3d(name, center, size, yaw))
+            truncation = box[8] if len(box) > 8 else 0.0
+            n_pts_inside = box[9] if len(box) > 9 else None
+            objects.append(
+                Object3d(name, center, size, yaw, truncation, n_pts_inside))
 
         return objects, semantic_mask, instance_mask
 
@@ -224,28 +232,35 @@ class Object3d(BEVBox3D):
     Stores object specific details like bbox coordinates.
     """
 
-    def __init__(self, name, center, size, yaw):
+    def __init__(self,
+                 name,
+                 center,
+                 size,
+                 yaw,
+                 truncation=0.0,
+                 n_pts_inside=None):
         super().__init__(center, size, yaw, name, -1.0)
 
         self.occlusion = 0.0
+        self.truncation = truncation
+        self.n_pts_inside = n_pts_inside
 
     def get_difficulty(self):
         """
         The method determines difficulty level of the object, such as Easy (0),
-        Moderate (1), Hard (2), VeryHard (3) or Unknown (4) depening on the
-        occlsion and the number of points inside the box.
+        Moderate (1), Hard (2), VeryHard (3) or Unknown (4) depending on the
+        truncation and the number of points inside the box.
         """
-        if not (hasattr(self, 'occlusion') and
-                hasattr(self, 'n_points_inside')):
+        if not (hasattr(self, 'truncation') and hasattr(self, 'n_pts_inside')):
             self.level_str = 'Unknown'
             return 4
-        if self.occlusion > 0.75 or self.n_points_inside < 100:
+        if self.truncation > 0.75 or self.n_pts_inside < 100:
             self.level_str = 'VeryHard'
             return 3
-        elif self.occlusion > 0.5 or self.n_points_inside < 1000:
+        elif self.truncation > 0.5 or self.n_pts_inside < 1000:
             self.level_str = 'Hard'
             return 2
-        elif self.occlusion > 0.25 or self.n_points_inside < 10000:
+        elif self.truncation > 0.25 or self.n_pts_inside < 10000:
             self.level_str = 'Moderate'
             return 1
         else:

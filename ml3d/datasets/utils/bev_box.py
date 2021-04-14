@@ -49,9 +49,9 @@ class BEVBox3D(BoundingBox3D):
 
         self.points_inside_box = np.array([])
         self.level = self.get_difficulty()
-        if self.world_cam:
-            self.dis_to_cam = np.linalg.norm(self.center @ self.world_cam[:3, :3] +
-                                         self.world_cam[3, :3])
+        if self.world_cam is not None:
+            self.dis_to_cam = np.linalg.norm(
+                self.center @ self.world_cam[:3, :3] + self.world_cam[3, :3])
         else:
             self.dis_to_cam = np.linalg.norm(self.center)
 

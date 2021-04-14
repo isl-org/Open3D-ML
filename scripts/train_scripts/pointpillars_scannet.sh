@@ -3,8 +3,7 @@
 #SBATCH -c 14
 #SBATCH --gres=gpu:1
 
-function term_handler()
-{
+function term_handler() {
     echo "Cleaning up.."
     rm -rf /dev/shm/slurm-${SLURM_JOB_ID}
 }
@@ -27,7 +26,7 @@ export OPEN3D_ML_ROOT=$HOME/Documents/Open3D/Code/Open3D-ML
 # python -m pyprof.parse pointpillars.sqlite > pointpillars.dict
 # python -m pyprof.prof --csv pointpillars.dict > pyprof-pointpillars.csv
 # Cache up to 8G data in RAM, larger data in local disk
-if (( $(du -m "$2" | cut -f1) > 8192 )); then
+if (($(du -m "$2" | cut -f1) > 8192)); then
     LOCALDIR="$TMPDIR"/data
 else
     LOCALDIR=/dev/shm/slurm-${SLURM_JOB_ID}/data
@@ -38,7 +37,7 @@ echo Copying training data to $LOCALDIR
 rsync -ah --info=progress2 "$2/." "$LOCALDIR"
 # LOCALDIR="$2"
 tensorboard --logdir /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/scannet-frames/train_logs \
-  --bind_all --port=6036 &
+    --bind_all --port=6036 &
 CONFIG_FILE=${3:-"ml3d/configs/pointpillars_scannet_frames.yml"}
 echo "Starting training..."
 python scripts/run_pipeline.py "$1" -c "$CONFIG_FILE" \
@@ -47,5 +46,5 @@ python scripts/run_pipeline.py "$1" -c "$CONFIG_FILE" \
     --main_log_dir /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/scannet-frames/logs-$(date -I) \
     --pipeline.train_sum_dir /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/scannet-frames/train_logs \
     --pipeline ObjectDetection
-    #--ckpt_path /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/logs/PointPillars_Scannet_torch/checkpoint/ckpt_00030.pth \
+#--ckpt_path /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/logs/PointPillars_Scannet_torch/checkpoint/ckpt_00030.pth \
 # popd

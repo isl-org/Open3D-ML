@@ -272,8 +272,8 @@ class ScannetProcess():
                     unit="scan"):
                 try:
                     self.process_scene(scan)
-                    log.info("Pending tasks: %d",
-                             self._runner._work_queue.qsize())
+                    log.debug("Pending tasks: %d",
+                              self._runner._work_queue.qsize())
                 except (FileNotFoundError, Exception):
                     errmsg = f'{scan}: ' + traceback.format_exc()
                     log.warning(errmsg)
@@ -284,11 +284,11 @@ class ScannetProcess():
                     errfile.write("Processing failed:\n" + "\n".join(errors))
 
     def process_scene(self, scan):
-        if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
-                isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
-                isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
-                isfile(f'{join(self.out_path, scan)}_bbox.npy')):
-            return
+        # if (isfile(f'{join(self.out_path, scan)}_vert.npy') and
+        #         isfile(f'{join(self.out_path, scan)}_sem_label.npy') and
+        #         isfile(f'{join(self.out_path, scan)}_ins_label.npy') and
+        #         isfile(f'{join(self.out_path, scan)}_bbox.npy')):
+        #     return
 
         log.info("Processing " + scan)
         in_path = join(self.dataset_path, scan)
@@ -412,6 +412,77 @@ class ScannetProcess():
         pcd.point["colors"] = Tensor.from_numpy(pts_colors)
         return pcd
 
+    @staticmethod
+    def get_difficulty(o3d_bbox, pointcloud):
+        """ Estimate difficulty level for instance bounding box as truncation
+        ratio and number of points inside bounding box. Truncation ratio is the
+        ratio of volumes of bounding box for points inside o3d_bbox to the full
+        o3d_bbox.
+
+        Args:
+            o3d_bbox (BoundingBox3D): Bounding box
+            pointcloud ((N,3) array): Point cloud in reference frame where
+                bounding box is axis aligned.
+        Returns:
+            tuple (truncation ratio, number of points inside bounding box)
+        """
+
+        pcd_in = pointcloud[o3d_bbox.inside(pointcloud), :]
+        if pcd_in.shape[0] == 0:  # No points inside box
+            return 1, 0
+        min_extent = pcd_in.min(axis=0)
+        max_extent = pcd_in.max(axis=0)
+        truncation = 1 - np.prod(max_extent - min_extent) / np.prod(
+            o3d_bbox.size)
+        if not 0 <= truncation <= 1:
+            log.error(f"truncation is {truncation} for {o3d_bbox}")
+        return truncation, pcd_in.shape[0]
+
+    def process_frame(self, pcd, label_to_depth, frame_pcd_path,
+                      instance_bboxes, intrinsic_depth):
+        """ Process a single frame and save the point cloud and bounding boxes.
+
+        Args:
+            pcd:
+            label_to_depth:
+            frame_pcd_path (str or Path): Data will be saved here with suffixes
+                `_bbox.npy` and `_vert.npz`
+            instance_bboxes:
+            intrinsic_depth ((4,4) array):
+
+        Returns: (Int) Number of bounding boxes in the frame
+        """
+
+        frame_instance_bboxes = []
+        mesh_vertices = np.hstack((pcd.point["points"].cpu().numpy(),
+                                   pcd.point["colors"].cpu().numpy()))
+        depth_to_label = np.linalg.inv(label_to_depth)
+        pcd_label = (mesh_vertices[:, :3] @ depth_to_label[:3, :3].T +
+                     depth_to_label[:3, 3].T)
+        for bbox in instance_bboxes:
+            bev_bbox = BEVBox3D(
+                bbox[:3],  # center xyz
+                bbox[3:6],  # size w=dx, l=dy, h=dz
+                0,  # yaw angle
+                bbox[6],  # label
+                1,  # confidence
+                world_cam=label_to_depth.T,
+                cam_img=intrinsic_depth.T)
+            truncation, n_pts_inside = self.get_difficulty(bev_bbox, pcd_label)
+            if n_pts_inside > self.min_instance_pts:
+                bev_bbox_cam = bev_bbox.to_camera_bev()
+                frame_instance_bboxes.append(
+                    np.append(bev_bbox_cam.to_xyzwlhyc(),
+                              [truncation, n_pts_inside]))
+        # Don't save empty frames
+        if frame_instance_bboxes:
+            self._runner.submit(np.save, frame_pcd_path + "_bbox.npy",
+                                np.vstack(frame_instance_bboxes))
+            self._runner.submit(np.savez_compressed,
+                                frame_pcd_path + "_vert.npz",
+                                point=mesh_vertices)
+        return len(frame_instance_bboxes)
+
     def export_frame_pointclouds(self, scan, instance_bboxes, axis_align_matrix,
                                  color_to_depth):
         """Read <scan>/<scan>.sens file for a scene and convert depth frames to
@@ -433,7 +504,7 @@ class ScannetProcess():
         # label_to_depth = color_to_depth @ np.linalg.inv( axis_align_matrix @ camera_to_world)
         device = o3d.core.Device('cpu:0')
         # 'cuda:0' if o3d.core.cuda.is_available() else 'cpu:0')
-        frame_id = 0
+        frame_id = 0  # frame_id to write
         n_frames = 0  # frames with visible bboxes
         n_bbox = 0  # visible bboxes
         sens_file = join(self.dataset_path, scan, scan + '.sens')
@@ -450,7 +521,6 @@ class ScannetProcess():
                                                     unit='frame'):
             if not self.frame_color:
                 color = None
-            frame_instance_bboxes = []
             depth_image = o3d.t.geometry.Image(
                 o3d.core.Tensor.from_numpy(depth).to(device))
             # Assume color ref == camera ref
@@ -462,57 +532,27 @@ class ScannetProcess():
                 Tensor.eye(4, device=device, dtype=o3d.core.Dtype.Float32),
                 sensor_data.depth_shift, sensor_data.depth_max, self.pcd_stride)
 
-            if not pcd_future[0]:
-                pcd_future[0] = pcd_future[1]
-                label_to_depth[0] = label_to_depth[1]
-                continue
-            mesh_vertices = np.hstack(
-                (pcd_future[0].result().point["points"].cpu().numpy(),
-                 pcd_future[0].result().point["colors"].cpu().numpy()))
-            for bbox in instance_bboxes:
-                bev_bbox = BEVBox3D(
-                    bbox[:3],  # center xyz
-                    bbox[3:6],  # size w=dx, l=dy, h=dz
-                    0,  # yaw angle
-                    bbox[6],  # label
-                    1,  # confidence
-                    world_cam=label_to_depth[0].T,
-                    cam_img=sensor_data.intrinsic_depth.T)
-                bev_bbox_cam = bev_bbox.to_camera_bev()
-                if len(bev_bbox_cam.inside(
-                        mesh_vertices[:, :3])) > self.min_instance_pts:
-                    frame_instance_bboxes.append(bev_bbox_cam)
-            # Don't save empty frames
-            if frame_instance_bboxes:
-                n_bbox += len(frame_instance_bboxes)
-                n_frames += 1
-                frame_pcd = f"{scan}_{frame_id:06}"
-                np_bboxes = np.vstack(
-                    list(box.to_xyzwlhyc() for box in frame_instance_bboxes))
-                self._runner.submit(
-                    np.save, f'{join(self.out_frame_path, frame_pcd)}_bbox.npy',
-                    np_bboxes)
-                self._runner.submit(
-                    np.savez_compressed,
-                    f'{join(self.out_frame_path, frame_pcd)}_vert.npz',
-                    point=mesh_vertices)
+            if pcd_future[0]:
+                n_frame_bbox = self.process_frame(
+                    pcd_future[0].result(), label_to_depth[0],
+                    join(self.out_frame_path, f"{scan}_{frame_id:06}"),
+                    instance_bboxes, sensor_data.intrinsic_depth)
+                if n_frame_bbox > 0:
+                    n_frames += 1
+                    n_bbox += n_frame_bbox
+                frame_id += self.frame_skip
+
             pcd_future[0] = pcd_future[1]
             label_to_depth[0] = label_to_depth[1]
-            frame_id += self.frame_skip
 
         # Save last frame
-        if frame_instance_bboxes:
-            mesh_vertices = np.hstack(
-                (pcd_future[0].result().point["points"].cpu().numpy(),
-                 pcd_future[0].result().point["colors"].cpu().numpy()))
-            frame_pcd = f"{scan}_{frame_id:06}"
-            self._runner.submit(
-                np.savez_compressed,
-                f'{join(self.out_frame_path, frame_pcd)}_vert.npz',
-                point=mesh_vertices)
-            self._runner.submit(
-                np.save, f'{join(self.out_frame_path, frame_pcd)}_bbox.npy',
-                frame_instance_bboxes)
+        n_frame_bbox = self.process_frame(
+            pcd_future[0].result(), label_to_depth[0],
+            join(self.out_frame_path, f"{scan}_{frame_id:06}"), instance_bboxes,
+            sensor_data.intrinsic_depth)
+        if n_frame_bbox > 0:
+            n_frames += 1
+            n_bbox += n_frame_bbox
         log.info(f"{n_bbox} instances in {n_frames} frames")
 
     def export(self, mesh_file, agg_file, seg_file, meta_file, label_map_file):
@@ -666,7 +706,7 @@ class ScannetProcess():
         def get_scene_stats(scan):
             try:
                 mesh_vertices = dset.read_lidar(scan + '_vert')
-                instance_bboxes, semantic_labels, instance_labels = dset.read_label_files(
+                instance_labels, semantic_labels, instance_bboxes = dset.read_label_files(
                     scan)
             except FileNotFoundError:
                 log.warning(f"Some files are missing: {scan}_*.np[yz]." +
@@ -706,7 +746,7 @@ class ScannetProcess():
                           'w') as sumfile:
                     yaml.dump(dataset_stats, sumfile)
             if self.frame_pcd:
-                dset = Scannet(self.out_path, portion='frames')
+                dset = Scannet(self.out_frame_path, portion='frames')
                 frames = dset.get_split_list('train') + dset.get_split_list(
                     'val')
                 frame_stats = list(
@@ -750,6 +790,7 @@ if __name__ == '__main__':
                 for process in range(max_processes)
             ]
             for process in range(max_processes):
+                # converter[process].convert()
                 futures[process].result()
 
     ScannetProcess(args.dataset_path,

@@ -7,16 +7,21 @@ import logging as log
 import numpy as np
 from sklearn.cluster import KMeans
 
+NBINS = 10
+
 
 def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
                         instance_bboxes):
     """Compute scene statistics
+
     Args:
         mesh_vertices: (n_pts, 6) array with each row XYZRGB of a vertex
         semantic_labels: (n_pts, ) array with class label ids
         instance_labels: (n_pts, ) array with instance label ids
-        instance_bboxes: (n_pts, 8) array with each row (xc, yc, zc, dx, dy,
-        dz, yaw, class_label)
+        instance_bboxes: (n_pts, 7-10) array with each row
+            scenes: [xc, yc, zc, dx, dy, dz, class_id] or
+            frames: [xc, yc, zc, dx, dy, dz, yaw, class_id, truncation, n_pts_inside_bbox]
+
     Returns:
         scene_stats(dict):
     """
@@ -28,16 +33,21 @@ def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
             'max': np.amax(mesh_vertices[:, :3], axis=0)
         }
     if instance_bboxes is not None:
-        class_id, class_bbox_count = np.unique(instance_bboxes[:, -1],
+        cls_idx = 6 if instance_bboxes.shape[1] == 7 else 7
+        class_id, class_bbox_count = np.unique(instance_bboxes[:, cls_idx],
                                                return_counts=True)
         stats['class_count'] = dict(
             zip(class_id.tolist(), class_bbox_count.tolist()))
 
-        stats['bbox_shape'] = {
-            class_id: [] for class_id in np.unique(instance_bboxes[:, -1])
-        }
+        stats['bbox_shape'] = {clsid: [] for clsid in class_id}
         for bbox in instance_bboxes:
-            stats['bbox_shape'][bbox[-1]].append(bbox[3:6])
+            stats['bbox_shape'][bbox[cls_idx]].append(bbox[3:6])
+        if instance_bboxes.shape[1] > 8:
+            stats['truncation'], _ = np.histogram(instance_bboxes[:, 8],
+                                                  bins=NBINS,
+                                                  range=(0, 1))
+        if instance_bboxes.shape[1] > 9:
+            stats['n_pts_bbox'] = instance_bboxes[:, 9]
 
     if instance_labels is not None and semantic_labels is not None:
         instance_id, n_pts_seg = np.unique(instance_labels, return_counts=True)
@@ -54,9 +64,11 @@ def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
 
 def compute_dataset_stats(scene_stats):
     """
-    Compute dataset statistics by aggregating data from all scenes
+    Compute dataset statistics by aggregating data from all scenes.
+
     Args:
         scene_stats(list(dict)):
+
     Returns:
         data_stats(dict):
     """
@@ -125,9 +137,20 @@ def compute_dataset_stats(scene_stats):
             }
         anchor_boxes, mIoU = calc_anchor_boxes(
             class_bboxes, range(len(class_ids) // 2, 2 * len(class_ids) + 1))
-        data_stats['anchor_boxes'] = {
-            'mIou': mIoU,
-            'anchor_boxes': anchor_boxes
+        data_stats['anchor_boxes'] = {'mIou': mIoU, 'boxes': anchor_boxes}
+
+    if 'truncation' in scene_stats[0]:
+        truncation = np.sum([stats['truncation'] for stats in scene_stats],
+                            axis=0).tolist()
+        data_stats['truncation'] = {
+            (i + 1.0) / NBINS: t for i, t in enumerate(truncation)
+        }
+    if 'n_pts_bbox' in scene_stats[0]:
+        n_pts_bbox = np.concatenate(
+            [stats['n_pts_bbox'] for stats in scene_stats])
+        hist = np.histogram(n_pts_bbox, bins=NBINS)
+        data_stats['n_pts_bbox'] = {
+            int(hist[1][k + 1]): int(count) for k, count in enumerate(hist[0])
         }
 
     if 'n_pts_seg' in scene_stats[0]:
@@ -140,7 +163,9 @@ def compute_dataset_stats(scene_stats):
             ]
             data_stats['n_pts_seg'][class_id] = {
                 'mean': float(np.mean(class_n_pts_segs)),
-                'std': float(np.std(class_n_pts_segs))
+                'std': float(np.std(class_n_pts_segs)),
+                'min': int(np.min(class_n_pts_segs)),
+                'max': int(np.max(class_n_pts_segs))
             }
 
     return data_stats
@@ -185,7 +210,7 @@ def calc_anchor_boxes(bbox_shapes, n_anchors):
             for cls in bbox_shapes.keys()
         }
         anchor_boxes[n_clusters].sort(key=lambda box: box[0] * box[1] * box[2])
-        log.info(f"{n_clusters} clusters:\n{anchor_boxes[n_clusters]}")
+        log.debug(f"{n_clusters} clusters:\n{anchor_boxes[n_clusters]}")
         log.info(f"mIoU = {mIoU[n_clusters]}\nclass mIoU = {class_mIoU}")
     return anchor_boxes, mIoU
 
