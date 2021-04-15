@@ -2,7 +2,7 @@ dataset:
   name: Scannet
   dataset_path:  # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: []
+  class_weights: [52539651, 40780759, 6961796, 4665739, 13155460, 4172698, 6368886, 7869501, 6780748, 4418153, 883498, 883847, 3330654, 3637628, 939700, 593984, 547679, 460448, 567893, 6490881]
   test_result_folder: ./test
   use_cache: False
   sampler:
