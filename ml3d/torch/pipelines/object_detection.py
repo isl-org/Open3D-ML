@@ -150,7 +150,7 @@ class ObjectDetection(BasePipeline):
             valid_split,
             batch_size=cfg.val_batch_size,
             num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', True),
+            pin_memory=cfg.get('pin_memory', False),
             collate_fn=batcher.collate_fn,
         )
 
@@ -168,7 +168,7 @@ class ObjectDetection(BasePipeline):
                 for l, v in loss.items():
                     if not l in self.valid_losses:
                         self.valid_losses[l] = []
-                    self.valid_losses[l].append(v.cpu().item())
+                    self.valid_losses[l].append(v.cpu().numpy())
 
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, data)
@@ -252,7 +252,7 @@ class ObjectDetection(BasePipeline):
             train_split,
             batch_size=cfg.batch_size,
             num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', True),
+            pin_memory=cfg.get('pin_memory', False),
             collate_fn=batcher.collate_fn,
         )
 
@@ -297,9 +297,9 @@ class ObjectDetection(BasePipeline):
                 for l, v in loss.items():
                     if not l in self.losses:
                         self.losses[l] = []
-                    self.losses[l].append(v.cpu().item())
-                    desc += " %s: %.03f" % (l, v.cpu().item())
-                desc += " > loss: %.03f" % loss_sum.cpu().item()
+                    self.losses[l].append(v.cpu().detach().numpy())
+                    desc += " %s: %.03f" % (l, v.cpu().detach().numpy())
+                desc += " > loss: %.03f" % loss_sum.cpu().detach().numpy()
                 process_bar.set_description(desc)
                 process_bar.refresh()
 

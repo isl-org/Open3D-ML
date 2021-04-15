@@ -1,3 +1,30 @@
+#***************************************************************************************/
+#
+#    Based on Pointnet2 Library (MIT license):
+#    https://github.com/sshaoshuai/Pointnet2.PyTorch
+#
+#    Copyright (c) 2019 Shaoshuai Shi
+
+#    Permission is hereby granted, free of charge, to any person obtaining a copy
+#    of this software and associated documentation files (the "Software"), to deal
+#    in the Software without restriction, including without limitation the rights
+#    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#    copies of the Software, and to permit persons to whom the Software is
+#    furnished to do so, subject to the following conditions:
+
+#    The above copyright notice and this permission notice shall be included in all
+#    copies or substantial portions of the Software.
+
+#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#    SOFTWARE.
+#
+#***************************************************************************************/
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -60,7 +87,7 @@ class Pointnet2MSG(nn.Module):
 
         return xyz, features
 
-    def forward(self, pointcloud: torch.cuda.FloatTensor):
+    def forward(self, pointcloud):
         xyz, features = self._break_up_pc(pointcloud)
 
         l_xyz, l_features = [xyz], [features]
@@ -103,13 +130,10 @@ class _PointnetSAModuleBase(nn.Module):
         """
         new_features_list = []
 
-        xyz_flipped = xyz.transpose(1, 2).contiguous()
-        if new_xyz is None:
-            new_xyz = pointnet2_utils.gather_operation(
-                xyz_flipped,
-                pointnet2_utils.furthest_point_sample(
-                    xyz, self.npoint)).transpose(
-                        1, 2).contiguous() if self.npoint is not None else None
+        if new_xyz is None and self.npoint is not None:
+            sampling = pointnet2_utils.furthest_point_sample(xyz, self.npoint)
+            new_xyz = torch.gather(xyz, 1,
+                                   torch.stack([sampling] * 3, -1).long())
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,
