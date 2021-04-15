@@ -141,9 +141,10 @@ pipeline:
   main_log_dir: ./logs
   train_sum_dir: ./logs/train_log
   grad_clip_norm: 2
+  num_workers: 8
 
   optimizer:
-    lr: 0.01    # *10
+    lr: 0.003
     betas: [0.95, 0.99]
     weight_decay: 0.01
 

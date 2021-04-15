@@ -93,17 +93,17 @@ class Scannet(BaseDataset):
                     self.test_scenes.append(join(self.dataset_path, scene))
         elif self.portion == 'frames':
             for scene in available_scenes:
-                vert_files = glob(join(self.dataset_path,
-                                       scene + '_*_vert.np?'))
+                bbox_files = glob(join(self.dataset_path,
+                                       scene + '_*_bbox.npy'))
                 if scene in train_files:
                     self.train_scenes.extend(
-                        framefile[:-9] for framefile in vert_files)
+                        framefile[:-9] for framefile in bbox_files)
                 elif scene in val_files:
                     self.val_scenes.extend(
-                        framefile[:-9] for framefile in vert_files)
+                        framefile[:-9] for framefile in bbox_files)
                 elif scene in test_files:
                     self.test_scenes.extend(
-                        framefile[:-9] for framefile in vert_files)
+                        framefile[:-9] for framefile in bbox_files)
 
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
@@ -254,13 +254,13 @@ class Object3d(BEVBox3D):
         if not (hasattr(self, 'truncation') and hasattr(self, 'n_pts_inside')):
             self.level_str = 'Unknown'
             return 4
-        if self.truncation > 0.75 or self.n_pts_inside < 100:
+        if self.truncation > 0.75 or self.n_pts_inside < 256:
             self.level_str = 'VeryHard'
             return 3
-        elif self.truncation > 0.5 or self.n_pts_inside < 1000:
+        elif self.truncation > 0.5 or self.n_pts_inside < 2048:
             self.level_str = 'Hard'
             return 2
-        elif self.truncation > 0.25 or self.n_pts_inside < 10000:
+        elif self.truncation > 0.25 or self.n_pts_inside < 16384:
             self.level_str = 'Moderate'
             return 1
         else:
