@@ -41,32 +41,36 @@ class SparseConvUnet(BaseModel):
         self.unet = UNet(reps, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
                          residual_blocks)
 
-        self.bn = tf.keras.layers.BatchNormalization(momentum=0.99,
-                                                     epsilon=1e-4)
-        self.relu = tf.keras.layers.ReLU()
-
-        self.linear = tf.keras.layers.Dense(num_classes)
+        self.bn = BatchNormBlock()
+        self.relu = ReLUBlock()
+        self.linear = LinearBlock(m, num_classes)
         self.out = OutputLayer()
 
     def call(self, inputs, training=False):
-        output = []
+        pos_list = []
+        feat_list = []
+        rev_list = []
         start_idx = 0
+
         for length in inputs['batch_lengths']:
             pos = inputs['point'][start_idx:start_idx + length]
             feat = inputs['feat'][start_idx:start_idx + length]
 
             feat, pos, rev = self.inp(feat, pos)
-            feat = self.ssc(feat, pos, voxel_size=1.0)
-            feat = self.unet(pos, feat)
-            feat = self.bn(feat)
-            feat = self.relu(feat)
-            feat = self.linear(feat)
-            feat = self.out(feat, rev)
+            pos_list.append(pos)
+            feat_list.append(feat)
+            rev_list.append(rev)
 
-            output.append(feat)
             start_idx += length
 
-        return tf.concat(output, 0)
+        feat_list = self.ssc(feat_list, pos_list, voxel_size=1.0)
+        feat_list = self.unet(pos_list, feat_list, training=training)
+        feat_list = self.bn(feat_list, training=training)
+        feat_list = self.relu(feat_list)
+        feat_list = self.linear(feat_list)
+        output = self.out(feat_list, rev_list)
+
+        return output
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)
@@ -88,6 +92,8 @@ class SparseConvUnet(BaseModel):
         if attr['split'] in ['training', 'train']:
             points, feat, labels = self.augment.augment(
                 points, feat, labels, self.cfg.get('augment', None))
+
+        feat = feat / 127.5 - 1.
 
         m = points.min(0)
         M = points.max(0)
@@ -202,13 +208,73 @@ class SparseConvUnet(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
 
-        optimizer = tf.keras.optimizers.Adam(
-            learning_rate=cfg_pipeline.learning_rate)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=cfg_pipeline.adam_lr)
 
         return optimizer
 
 
 MODEL._register_module(SparseConvUnet, 'tf')
+
+
+class BatchNormBlock(tf.keras.layers.Layer):
+
+    def __init__(self, eps=1e-4, momentum=0.99):
+        super(BatchNormBlock, self).__init__()
+
+        self.bn = tf.keras.layers.BatchNormalization(momentum=momentum,
+                                                     epsilon=eps)
+
+    def call(self, feat_list, training):
+        lengths = [feat.shape[0] for feat in feat_list]
+        out = self.bn(tf.concat(feat_list, 0), training=training)
+        out_list = []
+        start = 0
+        for l in lengths:
+            out_list.append(out[start:start + l])
+            start += l
+
+        return out_list
+
+    def __name__(self):
+        return "BatchNormBlock"
+
+
+class ReLUBlock(tf.keras.layers.Layer):
+
+    def __init__(self):
+        super(ReLUBlock, self).__init__()
+        self.relu = tf.keras.layers.ReLU()
+
+    def call(self, feat_list):
+        lengths = [feat.shape[0] for feat in feat_list]
+        out = self.relu(tf.concat(feat_list, 0))
+        out_list = []
+        start = 0
+        for l in lengths:
+            out_list.append(out[start:start + l])
+            start += l
+
+        return out_list
+
+    def __name__(self):
+        return "ReLUBlock"
+
+
+class LinearBlock(tf.keras.layers.Layer):
+
+    def __init__(self, a, b):
+        super(LinearBlock, self).__init__()
+        self.linear = tf.keras.layers.Dense(b)
+
+    def call(self, feat_list):
+        out_list = []
+        for feat in feat_list:
+            out_list.append(self.linear(feat))
+
+        return out_list
+
+    def __name__(self):
+        return "LinearBlock"
 
 
 class InputLayer(tf.keras.layers.Layer):
@@ -268,8 +334,11 @@ class OutputLayer(tf.keras.layers.Layer):
     def __init__(self, voxel_size=1.0):
         super(OutputLayer, self).__init__()
 
-    def call(self, features, rev):
-        return tf.gather(features, rev)
+    def call(self, features_list, rev_list):
+        out = []
+        for feat, rev in zip(features_list, rev_list):
+            out.append(tf.gather(feat, rev))
+        return tf.concat(out, 0)
 
 
 class SubmanifoldSparseConv(tf.keras.layers.Layer):
@@ -297,10 +366,20 @@ class SubmanifoldSparseConv(tf.keras.layers.Layer):
                               offset=offset,
                               normalize=normalize)
 
-    def call(self, features, inp_positions, out_positions=None, voxel_size=1.0):
-        if out_positions is None:
-            out_positions = inp_positions
-        return self.net(features, inp_positions, out_positions, voxel_size)
+    def call(self,
+             features_list,
+             inp_positions_list,
+             out_positions_list=None,
+             voxel_size=1.0):
+        if out_positions_list is None:
+            out_positions_list = inp_positions_list
+
+        out_feat = []
+        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
+                                          out_positions_list):
+            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+
+        return out_feat
 
     def __name__(self):
         return "SubmanifoldSparseConv"
@@ -363,11 +442,21 @@ class Convolution(tf.keras.layers.Layer):
 
         return (out_pos + 0.5).astype(np.float32)
 
-    def call(self, features, inp_positions, voxel_size=1.0):
-        out_positions = tf.numpy_function(self.calculate_grid, [inp_positions],
-                                          tf.float32)
-        out = self.net(features, inp_positions, out_positions, voxel_size)
-        return out, out_positions / 2
+    def call(self, features_list, inp_positions_list, voxel_size=1.0):
+        out_positions_list = []
+        for inp_positions in inp_positions_list:
+            out_positions_list.append(
+                tf.numpy_function(self.calculate_grid, [inp_positions],
+                                  tf.float32))
+
+        out_feat = []
+        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
+                                          out_positions_list):
+            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+
+        out_positions_list = [out / 2 for out in out_positions_list]
+
+        return out_feat, out_positions_list
 
     def __name__(self):
         return "Convolution"
@@ -398,8 +487,17 @@ class DeConvolution(tf.keras.layers.Layer):
                                        offset=offset,
                                        normalize=normalize)
 
-    def call(self, features, inp_positions, out_positions, voxel_size=1.0):
-        return self.net(features, inp_positions, out_positions, voxel_size)
+    def call(self,
+             features_list,
+             inp_positions_list,
+             out_positions_list,
+             voxel_size=1.0):
+        out_feat = []
+        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
+                                          out_positions_list):
+            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+
+        return out_feat
 
     def __name__(self):
         return "DeConvolution"
@@ -426,7 +524,11 @@ class JoinFeat(tf.keras.layers.Layer):
         return "JoinFeat"
 
     def call(self, feat_cat, feat):
-        return tf.concat([feat_cat, feat], -1)
+        out = []
+        for a, b in zip(feat_cat, feat):
+            out.append(tf.concat([a, b], -1))
+
+        return out
 
 
 class NetworkInNetwork(tf.keras.layers.Layer):
@@ -439,7 +541,11 @@ class NetworkInNetwork(tf.keras.layers.Layer):
             self.linear = tf.keras.layers.Dense(nOut, use_bias=bias)
 
     def call(self, inputs):
-        return self.linear(inputs)
+        out = []
+        for inp in inputs:
+            out.append(self.linear(inp))
+
+        return out
 
 
 class ResidualBlock(tf.keras.layers.Layer):
@@ -449,30 +555,35 @@ class ResidualBlock(tf.keras.layers.Layer):
 
         self.lin = NetworkInNetwork(nIn, nOut)
 
-        self.bn1 = tf.keras.layers.BatchNormalization(momentum=0.99,
-                                                      epsilon=1e-4)
-        self.relu1 = tf.keras.layers.LeakyReLU(0.)
+        self.bn1 = BatchNormBlock()
+
+        self.relu1 = ReLUBlock()
         self.scn1 = SubmanifoldSparseConv(in_channels=nIn,
                                           filters=nOut,
                                           kernel_size=[3, 3, 3])
 
-        self.bn2 = tf.keras.layers.BatchNormalization(momentum=0.99,
-                                                      epsilon=1e-4)
-        self.relu2 = tf.keras.layers.LeakyReLU(0.)
+        self.bn2 = BatchNormBlock()
+
+        self.relu2 = ReLUBlock()
         self.scn2 = SubmanifoldSparseConv(in_channels=nOut,
                                           filters=nOut,
                                           kernel_size=[3, 3, 3])
 
-    def call(self, feat, pos, training):
-        out1 = self.lin(feat)
+    def call(self, feat_list, pos_list, training):
+        out1 = self.lin(feat_list)
 
-        feat = self.relu1(self.bn1(feat, training))
-        feat = self.scn1(feat, pos)
+        feat_list = self.bn1(feat_list, training)
 
-        feat = self.relu2(self.bn2(feat, training))
-        out2 = self.scn2(feat, pos)
+        feat_list = self.relu1(feat_list)
 
-        return out1 + out2
+        feat_list = self.scn1(feat_list, pos_list)
+
+        feat_list = self.bn2(feat_list, training)
+        feat_list = self.relu2(feat_list)
+
+        out2 = self.scn2(feat_list, pos_list)
+
+        return [a + b for a, b in zip(out1, out2)]
 
     def __name__(self):
         return "ResidualBlock"
@@ -495,9 +606,8 @@ class UNet(tf.keras.layers.Layer):
         if residual_blocks:
             m.append(ResidualBlock(a, b))
         else:
-            m.append(
-                tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
-            m.append(tf.keras.layers.LeakyReLU(0.))
+            m.append(BatchNormBlock())
+            m.append(ReLUBlock())
             m.append(
                 SubmanifoldSparseConv(in_channels=a,
                                       filters=b,
@@ -511,17 +621,15 @@ class UNet(tf.keras.layers.Layer):
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
-            m.append(
-                tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
-            m.append(tf.keras.layers.LeakyReLU(0.))
+            m.append(BatchNormBlock())
+            m.append(ReLUBlock())
             m.append(
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
             m = m + UNet.U(nPlanes[1:], residual_blocks, reps)
-            m.append(
-                tf.keras.layers.BatchNormalization(momentum=0.99, epsilon=1e-4))
-            m.append(tf.keras.layers.LeakyReLU(0.))
+            m.append(BatchNormBlock())
+            m.append(ReLUBlock())
             m.append(
                 DeConvolution(in_channels=nPlanes[1],
                               filters=nPlanes[0],
@@ -535,34 +643,38 @@ class UNet(tf.keras.layers.Layer):
 
         return m
 
-    def call(self, pos, feat, training=False):
+    def call(self, pos_list, feat_list, training):
         conv_pos = []
         concat_feat = []
         for module in self.net:
-            if isinstance(module, tf.keras.layers.BatchNormalization):
-                feat = module(feat, training=training)
-            elif isinstance(module, tf.keras.layers.LeakyReLU):
-                feat = module(feat)
+            if isinstance(module, BatchNormBlock):
+                feat_list = module(feat_list, training=training)
+            elif isinstance(module, ReLUBlock):
+                feat_list = module(feat_list)
 
             elif module.__name__() == "ResidualBlock":
-                feat = module(feat, pos, training=training)
+                feat_list = module(feat_list, pos_list, training=training)
 
             elif module.__name__() == "SubmanifoldSparseConv":
-                feat = module(feat, pos)
+                feat_list = module(feat_list, pos_list)
 
             elif module.__name__() == "Convolution":
-                conv_pos.append(tf.identity(pos))
-                feat, pos = module(feat, pos)
+                conv_pos.append([tf.identity(pos) for pos in pos_list])
+                feat_list, pos_list = module(feat_list, pos_list)
+
             elif module.__name__() == "DeConvolution":
-                feat = module(feat, 2 * pos, conv_pos[-1])
-                pos = conv_pos.pop()
+                feat_list = module(feat_list, [2 * pos for pos in pos_list],
+                                   conv_pos[-1])
+                pos_list = conv_pos.pop()
 
             elif module.__name__() == "ConcatFeat":
-                concat_feat.append(tf.identity(module(feat)))
+                concat_feat.append(
+                    [tf.identity(feat) for feat in module(feat_list)])
+
             elif module.__name__() == "JoinFeat":
-                feat = module(concat_feat.pop(), feat)
+                feat_list = module(concat_feat.pop(), feat_list)
 
             else:
                 raise Exception("Unknown module {}".format(module))
 
-        return feat
+        return feat_list
