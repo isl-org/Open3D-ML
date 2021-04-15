@@ -420,25 +420,21 @@ class SparseConvUnetBatch:
             label.append(data['label'])
             lengths.append(data['point'].shape[0])
 
-        pc = torch.cat(pc, 0)
-        feat = torch.cat(feat, 0)
-        label = torch.cat(label, 0)
-
         self.point = pc
         self.feat = feat
         self.label = label
         self.batch_lengths = lengths
 
     def pin_memory(self):
-        self.point = self.point.pin_memory()
-        self.feat = self.feat.pin_memory()
-        self.label = self.label.pin_memory()
+        self.point = [pc.pin_memory() for pc in self.point]
+        self.feat = [feat.pin_memory() for feat in self.feat]
+        self.label = [label.pin_memory() for label in self.label]
         return self
 
     def to(self, device):
-        self.point = self.point.to(device)
-        self.feat = self.feat.to(device)
-        self.label = self.label.to(device)
+        self.point = [pc.to(device) for pc in self.point]
+        self.feat = [feat.to(device) for feat in self.feat]
+        self.label = [label.to(device) for label in self.label]
 
 
 class PointPillarsBatch:

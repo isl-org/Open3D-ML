@@ -11,8 +11,10 @@ model:
   name: SparseConvUnet
   batcher: ConcatBatcher
   ckpt_path: # path/to/your/checkpoint
-  m: 16
-  scale: 20
+  m: 32
+  voxel_size: 0.02
+  residual_blocks: False
+  reps: 1
   in_channels: 3
   num_classes: 20
   ignored_label_inds: [-1]
@@ -37,13 +39,13 @@ model:
       std: 0.05
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.01
+  adam_lr: 0.001
   batch_size: 8
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 512
-  save_ckpt_freq: 2
-  scheduler_gamma: 0.95
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.99
   test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 4
+  val_batch_size: 8

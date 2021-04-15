@@ -43,29 +43,32 @@ class SparseConvUnet(BaseModel):
                                          kernel_size=[3, 3, 3])
         self.unet = UNet(reps, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
                          residual_blocks)
-        self.bn = nn.BatchNorm1d(m, eps=1e-4, momentum=0.01)
-        self.relu = nn.ReLU()
-        self.linear = nn.Linear(m, num_classes)
+        self.bn = BatchNormBlock(m)
+        self.relu = ReLUBlock()
+        self.linear = LinearBlock(m, num_classes)
         self.out = OutputLayer()
 
     def forward(self, inputs):
-        output = []
-        start_idx = 0
-        for length in inputs.batch_lengths:
-            pos = inputs.point[start_idx:start_idx + length]
-            feat = inputs.feat[start_idx:start_idx + length]
+        pos_list = []
+        feat_list = []
+        rev_list = []
 
+        for i in range(len(inputs.batch_lengths)):
+            pos = inputs.point[i]
+            feat = inputs.feat[i]
             feat, pos, rev = self.inp(feat, pos)
-            feat = self.ssc(feat, pos, voxel_size=1.0)
-            feat = self.unet(pos, feat)
-            feat = self.bn(feat)
-            feat = self.relu(feat)
-            feat = self.linear(feat)
-            feat = self.out(feat, rev)
+            pos_list.append(pos)
+            feat_list.append(feat)
+            rev_list.append(rev)
 
-            output.append(feat)
-            start_idx += length
-        return torch.cat(output, 0)
+        feat_list = self.ssc(feat_list, pos_list, voxel_size=1.0)
+        feat_list = self.unet(pos_list, feat_list)
+        feat_list = self.bn(feat_list)
+        feat_list = self.relu(feat_list)
+        feat_list = self.linear(feat_list)
+        output = self.out(feat_list, rev_list)
+
+        return output
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)
@@ -87,6 +90,8 @@ class SparseConvUnet(BaseModel):
         if attr['split'] in ['training', 'train']:
             points, feat, labels = self.augment.augment(
                 points, feat, labels, self.cfg.get('augment', None))
+
+        feat = feat / 127.5 - 1.
 
         m = points.min(0)
         M = points.max(0)
@@ -149,7 +154,7 @@ class SparseConvUnet(BaseModel):
         :return: loss
         """
         cfg = self.cfg
-        labels = inputs['data'].label
+        labels = torch.cat(inputs['data'].label, 0)
 
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
@@ -167,6 +172,65 @@ class SparseConvUnet(BaseModel):
 
 
 MODEL._register_module(SparseConvUnet, 'torch')
+
+
+class BatchNormBlock(nn.Module):
+
+    def __init__(self, m, eps=1e-4, momentum=0.01):
+        super(BatchNormBlock, self).__init__()
+        self.bn = nn.BatchNorm1d(m, eps=eps, momentum=momentum)
+
+    def forward(self, feat_list):
+        lengths = [feat.shape[0] for feat in feat_list]
+        out = self.bn(torch.cat(feat_list, 0))
+        out_list = []
+        start = 0
+        for l in lengths:
+            out_list.append(out[start:start + l])
+            start += l
+
+        return out_list
+
+    def __name__(self):
+        return "BatchNormBlock"
+
+
+class ReLUBlock(nn.Module):
+
+    def __init__(self):
+        super(ReLUBlock, self).__init__()
+        self.relu = nn.ReLU()
+
+    def forward(self, feat_list):
+        lengths = [feat.shape[0] for feat in feat_list]
+        out = self.relu(torch.cat(feat_list, 0))
+        out_list = []
+        start = 0
+        for l in lengths:
+            out_list.append(out[start:start + l])
+            start += l
+
+        return out_list
+
+    def __name__(self):
+        return "ReLUBlock"
+
+
+class LinearBlock(nn.Module):
+
+    def __init__(self, a, b):
+        super(LinearBlock, self).__init__()
+        self.linear = nn.Linear(a, b)
+
+    def forward(self, feat_list):
+        out_list = []
+        for feat in feat_list:
+            out_list.append(self.linear(feat))
+
+        return out_list
+
+    def __name__(self):
+        return "LinearBlock"
 
 
 class InputLayer(nn.Module):
@@ -215,8 +279,11 @@ class OutputLayer(nn.Module):
     def __init__(self, voxel_size=1.0):
         super(OutputLayer, self).__init__()
 
-    def forward(self, features, rev):
-        return features[rev]
+    def forward(self, features_list, rev_list):
+        out = []
+        for feat, rev in zip(features_list, rev_list):
+            out.append(feat[rev])
+        return torch.cat(out, 0)
 
 
 class SubmanifoldSparseConv(nn.Module):
@@ -245,13 +312,19 @@ class SubmanifoldSparseConv(nn.Module):
                               normalize=normalize)
 
     def forward(self,
-                features,
-                inp_positions,
-                out_positions=None,
+                features_list,
+                inp_positions_list,
+                out_positions_list=None,
                 voxel_size=1.0):
-        if out_positions is None:
-            out_positions = inp_positions
-        return self.net(features, inp_positions, out_positions, voxel_size)
+        if out_positions_list is None:
+            out_positions_list = inp_positions_list
+
+        out_feat = []
+        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
+                                          out_positions_list):
+            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+
+        return out_feat
 
     def __name__(self):
         return "SubmanifoldSparseConv"
@@ -298,10 +371,19 @@ class Convolution(nn.Module):
                               offset=offset,
                               normalize=normalize)
 
-    def forward(self, features, inp_positions, voxel_size=1.0):
-        out_positions = calculate_grid(inp_positions)
-        out = self.net(features, inp_positions, out_positions, voxel_size)
-        return out, out_positions / 2
+    def forward(self, features_list, inp_positions_list, voxel_size=1.0):
+        out_positions_list = []
+        for inp_positions in inp_positions_list:
+            out_positions_list.append(calculate_grid(inp_positions))
+
+        out_feat = []
+        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
+                                          out_positions_list):
+            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+
+        out_positions_list = [out / 2 for out in out_positions_list]
+
+        return out_feat, out_positions_list
 
     def __name__(self):
         return "Convolution"
@@ -332,8 +414,17 @@ class DeConvolution(nn.Module):
                                        offset=offset,
                                        normalize=normalize)
 
-    def forward(self, features, inp_positions, out_positions, voxel_size=1.0):
-        return self.net(features, inp_positions, out_positions, voxel_size)
+    def forward(self,
+                features_list,
+                inp_positions_list,
+                out_positions_list,
+                voxel_size=1.0):
+        out_feat = []
+        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
+                                          out_positions_list):
+            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+
+        return out_feat
 
     def __name__(self):
         return "DeConvolution"
@@ -360,7 +451,11 @@ class JoinFeat(nn.Module):
         return "JoinFeat"
 
     def forward(self, feat_cat, feat):
-        return torch.cat([feat_cat, feat], -1)
+        out = []
+        for a, b in zip(feat_cat, feat):
+            out.append(torch.cat([a, b], -1))
+
+        return out
 
 
 class NetworkInNetwork(nn.Module):
@@ -373,7 +468,11 @@ class NetworkInNetwork(nn.Module):
             self.linear = nn.Linear(nIn, nOut, bias=bias)
 
     def forward(self, inputs):
-        return self.linear(inputs)
+        out = []
+        for inp in inputs:
+            out.append(self.linear(inp))
+
+        return out
 
 
 class ResidualBlock(nn.Module):
@@ -383,36 +482,33 @@ class ResidualBlock(nn.Module):
 
         self.lin = NetworkInNetwork(nIn, nOut)
 
-        self.bn1 = nn.BatchNorm1d(nIn, eps=1e-4, momentum=0.01)
-        self.relu1 = nn.LeakyReLU(0)
+        self.bn1 = BatchNormBlock(nIn)
+        self.relu1 = ReLUBlock()
         self.scn1 = SubmanifoldSparseConv(in_channels=nIn,
                                           filters=nOut,
                                           kernel_size=[3, 3, 3])
 
-        self.bn2 = nn.BatchNorm1d(nOut, eps=1e-4, momentum=0.01)
-        self.relu2 = nn.LeakyReLU(0)
+        self.bn2 = BatchNormBlock(nOut)
+        self.relu2 = ReLUBlock()
         self.scn2 = SubmanifoldSparseConv(in_channels=nOut,
                                           filters=nOut,
                                           kernel_size=[3, 3, 3])
 
-    def forward(self, feat, pos):
-        out1 = self.lin(feat)
+    def forward(self, feat_list, pos_list):
+        out1 = self.lin(feat_list)
 
-        if feat.shape[0] == 1:
-            feat *= 0
-        else:
-            feat = self.relu1(self.bn1(feat))
+        feat_list = self.bn1(feat_list)
 
-        feat = self.scn1(feat, pos)
+        feat_list = self.relu1(feat_list)
 
-        if feat.shape[0] == 1:
-            feat *= 0
-        else:
-            feat = self.relu2(self.bn2(feat))
+        feat_list = self.scn1(feat_list, pos_list)
 
-        out2 = self.scn2(feat, pos)
+        feat_list = self.bn2(feat_list)
+        feat_list = self.relu2(feat_list)
 
-        return out1 + out2
+        out2 = self.scn2(feat_list, pos_list)
+
+        return [a + b for a, b in zip(out1, out2)]
 
     def __name__(self):
         return "ResidualBlock"
@@ -436,8 +532,8 @@ class UNet(nn.Module):
             m.append(ResidualBlock(a, b))
 
         else:
-            m.append(nn.BatchNorm1d(a, eps=1e-4, momentum=0.01))
-            m.append(nn.LeakyReLU(0))
+            m.append(BatchNormBlock(a))
+            m.append(ReLUBlock())
             m.append(
                 SubmanifoldSparseConv(in_channels=a,
                                       filters=b,
@@ -451,15 +547,15 @@ class UNet(nn.Module):
 
         if len(nPlanes) > 1:
             m.append(ConcatFeat())
-            m.append(nn.BatchNorm1d(nPlanes[0], eps=1e-4, momentum=0.01))
-            m.append(nn.LeakyReLU(0))
+            m.append(BatchNormBlock(nPlanes[0]))
+            m.append(ReLUBlock())
             m.append(
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
             m = m + UNet.U(nPlanes[1:], residual_blocks, reps)
-            m.append(nn.BatchNorm1d(nPlanes[1], eps=1e-4, momentum=0.01))
-            m.append(nn.LeakyReLU(0))
+            m.append(BatchNormBlock(nPlanes[1]))
+            m.append(ReLUBlock())
             m.append(
                 DeConvolution(in_channels=nPlanes[1],
                               filters=nPlanes[0],
@@ -473,40 +569,40 @@ class UNet(nn.Module):
 
         return m
 
-    def forward(self, pos, feat):
+    def forward(self, pos_list, feat_list):
         conv_pos = []
         concat_feat = []
         for module in self.net:
-            if isinstance(module, nn.BatchNorm1d):
-                if feat.shape[0] == 1:
-                    feat *= 0  # Cannot calculate std_dev for 1 dimension.
-                else:
-                    feat = module(feat)
-            elif isinstance(module, nn.LeakyReLU):
-                feat = module(feat)
+            if isinstance(module, BatchNormBlock):
+                feat_list = module(feat_list)
+            elif isinstance(module, ReLUBlock):
+                feat_list = module(feat_list)
 
             elif module.__name__() == "ResidualBlock":
-                feat = module(feat, pos)
+                feat_list = module(feat_list, pos_list)
 
             elif module.__name__() == "SubmanifoldSparseConv":
-                feat = module(feat, pos)
+                feat_list = module(feat_list, pos_list)
 
             elif module.__name__() == "Convolution":
-                conv_pos.append(pos.clone())
-                feat, pos = module(feat, pos)
+                conv_pos.append([pos.clone() for pos in pos_list])
+                feat_list, pos_list = module(feat_list, pos_list)
+
             elif module.__name__() == "DeConvolution":
-                feat = module(feat, 2 * pos, conv_pos[-1])
-                pos = conv_pos.pop()
+                feat_list = module(feat_list, [2 * pos for pos in pos_list],
+                                   conv_pos[-1])
+                pos_list = conv_pos.pop()
 
             elif module.__name__() == "ConcatFeat":
-                concat_feat.append(module(feat).clone())
+                concat_feat.append([feat.clone() for feat in module(feat_list)])
+
             elif module.__name__() == "JoinFeat":
-                feat = module(concat_feat.pop(), feat)
+                feat_list = module(concat_feat.pop(), feat_list)
 
             else:
                 raise Exception("Unknown module {}".format(module))
 
-        return feat
+        return feat_list
 
 
 def load_unet_wts(net, path):
