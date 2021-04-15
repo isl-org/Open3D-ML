@@ -56,9 +56,7 @@ class ObjectDetection(BasePipeline):
         """
         model = self.model
 
-        inputs, counts_pts = data[:-2], data[-2]
-
-        results = model(inputs, counts=counts_pts, training=False)
+        results = model(data, training=False)
         boxes = model.inference_end(results, data)
 
         return boxes
@@ -131,9 +129,8 @@ class ObjectDetection(BasePipeline):
 
         process_bar = tqdm(valid_loader, total=len_valid, desc='validation')
         for i, data in enumerate(process_bar):
-            inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
-            results = model(data, counts=counts_pts, training=False)
-            loss = model.loss(results, inputs, counts=counts_lbs)
+            results = model(data, training=False)
+            loss = model.loss(results, data, training=False)
             for l, v in loss.items():
                 if not l in self.valid_losses:
                     self.valid_losses[l] = []
@@ -214,7 +211,7 @@ class ObjectDetection(BasePipeline):
         train_loader, len_train = train_split.get_loader(cfg.batch_size,
                                                          transform=False)
 
-        self.optimizer = model.get_optimizer(cfg.optimizer)
+        self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
         is_resume = model.cfg.get('is_resume', True)
         start_ep = self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
@@ -237,13 +234,15 @@ class ObjectDetection(BasePipeline):
             self.losses = {}
             process_bar = tqdm(train_loader, total=len_train, desc='training')
             for data in process_bar:
-                inputs, counts_pts, counts_lbs = data[:-2], data[-2], data[-1]
                 with tf.GradientTape(persistent=True) as tape:
-                    results = model(inputs, counts=counts_pts)
-                    loss = model.loss(results, inputs, counts=counts_lbs)
+                    results = model(data)
+                    loss = model.loss(results, data)
                     loss_sum = tf.add_n(loss.values())
 
                 grads = tape.gradient(loss_sum, model.trainable_weights)
+                for (grad, var) in zip(grads, model.trainable_weights):
+                    if grad is None:
+                        print(var.shape, var.name, grad)
 
                 norm = cfg.get('grad_clip_norm', -1)
                 if model.cfg.get('grad_clip_norm', -1) > 0:

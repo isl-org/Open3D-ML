@@ -135,14 +135,13 @@ class PointPillars(BaseModel):
 
         return voxels, num_points, coors_batch
 
-    def call(self, inputs, training=True, counts=None):
+    def call(self, inputs, training=True):
         """
         Forward pass
         :param inputs: tuple/list of inputs (points, bboxes, labels, calib)
         :param training: toggle training run
-        :param counts: split flat input into batch list
         """
-        inputs = unpack(inputs[0], counts)
+        inputs = unpack(inputs[0], inputs[-2])
         x = self.extract_feats(inputs, training=training)
         outs = self.bbox_head(x, training=training)
 
@@ -152,7 +151,7 @@ class PointPillars(BaseModel):
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
         return tf.optimizers.Adam(learning_rate=cfg['lr'],
                                   beta_1=beta1,
-                                  beta_2=beta2)
+                                  beta_2=beta2), None
 
         #used by torch, but doesn't perform well with TF:
         #import tensorflow_addons as tfa
@@ -162,18 +161,17 @@ class PointPillars(BaseModel):
         #                            beta_1=beta1,
         #                            beta_2=beta2)
 
-    def loss(self, results, inputs, counts=None):
+    def loss(self, results, inputs, training=True):
         """
         Computes loss
         :param results: results of forward pass (scores, bboxes, dirs)
         :param inputs: tuple/list of gt inputs (points, bboxes, labels, calib)
-        :param counts: split flat input into batch list
         """
         scores, bboxes, dirs = results
 
         gt_bboxes, gt_labels = inputs[1:3]
-        gt_bboxes = unpack(gt_bboxes, counts)
-        gt_labels = unpack(gt_labels, counts)
+        gt_bboxes = unpack(gt_bboxes, inputs[-1])
+        gt_labels = unpack(gt_labels, inputs[-1])
 
         # generate and filter bboxes
         target_bboxes, target_idx, pos_idx, neg_idx = self.bbox_head.assign_bboxes(
@@ -383,7 +381,7 @@ class PointPillars(BaseModel):
             labels = _labels.cpu().numpy()
             inference_result.append([])
 
-            world_cam, cam_img = _calib
+            world_cam, cam_img = _calib.numpy()
 
             for bbox, score, label in zip(bboxes, scores, labels):
                 dim = bbox[[3, 5, 4]]
@@ -1029,6 +1027,9 @@ class Anchor3DHead(tf.keras.layers.Layer):
         idx_off = 0
         for i in range(len(target_bboxes)):
             for j, (neg_th, pos_th) in enumerate(self.iou_thr):
+                if target_bboxes[i].shape[0] == 0:
+                    continue
+
                 anchors_stride = tf.reshape(anchors[i][..., j, :, :],
                                             (-1, self.box_code_size))
 
