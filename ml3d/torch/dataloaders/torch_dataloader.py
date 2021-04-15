@@ -11,15 +11,12 @@ from ...utils import Cache, get_hash
 class TorchDataloader(Dataset):
     """
     This class allows you to load datasets for a PyTorch framework.
-	**Example:**
+    **Example:**
         This example loads the SemanticKITTI dataset using the Torch dataloader:
 
-
             import torch
-
-			from torch.utils.data import Dataset, DataLoader
-
-			train_split = TorchDataloader(dataset=dataset.get_split('training'))
+            from torch.utils.data import Dataset, DataLoader
+            train_split = TorchDataloader(dataset=dataset.get_split('training'))
     """
 
     def __init__(self,
@@ -81,8 +78,8 @@ class TorchDataloader(Dataset):
 
     def __getitem__(self, index):
         """
-		Returns the item at index position (idx).
-		"""
+        Returns the item at index position (idx).
+        """
         dataset = self.dataset
         index = index % len(dataset)
 

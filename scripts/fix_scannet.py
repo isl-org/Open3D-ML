@@ -23,7 +23,8 @@ scannet_frames_out = Path(
 
 def easy_bbox(bbox_file):
     bboxes = np.load(bbox_file)
-    bboxes_easy = bboxes[np.logical_and(bboxes[:, 8] <= 0.25, bboxes[:, 9] >= 16384), :]
+    bboxes_easy = bboxes[
+        np.logical_and(bboxes[:, 8] <= 0.25, bboxes[:, 9] >= 16384), :]
     if len(bboxes_easy) > 0:
         np.save(scannet_frames_out / bbox_file.name, bboxes_easy)
     return len(bboxes_easy), len(bboxes)

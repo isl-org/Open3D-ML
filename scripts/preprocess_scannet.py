@@ -245,7 +245,7 @@ class ScannetProcess():
         self.min_instance_pts = 10
 
         # Parallelize tasks that do not need the GIL
-        self.max_workers = 4
+        self.max_workers = 3
         self._runner = None
 
         scans = os.listdir(dataset_path)
@@ -771,7 +771,7 @@ if __name__ == '__main__':
     if args.out_path is None:
         args.out_path = args.dataset_path
 
-    max_processes = os.cpu_count() // 2
+    max_processes = len(os.sched_getaffinity(0)) // 4
     if not args.only_stats:
         with concurrent.futures.ProcessPoolExecutor(
                 max_workers=max_processes) as executor:
