@@ -24,7 +24,10 @@ import torch
 
 from functools import partial
 
+import open3d as o3d
 from open3d.ml.torch.ops import nms
+from ...vis.labellut import LabelLUT
+from ...vis.boundingbox import BoundingBox3D
 
 
 def get_paddings_indicator(actual_num, max_num, axis=0):
@@ -156,6 +159,8 @@ class Anchor3DRangeGenerator(object):
         self.ranges = ranges
         self.rotations = rotations
 
+        # visualize_anchor_boxes(sizes)
+
     @property
     def num_base_anchors(self):
         """list[int]: Total number of base anchors in a feature grid."""
@@ -198,7 +203,7 @@ class Anchor3DRangeGenerator(object):
 
         Args:
             feature_size (list[float] | tuple[float]): Feature map size. It is
-                either a list of a tuple of [D, H, W](in order of z, y, and x).
+                either a list or a tuple of [D, H, W](in order of z, y, and x).
             anchor_range (torch.Tensor | list[float]): Range of anchors with
                 shape [6]. The order is consistent with that of anchors, i.e.,
                 (x_min, y_min, z_min, x_max, y_max, z_max).
@@ -465,3 +470,21 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     enclose_area = torch.max(enclose_area, eps)
     gious = ious - (enclose_area - union) / enclose_area
     return gious
+
+
+def visualize_anchor_boxes(anchor_box_shapes):
+
+    box_lut = LabelLUT()
+    for k in range(len(anchor_box_shapes)):
+        box_lut.add_label(k, k)
+
+    bboxes3d = [
+        BoundingBox3D([0, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 0],
+                      box_shape,
+                      label,
+                      1.0,
+                      arrow_length=0.0)
+        for label, box_shape in enumerate(anchor_box_shapes)
+    ]
+    lineset = BoundingBox3D.create_lines(bboxes3d, lut=box_lut)
+    o3d.visualization.draw_geometries([lineset])  # Blocking call

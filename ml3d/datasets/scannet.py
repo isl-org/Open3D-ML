@@ -8,6 +8,7 @@ import numpy as np
 from .base_dataset import BaseDataset
 from ..utils import DATASET
 from .utils import BEVBox3D
+from ..vis.labellut import LabelLUT
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,6 +61,9 @@ class Scannet(BaseDataset):
         self.cat_ids2class = {
             nyu40id: i for i, nyu40id in enumerate(list(self.cat_ids))
         }
+        self.label_lut = LabelLUT()
+        for cat, label in self.cat2label.items():
+            self.label_lut.add_label(cat, label)
 
         self.label_to_names = self.get_label_to_names()
 
@@ -160,6 +164,8 @@ class Scannet(BaseDataset):
             n_pts_inside = box[9] if len(box) > 9 else None
             objects.append(
                 Object3d(name, center, size, yaw, truncation, n_pts_inside))
+            # label_class = self.cat_ids2class[int(box[-1])]
+            # name = self.label2cat[label_class]
 
         return objects, semantic_mask, instance_mask
 
@@ -240,6 +246,8 @@ class Object3d(BEVBox3D):
                  truncation=0.0,
                  n_pts_inside=None):
         super().__init__(center, size, yaw, name, -1.0)
+        # def __init__(self, label_class, center, size, yaw):
+        #     super().__init__(center, size, yaw, label_class, -1.0)
 
         self.occlusion = 0.0
         self.truncation = truncation

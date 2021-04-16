@@ -26,8 +26,9 @@ from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
 
 from functools import partial
-import numpy as np
 import os
+import logging
+import numpy as np
 
 from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
@@ -42,7 +43,7 @@ from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
 import matplotlib.pyplot as plt
-# from mpl_toolkits.axes_grid1 import ImageGrid
+from mpl_toolkits.axes_grid1 import ImageGrid
 
 
 class PointPillars(BaseModel):
@@ -104,6 +105,21 @@ class PointPillars(BaseModel):
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
         self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
 
+        # Config sanity checks
+        assert all(
+            scatter['output_shape'] % np.prod(backbone["layer_strides"]) == 0
+        ), "scatter.output_shape should be a multiple of prod(backbone.layer_strides)"
+        point_cloud_range = np.array(self.point_cloud_range)
+        pseudo_image_shape = (point_cloud_range[3:] -
+                              point_cloud_range[:3]) / voxelize["voxel_size"]
+        assert all(pseudo_image_shape[[1, 0]] == scatter["output_shape"]), \
+            "scatter.output_shape does not match the Y,X extent of the voxelized point cloud range"
+        if any(
+                np.prod(scatter["output_shape"]) < np.array(
+                    voxelize["max_voxels"])):
+            logging.warn(
+                "voxelize.max_voxels is larger than prod(scatter.output_shape)")
+
         self.device = device
         self.to(device)
 
@@ -113,35 +129,43 @@ class PointPillars(BaseModel):
         voxel_features = self.voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0].item() + 1
         x = self.middle_encoder(voxel_features, coors, batch_size)
+        self.scatter_features = x
         x = self.backbone(x)
         x = self.neck(x)
         return x
+
+    def get_visual(self):
+        """Returns (Dict) containing tensors to visualize intermediate features """
+        return {
+            "pseudo_image":
+                self.pseudo_image,
+            "voxel_features": (255 * self.scatter_features /
+                               self.scatter_features.max()).type(torch.uint8)
+        }
 
     @torch.no_grad()
     def voxelize(self, points):
         """Apply hard voxelization to points."""
         voxels, coors, num_points = [], [], []
-        # fig = plt.figure(figsize=(14, 8))
-        # grid = ImageGrid(fig, 111, nrows_ncols=(4, 7), axes_pad=0.1)
-        # for res, ax in zip(points, grid):
-        for res in points:
+        self.pseudo_image = torch.zeros(
+            (
+                len(points),  # NHW
+                self.pi_ny,
+                self.pi_nx),
+            dtype=torch.uint8,
+            device=points.device)
+        for k, res in enumerate(points):
             res_voxels, res_coors, res_num_points = self.voxel_layer(res)
 
-            # avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
-            # vis_image = torch.zeros(self.pi_ny,
-            #                         self.pi_nx,
-            #                         dtype=torch.uint8,
-            #                         device=res_voxels.device)
-            # coords = res_coors.to(torch.long)
-            # vis_image[coords[:, 1],
-            #           coords[:, 2]] = (255 * avg_depth / 3.5).to(torch.uint8)
-            # ax.imshow(vis_image.cpu())
+            avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
+            vis_coords = res_coors.to(torch.long)
+            self.pseudo_image[k, vis_coords[:, 1],
+                              vis_coords[:, 2]] = (255 * avg_depth / 3.5).to(
+                                  torch.uint8)
 
             voxels.append(res_voxels)
             coors.append(res_coors)
             num_points.append(res_num_points)
-
-        # plt.show()
 
         voxels = torch.cat(voxels, dim=0)
         num_points = torch.cat(num_points, dim=0)
@@ -311,11 +335,12 @@ class PointPillars(BaseModel):
 
         if attr['split'] not in ['test', 'testing']:
             t_data['bbox_objs'] = data['bbox_objs']
-            t_data['labels'] = np.array([
-                self.name2lbl.get(bb.label_class, len(self.classes))
-                for bb in data['bbox_objs']
-            ],
-                                        dtype=np.int64)
+            t_data['labels'] = np.array(
+                [
+                    # self.name2lbl.get(bb.label_class, len(self.classes))
+                    bb.label_class for bb in data['bbox_objs']
+                ],
+                dtype=np.int64)
             t_data['bboxes'] = np.array(
                 [bb.to_xyzwhlr() for bb in data['bbox_objs']], dtype=np.float32)
 
@@ -627,8 +652,12 @@ class PointPillarsScatter(nn.Module):
             coors (torch.Tensor): Coordinates of each voxel in shape (N, 4).
                 The first column indicates the sample ID.
             batch_size (int): Number of samples in the current batch.
+
+        Returns:
+            batch_canvas (torch.Tensor (N,C,H,W))
         """
         # batch_canvas will be the final output.
+
         batch_canvas = []
         for batch_itt in range(batch_size):
             # Create the canvas for this sample
@@ -657,6 +686,16 @@ class PointPillarsScatter(nn.Module):
         # Undo the column stacking to final 4-dim tensor
         batch_canvas = batch_canvas.view(batch_size, self.in_channels, self.ny,
                                          self.nx)
+        # self.out_visual = (255 * batch_canvas / batch_canvas.max()).type(
+        # torch.uint8)
+        # vis_shape = vis.shape
+        # vis = vis.reshape(
+        #     (vis_shape[0], 8, -1, vis_shape[2], vis_shape[3])).permute(
+        #         (0, 1, 3, 2, 4)).reshape((vis_shape[0], 8 * vis_shape[2], -1))
+
+        # fig, ax = plt.subplots(1, 1)
+        # ax.imshow(vis[0, :, :].cpu().numpy())
+        # plt.show()
 
         return batch_canvas
 
@@ -806,6 +845,7 @@ class Anchor3DHead(nn.Module):
                  num_classes=1,
                  in_channels=384,
                  feat_channels=384,
+                 stride=1,
                  nms_pre=100,
                  score_thr=0.1,
                  dir_offset=0,
@@ -839,14 +879,23 @@ class Anchor3DHead(nn.Module):
         self.box_code_size = 7
 
         self.fp16_enabled = False
+        if not hasattr(stride, '__len__'):
+            stride = [stride, stride]
 
         #Initialize neural network layers of the head.
         self.cls_out_channels = self.num_anchors * self.num_classes
-        self.conv_cls = nn.Conv2d(self.feat_channels, self.cls_out_channels, 1)
+        self.conv_cls = nn.Conv2d(self.feat_channels,
+                                  self.cls_out_channels,
+                                  1,
+                                  stride=stride)
         self.conv_reg = nn.Conv2d(self.feat_channels,
-                                  self.num_anchors * self.box_code_size, 1)
-        self.conv_dir_cls = nn.Conv2d(self.feat_channels, self.num_anchors * 2,
-                                      1)
+                                  self.num_anchors * self.box_code_size,
+                                  1,
+                                  stride=stride)
+        self.conv_dir_cls = nn.Conv2d(self.feat_channels,
+                                      self.num_anchors * 2,
+                                      1,
+                                      stride=stride)
 
         self.init_weights()
 

@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 from ...datasets.utils import BEVBox3D
-
+from ...vis import BoundingBox3D
 from ...metrics.mAP import mAP
 
 # import torch.cuda.profiler as profiler
@@ -121,7 +121,7 @@ class ObjectDetection(BasePipeline):
                 results = self.run_inference(data)
                 pred.append(results[0])
 
-        #dataset.save_test_result(results, attr)
+        # dataset.save_test_result(results, attr)
 
     def run_valid(self):
         """
@@ -163,6 +163,7 @@ class ObjectDetection(BasePipeline):
         log.info("Started validation")
 
         self.valid_losses = {}
+        self.val_anchor_vis = []
 
         pred = []
         gt = []
@@ -177,7 +178,7 @@ class ObjectDetection(BasePipeline):
                 results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
-                    if not l in self.valid_losses:
+                    if l not in self.valid_losses:
                         self.valid_losses[l] = []
                     self.valid_losses[l].append(v.cpu().item())
 
@@ -185,6 +186,9 @@ class ObjectDetection(BasePipeline):
                 boxes = model.inference_end(results, data)
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
+                # Record bboxes for the last iteration
+                if process_bar.n == process_bar.total - 1:
+                    self.val_anchor_vis.append(self.get_visual(boxes, data))
 
             if no_bboxes > 0:
                 log.warning("No bounding box labels in " +
@@ -290,43 +294,48 @@ class ObjectDetection(BasePipeline):
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
-        with torch.autograd.profiler.emit_nvtx(enabled=False):
-            for epoch in range(start_ep, cfg.max_epoch + 1):
-                log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-                model.train()
+        # with torch.autograd.profiler.emit_nvtx(enabled=False):
+        for epoch in range(start_ep, cfg.max_epoch + 1):
+            log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            model.train()
 
-                self.losses = {}
-                no_bboxes = 0
-                process_bar = tqdm(train_loader, desc='training')
-                for data in process_bar:
-                    if any([bbox.numel() == 0 for bbox in data.bboxes]):
-                        no_bboxes += 1
-                        continue
-                    data.to(device)
-                    results = model(data)
-                    loss = model.loss(results, data)
-                    loss_sum = sum(loss.values())
+            self.losses = {}
+            self.train_anchor_vis = []
+            no_bboxes = 0
+            process_bar = tqdm(train_loader, desc='training')
+            for data in process_bar:
+                if any([bbox.numel() == 0 for bbox in data.bboxes]):
+                    no_bboxes += 1
+                    continue
+                data.to(device)
+                results = model(data)
+                loss = model.loss(results, data)
+                loss_sum = sum(loss.values())
+                # Record visualization for the last iteration
+                # if process_bar.n == process_bar.total - 1:
+                #     boxes = model.inference_end(results, data)
+                #     self.train_anchor_vis.append(self.get_visual(boxes, data))
 
-                    self.optimizer.zero_grad()
-                    loss_sum.backward()
-                    if model.cfg.get('grad_clip_norm', -1) > 0:
-                        torch.nn.utils.clip_grad_value_(
-                            model.parameters(), model.cfg.grad_clip_norm)
-                    self.optimizer.step()
-                    desc = "training - "
-                    for l, v in loss.items():
-                        if not l in self.losses:
-                            self.losses[l] = []
-                        self.losses[l].append(v.cpu().item())
-                        desc += " %s: %.03f" % (l, v.cpu().item())
-                    desc += " > loss: %.03f" % loss_sum.cpu().item()
-                    process_bar.set_description(desc)
-                    process_bar.refresh()
+                self.optimizer.zero_grad()
+                loss_sum.backward()
+                if model.cfg.get('grad_clip_norm', -1) > 0:
+                    torch.nn.utils.clip_grad_value_(model.parameters(),
+                                                    model.cfg.grad_clip_norm)
+                self.optimizer.step()
+                desc = "training - "
+                for l, v in loss.items():
+                    if l not in self.losses:
+                        self.losses[l] = []
+                    self.losses[l].append(v.cpu().item())
+                    desc += " %s: %.03f" % (l, v.cpu().item())
+                desc += " > loss: %.03f" % loss_sum.cpu().item()
+                process_bar.set_description(desc)
+                process_bar.refresh()
 
                 if no_bboxes > 0:
                     log.warning("No bounding box labels in " +
                                 f"{no_bboxes}/{len(process_bar)} cases.")
-                #self.scheduler.step()
+                # self.scheduler.step()
 
                 # --------------------- validation
                 self.run_valid()
@@ -336,12 +345,98 @@ class ObjectDetection(BasePipeline):
                 if epoch % cfg.save_ckpt_freq == 0:
                     self.save_ckpt(epoch)
 
+    def get_visual(self, infer_bboxes_batch, inputs_batch):
+        """
+        inputs.bbox_objs: List[List[Object3D]]
+        infer_bboxes:
+        """
+        points = []
+        colors = []
+        faces = []
+        input_pcd = []
+        max_pcd_pts = 10000
+        max_pts = 0
+        max_faces = 0
+        for infer_bboxes, gt_bboxes, pointcloud in zip(infer_bboxes_batch,
+                                                       inputs_batch.bbox_objs,
+                                                       inputs_batch.point):
+            gt_points, gt_colors, gt_faces = BoundingBox3D.create_trimesh(
+                gt_bboxes, lut=self.dataset.label_lut)
+            pred_points, pred_colors, pred_faces = BoundingBox3D.create_trimesh(
+                infer_bboxes)
+            pred_faces += gt_points.shape[0]
+            max_pts = max(max_pts, gt_points.shape[0] + pred_points.shape[0])
+            max_faces = max(max_faces, gt_faces.shape[0] + pred_faces.shape[0])
+            points.append(np.vstack((gt_points, pred_points)))
+            colors.append(np.vstack((gt_colors, pred_colors)))
+            faces.append(np.vstack((gt_faces, pred_faces)))
+            pcd_subsample = np.linspace(0,
+                                        pointcloud.shape[0] - 1,
+                                        num=max_pcd_pts,
+                                        dtype=int)
+            input_pcd.append(pointcloud[pcd_subsample, :].cpu().numpy())
+
+        points = np.stack(
+            [np.pad(p, ((0, max_pts - p.shape[0]), (0, 0))) for p in points])
+        colors = np.stack(
+            [np.pad(c, ((0, max_pts - c.shape[0]), (0, 0))) for c in colors])
+        faces = np.stack(
+            [np.pad(f, ((0, max_faces - f.shape[0]), (0, 0))) for f in faces])
+        input_pcd = np.stack(input_pcd)
+
+        return {
+            'points': points,
+            'colors': colors,
+            'faces': faces,
+            'input_pcd': input_pcd
+        }
+
     def save_logs(self, writer, epoch):
+        anchor_config = {
+            "material": {
+                "cls": "MeshBasicMaterial",
+                "wireframe": True
+            },
+            "camera": {
+                "cls": "OrthographicCamera",
+                "near": 0.25,
+                "far": 3.5
+            }
+        }
+        pcd_config = {
+            "camera": {
+                "cls": "OrthographicCamera",
+                "near": 0.25,
+                "far": 3.5
+            }
+        }
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
+        for key, mesh in enumerate(self.train_anchor_vis):
+            writer.add_mesh(f"train/anchors/{key}",
+                            vertices=torch.from_numpy(mesh['points']),
+                            colors=torch.from_numpy(mesh['colors']),
+                            faces=torch.from_numpy(mesh['faces']),
+                            config_dict=anchor_config,
+                            global_step=epoch)
+            writer.add_mesh(f"train/pointcloud/{key}",
+                            vertices=torch.from_numpy(mesh['input_pcd']),
+                            config_dict=pcd_config,
+                            global_step=epoch)
 
         for key, val in self.valid_losses.items():
             writer.add_scalar("valid/" + key, np.mean(val), epoch)
+        for key, mesh in enumerate(self.val_anchor_vis):
+            writer.add_mesh(f"valid/anchors/{key}",
+                            vertices=torch.from_numpy(mesh['points']),
+                            colors=torch.from_numpy(mesh['colors']),
+                            faces=torch.from_numpy(mesh['faces']),
+                            config_dict=anchor_config,
+                            global_step=epoch)
+            writer.add_mesh(f"train/pointcloud/{key}",
+                            vertices=torch.from_numpy(mesh['input_pcd']),
+                            config_dict=pcd_config,
+                            global_step=epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -380,7 +475,7 @@ class ObjectDetection(BasePipeline):
             dict(epoch=epoch,
                  model_state_dict=self.model.state_dict(),
                  optimizer_state_dict=self.optimizer.state_dict()),
-            #scheduler_state_dict=self.scheduler.state_dict()),
+            # scheduler_state_dict=self.scheduler.state_dict()),
             join(path_ckpt, f'ckpt_{epoch:05d}.pth'))
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 

@@ -40,7 +40,7 @@ class LabelLUT:
                 lut.add_label('one', 1)
                 lut.add_label('two', 2)
                 lut.add_label('three', 3, [0,0,1]) # use blue for label 'three'
-        
+
         **Args:**
             name: The label name as string.
             value: The value associated with the label.

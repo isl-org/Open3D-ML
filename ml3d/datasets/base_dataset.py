@@ -25,12 +25,12 @@ class BaseDataset(ABC):
         cfg: The configuration file as Config object that stores the keyword
             arguments that were passed to the constructor.
         name: The name of the dataset.
-                                
-        **Example:** 
+
+        **Example:**
         This example shows a custom dataset that inherit from the base_dataset class:
             from .base_dataset import BaseDataset
-                                                
-            class MyDataset(BaseDataset): 
+
+            class MyDataset(BaseDataset):
             def __init__(self,
                  dataset_path,
                  name='CustomDataset',
@@ -63,16 +63,16 @@ class BaseDataset(ABC):
     @abstractmethod
     def get_label_to_names():
         """Returns a label to names dictonary object.
-        
+
         Returns:
-            A dict where keys are label numbers and 
+            A dict where keys are label numbers and
             values are the corresponding names.
         """
 
     @abstractmethod
     def get_split(self, split):
         """Returns a dataset split.
-        
+
         Args:
             split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.

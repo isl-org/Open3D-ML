@@ -178,3 +178,70 @@ class BoundingBox3D:
         lines.colors = o3d.utility.Vector3dVector(colors)
 
         return lines
+
+    @staticmethod
+    def create_trimesh(boxes, lut=None):
+        """
+        Create triangular mesh from BoundingBox3D for display with the
+        Tensorboard mesh plugin.
+
+        Args:
+            boxes (List[BoundingBox3D]): Bounding boxes to be displayed.
+            lut (LabelLUT, optional): Lookup table to assign colors to each box.
+
+        Returns:
+            points (array(8*N,3)): Box corners.
+            colors (array(8*N,3)): Colors for each corner.
+            faces (array(12*N,3)): Point indices defining triangular faces.
+        """
+        nverts = 8
+        nfaces = 12
+        points = np.empty((nverts * len(boxes), 3), dtype="float32")
+        faces = np.empty((nfaces * len(boxes), 3), dtype="int32")
+        colors = np.empty((nverts * len(boxes), 3), dtype="uint8")
+
+        for i, box in enumerate(boxes):
+            pidx = nverts * i
+            x = 0.5 * box.size[0] * box.left
+            y = 0.5 * box.size[1] * box.up
+            z = 0.5 * box.size[2] * box.front
+            # It seems to be substantially faster to assign directly for the
+            # points, as opposed to points[pidx:pidx+nverts] = np.stack((...))
+            points[pidx] = box.center + x + y + z
+            points[pidx + 1] = box.center - x + y + z
+            points[pidx + 2] = box.center - x + y - z
+            points[pidx + 3] = box.center + x + y - z
+            points[pidx + 4] = box.center + x - y + z
+            points[pidx + 5] = box.center - x - y + z
+            points[pidx + 6] = box.center - x - y - z
+            points[pidx + 7] = box.center + x - y - z
+
+        # It is faster to break the indices and colors into their own loop.
+        for i, box in enumerate(boxes):
+            pidx = nverts * i
+            idx = nfaces * i
+            faces[idx:idx + nfaces] = (
+                (pidx, pidx + 1, pidx + 2),
+                (pidx + 2, pidx + 3, pidx),  # + y
+                (pidx + 4, pidx + 5, pidx + 6),
+                (pidx + 6, pidx + 7, pidx + 4),  # - y
+                (pidx, pidx + 1, pidx + 5),
+                (pidx + 5, pidx + 4, pidx),  # + z
+                (pidx + 2, pidx + 3, pidx + 7),
+                (pidx + 7, pidx + 6, pidx + 2),  # - z
+                (pidx, pidx + 3, pidx + 7),
+                (pidx + 7, pidx + 4, pidx),  # + x
+                (pidx + 1, pidx + 2, pidx + 6),
+                (pidx + 6, pidx + 5, pidx + 1))  # - x
+
+            if lut is not None:
+                label = lut.labels[box.label_class]
+                c = (255 * label.color[0], 255 * label.color[1],
+                     255 * label.color[2])
+            else:
+                c = (128, 128, 128)
+
+            colors[pidx:pidx +
+                   nverts] = c  # copies c to each element in the range
+
+        return points, colors, faces
