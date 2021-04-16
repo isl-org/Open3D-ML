@@ -1,4 +1,3 @@
-import torch
 import numpy as np
 
 
@@ -108,7 +107,6 @@ class SemSegMetric(object):
             -------
             confusion matrix of this batch
         """
-        N = scores.size(-2)
         C = scores.size(-1)
         y_pred = scores.detach().cpu().numpy().reshape(-1, C)  # (N, C)
         y_pred = np.argmax(y_pred, axis=1)  # (N,)

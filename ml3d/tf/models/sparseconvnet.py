@@ -126,7 +126,6 @@ class SparseConvUnet(BaseModel):
         }
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
-        cfg = self.cfg
 
         def concat_batch_gen():
             iters = dataset.num_pc // batch_size
@@ -172,7 +171,6 @@ class SparseConvUnet(BaseModel):
         return self.inference_input
 
     def inference_end(self, results):
-        results = results
         results = tf.reshape(results, [-1, self.cfg.num_classes])
 
         m_softmax = tf.keras.layers.Softmax(axis=-1)
@@ -197,7 +195,6 @@ class SparseConvUnet(BaseModel):
         :param labels: labels
         :return: loss
         """
-        cfg = self.cfg
         labels = inputs['label']
 
         scores, labels = Loss.filter_valid_label(results, labels)

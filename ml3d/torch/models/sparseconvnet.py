@@ -5,7 +5,6 @@ import torch.nn as nn
 from .base_model import BaseModel
 from ...utils import MODEL
 from ..modules.losses import filter_valid_label
-from ...datasets.utils import trans_augment
 from ...datasets.augment import SemsegAugmentation
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
@@ -116,7 +115,6 @@ class SparseConvUnet(BaseModel):
         return data
 
     def transform(self, data, attr):
-        device = self.device
         data['point'] = torch.from_numpy(data['point'])
         data['feat'] = torch.from_numpy(data['feat'])
         data['label'] = torch.from_numpy(data['label'])

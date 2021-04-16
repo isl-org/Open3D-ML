@@ -1,7 +1,6 @@
 import numpy as np
 import logging
 import sys
-import warnings
 
 from tqdm import tqdm
 from datetime import datetime

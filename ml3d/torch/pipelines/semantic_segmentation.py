@@ -3,7 +3,6 @@ import torch.nn as nn
 import numpy as np
 import logging
 import sys
-import warnings
 
 from datetime import datetime
 from tqdm import tqdm
