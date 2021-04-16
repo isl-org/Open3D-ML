@@ -30,6 +30,8 @@ from torch import nn
 from torch.nn import functional as F
 
 import numpy as np
+import os
+import pickle
 from functools import partial
 
 from .base_model_objdet import BaseModel
@@ -40,8 +42,8 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.torch.ops import nms
 from ..utils.torch_utils import gen_CNN
-from ...datasets.utils import DataProcessing, BEVBox3D
-from ...datasets.utils.operations import points_in_box
+from ...datasets.utils import DataProcessing, BEVBox3D, ObjdetAugmentation
+from ...datasets.utils.operations import points_in_box, filter_by_min_points
 
 from ...utils import MODEL
 from ..modules.optimizers import OptimWrapper
@@ -178,6 +180,48 @@ class PointRCNN(BaseModel):
 
         return optimizer, lr_scheduler  #, bnm_scheduler
 
+    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
+        db_boxes = pickle.load(open(pickle_path, 'rb'))
+
+        if min_points_dict is not None:
+            db_boxes = filter_by_min_points(db_boxes, min_points_dict)
+
+        db_boxes_dict = {}
+        for key in sample_dict.keys():
+            db_boxes_dict[key] = []
+
+        for db_box in db_boxes:
+            if db_box.label_class in sample_dict.keys():
+                db_boxes_dict[db_box.label_class].append(db_box)
+
+        self.db_boxes_dict = db_boxes_dict
+
+    def augment_data(self, data, attr):
+        cfg = self.cfg.augment
+
+        if 'ObjectSample' in cfg.keys():
+            if not hasattr(self, 'db_boxes_dict'):
+                data_path = attr['path']
+                # remove tail of path to get root data path
+                for _ in range(3):
+                    data_path = os.path.split(data_path)[0]
+                pickle_path = os.path.join(data_path, 'bboxes.pkl')
+                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
+
+            data = ObjdetAugmentation.ObjectSample(
+                data,
+                db_boxes_dict=self.db_boxes_dict,
+                sample_dict=cfg['ObjectSample']['sample_dict'])
+
+        if cfg.get('ObjectRangeFilter', False):
+            data = ObjdetAugmentation.ObjectRangeFilter(
+                data, self.cfg.point_cloud_range)
+
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        return data
+
     def loss(self, results, inputs):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
@@ -187,6 +231,9 @@ class PointRCNN(BaseModel):
             return self.rcnn.loss(results, inputs)
 
     def preprocess(self, data, attr):
+        if attr['split'] in ['train', 'training']:
+            data = self.augment_data(data, attr)
+
         # remove intensity
         points = np.array(data['point'][..., :3], dtype=np.float32)
         calib = data['calib']
@@ -872,7 +919,7 @@ class RCNN(nn.Module):
             loss_size = 3 * loss_size  # consistent with old codes
             rcnn_loss_reg = loss_loc + loss_angle + loss_size
         else:
-            lrcnn_loss_reg = rcnn_loss_cls * 0
+            rcnn_loss_reg = rcnn_loss_cls * 0
 
         return {"cls": rcnn_loss_cls, "reg": rcnn_loss_reg}
 
