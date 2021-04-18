@@ -163,7 +163,6 @@ class ObjectDetection(BasePipeline):
         log.info("Started validation")
 
         self.valid_losses = {}
-        self.valid_visual = {}
 
         pred = []
         gt = []
@@ -188,7 +187,7 @@ class ObjectDetection(BasePipeline):
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
                 # Record visualization for the last iteration
                 if process_bar.n == process_bar.total - 1:
-                    self.valid_visual = self.get_visual(boxes, data)
+                    self.visual['valid'] = self.get_visual(boxes, data)
 
             if no_bboxes > 0:
                 log.warning("No bounding box labels in " +
@@ -300,7 +299,7 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            self.train_visual = {}
+            self.visual = {'train': {}, 'valid': {}}
             no_bboxes = 0
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
@@ -314,7 +313,9 @@ class ObjectDetection(BasePipeline):
                 # Record visualization for the last iteration
                 if process_bar.n == process_bar.total - 1:
                     boxes = model.inference_end(results, data)
-                    self.train_visual = self.get_visual(boxes, data)
+                    self.visual['train'] = self.get_visual(boxes, data)
+                    # if epoch == start_ep:
+                    #     writer.add_graph(self.model, data.point)
 
                 self.optimizer.zero_grad()
                 loss_sum.backward()
@@ -332,18 +333,18 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
-                if no_bboxes > 0:
-                    log.warning("No bounding box labels in " +
-                                f"{no_bboxes}/{len(process_bar)} cases.")
-                # self.scheduler.step()
+            if no_bboxes > 0:
+                log.warning("No bounding box labels in " +
+                            f"{no_bboxes}/{len(process_bar)} cases.")
+            # self.scheduler.step()
 
-                # --------------------- validation
-                self.run_valid()
+            # --------------------- validation
+            self.run_valid()
 
-                self.save_logs(writer, epoch)
+            self.save_logs(writer, epoch)
 
-                if epoch % cfg.save_ckpt_freq == 0:
-                    self.save_ckpt(epoch)
+            if epoch % cfg.save_ckpt_freq == 0:
+                self.save_ckpt(epoch)
 
     def get_visual(self, infer_bboxes_batch, inputs_batch):
         """
@@ -430,26 +431,26 @@ class ObjectDetection(BasePipeline):
         }
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
-
         for key, value in self.valid_losses.items():
             writer.add_scalar("valid/" + key, np.mean(value), epoch)
-        for key, value in self.valid_visual.items():
-            if key == "bboxes":
-                writer.add_mesh(f"valid/bboxes",
-                                vertices=torch.from_numpy(value['points']),
-                                colors=torch.from_numpy(value['colors']),
-                                faces=torch.from_numpy(value['faces']),
-                                config_dict=bbox_config,
-                                global_step=epoch)
-            elif key == "input_pcd":
-                writer.add_mesh(f"valid/input_pcd",
-                                vertices=torch.from_numpy(value),
-                                config_dict=pcd_config,
-                                global_step=epoch)
-            else:
-                writer.add_images(f"valid/features/{key}",
-                                  value,
-                                  global_step=epoch)
+        for stage in ('train', 'valid'):
+            for key, value in self.visual[stage].items():
+                if key == "bboxes":
+                    writer.add_mesh(f"{stage}/bboxes",
+                                    vertices=torch.from_numpy(value['points']),
+                                    colors=torch.from_numpy(value['colors']),
+                                    faces=torch.from_numpy(value['faces']),
+                                    config_dict=bbox_config,
+                                    global_step=epoch)
+                elif key == "input_pcd":
+                    writer.add_mesh(f"{stage}/input_pcd",
+                                    vertices=torch.from_numpy(value),
+                                    config_dict=pcd_config,
+                                    global_step=epoch)
+                else:
+                    writer.add_images(f"{stage}/features/{key}",
+                                      value,
+                                      global_step=epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')

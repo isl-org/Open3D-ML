@@ -109,6 +109,11 @@ class Scannet(BaseDataset):
                     self.test_scenes.extend(
                         framefile[:-9] for framefile in bbox_files)
 
+        if hasattr(cfg, 'max_size'):
+            self.train_scenes = self.train_scenes[:cfg.max_size[0]]
+            self.val_scenes = self.val_scenes[:cfg.max_size[1]]
+            self.test_scenes = self.test_scenes[:cfg.max_size[2]]
+
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
             39

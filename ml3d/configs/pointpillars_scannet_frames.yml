@@ -5,6 +5,7 @@ dataset:
   # path/to/your/dataset
   dataset_path: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/Datasets/ScanNet-cache
   cache_dir: ./logs/cache
+  max_size: [100, 10, 10]
   #  steps_per_epoch_train: 5000
 
 model:
