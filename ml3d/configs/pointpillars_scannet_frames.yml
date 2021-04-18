@@ -1,6 +1,6 @@
 dataset:
   name: Scannet
-    # [scenes|frames] Use point clouds from entire scenes or individual frames
+  # [scenes|frames] Use point clouds from entire scenes or individual frames
   portion: frames
   # path/to/your/dataset
   dataset_path: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/Datasets/ScanNet-cache

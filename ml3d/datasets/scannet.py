@@ -158,14 +158,13 @@ class Scannet(BaseDataset):
             else:
                 yaw = 0.0
                 cat_id = int(box[6])
-            name = self.label2cat[self.cat_ids2class[cat_id]]
-
+            label_class = self.cat_ids2class[cat_id]
+            # name = self.label2cat[label_class]
             truncation = box[8] if len(box) > 8 else 0.0
             n_pts_inside = box[9] if len(box) > 9 else None
             objects.append(
-                Object3d(name, center, size, yaw, truncation, n_pts_inside))
-            # label_class = self.cat_ids2class[int(box[-1])]
-            # name = self.label2cat[label_class]
+                Object3d(label_class, center, size, yaw, truncation,
+                         n_pts_inside))
 
         return objects, semantic_mask, instance_mask
 
@@ -238,16 +237,17 @@ class Object3d(BEVBox3D):
     Stores object specific details like bbox coordinates.
     """
 
-    def __init__(self,
-                 name,
-                 center,
-                 size,
-                 yaw,
-                 truncation=0.0,
-                 n_pts_inside=None):
-        super().__init__(center, size, yaw, name, -1.0)
-        # def __init__(self, label_class, center, size, yaw):
-        #     super().__init__(center, size, yaw, label_class, -1.0)
+    def __init__(
+            self,
+            label_class: int,
+            center,
+            size,
+            yaw,
+            # def __init__(self, name, center, size, yaw,
+            truncation=0.0,
+            n_pts_inside=None):
+        # super().__init__(center, size, yaw, name, -1.0)
+        super().__init__(center, size, yaw, label_class, -1.0)
 
         self.occlusion = 0.0
         self.truncation = truncation

@@ -24,25 +24,31 @@ class BoundingBox3D:
         """Creates a bounding box. Front, up, left define the axis of the box
         and must be normalized and mutually orthogonal.
 
-        center: (x, y, z) that defines the center of the box
-        front: normalized (i, j, k) that defines the front (Y) direction of the box
-        up: normalized (i, j, k) that defines the up (Z) direction of the box
-        left: normalized (i, j, k) that defines the left (X) direction of the box
-        size: (width, height, depth) that defines the size of the box, as
+        Args:
+
+        center (ArrayLike[3]): (x, y, z) that defines the center of the box
+        front (ArrayLike[3]): normalized (i, j, k) that defines the front (Y)
+            direction of the box
+        up (ArrayLike[3]): normalized (i, j, k) that defines the up (Z)
+            direction of the box
+        left (ArrayLike[3]): normalized (i, j, k) that defines the left (X)
+            direction of the box
+        size (ArrayLike[3]): (width, height, depth) that defines the size of the box, as
             measured from edge to edge
-        label_class: integer specifying the classification label. If an LUT is
+        label_class (int): integer specifying the classification label. If an LUT is
             specified in create_lines() this will be used to determine the color
             of the box.
-        confidence: confidence level of the box
-        meta: a user-defined string (optional)
-        show_class: displays the class label in text near the box (optional)
-        show_confidence: displays the confidence value in text near the box
-            (optional)
-        show_meta: displays the meta string in text near the box (optional)
-        identifier: a unique integer that defines the id for the box (optional,
-            will be generated if not provided)
-        arrow_length: the length of the arrow in the front_direct. Set to zero
-            to disable the arrow (optional)
+        confidence (float): confidence level of the box
+        meta (str): a user-defined string (optional)
+        show_class (bool, optional): displays the class label in text near the box
+        show_confidence (bool, optional): displays the confidence value in text
+            near the box
+        show_meta (bool, optional): displays the meta string in text near the
+            box
+        identifier (int, optional): a unique integer that defines the id for the
+            box (will be generated if not provided)
+        arrow_length (float, optional): the length of the arrow in the
+            front_direct. Set to zero to disable the arrow
         """
         assert (len(center) == 3)
         assert (len(front) == 3)

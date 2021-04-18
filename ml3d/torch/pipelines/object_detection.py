@@ -163,7 +163,7 @@ class ObjectDetection(BasePipeline):
         log.info("Started validation")
 
         self.valid_losses = {}
-        self.val_anchor_vis = []
+        self.valid_visual = {}
 
         pred = []
         gt = []
@@ -186,9 +186,9 @@ class ObjectDetection(BasePipeline):
                 boxes = model.inference_end(results, data)
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
-                # Record bboxes for the last iteration
+                # Record visualization for the last iteration
                 if process_bar.n == process_bar.total - 1:
-                    self.val_anchor_vis.append(self.get_visual(boxes, data))
+                    self.valid_visual = self.get_visual(boxes, data)
 
             if no_bboxes > 0:
                 log.warning("No bounding box labels in " +
@@ -300,7 +300,7 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            self.train_anchor_vis = []
+            self.train_visual = {}
             no_bboxes = 0
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
@@ -312,9 +312,9 @@ class ObjectDetection(BasePipeline):
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
                 # Record visualization for the last iteration
-                # if process_bar.n == process_bar.total - 1:
-                #     boxes = model.inference_end(results, data)
-                #     self.train_anchor_vis.append(self.get_visual(boxes, data))
+                if process_bar.n == process_bar.total - 1:
+                    boxes = model.inference_end(results, data)
+                    self.train_visual = self.get_visual(boxes, data)
 
                 self.optimizer.zero_grad()
                 loss_sum.backward()
@@ -347,19 +347,32 @@ class ObjectDetection(BasePipeline):
 
     def get_visual(self, infer_bboxes_batch, inputs_batch):
         """
-        inputs.bbox_objs: List[List[Object3D]]
-        infer_bboxes:
+        Create visualization for network inputs and outputs. Add visualizations
+        of  intermediate features from the model, if any.
+
+        Args:
+            infer_bboxes_batch (Sequence[Sequence[BoundingBox3D]):
+            inputs_batch (Sequence[Sequence[bbox_objs: Object3D, point:
+                array(N,3)]]):
+
+        Returns:
+            [Dict] visualizations of inputs, intermediate features and outputs
         """
         points = []
         colors = []
         faces = []
         input_pcd = []
-        max_pcd_pts = 10000
+        max_pcd_pts = 4900
         max_pts = 0
         max_faces = 0
+        pcd_range = np.array(self.model.point_cloud_range).reshape((2, 3))
+        pcd_range_bbox = BoundingBox3D(pcd_range.mean(axis=0), [0, 1, 0],
+                                       [0, 0, 1], [1, 0, 0],
+                                       pcd_range[1] - pcd_range[0], 0, 1.0)
         for infer_bboxes, gt_bboxes, pointcloud in zip(infer_bboxes_batch,
                                                        inputs_batch.bbox_objs,
                                                        inputs_batch.point):
+            gt_bboxes.append(pcd_range_bbox)
             gt_points, gt_colors, gt_faces = BoundingBox3D.create_trimesh(
                 gt_bboxes, lut=self.dataset.label_lut)
             pred_points, pred_colors, pred_faces = BoundingBox3D.create_trimesh(
@@ -374,7 +387,8 @@ class ObjectDetection(BasePipeline):
                                         pointcloud.shape[0] - 1,
                                         num=max_pcd_pts,
                                         dtype=int)
-            input_pcd.append(pointcloud[pcd_subsample, :].cpu().numpy())
+            input_pcd.append(
+                pointcloud[pcd_subsample, :].cpu().detach().numpy())
 
         points = np.stack(
             [np.pad(p, ((0, max_pts - p.shape[0]), (0, 0))) for p in points])
@@ -384,15 +398,19 @@ class ObjectDetection(BasePipeline):
             [np.pad(f, ((0, max_faces - f.shape[0]), (0, 0))) for f in faces])
         input_pcd = np.stack(input_pcd)
 
-        return {
-            'points': points,
-            'colors': colors,
-            'faces': faces,
-            'input_pcd': input_pcd
+        visual_dict = {
+            'input_pcd': input_pcd,
+            'bboxes': {
+                'points': points,
+                'colors': colors,
+                'faces': faces
+            }
         }
+        visual_dict.update(self.model.get_visual())
+        return visual_dict
 
     def save_logs(self, writer, epoch):
-        anchor_config = {
+        bbox_config = {
             "material": {
                 "cls": "MeshBasicMaterial",
                 "wireframe": True
@@ -412,31 +430,26 @@ class ObjectDetection(BasePipeline):
         }
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
-        for key, mesh in enumerate(self.train_anchor_vis):
-            writer.add_mesh(f"train/anchors/{key}",
-                            vertices=torch.from_numpy(mesh['points']),
-                            colors=torch.from_numpy(mesh['colors']),
-                            faces=torch.from_numpy(mesh['faces']),
-                            config_dict=anchor_config,
-                            global_step=epoch)
-            writer.add_mesh(f"train/pointcloud/{key}",
-                            vertices=torch.from_numpy(mesh['input_pcd']),
-                            config_dict=pcd_config,
-                            global_step=epoch)
 
-        for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/" + key, np.mean(val), epoch)
-        for key, mesh in enumerate(self.val_anchor_vis):
-            writer.add_mesh(f"valid/anchors/{key}",
-                            vertices=torch.from_numpy(mesh['points']),
-                            colors=torch.from_numpy(mesh['colors']),
-                            faces=torch.from_numpy(mesh['faces']),
-                            config_dict=anchor_config,
-                            global_step=epoch)
-            writer.add_mesh(f"train/pointcloud/{key}",
-                            vertices=torch.from_numpy(mesh['input_pcd']),
-                            config_dict=pcd_config,
-                            global_step=epoch)
+        for key, value in self.valid_losses.items():
+            writer.add_scalar("valid/" + key, np.mean(value), epoch)
+        for key, value in self.valid_visual.items():
+            if key == "bboxes":
+                writer.add_mesh(f"valid/bboxes",
+                                vertices=torch.from_numpy(value['points']),
+                                colors=torch.from_numpy(value['colors']),
+                                faces=torch.from_numpy(value['faces']),
+                                config_dict=bbox_config,
+                                global_step=epoch)
+            elif key == "input_pcd":
+                writer.add_mesh(f"valid/input_pcd",
+                                vertices=torch.from_numpy(value),
+                                config_dict=pcd_config,
+                                global_step=epoch)
+            else:
+                writer.add_images(f"valid/features/{key}",
+                                  value,
+                                  global_step=epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
