@@ -892,15 +892,15 @@ class Anchor3DHead(nn.Module):
         self.cls_out_channels = self.num_anchors * self.num_classes
         self.conv_cls = nn.Conv2d(self.feat_channels,
                                   self.cls_out_channels,
-                                  1,
+                                  2 * stride + 1,
                                   stride=stride)
         self.conv_reg = nn.Conv2d(self.feat_channels,
                                   self.num_anchors * self.box_code_size,
-                                  1,
+                                  2 * stride + 1,
                                   stride=stride)
         self.conv_dir_cls = nn.Conv2d(self.feat_channels,
                                       self.num_anchors * 2,
-                                      1,
+                                      2 * stride + 1,
                                       stride=stride)
 
         self.init_weights()
