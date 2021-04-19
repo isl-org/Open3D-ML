@@ -167,7 +167,7 @@ def test_pointpillars_torch():
     }
     data = net.preprocess(data, {'split': 'test'})
     data = net.transform(data, {'split': 'test'})
-    data = batcher.collate_fn([{'data': data}])
+    data = batcher.collate_fn([{'data': data, 'attr': {'split': 'test'}}])
 
     net.eval()
     with torch.no_grad():
