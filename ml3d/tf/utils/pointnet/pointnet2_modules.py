@@ -1,40 +1,11 @@
-#***************************************************************************************/
-#
-#    Based on Pointnet2 Library (MIT license):
-#    https://github.com/sshaoshuai/Pointnet2.PyTorch
-#
-#    Copyright (c) 2019 Shaoshuai Shi
-
-#    Permission is hereby granted, free of charge, to any person obtaining a copy
-#    of this software and associated documentation files (the "Software"), to deal
-#    in the Software without restriction, including without limitation the rights
-#    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-#    copies of the Software, and to permit persons to whom the Software is
-#    furnished to do so, subject to the following conditions:
-
-#    The above copyright notice and this permission notice shall be included in all
-#    copies or substantial portions of the Software.
-
-#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-#    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-#    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-#    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-#    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-#    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-#    SOFTWARE.
-#
-#***************************************************************************************/s
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import tensorflow as tf
 
 from . import pointnet2_utils
-from . import pytorch_utils as pt_utils
+from . import tf_utils
 from typing import List
 
 
-class _PointnetSAModuleBase(nn.Module):
+class _PointnetSAModuleBase(tf.keras.layers.Layer):
 
     def __init__(self):
         super().__init__()
@@ -43,10 +14,7 @@ class _PointnetSAModuleBase(nn.Module):
         self.mlps = None
         self.pool_method = 'max_pool'
 
-    def forward(self,
-                xyz: torch.Tensor,
-                features: torch.Tensor = None,
-                new_xyz=None) -> (torch.Tensor, torch.Tensor):
+    def call(self, xyz, features=None, new_xyz=None, training=True):
         """
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
@@ -58,33 +26,36 @@ class _PointnetSAModuleBase(nn.Module):
         new_features_list = []
 
         if new_xyz is None and self.npoint is not None:
-            sampling = pointnet2_utils.furthest_point_sample(xyz, self.npoint)
-            new_xyz = torch.gather(xyz, 1,
-                                   torch.stack([sampling] * 3, -1).long())
+            sampling = tf.expand_dims(pointnet2_utils.furthest_point_sample(
+                xyz, self.npoint),
+                                      axis=-1)
+            new_xyz = tf.gather_nd(xyz, sampling, batch_dims=1)
 
         for i in range(len(self.groupers)):
             new_features = self.groupers[i](xyz, new_xyz,
                                             features)  # (B, C, npoint, nsample)
 
             new_features = self.mlps[i](
-                new_features)  # (B, mlp[-1], npoint, nsample)
+                new_features,
+                training=training)  # (B, mlp[-1], npoint, nsample)
             if self.pool_method == 'max_pool':
-                new_features = F.max_pool2d(new_features,
-                                            kernel_size=[
-                                                1, new_features.size(3)
-                                            ])  # (B, mlp[-1], npoint, 1)
+                new_features = tf.nn.max_pool2d(new_features,
+                                                kernel_size=[
+                                                    1, new_features.size(3)
+                                                ])  # (B, mlp[-1], npoint, 1)
             elif self.pool_method == 'avg_pool':
-                new_features = F.avg_pool2d(new_features,
-                                            kernel_size=[
-                                                1, new_features.size(3)
-                                            ])  # (B, mlp[-1], npoint, 1)
+                new_features = tf.nn.avg_pool2d(new_features,
+                                                kernel_size=[
+                                                    1, new_features.size(3)
+                                                ])  # (B, mlp[-1], npoint, 1)
             else:
                 raise NotImplementedError
 
-            new_features = new_features.squeeze(-1)  # (B, mlp[-1], npoint)
+            new_features = tf.squeeze(new_features,
+                                      axis=-1)  # (B, mlp[-1], npoint)
             new_features_list.append(new_features)
 
-        return new_xyz, torch.cat(new_features_list, dim=1)
+        return new_xyz, tf.concat(new_features_list, axis=1)
 
 
 class PointnetSAModuleMSG(_PointnetSAModuleBase):
@@ -98,8 +69,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
                  mlps: List[List[int]],
                  bn: bool = True,
                  use_xyz: bool = True,
-                 pool_method='max_pool',
-                 instance_norm=False):
+                 pool_method='max_pool'):
         """
         :param npoint: int
         :param radii: list of float, list of radii to group with
@@ -108,15 +78,14 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
         :param bn: whether to use batchnorm
         :param use_xyz:
         :param pool_method: max_pool / avg_pool
-        :param instance_norm: whether to use instance_norm
         """
         super().__init__()
 
         assert len(radii) == len(nsamples) == len(mlps)
 
         self.npoint = npoint
-        self.groupers = nn.ModuleList()
-        self.mlps = nn.ModuleList()
+        self.groupers = []
+        self.mlps = []
         for i in range(len(radii)):
             radius = radii[i]
             nsample = nsamples[i]
@@ -127,9 +96,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
             if use_xyz:
                 mlp_spec[0] += 3
 
-            self.mlps.append(
-                pt_utils.SharedMLP(mlp_spec, bn=bn,
-                                   instance_norm=instance_norm))
+            self.mlps.append(tf_utils.SharedMLP(mlp_spec, bn=bn))
         self.pool_method = pool_method
 
 
@@ -144,8 +111,7 @@ class PointnetSAModule(PointnetSAModuleMSG):
                  nsample: int = None,
                  bn: bool = True,
                  use_xyz: bool = True,
-                 pool_method='max_pool',
-                 instance_norm=False):
+                 pool_method='max_pool'):
         """
         :param mlp: list of int, spec of the pointnet before the global max_pool
         :param npoint: int, number of features
@@ -154,7 +120,6 @@ class PointnetSAModule(PointnetSAModuleMSG):
         :param bn: whether to use batchnorm
         :param use_xyz:
         :param pool_method: max_pool / avg_pool
-        :param instance_norm: whether to use instance_norm
         """
         super().__init__(mlps=[mlp],
                          npoint=npoint,
@@ -162,11 +127,10 @@ class PointnetSAModule(PointnetSAModuleMSG):
                          nsamples=[nsample],
                          bn=bn,
                          use_xyz=use_xyz,
-                         pool_method=pool_method,
-                         instance_norm=instance_norm)
+                         pool_method=pool_method)
 
 
-class PointnetFPModule(nn.Module):
+class PointnetFPModule(tf.keras.layers.Layer):
     r"""Propigates the features of one set to another"""
 
     def __init__(self, *, mlp: List[int], bn: bool = True):
@@ -175,11 +139,9 @@ class PointnetFPModule(nn.Module):
         :param bn: whether to use batchnorm
         """
         super().__init__()
-        self.mlp = pt_utils.SharedMLP(mlp, bn=bn)
+        self.mlp = tf_utils.SharedMLP(mlp, bn=bn)
 
-    def forward(self, unknown: torch.Tensor, known: torch.Tensor,
-                unknow_feats: torch.Tensor,
-                known_feats: torch.Tensor) -> torch.Tensor:
+    def call(self, unknown, known, unknow_feats, known_feats, training=True):
         """
         :param unknown: (B, n, 3) tensor of the xyz positions of the unknown features
         :param known: (B, m, 3) tensor of the xyz positions of the known features
@@ -191,7 +153,7 @@ class PointnetFPModule(nn.Module):
         if known is not None:
             dist, idx = pointnet2_utils.three_nn_gpu(unknown, known)
             dist_recip = 1.0 / (dist + 1e-8)
-            norm = torch.sum(dist_recip, dim=2, keepdim=True)
+            norm = tf.sum(dist_recip, axis=2, keepdim=True)
             weight = dist_recip / norm
 
             interpolated_feats = pointnet2_utils.three_interpolate_gpu(
@@ -201,15 +163,15 @@ class PointnetFPModule(nn.Module):
                                                     unknown.size(1))
 
         if unknow_feats is not None:
-            new_features = torch.cat([interpolated_feats, unknow_feats],
-                                     dim=1)  # (B, C2 + C1, n)
+            new_features = tf.concat([interpolated_feats, unknow_feats],
+                                     axis=1)  # (B, C2 + C1, n)
         else:
             new_features = interpolated_feats
 
-        new_features = new_features.unsqueeze(-1)
-        new_features = self.mlp(new_features)
+        new_features = tf.expand_dims(new_features, axis=-1)
+        new_features = self.mlp(new_features, training=training)
 
-        return new_features.squeeze(-1)
+        return tf.squeeze(new_features, axis=-1)
 
 
 if __name__ == "__main__":
