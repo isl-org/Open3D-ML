@@ -135,33 +135,37 @@ class PointPillars(BaseModel):
         return x
 
     def get_visual(self):
-        """Returns (Dict) containing tensors to visualize intermediate features """
-        return {
-            "pseudo_image":
-                self.pseudo_image,
-            "voxel_features": (255 * self.scatter_features /
-                               self.scatter_features.max()).type(torch.uint8)
-        }
+        """Returns (Dict) containing tensors to visualize intermediate features
+        """
+        visual_dict = {"pseudo_image": self.pseudo_image}
+        scatter_features = (255 * self.scatter_features /
+                            self.scatter_features.max()).type(torch.uint8)
+        visual_dict.update({
+            f"voxel_features/{n}": feat[:, np.newaxis, ...]  # N1HW data format
+            for n, feat in enumerate(scatter_features)
+        })
+
+        return visual_dict
 
     @torch.no_grad()
     def voxelize(self, points):
         """Apply hard voxelization to points."""
         voxels, coors, num_points = [], [], []
+        # N1HW format
         self.pseudo_image = torch.zeros(
-            (
-                len(points),  # NHW
-                self.pi_ny,
-                self.pi_nx),
+            (len(points), 1, self.pi_ny, self.pi_nx),
             dtype=torch.uint8,
-            device=points.device)
+            device=points[0].device)
         for k, res in enumerate(points):
             res_voxels, res_coors, res_num_points = self.voxel_layer(res)
 
             avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
             vis_coords = res_coors.to(torch.long)
-            self.pseudo_image[k, vis_coords[:, 1],
-                              vis_coords[:, 2]] = (255 * avg_depth / 3.5).to(
-                                  torch.uint8)
+            self.pseudo_image[k, 0, vis_coords[:, 1],
+                              vis_coords[:,
+                                         2]] = (255 * avg_depth /
+                                                self.point_cloud_range[5]).to(
+                                                    torch.uint8)
 
             voxels.append(res_voxels)
             coors.append(res_coors)
@@ -177,6 +181,7 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def forward(self, inputs):
+        # if hasattr(inputs, 'point'):
         inputs = inputs.point
         x = self.extract_feats(inputs)
         outs = self.bbox_head(x)
@@ -337,8 +342,9 @@ class PointPillars(BaseModel):
             t_data['bbox_objs'] = data['bbox_objs']
             t_data['labels'] = np.array(
                 [
-                    # self.name2lbl.get(bb.label_class, len(self.classes))
-                    bb.label_class for bb in data['bbox_objs']
+                    self.name2lbl.get(bb.label_class, len(self.classes))
+                    # bb.label_class
+                    for bb in data['bbox_objs']
                 ],
                 dtype=np.int64)
             t_data['bboxes'] = np.array(
@@ -352,9 +358,9 @@ class PointPillars(BaseModel):
         inference_result = []
         for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
                                                      scores_b, labels_b):
-            bboxes = _bboxes.cpu().numpy()
-            scores = _scores.cpu().numpy()
-            labels = _labels.cpu().numpy()
+            bboxes = _bboxes.cpu().detach().numpy()
+            scores = _scores.cpu().detach().numpy()
+            labels = _labels.cpu().detach().numpy()
             inference_result.append([])
 
             world_cam, cam_img = None, None
@@ -886,15 +892,15 @@ class Anchor3DHead(nn.Module):
         self.cls_out_channels = self.num_anchors * self.num_classes
         self.conv_cls = nn.Conv2d(self.feat_channels,
                                   self.cls_out_channels,
-                                  1,
+                                  2 * stride + 1,
                                   stride=stride)
         self.conv_reg = nn.Conv2d(self.feat_channels,
                                   self.num_anchors * self.box_code_size,
-                                  1,
+                                  2 * stride + 1,
                                   stride=stride)
         self.conv_dir_cls = nn.Conv2d(self.feat_channels,
                                       self.num_anchors * 2,
-                                      1,
+                                      2 * stride + 1,
                                       stride=stride)
 
         self.init_weights()

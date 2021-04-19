@@ -124,7 +124,7 @@ def main():
         'model': pprint.pformat(cfg_dict_model, indent=2),
         'pipeline': pprint.pformat(cfg_dict_pipeline, indent=2)
     }
-    if hasattr(args, "about"):
+    if args.about is not None:
         pipeline.cfg_tb['about'] = args.about
 
 

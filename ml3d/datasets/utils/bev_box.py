@@ -19,18 +19,21 @@ class BEVBox3D(BoundingBox3D):
         """Creates a bounding box. Front, up, left define the axis of the box
         and must be normalized and mutually orthogonal.
 
-        center: (x, y, z) that defines the center of the box
-        size: (width, height, depth) that defines the size of the box, as
-            measured from edge to edge
-        yaw: yaw angle of box
-        label_class: integer specifying the classification label. If an LUT is
-            specified in create_lines() this will be used to determine the color
-            of the box.
-        confidence: confidence level of the box
-        world_cam: world to camera transformation (shape = [4,4])
-            x_cam = x_world @ world_cam
-        cam_img: camera to image transformation (shape = [4,4])
-            x_img = x_cam @ cam_img
+        Args:
+
+            center (ArrayLike[3]): (x, y, z) that defines the center of the box
+            size (ArrayLike[3]): (width, height, depth) that defines the size of
+                the box, as measured from edge to edge
+            yaw (float): yaw angle of box
+            label_class (int): integer specifying the classification label. If
+                an LUT is specified in create_lines() this will be used to determine
+                the color of the box.  confidence (float): confidence level of the
+                box
+            world_cam (ArrayLike[4,4]): world to camera transformation
+                x_cam = x_world @ world_cam
+            cam_img (ArrayLike[4,4]): camera to image transformation
+                x_img = x_cam @ cam_img
+            **kwargs: Arguments passed to BoundingBox3D
         """
 
         self.yaw = yaw

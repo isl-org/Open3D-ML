@@ -16,7 +16,7 @@ python scripts/run_pipeline.py {tf|torch} -p PIPELINE_NAME -m MODEL_NAME \
 -d DATASET_NAME --cfg_dataset DATASET_CONFIG_FILE  [optional arguments]
 
 ```
-Alternatively, you can run the script using one single config file, which 
+Alternatively, you can run the script using one single config file, which
 contains configs for dataset, model, and pipeline.
 ```shell
 python scripts/run_pipeline.py {tf|torch} -c CONFIG_FILE [optional arguments]
@@ -38,6 +38,7 @@ python scripts/run_pipeline.py tf -c ml3d/configs/kpconv_semantickitti.yml \
 ```
 
 Arguments can be
+
 - `-p, --pipeline`: pipeline name, SemanticSegmentation or ObjectDetection
 - `-m, --model`: model name (RnadLANet, KPConv)
 - `-d, --dataset`: dataset name (SemanticKITTI, Toronto3D, S3DIS, ParisLille3D, Semantic3D)
@@ -52,4 +53,3 @@ Arguments can be
 You can also add arbitrary arguments in the command line and the arguments will
 save in a dictionary and merge with dataset/model/pipeline's existing cfg.
 For example, `--foo abc` will add `{"foo": "abc"}`to the cfg dict.
-
