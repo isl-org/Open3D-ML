@@ -96,18 +96,17 @@ class Scannet(BaseDataset):
                 elif scene in test_files:
                     self.test_scenes.append(join(self.dataset_path, scene))
         elif self.portion == 'frames':
+            all_bbox_files = glob(join(self.dataset_path, '*_bbox.npy'))
             for scene in available_scenes:
-                bbox_files = glob(join(self.dataset_path,
-                                       scene + '_*_bbox.npy'))
                 if scene in train_files:
                     self.train_scenes.extend(
-                        framefile[:-9] for framefile in bbox_files)
+                        framefile[:-9] for framefile in all_bbox_files if scene in framefile)
                 elif scene in val_files:
                     self.val_scenes.extend(
-                        framefile[:-9] for framefile in bbox_files)
+                        framefile[:-9] for framefile in all_bbox_files if scene in framefile)
                 elif scene in test_files:
                     self.test_scenes.extend(
-                        framefile[:-9] for framefile in bbox_files)
+                        framefile[:-9] for framefile in all_bbox_files if scene in framefile)
 
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,

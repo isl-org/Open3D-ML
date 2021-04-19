@@ -699,66 +699,69 @@ class ScannetProcess():
                     seg_to_verts[seg_id] = [i]
         return seg_to_verts, num_verts
 
+    @staticmethod
+    def get_scene_stats(dset, scan):
+        try:
+            mesh_vertices = dset.read_lidar(scan + '_vert')
+            instance_labels, semantic_labels, instance_bboxes = dset.read_label_files(
+                scan)
+        except FileNotFoundError:
+            log.warning(f"Some files are missing: {scan}_*.np[yz]." +
+                        " Please re-run preprocessing.")
+            return None
+        return utils.statistics.compute_scene_stats(mesh_vertices,
+                                                    semantic_labels,
+                                                    instance_labels,
+                                                    instance_bboxes)
+
+    @staticmethod
+    def get_frame_stats(dset, frame):
+        try:
+            mesh_vertices = dset.read_lidar(frame + '_vert')
+            _, _, instance_bboxes = dset.read_label_files(frame)
+        except FileNotFoundError:
+            log.warning(f"Some files are missing: {frame}_*.np[yz]." +
+                        " Please re-run preprocessing.")
+            return None
+        return utils.statistics.compute_scene_stats(mesh_vertices, None,
+                                                    None, instance_bboxes)
+
+
     def compute_dataset_statistics(self):
         """ Compute statistics on the dataset using the training and validation
         splits. Statistics are generated separately for scenes and frames."""
 
-        def get_scene_stats(scan):
-            try:
-                mesh_vertices = dset.read_lidar(scan + '_vert')
-                instance_labels, semantic_labels, instance_bboxes = dset.read_label_files(
-                    scan)
-            except FileNotFoundError:
-                log.warning(f"Some files are missing: {scan}_*.np[yz]." +
-                            " Please re-run preprocessing.")
-                return None
-            return utils.statistics.compute_scene_stats(mesh_vertices,
-                                                        semantic_labels,
-                                                        instance_labels,
-                                                        instance_bboxes)
-
-        def get_frame_stats(frame):
-            try:
-                mesh_vertices = dset.read_lidar(frame + '_vert')
-                _, _, instance_bboxes = dset.read_label_files(frame)
-            except FileNotFoundError:
-                log.warning(f"Some files are missing: {frame}_*.np[yz]." +
-                            " Please re-run preprocessing.")
-                return None
-            return utils.statistics.compute_scene_stats(mesh_vertices, None,
-                                                        None, instance_bboxes)
-
         with concurrent.futures.ThreadPoolExecutor(
-                max_workers=os.cpu_count()) as runner:
+                max_workers=4) as runner:
             if self.scene_pcd:
                 dset = Scannet(self.out_path, portion='scenes')
                 scenes = dset.get_split_list('train') + dset.get_split_list(
                     'val')
                 scene_stats = list(
-                    tqdm(runner.map(get_scene_stats, scenes),
-                         total=len(scenes),
-                         desc="scene_stats",
-                         unit="scene"))
+                    tqdm(runner.map(self.get_scene_stats, (dset,)*len(scenes), scenes),
+                            total=len(scenes),
+                            desc="scene_stats",
+                            unit="scene"))
 
                 dataset_stats = utils.statistics.compute_dataset_stats(
                     scene_stats)
                 with open(join(self.out_path, 'scene_summary.yaml'),
-                          'w') as sumfile:
+                            'a') as sumfile:
                     yaml.dump(dataset_stats, sumfile)
             if self.frame_pcd:
                 dset = Scannet(self.out_frame_path, portion='frames')
                 frames = dset.get_split_list('train') + dset.get_split_list(
                     'val')
                 frame_stats = list(
-                    tqdm(runner.map(get_frame_stats, frames),
-                         total=len(frames),
-                         desc="frame_stats",
-                         unit="frame"))
+                    tqdm(runner.map(self.get_frame_stats, (dset,)*len(frames), frames),
+                            total=len(frames),
+                            desc="frame_stats",
+                            unit="frame"))
 
                 dataset_stats = utils.statistics.compute_dataset_stats(
-                    frame_stats)
+                    frame_stats, n_anchors_range=(35, 120))
                 with open(join(self.out_path, 'frame_summary.yaml'),
-                          'w') as sumfile:
+                            'a') as sumfile:
                     yaml.dump(dataset_stats, sumfile)
 
 

@@ -62,15 +62,18 @@ def compute_scene_stats(mesh_vertices, semantic_labels, instance_labels,
     return stats
 
 
-def compute_dataset_stats(scene_stats):
+def compute_dataset_stats(scene_stats, n_anchors_range=None):
     """
     Compute dataset statistics by aggregating data from all scenes.
 
     Args:
-        scene_stats(list(dict)):
+        scene_stats(List(Dict)):
+        n_anchors_range (optional, (int,int)): Estimate anchor boxes with 
+            minimum IoU with ground truth boxes with an anchor box budget in 
+            this range. If not provided, (n_classes//2, 2*n_classes+1) is used.
 
     Returns:
-        data_stats(dict):
+        data_stats(Dict):
     """
     scene_stats = list(filter(None, scene_stats))  # Remove empty scenes
     data_stats = {}
@@ -122,6 +125,8 @@ def compute_dataset_stats(scene_stats):
             clsid for stats in scene_stats
             for clsid in stats['bbox_shape'].keys()
         ]).tolist()
+        if n_anchors_range is None:
+            n_anchors_range = (len(class_ids) // 2, 2 * len(class_ids) + 1)
 
         data_stats['bbox_shape'] = dict(zip(class_ids, [[]] * len(class_ids)))
         class_bboxes = dict(zip(class_ids, [[]] * len(class_ids)))
@@ -136,7 +141,7 @@ def compute_dataset_stats(scene_stats):
                 'std': np.std(class_bboxes[class_id], axis=0).tolist()
             }
         anchor_boxes, mIoU = calc_anchor_boxes(
-            class_bboxes, range(len(class_ids) // 2, 2 * len(class_ids) + 1))
+            class_bboxes, range(n_anchors_range[0], n_anchors_range[1]))
         data_stats['anchor_boxes'] = {'mIou': mIoU, 'boxes': anchor_boxes}
 
     if 'truncation' in scene_stats[0]:
