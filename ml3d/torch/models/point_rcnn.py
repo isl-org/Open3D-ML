@@ -230,9 +230,21 @@ class PointRCNN(BaseModel):
                 return {}
             return self.rcnn.loss(results, inputs)
 
+    def filter_objects(self,
+                       bbox_objs):  # TODO: take similar classes from config.
+        filtered = []
+        for bb in bbox_objs:
+            if bb.label_class in ['Car', 'Van']:
+                if bb.label_class == 'Van':
+                    bb.label_class = 'Car'
+                filtered.append(bb)
+        return filtered
+
     def preprocess(self, data, attr):
         if attr['split'] in ['train', 'training']:
             data = self.augment_data(data, attr)
+
+        data['bounding_boxes'] = self.filter_objects(data['bounding_boxes'])
 
         # remove intensity
         points = np.array(data['point'][..., :3], dtype=np.float32)
@@ -249,19 +261,28 @@ class PointRCNN(BaseModel):
         return new_data
 
     @staticmethod
-    def generate_rpn_training_labels(points, bboxes):
+    def generate_rpn_training_labels(points, bboxes, bboxes_world, calib=None):
         cls_label = np.zeros((points.shape[0]), dtype=np.int32)
         reg_label = np.zeros((points.shape[0], 7),
                              dtype=np.float32)  # dx, dy, dz, ry, h, w, l
 
-        pts_idx = points_in_box(points, bboxes)
+        pts_idx = points_in_box(points.copy(),
+                                bboxes_world,
+                                camera_frame=True,
+                                cam_world=DataProcessing.invT(
+                                    calib['world_cam']))
 
         # enlarge the bbox3d, ignore nearby points
-        extended_boxes = bboxes.copy()
+        extended_boxes = bboxes_world.copy()
         extended_boxes[3:6] += 0.4
-        extended_boxes[:, 1] += 0.2
+        # extended_boxes[:, 1] += 0.2
+        extended_boxes[:, 2] -= 0.2  # TODO: check direction of height.
 
-        pts_idx_ext = points_in_box(points, extended_boxes)
+        pts_idx_ext = points_in_box(points.copy(),
+                                    extended_boxes,
+                                    camera_frame=True,
+                                    cam_world=DataProcessing.invT(
+                                        calib['world_cam']))
 
         for k in range(bboxes.shape[0]):
             fg_pt_flag = pts_idx[:, k]
@@ -274,7 +295,8 @@ class PointRCNN(BaseModel):
 
             # pixel offset of object center
             center3d = bboxes[k][0:3].copy()  # (x, y, z)
-            center3d[1] -= bboxes[k][3] / 2
+            center3d[1] -= bboxes[k][
+                3] / 2  # y coordinate is height of bottom plane. It is not center of 3d box.
             reg_label[fg_pt_flag, 0:3] = center3d - fg_pts_rect
 
             # size and angle encoding
@@ -321,11 +343,14 @@ class PointRCNN(BaseModel):
                 for bb in data['bbox_objs']
             ])
 
-            bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
+            bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']
+                              ])  # Camera frame.
+            bboxes_world = np.stack(
+                [bb.to_xyzwhlr() for bb in data['bbox_objs']])
 
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
-                    points, bboxes)
+                    points, bboxes, bboxes_world, data['calib'])
             t_data['labels'] = labels
             t_data['bbox_objs'] = data['bbox_objs']
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":

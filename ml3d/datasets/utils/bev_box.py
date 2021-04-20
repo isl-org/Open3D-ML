@@ -113,7 +113,9 @@ class BEVBox3D(BoundingBox3D):
         bbox = np.zeros((7,))
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
         bbox[0:3] = (np.array([*bbox[0:3], 1.0]) @ self.world_cam)[:3]
-        bbox[3:6] = self.size[2::-1]
+        bbox[3:6] = [self.size[1], self.size[0], self.size[2]]  # h, w, l
+        # TODO : Check implications.
+        # bbox[3:6] = self.size[2::-1]
         bbox[6] = self.yaw
         return bbox
 

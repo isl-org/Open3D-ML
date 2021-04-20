@@ -303,7 +303,11 @@ def points_in_convex_polygon_3d(points, polygon_surfaces, num_surfaces=None):
     return ret
 
 
-def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
+def points_in_box(points,
+                  rbbox,
+                  origin=(0.5, 0.5, 0),
+                  camera_frame=False,
+                  cam_world=None):
     """Check points in rotated bbox and return indicces.
     Args:
         points (np.ndarray, shape=[N, 3+dim]): Points to query.
@@ -315,6 +319,15 @@ def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
     """
     # TODO: this function is different from PointCloud3D, be careful
     # when start to use nuscene, check the input
+
+    if camera_frame:
+        assert cam_world is not None, "Provide cam_to_world matrix if points are in camera frame."
+
+        # transform in world space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        points = np.matmul(points, cam_world)[..., :3]
+
     rbbox = np.array(rbbox)
     rbbox_corners = center_to_corner_box3d(rbbox[:, :3],
                                            rbbox[:, 3:6],
