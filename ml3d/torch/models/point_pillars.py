@@ -1,4 +1,4 @@
-#***************************************************************************************/
+#******************************************************************************/
 #
 #    Based on MMDetection3D Library (Apache 2.0 license):
 #    https://github.com/open-mmlab/mmdetection3d
@@ -17,7 +17,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
-#***************************************************************************************/
+#******************************************************************************/
 
 import torch
 import pickle
@@ -25,7 +25,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
 
-from functools import partial
+# from functools import partial
 import os
 import logging
 import numpy as np
@@ -42,8 +42,8 @@ from ..modules.losses.cross_entropy import CrossEntropyLoss
 from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import ImageGrid
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.axes_grid1 import ImageGrid
 
 
 class PointPillars(BaseModel):
@@ -143,6 +143,19 @@ class PointPillars(BaseModel):
         visual_dict.update({
             f"voxel_features/{n}": feat[:, np.newaxis, ...]  # N1HW data format
             for n, feat in enumerate(scatter_features)
+        })
+
+        visual_dict.update({
+            'weights': {
+                "backbone/0/0/weight": self.backbone.blocks[0][0].weight,
+                "backbone/1/0/weight": self.backbone.blocks[1][0].weight,
+                "backbone/2/0/weight": self.backbone.blocks[2][0].weight,
+                "neck/0/0/weight": self.neck.deblocks[0][0].weight,
+                "neck/1/0/weight": self.neck.deblocks[1][0].weight,
+                "neck/2/0/weight": self.neck.deblocks[2][0].weight,
+                "head/cls/weight": self.bbox_head.conv_cls.weight,
+                "head/reg/weight": self.bbox_head.conv_reg.weight,
+            }
         })
 
         return visual_dict
@@ -329,10 +342,13 @@ class PointPillars(BaseModel):
         if cfg.get('PointShuffle', False):
             data = ObjdetAugmentation.PointShuffle(data)
 
+        # if cfg.get('Rotation', False):
+        #     data = ObjdetAugmentation.(data)
+
         return data
 
     def transform(self, data, attr):
-        #Augment data
+        # Augment data
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
@@ -436,7 +452,7 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         assert (points.le(self.points_range_max.to(device=points.device)).all() and
                 points.ge(self.points_range_min.to(device=points.device)).all()), \
-                "Input point cloud exceeds pre-defined point cloud range!"
+            "Input point cloud exceeds pre-defined point cloud range!"
 
         ans = voxelize(points, self.voxel_size, self.points_range_min,
                        self.points_range_max, self.max_num_points, max_voxels)
@@ -755,6 +771,8 @@ class SECOND(nn.Module):
             blocks.append(block)
 
         self.blocks = nn.ModuleList(blocks)
+        # Do not initialize weights in the conv layers to follow the original
+        # implementation
 
     def forward(self, x):
         """Forward function.
@@ -892,15 +910,15 @@ class Anchor3DHead(nn.Module):
         self.cls_out_channels = self.num_anchors * self.num_classes
         self.conv_cls = nn.Conv2d(self.feat_channels,
                                   self.cls_out_channels,
-                                  2 * stride + 1,
+                                  2 * stride[0] - 1,
                                   stride=stride)
         self.conv_reg = nn.Conv2d(self.feat_channels,
                                   self.num_anchors * self.box_code_size,
-                                  2 * stride + 1,
+                                  2 * stride[0] - 1,
                                   stride=stride)
         self.conv_dir_cls = nn.Conv2d(self.feat_channels,
                                       self.num_anchors * 2,
-                                      2 * stride + 1,
+                                      2 * stride[0] - 1,
                                       stride=stride)
 
         self.init_weights()
@@ -1084,6 +1102,10 @@ class Anchor3DHead(nn.Module):
             dir_scores = dir_scores[topk_inds]
 
         bboxes = self.bbox_coder.decode(anchors, bbox_preds)
+        # keep = (bboxes[:, [3, 4, 5]] < 5).all(axis=1)  # TODO
+        # bboxes = bboxes[keep, :]
+        # scores = scores[keep, :]
+        # dir_scores = dir_scores[keep]
 
         idxs = multiclass_nms(bboxes, scores, self.score_thr)
 

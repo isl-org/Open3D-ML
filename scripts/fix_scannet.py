@@ -70,7 +70,8 @@ def convert_bbox_obj_to_bbox_array():
     for bbox_file in tqdm(Path(scannet_frames).glob("*_bbox.npy")):
         try:
             o3d_bboxes = np.load(bbox_file, allow_pickle=True)
-            np_bboxes = np.vstack(list(box.to_xyzwlhyc() for box in o3d_bboxes))
+            np_bboxes = np.vstack(
+                list(box.to_xyz_dxdydz_yc() for box in o3d_bboxes))
             bbox_out_file = Path(scannet_frames_out) / bbox_file.name
             np.save(bbox_out_file, np_bboxes)
         except Exception:

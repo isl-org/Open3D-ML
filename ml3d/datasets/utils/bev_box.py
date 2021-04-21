@@ -26,9 +26,9 @@ class BEVBox3D(BoundingBox3D):
                 the box, as measured from edge to edge
             yaw (float): yaw angle of box
             label_class (int): integer specifying the classification label. If
-                an LUT is specified in create_lines() this will be used to determine
-                the color of the box.  confidence (float): confidence level of the
-                box
+                an LUT is specified in create_lines() this will be used to
+                determine the color of the box.
+            confidence (float): confidence level of the box
             world_cam (ArrayLike[4,4]): world to camera transformation
                 x_cam = x_world @ world_cam
             cam_img (ArrayLike[4,4]): camera to image transformation
@@ -100,9 +100,9 @@ class BEVBox3D(BoundingBox3D):
         bbox[6] = self.yaw
         return bbox
 
-    def to_xyzwlhyc(self):
+    def to_xyz_dxdydz_yc(self):
         """
-        Convert box to [center (xyz), size (dx, dy, dz), yaw (rad),
+        Convert box to [center (xyz), size (dx, dy, dz), yaw (Z rotation in rad),
         label_class] representation for caching in a npy file
 
         Returns: (numpy array (8,))
@@ -227,6 +227,7 @@ class BEVBox3D(BoundingBox3D):
         box_dicts = {
             'bbox': np.empty((len(bboxes), 7)),
             'label': np.empty((len(bboxes),), dtype='<U20'),
+            # 'label': np.empty((len(bboxes),), dtype=np.int),
             'score': np.empty((len(bboxes),)),
             'difficulty': np.empty((len(bboxes),))
         }
