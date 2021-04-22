@@ -423,6 +423,11 @@ class PointPillarsBatch:
 
         for batch in batches:
             data = batch['data']
+            attr = batch['attr']
+            if 'test' not in attr['split'] and len(
+                    data['bboxes']
+            ) == 0:  # Skip training batch with no bounding box.
+                continue
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(
                 torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
