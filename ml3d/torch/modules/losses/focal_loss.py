@@ -32,7 +32,9 @@ class FocalLoss(nn.Module):
 
         pred_sigmoid = pred.sigmoid()
 
-        target = one_hot(target, int(pred.shape[-1])).type_as(pred)
+        if len(pred.shape) > 1 and int(pred.shape[-1]) > 1:
+            target = one_hot(target, int(pred.shape[-1]))
+        target = target.type_as(pred)
 
         pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
         focal_weight = (self.alpha * target + (1 - self.alpha) *
@@ -45,7 +47,9 @@ class FocalLoss(nn.Module):
 
         loss = loss * self.loss_weight
 
-        if avg_factor:
+        if avg_factor is None:
+            return loss.mean()
+        elif avg_factor > 0:
             return loss.sum() / avg_factor
         else:
-            return loss.mean()
+            return loss

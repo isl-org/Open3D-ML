@@ -127,13 +127,40 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
+        """
+        Run inference on given data.
 
-    """
-    Run the inference using the data passed.
-    
-    """
+        Args:
+            data: A raw data.
+        Returns:
+            Returns the inference results.
+        """
 
     def run_inference(self, data):
+        if self.model.cfg.name == 'SparseConvUnet':
+            return self.run_inference_direct(data)
+        else:
+            return self.run_inference_patchwise(data)
+
+    def run_inference_direct(self, data):
+        model = self.model
+        device = self.device
+
+        model.to(device)
+        model.device = device
+        model.eval()
+
+        model.inference_begin(data)
+        inputs = model.inference_preprocess()
+
+        with torch.no_grad():
+            results = model(inputs)
+
+        results = model.inference_end(inputs, results)
+
+        return results
+
+    def run_inference_patchwise(self, data):
         cfg = self.cfg
         model = self.model
         device = self.device
@@ -318,10 +345,16 @@ class SemanticSegmentation(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size,
-                                  sampler=get_sampler(train_sampler),
-                                  collate_fn=self.batcher.collate_fn)
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            sampler=get_sampler(train_sampler),
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=self.batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed))
+        )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
         valid_dataset = dataset.get_split('validation')
         valid_sampler = valid_dataset.sampler
@@ -332,10 +365,15 @@ class SemanticSegmentation(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
-        valid_loader = DataLoader(valid_split,
-                                  batch_size=cfg.val_batch_size,
-                                  sampler=get_sampler(valid_sampler),
-                                  collate_fn=self.batcher.collate_fn)
+        valid_loader = DataLoader(
+            valid_split,
+            batch_size=cfg.val_batch_size,
+            sampler=get_sampler(valid_sampler),
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=self.batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed)))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 

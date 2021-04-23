@@ -3,10 +3,10 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
+import open3d as o3d
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
@@ -192,15 +192,12 @@ class ParisLille3DSplit(BaseDatasetSplit):
     def get_data(self, idx):
         pc_path = self.path_list[idx]
         log.debug("get_data called {}".format(pc_path))
-        data = PlyData.read(pc_path)['vertex']
 
-        points = np.zeros((data['x'].shape[0], 3), dtype=np.float32)
-        points[:, 0] = data['x']
-        points[:, 1] = data['y']
-        points[:, 2] = data['z']
+        pc = o3d.t.io.read_point_cloud(pc_path).point
+        points = pc["points"].numpy().astype(np.float32)
 
         if (self.split != 'test'):
-            labels = np.array(data['class'], dtype=np.int32).reshape((-1,))
+            labels = pc["class"].numpy().astype(np.int32).reshape((-1,))
         else:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
 
