@@ -4,8 +4,18 @@ from copy import copy
 
 
 class BEVBox3D(BoundingBox3D):
-    """Class that defines a special bounding box for object detection, with only
-    one rotation axis (yaw)."""
+    """Class that defines a special bounding box for object detection, with only one rotation axis (yaw).
+
+                            up z    x front (yaw=0.5*pi)
+                                ^   ^
+                                |  /
+                                | /
+        (yaw=pi) left y <------ 0
+
+    The relative coordinate of bottom center in a BEV box is (0.5, 0.5, 0),
+    and the yaw is around the z axis, thus the rotation axis=2.
+    The yaw is 0 at the negative direction of y axis, and increases from
+    the negative direction of y to the positive direction of x."""
 
     def __init__(self,
                  center,
@@ -16,8 +26,7 @@ class BEVBox3D(BoundingBox3D):
                  world_cam=None,
                  cam_img=None,
                  **kwargs):
-        """Creates a bounding box. Front, up, left define the axis of the box
-        and must be normalized and mutually orthogonal.
+        """Creates a bounding box.
 
         Args:
 
@@ -52,11 +61,7 @@ class BEVBox3D(BoundingBox3D):
 
         self.points_inside_box = np.array([])
         self.level = self.get_difficulty()
-        if self.world_cam is not None:
-            self.dis_to_cam = np.linalg.norm(
-                self.center @ self.world_cam[:3, :3] + self.world_cam[3, :3])
-        else:
-            self.dis_to_cam = np.linalg.norm(self.center)
+        self.dis_to_cam = np.linalg.norm(self.to_camera()[:3])
 
     def __repr__(self):
         s = str(self.identifier) + " (class=" + str(
@@ -89,10 +94,12 @@ class BEVBox3D(BoundingBox3D):
 
     def to_xyzwhlr(self):
         """
-        Returns box in the common (KITTI) 7-sized vector representation.
-
-        Returns:
-            box: (7,)
+        Returns box in the common 7-sized vector representation:
+        (x, y, z, w, l, h, a), where
+        (x, y, z) is the bottom center of the box,
+        (w, l, h) is the width, lenght and height of the box
+        a is the yaw angle
+        :return box: (7,)
         """
         bbox = np.zeros((7,))
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
@@ -132,8 +139,18 @@ class BEVBox3D(BoundingBox3D):
         """
         Transforms box into camera space.
 
-        Returns:
-            transformed box in KITTI representation: (7,)
+                     up x    y front
+                        ^   ^
+                        |  /
+                        | /
+         left z <------ 0
+
+        Returns box in the common 7-sized vector representation:
+        (x, y, z, l, h, w, a), where
+        (x, y, z) is the bottom center of the box,
+        (l, h, w) is the length, height, width of the box
+        a is the yaw angle
+        :return transformed box: (7,)
         """
         if self.world_cam is None:
             return self.to_xyzwhlr()[[1, 2, 0, 4, 5, 3, 6]]

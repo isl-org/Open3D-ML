@@ -1,3 +1,30 @@
+#***************************************************************************************/
+#
+#    Based on Pointnet2 Library (MIT license):
+#    https://github.com/sshaoshuai/Pointnet2.PyTorch
+#
+#    Copyright (c) 2019 Shaoshuai Shi
+
+#    Permission is hereby granted, free of charge, to any person obtaining a copy
+#    of this software and associated documentation files (the "Software"), to deal
+#    in the Software without restriction, including without limitation the rights
+#    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+#    copies of the Software, and to permit persons to whom the Software is
+#    furnished to do so, subject to the following conditions:
+
+#    The above copyright notice and this permission notice shall be included in all
+#    copies or substantial portions of the Software.
+
+#    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+#    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+#    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+#    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+#    SOFTWARE.
+#
+#***************************************************************************************/
+
 import torch
 from torch.autograd import Variable
 from torch.autograd import Function
@@ -7,7 +34,7 @@ from typing import Tuple
 import open3d
 
 if open3d.core.cuda.device_count() > 0:
-    from open3d.ml.torch.ops import furthest_point_sampling, gather_points, gather_points_grad, three_nn, three_interpolate, three_interpolate_grad, group_points, group_points_grad, ball_query
+    from open3d.ml.torch.ops import furthest_point_sampling, three_nn, three_interpolate, three_interpolate_grad, ball_query
 
 
 class FurthestPointSampling(Function):
@@ -35,43 +62,6 @@ class FurthestPointSampling(Function):
 
 
 furthest_point_sample = FurthestPointSampling.apply
-
-
-class GatherOperation(Function):
-
-    @staticmethod
-    def forward(ctx, features: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
-        """
-        :param ctx:
-        :param features: (B, C, N)
-        :param idx: (B, npoint) index tensor of the features to gather
-        :return:
-            output: (B, C, npoint)
-        """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        assert features.is_contiguous()
-        assert idx.is_contiguous()
-
-        _, C, N = features.size()
-        output = gather_points(features, idx)
-
-        ctx.for_backwards = (idx, C, N)
-        return output
-
-    @staticmethod
-    def backward(ctx, grad_out):
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        idx, C, N = ctx.for_backwards
-        grad_out_data = grad_out.data.contiguous()
-        grad_features = gather_points_grad(grad_out_data, idx, C, N)
-        return grad_features, None
-
-
-gather_operation = GatherOperation.apply
 
 
 class ThreeNN(Function):
@@ -155,50 +145,6 @@ class ThreeInterpolate(Function):
 three_interpolate_gpu = ThreeInterpolate.apply
 
 
-class GroupingOperation(Function):
-
-    @staticmethod
-    def forward(ctx, features: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
-        """
-        :param ctx:
-        :param features: (B, C, N) tensor of features to group
-        :param idx: (B, npoint, nsample) tensor containing the indicies of features to group with
-        :return:
-            output: (B, C, npoint, nsample) tensor
-        """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        assert features.is_contiguous()
-        assert idx.is_contiguous()
-
-        output = group_points(features, idx)
-
-        ctx.for_backwards = (idx, features.size()[2])
-        return output
-
-    @staticmethod
-    def backward(ctx,
-                 grad_out: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        :param ctx:
-        :param grad_out: (B, C, npoint, nsample) tensor of the gradients of the output from forward
-        :return:
-            grad_features: (B, C, N) gradient of the features
-        """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
-
-        idx, N = ctx.for_backwards
-
-        grad_out_data = grad_out.data.contiguous()
-        grad_features = group_points_grad(grad_out_data, idx, N)
-        return grad_features, None
-
-
-grouping_operation = GroupingOperation.apply
-
-
 class BallQuery(Function):
 
     @staticmethod
@@ -255,14 +201,25 @@ class QueryAndGroup(nn.Module):
         if not open3d.core.cuda.device_count() > 0:
             raise NotImplementedError
 
+        batch_size = xyz.shape[0]
+
         idx = ball_query_gpu(self.radius, self.nsample, xyz, new_xyz)
+        idx_stacked = torch.stack([idx] * 3, dim=1).view(batch_size, 3,
+                                                         -1).long()
+
         xyz_trans = xyz.transpose(1, 2).contiguous()
-        grouped_xyz = grouping_operation(xyz_trans,
-                                         idx)  # (B, 3, npoint, nsample)
+        grouped_xyz = torch.gather(xyz_trans, dim=2, index=idx_stacked).view(
+            batch_size, 3, -1, self.nsample)  # (B, 3, npoint, nsample)
         grouped_xyz -= new_xyz.transpose(1, 2).unsqueeze(-1)
 
         if features is not None:
-            grouped_features = grouping_operation(features, idx)
+            idx_stacked = torch.stack([idx] * features.shape[1],
+                                      dim=1).view(batch_size, features.shape[1],
+                                                  -1).long()
+            grouped_features = torch.gather(features, dim=2,
+                                            index=idx_stacked).view(
+                                                batch_size, features.shape[1],
+                                                -1, self.nsample)
             if self.use_xyz:
                 new_features = torch.cat([grouped_xyz, grouped_features],
                                          dim=1)  # (B, C + 3, npoint, nsample)

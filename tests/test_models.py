@@ -167,7 +167,7 @@ def test_pointpillars_torch():
     }
     data = net.preprocess(data, {'split': 'test'})
     data = net.transform(data, {'split': 'test'})
-    data = batcher.collate_fn([{'data': data}])
+    data = batcher.collate_fn([{'data': data, 'attr': {'split': 'test'}}])
 
     net.eval()
     with torch.no_grad():
@@ -186,8 +186,8 @@ def test_pointpillars_tf():
     net = ml3d.models.PointPillars(**cfg.model, device='cpu')
 
     data = [
-        tf.constant(np.random.random((10000, 4)), dtype=tf.float32), [None],
-        [None], [[np.eye(4), np.eye(4)]]
+        tf.constant(np.random.random((10000, 4)), dtype=tf.float32), None, None,
+        [tf.constant(np.stack([np.eye(4), np.eye(4)], axis=0))]
     ]
 
     results = net(data, training=False)

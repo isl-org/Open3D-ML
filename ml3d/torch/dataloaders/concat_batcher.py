@@ -420,8 +420,14 @@ class PointPillarsBatch:
         self.bboxes = []
         self.bbox_objs = []
         self.calib = []
+
         for batch in batches:
             data = batch['data']
+            attr = batch['attr']
+            if 'test' not in attr['split'] and len(
+                    data['bboxes']
+            ) == 0:  # Skip training batch with no bounding box.
+                continue
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(
                 torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
@@ -479,7 +485,7 @@ class ConcatBatcher(object):
             batching_result.to(self.device)
             return {'data': batching_result, 'attr': []}
 
-        elif self.model == "PointPillars":
+        elif self.model == "PointPillars" or self.model == "PointRCNN":
             batching_result = PointPillarsBatch(batches)
             # batching_result.to(self.device)
             return batching_result
