@@ -152,10 +152,10 @@ class BEVBox3D(BoundingBox3D):
             return 0
 
         heights = [40, 25]
-        height = self.to_img()[3]
+        height = self.to_img()[3] + 1
         diff = -1
         for j in range(len(heights)):
-            if height > heights[j]:
+            if height >= heights[j]:
                 diff = j
                 break
         return diff

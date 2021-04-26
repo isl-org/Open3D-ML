@@ -210,7 +210,7 @@ def mAP(pred,
         cnt += len(filter_data(p, classes)[1])
         box_cnts.append(cnt)
 
-    gt_cnt = np.empty((len(classes), len(difficulties)))
+    gt_cnt = np.zeros((len(classes), len(difficulties)))
     for i, c in enumerate(classes):
         for j, d in enumerate(difficulties):
             for t in target:
@@ -246,6 +246,9 @@ def mAP(pred,
                 prec[ti] = tp_acc / (tp_acc + fp_acc)
                 prec[ti] = np.max(prec[ti:], axis=-1)
 
-            mAP[i, j] = np.sum(prec[::4]) / 11 * 100
+            if len(prec[::4]) < 11:
+                mAP[i, j] = np.sum(prec) / len(prec) * 100
+            else:
+                mAP[i, j] = np.sum(prec[::4]) / 11 * 100
 
     return mAP

@@ -266,6 +266,9 @@ class PointRCNN(BaseModel):
         reg_label = np.zeros((points.shape[0], 7),
                              dtype=np.float32)  # dx, dy, dz, ry, h, w, l
 
+        if len(bboxes) == 0:
+            return cls_label, reg_label
+
         pts_idx = points_in_box(points.copy(),
                                 bboxes_world,
                                 camera_frame=True,
@@ -338,15 +341,19 @@ class PointRCNN(BaseModel):
         t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
-            labels = np.stack([
-                self.name2lbl.get(bb.label_class, len(self.classes))
-                for bb in data['bbox_objs']
-            ])
+            labels = []
+            bboxes = []
+            bboxes_world = []
+            if len(data['bbox_objs']) != 0:
+                labels = np.stack([
+                    self.name2lbl.get(bb.label_class, len(self.classes))
+                    for bb in data['bbox_objs']
+                ])
 
-            bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']
-                              ])  # Camera frame.
-            bboxes_world = np.stack(
-                [bb.to_xyzwhlr() for bb in data['bbox_objs']])
+                bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']
+                                  ])  # Camera frame.
+                bboxes_world = np.stack(
+                    [bb.to_xyzwhlr() for bb in data['bbox_objs']])
 
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(

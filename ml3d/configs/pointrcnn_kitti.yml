@@ -21,7 +21,7 @@ model:
     ObjectRangeFilter: False
     ObjectSample:
       min_points_dict:
-        Car: 5
+        Car: 50
       sample_dict:
         Car: 15
 
