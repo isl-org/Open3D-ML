@@ -110,8 +110,8 @@ class PointPillars(BaseModel):
             scatter['output_shape'] % np.prod(backbone["layer_strides"]) == 0
         ), "scatter.output_shape should be a multiple of prod(backbone.layer_strides)"
         point_cloud_range = np.array(self.point_cloud_range)
-        pseudo_image_shape = (point_cloud_range[3:] -
-                              point_cloud_range[:3]) / voxelize["voxel_size"]
+        pseudo_image_shape = ((point_cloud_range[3:] - point_cloud_range[:3]) /
+                              voxelize["voxel_size"]).astype(np.int)
         assert all(pseudo_image_shape[[1, 0]] == scatter["output_shape"]), \
             "scatter.output_shape does not match the Y,X extent of the voxelized point cloud range"
         if any(
@@ -174,6 +174,12 @@ class PointPillars(BaseModel):
 
             avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
             vis_coords = res_coors.to(torch.long)
+            vc_min = vis_coords.min(axis=0)[0].cpu().numpy()
+            vc_max = vis_coords.max(axis=0)[0].cpu().numpy()
+            assert (np.all(vc_min[1:3] >= 0) and
+                    np.all(vc_max[1:3] < self.pseudo_image.shape[2:4])), \
+                            "Voxels out of bounds!"
+
             self.pseudo_image[k, 0, vis_coords[:, 1],
                               vis_coords[:,
                                          2]] = (255 * avg_depth /
@@ -335,15 +341,26 @@ class PointPillars(BaseModel):
                 db_boxes_dict=self.db_boxes_dict,
                 sample_dict=cfg['ObjectSample']['sample_dict'])
 
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        if cfg.get('CameraDolly', False):
+            data = ObjdetAugmentation.CameraDolly(data, **cfg['CameraDolly'])
+
+        if cfg.get('Rotation', False):
+            data = ObjdetAugmentation.Rotation(data, **cfg['Rotation'])
+
+        if cfg.get('SensorNoise', False):
+            data = ObjdetAugmentation.SensorNoise(data, **cfg['SensorNoise'])
+
         if cfg.get('ObjectRangeFilter', False):
             data = ObjdetAugmentation.ObjectRangeFilter(
                 data, self.cfg.point_cloud_range)
 
-        if cfg.get('PointShuffle', False):
-            data = ObjdetAugmentation.PointShuffle(data)
-
-        # if cfg.get('Rotation', False):
-        #     data = ObjdetAugmentation.(data)
+        assert np.all(
+            data['point'].min(axis=0) > self.cfg.point_cloud_range[:3])
+        assert np.all(
+            data['point'].max(axis=0) < self.cfg.point_cloud_range[3:6])
 
         return data
 

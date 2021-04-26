@@ -135,6 +135,10 @@ class BEVBox3D(BoundingBox3D):
         bb_cam.world_cam = None
         return bb_cam
 
+    def get_yaw(self):
+        self.yaw = 0.5 * (np.arccos(self.left[0]) + np.arccos(self.front[1]))
+        return self.yaw
+
     def to_camera(self):
         """
         Transforms box into camera space.

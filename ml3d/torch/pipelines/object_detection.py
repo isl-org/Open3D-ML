@@ -309,7 +309,8 @@ class ObjectDetection(BasePipeline):
             no_bboxes = 0
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
-                if any([bbox.numel() == 0 for bbox in data.bboxes]):
+                if (len(data.bboxes) == 0 or
+                        any([bbox.numel() == 0 for bbox in data.bboxes])):
                     no_bboxes += 1
                     continue
                 data.to(device)
@@ -399,14 +400,14 @@ class ObjectDetection(BasePipeline):
             input_pcd.append(
                 pointcloud[pcd_subsample, :].cpu().detach().numpy())
 
-            pcd = o3d.geometry.PointCloud()
-            pcd.points = o3d.utility.Vector3dVector(input_pcd[-1])
-            o3d.visualization.draw_geometries([
-                pcd,
-                BoundingBox3D.create_lines(gt_bboxes,
-                                           lut=self.dataset.label_lut),
-                # BoundingBox3D.create_lines(infer_bboxes)
-            ])
+            # pcd = o3d.geometry.PointCloud()
+            # pcd.points = o3d.utility.Vector3dVector(input_pcd[-1])
+            # o3d.visualization.draw_geometries([
+            #     pcd,
+            #     BoundingBox3D.create_lines(gt_bboxes,
+            #                                lut=self.dataset.label_lut),
+            #     BoundingBox3D.create_lines(infer_bboxes)
+            # ])
 
         points = np.stack(
             [np.pad(p, ((0, max_pts - p.shape[0]), (0, 0))) for p in points])

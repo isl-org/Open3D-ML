@@ -114,7 +114,7 @@ class Scannet(BaseDataset):
             self.val_scenes = self.val_scenes[:cfg.max_size[1]]
             self.test_scenes = self.test_scenes[:cfg.max_size[2]]
 
-        self.val_scenes = self.train_scenes  # TODO
+        self.val_scenes = self.train_scenes[:cfg.max_size[1]]  # TODO
 
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
@@ -160,7 +160,7 @@ class Scannet(BaseDataset):
             center = box[:3]
             if len(box) > 7:  # yaw is present in frames
                 size = box[3:6]  # dx, dy, dz / Y-up
-                yaw = box[6]
+                yaw = 0  # box[6]
                 cat_id = int(box[7])
             else:
                 size = [box[3], box[5], box[4]]  # w, h, l / KITTI Z-up
