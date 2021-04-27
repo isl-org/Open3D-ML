@@ -352,7 +352,7 @@ The following is a list of datasets for which we provide dataset reader classes.
 * KITTI ([project-page](http://www.cvlibs.net/datasets/kitti/))
 * Lyft ([project-page](https://self-driving.lyft.com/level5/data/))
 * nuScenes ([project-page](https://www.nuscenes.org/))
-* Waymo ([project-page](https://waymo.com/open/data/))
+* Waymo ([project-page](https://waymo.com/open))
 
 
 For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
