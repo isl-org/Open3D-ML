@@ -236,14 +236,21 @@ class KITTI(BaseDataset):
 	    """
         pass
 
-    def save_test_result(self):
+    def save_test_result(self, results, attrs):
         """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
             attr: The attributes that correspond to the outputs passed in results.
         """
-        pass
+        os.makedirs('./test', exist_ok=True)
+        for attr, res in zip(attrs, results):
+            name = attr['name']
+            path = './test/' + name + '.txt'
+            f = open(path, 'w')
+            for box in res:
+                f.write(box.to_kitti_format(box.confidence))
+                f.write('\n')
 
 
 class KITTISplit():
@@ -350,14 +357,27 @@ class Object3d(BEVBox3D):
                         self.center, self.yaw)
         return print_str
 
-    def to_kitti_format(self):
+    def to_kitti_format(self, score=1.):
         """
         This method transforms the class to kitti format.
         """
-        kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
-                    % (self.label_class, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
-                       self.box2d[2], self.box2d[3], self.size[2], self.size[0], self.size[1], self.center[0], self.center[1], self.center[2],
-                       self.yaw)
+        box2d = self.to_img()
+        box2d[2:] += box2d[:2]  # Add w, h.
+        truncation = -1
+        occlusion = -1
+        box = self.to_camera()
+        center = box[:3]
+        size = box[3:6]
+        ry = box[6]
+
+        x, z = center[0], center[2]
+        beta = np.arctan2(z, x)
+        alpha = -np.sign(beta) * np.pi / 2 + beta + ry
+
+        kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
+                    % (self.label_class, truncation, occlusion, alpha, box2d[0], box2d[1],
+                       box2d[2], box2d[3], size[0], size[1], size[2], center[0], center[1], center[2],
+                       ry, score)
         return kitti_str
 
 

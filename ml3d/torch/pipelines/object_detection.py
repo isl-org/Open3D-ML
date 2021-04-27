@@ -114,9 +114,8 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             for data in tqdm(test_loader, desc='testing'):
                 results = self.run_inference(data)
-                pred.append(results[0])
-
-        #dataset.save_test_result(results, attr)
+                pred.extend(results)
+                dataset.save_test_result(results, data.attr)
 
     def run_valid(self):
         """

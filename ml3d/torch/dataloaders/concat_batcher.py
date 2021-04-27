@@ -420,8 +420,10 @@ class PointPillarsBatch:
         self.bboxes = []
         self.bbox_objs = []
         self.calib = []
+        self.attr = []
 
         for batch in batches:
+            self.attr.append(batch['attr'])
             data = batch['data']
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(

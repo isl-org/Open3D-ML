@@ -56,6 +56,29 @@ class BEVBox3D(BoundingBox3D):
         self.level = self.get_difficulty()
         self.dis_to_cam = np.linalg.norm(self.to_camera()[:3])
 
+    def to_kitti_format(self, score=1.):
+        """
+        This method transforms the class to kitti format.
+        """
+        box2d = self.to_img()
+        box2d[2:] += box2d[:2]  # Add w, h.
+        truncation = -1
+        occlusion = -1
+        box = self.to_camera()
+        center = box[:3]
+        size = box[3:6]
+        ry = box[6]
+
+        x, z = center[0], center[2]
+        beta = np.arctan2(z, x)
+        alpha = -np.sign(beta) * np.pi / 2 + beta + ry
+
+        kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
+                    % (self.label_class, truncation, occlusion, alpha, box2d[0], box2d[1],
+                       box2d[2], box2d[3], size[0], size[1], size[2], center[0], center[1], center[2],
+                       ry, score)
+        return kitti_str
+
     def generate_corners3d(self):
         """
         generate corners3d representation for this object
