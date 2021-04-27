@@ -3,8 +3,8 @@
 # The following environment variables are required:
 # - NPROC
 #
-TENSORFLOW_VER="2.3.0"
-TORCH_GLNX_VER="1.6.0+cpu"
+TENSORFLOW_VER="2.4.1"
+TORCH_GLNX_VER="1.7.1+cpu"
 YAPF_VER="0.30.0"
 
 set -euo pipefail
@@ -67,4 +67,3 @@ pytest tests/test_models.py
 unset OPEN3D_ML_ROOT
 
 popd
-
