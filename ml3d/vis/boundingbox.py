@@ -76,15 +76,49 @@ class BoundingBox3D:
         s = s + ")"
         return s
 
+    def transform(self, transform):
+        """
+        Transform BoundingBox3D into another reference frame
+        Args:
+            transform ((4,4) array): Homogenous transform to apply on the right.
+        Returns:
+            self: Transformed BoundingBox3D
+        """
+        assert np.count_nonzero(transform[:3, 3]) == 0, (
+            "Transform has non-zero last column. Is this for applying on the"
+            " right?")
+        self.center = self.center @ transform[:3, :3] + transform[3, :3]
+        self.front = self.front @ transform[:3, :3]
+        self.up = self.up @ transform[:3, :3]
+        self.left = self.left @ transform[:3, :3]
+
+        return self
+
+    def inside(self, points):
+        """
+        Return indices of points inside the BoundingBox3D
+
+        Args:
+            points ((N,3) array): list of points
+
+        Returns: Indices of `points` inside the BoundingBox3D
+        """
+        obb = o3d.geometry.OrientedBoundingBox(
+            self.center,
+            np.vstack((self.left, self.front, self.up)).T, self.size)
+        return obb.get_point_indices_within_bounding_box(
+            o3d.utility.Vector3dVector(points))
+
     @staticmethod
     def create_lines(boxes, lut=None):
         """Creates and returns an open3d.geometry.LineSet that can be used to
         render the boxes.
 
-        boxes: the list of bounding boxes
-        lut: a ml3d.vis.LabelLUT that is used to look up the color based on the
-            label_class argument of the BoundingBox3D constructor. If not
-            provided, a color of 50% grey will be used. (optional)
+        Args:
+            boxes: the list of bounding boxes
+            lut: a ml3d.vis.LabelLUT that is used to look up the color based on the
+                label_class argument of the BoundingBox3D constructor. If not
+                provided, a color of 50% grey will be used. (optional)
         """
         nverts = 14
         nlines = 17

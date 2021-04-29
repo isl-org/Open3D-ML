@@ -1,15 +1,14 @@
-import open3d as o3d
-import numpy as np
-import os, argparse, pickle, sys
-from os.path import exists, join, isfile, dirname, abspath, split
+import os
+from os.path import join, isfile
 from pathlib import Path
 from glob import glob
 import logging
-import yaml
+import numpy as np
 
 from .base_dataset import BaseDataset
-from ..utils import Config, make_dir, DATASET
+from ..utils import DATASET
 from .utils import BEVBox3D
+from ..vis.labellut import LabelLUT
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,8 +19,8 @@ log = logging.getLogger(__name__)
 
 class Scannet(BaseDataset):
     """
-    Scannet 3D dataset for Object Detection, used in visualizer, training, or test
-    """
+    Scannet 3D dataset for Object Detection, used in visualizer, training, or
+    test """
 
     def __init__(self,
                  dataset_path,
@@ -45,12 +44,14 @@ class Scannet(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
+        # [scenes|frames] Use point clouds from entire scenes or individual frames
+        self.portion = cfg.portion
         self.num_classes = 18
 
         self.classes = [
             'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
             'bookshelf', 'picture', 'counter', 'desk', 'curtain',
-            'refrigerator', 'showercurtrain', 'toilet', 'sink', 'bathtub',
+            'refrigerator', 'showercurtain', 'toilet', 'sink', 'bathtub',
             'garbagebin'
         ]
         self.cat2label = {cat: self.classes.index(cat) for cat in self.classes}
@@ -60,6 +61,9 @@ class Scannet(BaseDataset):
         self.cat_ids2class = {
             nyu40id: i for i, nyu40id in enumerate(list(self.cat_ids))
         }
+        self.label_lut = LabelLUT()
+        for cat, label in self.cat2label.items():
+            self.label_lut.add_label(cat, label)
 
         self.label_to_names = self.get_label_to_names()
 
@@ -69,7 +73,7 @@ class Scannet(BaseDataset):
             if 'scene' in f and f.endswith('.npy'):
                 available_scenes.append(f[:12])
 
-        available_scenes = list(set(available_scenes))
+        available_scenes = set(available_scenes)
 
         resource_path = Path(__file__).parent / '_resources' / 'scannet'
         train_files = open(resource_path /
@@ -83,13 +87,32 @@ class Scannet(BaseDataset):
         self.val_scenes = []
         self.test_scenes = []
 
-        for scene in available_scenes:
-            if scene in train_files:
-                self.train_scenes.append(join(self.dataset_path, scene))
-            elif scene in val_files:
-                self.val_scenes.append(join(self.dataset_path, scene))
-            elif scene in test_files:
-                self.test_scenes.append(join(self.dataset_path, scene))
+        if self.portion == 'scenes':
+            for scene in available_scenes:
+                if scene in train_files:
+                    self.train_scenes.append(join(self.dataset_path, scene))
+                elif scene in val_files:
+                    self.val_scenes.append(join(self.dataset_path, scene))
+                elif scene in test_files:
+                    self.test_scenes.append(join(self.dataset_path, scene))
+        elif self.portion == 'frames':
+            for scene in available_scenes:
+                bbox_files = glob(join(self.dataset_path,
+                                       scene + '_*_bbox.npy'))
+                if scene in train_files:
+                    self.train_scenes.extend(
+                        framefile[:-9] for framefile in bbox_files)
+                elif scene in val_files:
+                    self.val_scenes.extend(
+                        framefile[:-9] for framefile in bbox_files)
+                elif scene in test_files:
+                    self.test_scenes.extend(
+                        framefile[:-9] for framefile in bbox_files)
+
+        if hasattr(cfg, 'max_size'):
+            self.train_scenes = self.train_scenes[:cfg.max_size[0]]
+            self.val_scenes = self.val_scenes[:cfg.max_size[1]]
+            self.test_scenes = self.test_scenes[:cfg.max_size[2]]
 
         self.semantic_ids = [
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
@@ -101,25 +124,29 @@ class Scannet(BaseDataset):
 
     @staticmethod
     def read_lidar(path):
-        assert Path(path).exists()
-        data = np.load(path)
-
-        return data
+        if Path(path + '.npz').exists():
+            with np.load(path + '.npz') as npzfile:
+                return npzfile['point']
+        else:  # npy
+            return np.load(path + '.npy')
 
     def read_label(self, scene):
-        instance_mask = np.load(scene + '_ins_label.npy')
-        semantic_mask = np.load(scene + '_sem_label.npy')
-        bboxes = np.load(scene + '_bbox.npy')
-
+        instance_mask = np.load(scene + '_ins_label.npy') if isfile(
+            scene + '_ins_label.npy') else np.array([], dtype=np.int32)
+        semantic_mask = np.load(scene + '_sem_label.npy') if isfile(
+            scene + '_ins_label.npy') else np.array([], dtype=np.int32)
+        bboxes = np.load(scene +
+                         '_bbox.npy') if isfile(scene +
+                                                '_bbox.npy') else np.array([])
         ## For filtering semantic labels to have same classes as object detection.
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)
 
-        remapper = np.ones(150) * (-100)
-        for i, x in enumerate(self.semantic_ids):
-            remapper[x] = i
-
-        semantic_mask = remapper[semantic_mask]
+        if semantic_mask.size > 0:
+            remapper = np.ones(150) * (-100)
+            for i, x in enumerate(self.semantic_ids):
+                remapper[x] = i
+            semantic_mask = remapper[semantic_mask]
 
         objects = []
         for box in bboxes:
@@ -127,8 +154,11 @@ class Scannet(BaseDataset):
             center = box[:3]
             size = [box[3], box[5], box[4]]  # w, h, l
 
-            yaw = 0.0
-            objects.append(Object3d(name, center, size, yaw))
+            yaw = box[6] if len(box) > 7 else 0.0
+            truncation = box[7] if len(box) > 8 else None
+            n_pts_inside = box[8] if len(box) > 9 else None
+            objects.append(
+                Object3d(name, center, size, yaw, truncation, n_pts_inside))
 
         return objects, semantic_mask, instance_mask
 
@@ -142,6 +172,8 @@ class Scannet(BaseDataset):
             return self.test_scenes
         elif split in ['val', 'validation']:
             return self.val_scenes
+        elif split == 'all':
+            return self.train_scenes + self.test_scenes + self.val_scenes
 
         raise ValueError("Invalid split {}".format(split))
 
@@ -171,7 +203,7 @@ class ScannetSplit():
     def get_data(self, idx):
         scene = self.path_list[idx]
 
-        pc = self.dataset.read_lidar(scene + '_vert.npy')
+        pc = self.dataset.read_lidar(scene + '_vert')
         feat = pc[:, 3:]
         pc = pc[:, :3]
 
@@ -201,10 +233,40 @@ class Object3d(BEVBox3D):
     Stores object specific details like bbox coordinates.
     """
 
-    def __init__(self, name, center, size, yaw):
+    # def __init__( self, label_class: int, center, size, yaw,
+    def __init__(self,
+                 name,
+                 center,
+                 size,
+                 yaw,
+                 truncation=None,
+                 n_pts_inside=None):
+        self.occlusion = 0.0
+        self.truncation = truncation
+        self.n_pts_inside = n_pts_inside
         super().__init__(center, size, yaw, name, -1.0)
 
-        self.occlusion = 0.0
+    def get_difficulty(self):
+        """
+        The method determines difficulty level of the object, such as Easy (0),
+        Moderate (1), Hard (2), VeryHard (3) or Unknown (4) depending on the
+        truncation and the number of points inside the box.
+        """
+        if self.truncation is None or self.n_pts_inside is None:
+            self.level_str = 'Unknown'
+            return 4
+        if self.truncation > 0.75 or self.n_pts_inside < 256:
+            self.level_str = 'VeryHard'
+            return 3
+        elif self.truncation > 0.5 or self.n_pts_inside < 2048:
+            self.level_str = 'Hard'
+            return 2
+        elif self.truncation > 0.25 or self.n_pts_inside < 16384:
+            self.level_str = 'Moderate'
+            return 1
+        else:
+            self.level_str = 'Easy'
+            return 0
 
 
 DATASET._register_module(Scannet)
