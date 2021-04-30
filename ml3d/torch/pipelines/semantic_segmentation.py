@@ -353,8 +353,9 @@ class SemanticSegmentation(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(
-                torch.utils.data.get_worker_info().seed % 1000000)))
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed))
+        )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
         valid_dataset = dataset.get_split('validation')
         # valid_sampler = valid_dataset.sampler
@@ -373,8 +374,8 @@ class SemanticSegmentation(BasePipeline):
             num_workers=cfg.get('num_workers', 4),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + int(
-                torch.utils.data.get_worker_info().seed % 1000000)))
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed)))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
