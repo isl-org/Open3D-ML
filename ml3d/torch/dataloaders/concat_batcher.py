@@ -437,7 +437,7 @@ class SparseConvUnetBatch:
         self.label = [label.to(device) for label in self.label]
 
 
-class PointPillarsBatch:
+class ObjectDetectBatch:
 
     def __init__(self, batches):
         """
@@ -516,8 +516,7 @@ class ConcatBatcher(object):
             return {'data': SparseConvUnetBatch(batches), 'attr': {}}
 
         elif self.model == "PointPillars" or self.model == "PointRCNN":
-            batching_result = PointPillarsBatch(batches)
-            # batching_result.to(self.device)
+            batching_result = ObjectDetectBatch(batches)
             return batching_result
 
         else:

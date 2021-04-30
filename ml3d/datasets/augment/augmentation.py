@@ -4,14 +4,17 @@ from ..utils.operations import create_3D_rotations
 
 
 class SemsegAugmentation():
-    """Class consisting different augmentation methods for Semantic Segmentation"""
+    """Class consisting different augmentation methods for Semantic Segmentation.
+        Args:
+            cfg: Config for augmentation.
+    """
 
     def __init__(self, cfg):
         self.cfg = cfg
 
     @staticmethod
     def normalize(pc, feat, cfg):
-        if 'points' in cfg.keys():
+        if 'points' in cfg:
             cfg_p = cfg['points']
             if cfg_p.get('recentering', False):
                 pc -= pc.mean(0)
@@ -19,7 +22,7 @@ class SemsegAugmentation():
                 pc -= pc.mean(0)
                 pc /= (pc.max(0) - pc.min(0)).max()
 
-        if 'feat' in cfg.keys() and feat is not None:
+        if 'feat' in cfg and feat is not None:
             cfg_f = cfg['feat']
             if cfg_f.get('recentering', False):
                 feat -= feat.mean(0)
@@ -85,9 +88,9 @@ class SemsegAugmentation():
 
     @staticmethod
     def noise(pc, cfg):
-        noise_level = cfg.get('noise_level', 0.001)
-        noise = (np.random.randn(pc.shape[0], pc.shape[1]) *
-                 noise_level).astype(np.float32)
+        noise_std = cfg.get('noise_std', 0.001)
+        noise = (np.random.randn(pc.shape[0], pc.shape[1]) * noise_std).astype(
+            np.float32)
 
         return pc + noise
 
@@ -156,34 +159,34 @@ class SemsegAugmentation():
         if cfg is None:
             return point, feat, labels
 
-        if 'normalize' in cfg.keys():
+        if 'normalize' in cfg:
             point, feat = self.normalize(point, feat, cfg['normalize'])
 
-        if 'rotate' in cfg.keys():
+        if 'rotate' in cfg:
             point = self.rotate(point, cfg['rotate'])
 
-        if 'scale' in cfg.keys():
+        if 'scale' in cfg:
             point = self.scale(point, cfg['scale'])
 
-        if 'noise' in cfg.keys():
+        if 'noise' in cfg:
             point = self.noise(point, cfg['noise'])
 
-        if 'RandomDropout' in cfg.keys():
+        if 'RandomDropout' in cfg:
             point, feat, labels = self.RandomDropout(point, feat, labels,
                                                      cfg['RandomDropout'])
 
-        if 'RandomHorizontalFlip' in cfg.keys():
+        if 'RandomHorizontalFlip' in cfg:
             point = self.RandomHorizontalFlip(point,
                                               cfg['RandomHorizontalFlip'])
 
-        if 'ChromaticAutoContrast' in cfg.keys():
+        if 'ChromaticAutoContrast' in cfg:
             feat = self.ChromaticAutoContrast(feat,
                                               cfg['ChromaticAutoContrast'])
 
-        if 'ChromaticTranslation' in cfg.keys():
+        if 'ChromaticTranslation' in cfg:
             feat = self.ChromaticTranslation(feat, cfg['ChromaticTranslation'])
 
-        if 'ChromaticJitter' in cfg.keys():
+        if 'ChromaticJitter' in cfg:
             feat = self.ChromaticJitter(feat, cfg['ChromaticJitter'])
 
         return point, feat, labels

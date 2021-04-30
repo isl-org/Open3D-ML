@@ -11,73 +11,92 @@ from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
 
 class SparseConvUnet(BaseModel):
+    """Semantic Segmentation model.
+
+    Uses UNet architecture replacing convolutions with Sparse Convolutions.
+
+    Attributes:
+        name: Name of model.
+          Default to "SparseConvUnet".
+        device: Which device to use (cpu or cuda).
+        voxel_size: Voxel length for subsampling.
+        multiplier: min length of feature length in each layer.
+        conv_block_reps: repetition of Unet Blocks.
+        residual_blocks: Whether to use Residual Blocks.
+        in_channels: Number of features(default 3 for color).
+        num_classes: Number of classes.
+    """
 
     def __init__(
             self,
             name="SparseConvUnet",
             device="cuda",
-            m=16,
+            multiplier=16,  # Proportional to number of neurons in each layer.
             voxel_size=0.05,
-            reps=1,  # Conv block repetitions.
+            conv_block_reps=1,  # Conv block repetitions.
             residual_blocks=False,
             in_channels=3,
             num_classes=20,
+            grid_size=4096,
             **kwargs):
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
-                                             m=m,
+                                             multiplier=multiplier,
                                              voxel_size=voxel_size,
-                                             reps=reps,
+                                             conv_block_reps=conv_block_reps,
                                              residual_blocks=residual_blocks,
                                              in_channels=in_channels,
                                              num_classes=num_classes,
+                                             grid_size=grid_size,
                                              **kwargs)
         cfg = self.cfg
         self.device = device
-        self.augment = SemsegAugmentation(cfg.augment)
-        self.m = cfg.m
-        self.inp = InputLayer()
-        self.ssc = SubmanifoldSparseConv(in_channels=in_channels,
-                                         filters=m,
-                                         kernel_size=[3, 3, 3])
-        self.unet = UNet(reps, [m, 2 * m, 3 * m, 4 * m, 5 * m, 6 * m, 7 * m],
-                         residual_blocks)
-        self.bn = BatchNormBlock(m)
+        self.augmenter = SemsegAugmentation(cfg.augment)
+        self.multiplier = cfg.multiplier
+        self.input_layer = InputLayer()
+        self.sub_sparse_conv = SubmanifoldSparseConv(in_channels=in_channels,
+                                                     filters=multiplier,
+                                                     kernel_size=[3, 3, 3])
+        self.unet = UNet(conv_block_reps, [
+            multiplier, 2 * multiplier, 3 * multiplier, 4 * multiplier,
+            5 * multiplier, 6 * multiplier, 7 * multiplier
+        ], residual_blocks)
+        self.batch_norm = BatchNormBlock(multiplier)
         self.relu = ReLUBlock()
-        self.linear = LinearBlock(m, num_classes)
-        self.out = OutputLayer()
+        self.linear = LinearBlock(multiplier, num_classes)
+        self.output_layer = OutputLayer()
 
     def forward(self, inputs):
         pos_list = []
         feat_list = []
-        rev_list = []
+        index_map_list = []
 
         for i in range(len(inputs.batch_lengths)):
             pos = inputs.point[i]
             feat = inputs.feat[i]
-            feat, pos, rev = self.inp(feat, pos)
+            feat, pos, index_map = self.input_layer(feat, pos)
             pos_list.append(pos)
             feat_list.append(feat)
-            rev_list.append(rev)
+            index_map_list.append(index_map)
 
-        feat_list = self.ssc(feat_list, pos_list, voxel_size=1.0)
+        feat_list = self.sub_sparse_conv(feat_list, pos_list, voxel_size=1.0)
         feat_list = self.unet(pos_list, feat_list)
-        feat_list = self.bn(feat_list)
+        feat_list = self.batch_norm(feat_list)
         feat_list = self.relu(feat_list)
         feat_list = self.linear(feat_list)
-        output = self.out(feat_list, rev_list)
+        output = self.output_layer(feat_list, index_map_list)
 
         return output
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)
 
-        if 'label' not in data.keys() or data['label'] is None:
+        if 'label' not in data or data['label'] is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
             labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
-        if 'feat' not in data.keys() or data['feat'] is None:
+        if 'feat' not in data or data['feat'] is None:
             raise Exception(
                 "SparseConvnet doesn't work without feature values.")
 
@@ -87,15 +106,19 @@ class SparseConvUnet(BaseModel):
         points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
 
         if attr['split'] in ['training', 'train']:
-            points, feat, labels = self.augment.augment(
+            points, feat, labels = self.augmenter.augment(
                 points, feat, labels, self.cfg.get('augment', None))
 
         feat = feat / 127.5 - 1.
 
         m = points.min(0)
         M = points.max(0)
-        offset = -m + np.clip(4096 - M + m - 0.001, 0, None) * np.random.rand(
-            3) + np.clip(4096 - M + m + 0.001, None, 0) * np.random.rand(3)
+
+        # Randomly place pointcloud in 4096 size grid.
+        grid_size = self.cfg.grid_size
+        offset = -m + np.clip(
+            grid_size - M + m - 0.001, 0, None) * np.random.rand(3) + np.clip(
+                grid_size - M + m + 0.001, None, 0) * np.random.rand(3)
 
         points += offset
         idxs = (points.min(1) >= 0) * (points.max(1) < 4096)
@@ -145,11 +168,16 @@ class SparseConvUnet(BaseModel):
         return {'inference_labels': pred_l, 'inference_scores': probs}
 
     def get_loss(self, Loss, results, inputs, device):
-        """
-        Runs the loss on outputs of the model
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
+        """Calculate the loss on output of the model.
+
+        Attributes:
+            Loss: Object of type `SemSegLoss`.
+            results: Output of the model.
+            inputs: Input of the model.
+            device: device(cpu or cuda).
+        
+        Returns:
+            Returns loss, labels and scores.
         """
         cfg = self.cfg
         labels = torch.cat(inputs['data'].label, 0)
@@ -237,29 +265,29 @@ class InputLayer(nn.Module):
         super(InputLayer, self).__init__()
         self.voxel_size = torch.Tensor([voxel_size, voxel_size, voxel_size])
 
-    def forward(self, features, inp_positions):
-        v = voxelize(inp_positions, self.voxel_size, torch.Tensor([0, 0, 0]),
+    def forward(self, features, in_positions):
+        v = voxelize(in_positions, self.voxel_size, torch.Tensor([0, 0, 0]),
                      torch.Tensor([40960, 40960, 40960]))
 
         # Contiguous repeating positions.
-        inp_positions = inp_positions[v.voxel_point_indices]
+        in_positions = in_positions[v.voxel_point_indices]
         features = features[v.voxel_point_indices]
 
         # Find reverse mapping.
-        rev1 = np.zeros((inp_positions.shape[0],))
-        rev1[v.voxel_point_indices.cpu().numpy()] = np.arange(
-            inp_positions.shape[0])
-        rev1 = rev1.astype(np.int32)
+        reverse_map_voxelize = np.zeros((in_positions.shape[0],))
+        reverse_map_voxelize[v.voxel_point_indices.cpu().numpy()] = np.arange(
+            in_positions.shape[0])
+        reverse_map_voxelize = reverse_map_voxelize.astype(np.int32)
 
         # Unique positions.
-        inp_positions = inp_positions[v.voxel_point_row_splits[:-1]]
+        in_positions = in_positions[v.voxel_point_row_splits[:-1]]
 
         # Mean of features.
         count = v.voxel_point_row_splits[1:] - v.voxel_point_row_splits[:-1]
-        rev2 = np.repeat(np.arange(count.shape[0]),
-                         count.cpu().numpy()).astype(np.int32)
+        reverse_map_sort = np.repeat(np.arange(count.shape[0]),
+                                     count.cpu().numpy()).astype(np.int32)
 
-        features_avg = inp_positions.clone()
+        features_avg = in_positions.clone()
         features_avg[:, 0] = reduce_subarrays_sum(features[:, 0],
                                                   v.voxel_point_row_splits)
         features_avg[:, 1] = reduce_subarrays_sum(features[:, 1],
@@ -269,7 +297,8 @@ class InputLayer(nn.Module):
 
         features_avg = features_avg / count.unsqueeze(1)
 
-        return features_avg, inp_positions, rev2[rev1]
+        return features_avg, in_positions, reverse_map_sort[
+            reverse_map_voxelize]
 
 
 class OutputLayer(nn.Module):
@@ -277,10 +306,10 @@ class OutputLayer(nn.Module):
     def __init__(self, voxel_size=1.0):
         super(OutputLayer, self).__init__()
 
-    def forward(self, features_list, rev_list):
+    def forward(self, features_list, index_map_list):
         out = []
-        for feat, rev in zip(features_list, rev_list):
-            out.append(feat[rev])
+        for feat, index_map in zip(features_list, index_map_list):
+            out.append(feat[index_map])
         return torch.cat(out, 0)
 
 
@@ -311,16 +340,16 @@ class SubmanifoldSparseConv(nn.Module):
 
     def forward(self,
                 features_list,
-                inp_positions_list,
+                in_positions_list,
                 out_positions_list=None,
                 voxel_size=1.0):
         if out_positions_list is None:
-            out_positions_list = inp_positions_list
+            out_positions_list = in_positions_list
 
         out_feat = []
-        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
-                                          out_positions_list):
-            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+        for feat, in_pos, out_pos in zip(features_list, in_positions_list,
+                                         out_positions_list):
+            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
 
         return out_feat
 
@@ -328,13 +357,13 @@ class SubmanifoldSparseConv(nn.Module):
         return "SubmanifoldSparseConv"
 
 
-def calculate_grid(inp_positions):
+def calculate_grid(in_positions):
     filter = torch.Tensor([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
                            [0, -1, -1], [0, -1, 0], [0, 0, -1],
-                           [0, 0, 0]]).to(inp_positions.device)
+                           [0, 0, 0]]).to(in_positions.device)
 
-    out_pos = inp_positions.long().repeat(1, filter.shape[0]).reshape(-1, 3)
-    filter = filter.repeat(inp_positions.shape[0], 1)
+    out_pos = in_positions.long().repeat(1, filter.shape[0]).reshape(-1, 3)
+    filter = filter.repeat(in_positions.shape[0], 1)
 
     out_pos = out_pos + filter
     out_pos = out_pos[out_pos.min(1).values >= 0]
@@ -369,15 +398,15 @@ class Convolution(nn.Module):
                               offset=offset,
                               normalize=normalize)
 
-    def forward(self, features_list, inp_positions_list, voxel_size=1.0):
+    def forward(self, features_list, in_positions_list, voxel_size=1.0):
         out_positions_list = []
-        for inp_positions in inp_positions_list:
-            out_positions_list.append(calculate_grid(inp_positions))
+        for in_positions in in_positions_list:
+            out_positions_list.append(calculate_grid(in_positions))
 
         out_feat = []
-        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
-                                          out_positions_list):
-            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+        for feat, in_pos, out_pos in zip(features_list, in_positions_list,
+                                         out_positions_list):
+            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
 
         out_positions_list = [out / 2 for out in out_positions_list]
 
@@ -414,13 +443,13 @@ class DeConvolution(nn.Module):
 
     def forward(self,
                 features_list,
-                inp_positions_list,
+                in_positions_list,
                 out_positions_list,
                 voxel_size=1.0):
         out_feat = []
-        for feat, inp_pos, out_pos in zip(features_list, inp_positions_list,
-                                          out_positions_list):
-            out_feat.append(self.net(feat, inp_pos, out_pos, voxel_size))
+        for feat, in_pos, out_pos in zip(features_list, in_positions_list,
+                                         out_positions_list):
+            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
 
         return out_feat
 
@@ -480,31 +509,26 @@ class ResidualBlock(nn.Module):
 
         self.lin = NetworkInNetwork(nIn, nOut)
 
-        self.bn1 = BatchNormBlock(nIn)
+        self.batch_norm1 = BatchNormBlock(nIn)
         self.relu1 = ReLUBlock()
-        self.scn1 = SubmanifoldSparseConv(in_channels=nIn,
-                                          filters=nOut,
-                                          kernel_size=[3, 3, 3])
+        self.sub_sparse_conv1 = SubmanifoldSparseConv(in_channels=nIn,
+                                                      filters=nOut,
+                                                      kernel_size=[3, 3, 3])
 
-        self.bn2 = BatchNormBlock(nOut)
+        self.batch_norm2 = BatchNormBlock(nOut)
         self.relu2 = ReLUBlock()
-        self.scn2 = SubmanifoldSparseConv(in_channels=nOut,
-                                          filters=nOut,
-                                          kernel_size=[3, 3, 3])
+        self.sub_sparse_conv2 = SubmanifoldSparseConv(in_channels=nOut,
+                                                      filters=nOut,
+                                                      kernel_size=[3, 3, 3])
 
     def forward(self, feat_list, pos_list):
         out1 = self.lin(feat_list)
-
-        feat_list = self.bn1(feat_list)
-
+        feat_list = self.batch_norm1(feat_list)
         feat_list = self.relu1(feat_list)
-
-        feat_list = self.scn1(feat_list, pos_list)
-
-        feat_list = self.bn2(feat_list)
+        feat_list = self.sub_sparse_conv1(feat_list, pos_list)
+        feat_list = self.batch_norm2(feat_list)
         feat_list = self.relu2(feat_list)
-
-        out2 = self.scn2(feat_list, pos_list)
+        out2 = self.sub_sparse_conv2(feat_list, pos_list)
 
         return [a + b for a, b in zip(out1, out2)]
 
@@ -515,13 +539,14 @@ class ResidualBlock(nn.Module):
 class UNet(nn.Module):
 
     def __init__(self,
-                 reps,
+                 conv_block_reps,
                  nPlanes,
                  residual_blocks=False,
                  downsample=[2, 2],
                  leakiness=0):
         super(UNet, self).__init__()
-        self.net = nn.ModuleList(self.U(nPlanes, residual_blocks, reps))
+        self.net = nn.ModuleList(
+            self.get_UNet(nPlanes, residual_blocks, conv_block_reps))
         self.residual_blocks = residual_blocks
 
     @staticmethod
@@ -538,9 +563,9 @@ class UNet(nn.Module):
                                       kernel_size=[3, 3, 3]))
 
     @staticmethod
-    def U(nPlanes, residual_blocks, reps):
+    def get_UNet(nPlanes, residual_blocks, conv_block_reps):
         m = []
-        for i in range(reps):
+        for i in range(conv_block_reps):
             UNet.block(m, nPlanes[0], nPlanes[0], residual_blocks)
 
         if len(nPlanes) > 1:
@@ -551,7 +576,7 @@ class UNet(nn.Module):
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
-            m = m + UNet.U(nPlanes[1:], residual_blocks, reps)
+            m = m + UNet.get_UNet(nPlanes[1:], residual_blocks, conv_block_reps)
             m.append(BatchNormBlock(nPlanes[1]))
             m.append(ReLUBlock())
             m.append(
@@ -561,7 +586,7 @@ class UNet(nn.Module):
 
             m.append(JoinFeat())
 
-            for i in range(reps):
+            for i in range(conv_block_reps):
                 UNet.block(m, nPlanes[0] * (2 if i == 0 else 1), nPlanes[0],
                            residual_blocks)
 
@@ -607,7 +632,7 @@ def load_unet_wts(net, path):
     wts = list(torch.load(path).values())
     state_dict = net.state_dict()
     i = 0
-    for key in state_dict.keys():
+    for key in state_dict:
         if 'offset' in key or 'tracked' in key:
             continue
         if len(wts[i].shape) == 4:

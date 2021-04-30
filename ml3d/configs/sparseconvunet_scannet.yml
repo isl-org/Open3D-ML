@@ -11,12 +11,13 @@ model:
   name: SparseConvUnet
   batcher: ConcatBatcher
   ckpt_path: # path/to/your/checkpoint
-  m: 32
+  multiplier: 32
   voxel_size: 0.02
   residual_blocks: False
-  reps: 1
+  conv_block_reps: 1
   in_channels: 3
   num_classes: 20
+  grid_size: 4096
   ignored_label_inds: [-1]
   augment:
     rotate:
@@ -25,7 +26,7 @@ model:
       min_s: 0.9
       max_s: 1.1
     noise:
-      noise_level: 0.01
+      noise_std: 0.01
     RandomDropout:
       dropout_ratio: 0.2
     RandomHorizontalFlip:

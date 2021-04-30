@@ -157,7 +157,7 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
-        Metric = SemSegMetric()
+        metric = SemSegMetric()
         Loss = SemSegLoss(self, model, dataset)
 
         test_split = dataset.get_split('test')
@@ -168,12 +168,12 @@ class SemanticSegmentation(BasePipeline):
             scores, labels = Loss.filter_valid_label(results['predict_scores'],
                                                      data['label'])
 
-            Metric.update(scores, labels)
+            metric.update(scores, labels)
 
             dataset.save_test_result(results, attr)
 
-        accs = Metric.acc()
-        ious = Metric.iou()
+        accs = metric.acc()
+        ious = metric.iou()
 
         log.info("Per class Accuracy : {}".format(accs[:-1]))
         log.info("Per class IOUs : {}".format(ious[:-1]))
