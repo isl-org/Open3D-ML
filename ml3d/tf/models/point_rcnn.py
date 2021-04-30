@@ -1,6 +1,8 @@
 import tensorflow as tf
 
 import numpy as np
+import os
+import pickle
 
 from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
@@ -10,8 +12,8 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
-from ...datasets.utils import DataProcessing, BEVBox3D
-from ...datasets.utils.operations import points_in_box
+from ...datasets.utils import DataProcessing, BEVBox3D, ObjdetAugmentation
+from ...datasets.utils.operations import points_in_box, filter_by_min_points
 
 from ...utils import MODEL
 from ..modules.schedulers import OneCycleScheduler
@@ -133,6 +135,48 @@ class PointRCNN(BaseModel):
 
         return optimizer, lr_scheduler
 
+    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
+        db_boxes = pickle.load(open(pickle_path, 'rb'))
+
+        if min_points_dict is not None:
+            db_boxes = filter_by_min_points(db_boxes, min_points_dict)
+
+        db_boxes_dict = {}
+        for key in sample_dict.keys():
+            db_boxes_dict[key] = []
+
+        for db_box in db_boxes:
+            if db_box.label_class in sample_dict.keys():
+                db_boxes_dict[db_box.label_class].append(db_box)
+
+        self.db_boxes_dict = db_boxes_dict
+
+    def augment_data(self, data, attr):
+        cfg = self.cfg.augment
+
+        if 'ObjectSample' in cfg.keys():
+            if not hasattr(self, 'db_boxes_dict'):
+                data_path = attr['path']
+                # remove tail of path to get root data path
+                for _ in range(3):
+                    data_path = os.path.split(data_path)[0]
+                pickle_path = os.path.join(data_path, 'bboxes.pkl')
+                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
+
+            data = ObjdetAugmentation.ObjectSample(
+                data,
+                db_boxes_dict=self.db_boxes_dict,
+                sample_dict=cfg['ObjectSample']['sample_dict'])
+
+        if cfg.get('ObjectRangeFilter', False):
+            data = ObjdetAugmentation.ObjectRangeFilter(
+                data, self.cfg.point_cloud_range)
+
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        return data
+
     def loss(self, results, inputs, training=True):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
@@ -141,10 +185,23 @@ class PointRCNN(BaseModel):
                 return {"loss": tf.constant(0.0)}
             return self.rcnn.loss(results, inputs)
 
+    def filter_objects(self, bbox_objs):
+        filtered = []
+        for bb in bbox_objs:
+            if bb.label_class in self.classes:
+                filtered.append(bb)
+        return filtered
+
     def preprocess(self, data, attr):
+        if attr['split'] in ['train', 'training']:
+            data = self.augment_data(data, attr)
+
+        data['bounding_boxes'] = self.filter_objects(data['bounding_boxes'])
+
         # remove intensity
         points = np.array(data['point'][..., :3], dtype=np.float32)
         calib = data['calib']
+
         # transform in cam space
         points = DataProcessing.world2cam(points, calib['world_cam'])
 
@@ -156,19 +213,31 @@ class PointRCNN(BaseModel):
         return new_data
 
     @staticmethod
-    def generate_rpn_training_labels(points, bboxes):
+    def generate_rpn_training_labels(points, bboxes, bboxes_world, calib=None):
         cls_label = np.zeros((points.shape[0]), dtype=np.int32)
         reg_label = np.zeros((points.shape[0], 7),
                              dtype=np.float32)  # dx, dy, dz, ry, h, w, l
 
-        pts_idx = points_in_box(points, bboxes)
+        if len(bboxes) == 0:
+            return cls_label, reg_label
+
+        pts_idx = points_in_box(points.copy(),
+                                bboxes_world,
+                                camera_frame=True,
+                                cam_world=DataProcessing.invT(
+                                    calib['world_cam']))
 
         # enlarge the bbox3d, ignore nearby points
-        extended_boxes = bboxes.copy()
+        extended_boxes = bboxes_world.copy()
         extended_boxes[3:6] += 0.4
-        extended_boxes[:, 1] += 0.2
+        # extended_boxes[:, 1] += 0.2
+        extended_boxes[:, 2] -= 0.2
 
-        pts_idx_ext = points_in_box(points, extended_boxes)
+        pts_idx_ext = points_in_box(points.copy(),
+                                    extended_boxes,
+                                    camera_frame=True,
+                                    cam_world=DataProcessing.invT(
+                                        calib['world_cam']))
 
         for k in range(bboxes.shape[0]):
             fg_pt_flag = pts_idx[:, k]
@@ -223,16 +292,23 @@ class PointRCNN(BaseModel):
         t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
-            labels = np.stack([
-                self.name2lbl.get(bb.label_class, len(self.classes))
-                for bb in data['bbox_objs']
-            ])
+            labels = []
+            bboxes = []
+            bboxes_world = []
+            if len(data['bbox_objs']) != 0:
+                labels = np.stack([
+                    self.name2lbl.get(bb.label_class, len(self.classes))
+                    for bb in data['bbox_objs']
+                ])
 
-            bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
+                bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']
+                                  ])  # Camera frame.
+                bboxes_world = np.stack(
+                    [bb.to_xyzwhlr() for bb in data['bbox_objs']])
 
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
-                    points, bboxes)
+                    points, bboxes, bboxes_world, data['calib'])
             t_data['labels'] = labels
             t_data['bbox_objs'] = data['bbox_objs']
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":
