@@ -148,13 +148,25 @@ class Scannet(BaseDataset):
     def is_tested(self):
         pass
 
-    def save_test_result(self):
-        pass
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(pred)[self.semantic_ids]
+
+        store_path = join(path, self.name, name + '.npy')
+        make_dir(Path(store_path).parent)
+        np.save(store_path, pred)
+        log.info("Saved {} in {}.".format(name, store_path))
 
 
 class ScannetSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
+        super().__init__(dataset, split)
         self.cfg = dataset.cfg
 
         self.path_list = dataset.get_split_list(split)

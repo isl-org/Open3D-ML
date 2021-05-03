@@ -38,6 +38,8 @@ class SparseConvUnet(BaseModel):
             in_channels=3,
             num_classes=20,
             grid_size=4096,
+            batcher='ConcatBatcher',
+            augment=None,
             **kwargs):
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
@@ -48,6 +50,8 @@ class SparseConvUnet(BaseModel):
                                              in_channels=in_channels,
                                              num_classes=num_classes,
                                              grid_size=grid_size,
+                                             batcher=batcher,
+                                             augment=augment,
                                              **kwargs)
         cfg = self.cfg
         self.device = device
@@ -109,8 +113,6 @@ class SparseConvUnet(BaseModel):
             points, feat, labels = self.augmenter.augment(
                 points, feat, labels, self.cfg.get('augment', None))
 
-        feat = feat / 127.5 - 1.
-
         m = points.min(0)
         M = points.max(0)
 
@@ -144,6 +146,15 @@ class SparseConvUnet(BaseModel):
 
         return data
 
+    def update_probs(self, inputs, results, test_probs, test_labels):
+        result = results.reshape(-1, self.cfg.num_classes)
+        probs = torch.nn.functional.softmax(result, dim=-1).cpu().data.numpy()
+        labels = np.argmax(probs, 1)
+
+        self.trans_point_sampler(patchwise=False)
+
+        return probs, labels
+
     def inference_begin(self, data):
         data = self.preprocess(data, {'split': 'test'})
         data['batch_lengths'] = [data['point'].shape[0]]
@@ -165,7 +176,7 @@ class SparseConvUnet(BaseModel):
 
         pred_l = np.argmax(probs, 1)
 
-        return {'inference_labels': pred_l, 'inference_scores': probs}
+        return {'predict_labels': pred_l, 'predict_scores': probs}
 
     def get_loss(self, Loss, results, inputs, device):
         """Calculate the loss on output of the model.

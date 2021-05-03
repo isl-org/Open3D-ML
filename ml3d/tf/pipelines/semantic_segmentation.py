@@ -125,7 +125,6 @@ class SemanticSegmentation(BasePipeline):
     def run_inference(self, data):
         cfg = self.cfg
         model = self.model
-        # model.eval()
         log.info("running inference")
 
         model.inference_begin(data)

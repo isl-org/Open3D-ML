@@ -37,6 +37,7 @@ class SparseConvUnet(BaseModel):
             in_channels=3,
             num_classes=20,
             grid_size=4096,
+            augment=None,
             **kwargs):
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
@@ -47,6 +48,7 @@ class SparseConvUnet(BaseModel):
                                              in_channels=in_channels,
                                              num_classes=num_classes,
                                              grid_size=grid_size,
+                                             augment=augment,
                                              **kwargs)
         cfg = self.cfg
         self.multiplier = cfg.multiplier
@@ -111,8 +113,6 @@ class SparseConvUnet(BaseModel):
         if attr['split'] in ['training', 'train']:
             points, feat, labels = self.augmenter.augment(
                 points, feat, labels, self.cfg.get('augment', None))
-
-        feat = feat / 127.5 - 1.  # Rescale color to [-1, 1].
 
         m = points.min(0)
         M = points.max(0)
@@ -184,7 +184,7 @@ class SparseConvUnet(BaseModel):
         return gen_func, gen_types, gen_shapes
 
     def inference_begin(self, data):
-        data = self.preprocess(data, {})
+        data = self.preprocess(data, {'split': 'test'})
 
         self.inference_input = self.transform(
             tf.constant(data['point']), tf.constant(data['feat']),
@@ -205,8 +205,8 @@ class SparseConvUnet(BaseModel):
         pred_l = np.argmax(probs, 1)
 
         self.inference_result = {
-            'inference_labels': pred_l,
-            'inference_scores': probs
+            'predict_labels': pred_l,
+            'predict_scores': probs
         }
 
         return True
