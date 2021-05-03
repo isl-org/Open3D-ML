@@ -1080,10 +1080,10 @@ def decode_bbox_target(roi_box3d,
     Args:
         roi_box3d: (N, 7)
         pred_reg: (N, C)
-        loc_scope:
-        loc_bin_size:
-        num_head_bin:
-        anchor_size:
+        loc_scope: scope length for x, z loss.
+        loc_bin_size: bin size for classifying x, z loss.
+        num_head_bin: number of bins for yaw.
+        anchor_size: anchor size for proposals.
         get_xz_fine: bool
         get_y_by_bin: bool
         loc_y_scope: float

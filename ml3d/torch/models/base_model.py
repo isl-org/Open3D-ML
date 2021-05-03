@@ -77,7 +77,7 @@ class BaseModel(ABC, torch.nn.Module):
         """Transform function for the point cloud and features.
 
         Args:
-            args: A list of tf Tensors.
+            cfg_pipeline: config file for pipeline.
         """
         return
 

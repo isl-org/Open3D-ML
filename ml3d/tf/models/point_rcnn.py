@@ -364,11 +364,11 @@ def get_reg_loss(pred_reg,
         loc_bin_size: constant
         num_head_bin: constant
         anchor_size: (N, 3) or (3)
-        get_xz_fine:
-        get_y_by_bin:
-        loc_y_scope:
-        loc_y_bin_size:
-        get_ry_fine:
+        get_xz_fine: whether to get fine xz loss.
+        get_y_by_bin: whether to divide y coordinate into bin.
+        loc_y_scope: scope length for y coordinate.
+        loc_y_bin_size: bin size for classifying y coordinate.
+        get_ry_fine: whether use fine yaw loss.
     """
     per_loc_bin_num = int(loc_scope / loc_bin_size) * 2
     loc_y_bin_num = int(loc_y_scope / loc_y_bin_size) * 2

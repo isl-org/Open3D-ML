@@ -1298,9 +1298,11 @@ class SimpleBlock(nn.Module):
         """Initialize a simple convolution block with its ReLU and BatchNorm.
 
         Args:
+            block_name: Block name
             in_dim: dimension input features
             out_dim: dimension input features
             radius: current radius of convolution
+            layer_ind: Index for layer
             config: parameters
         """
         super(SimpleBlock, self).__init__()
