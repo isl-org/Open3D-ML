@@ -3,7 +3,7 @@ from torch.utils.data import Sampler
 
 
 class TorchSamplerWrapper(Sampler):
-    """docstring for TorchSamplerWrapper"""
+    """docstring for TorchSamplerWrapper."""
 
     def __init__(self, sampler):
         self.sampler = sampler

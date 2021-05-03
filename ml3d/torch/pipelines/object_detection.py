@@ -28,9 +28,7 @@ log = logging.getLogger(__name__)
 
 
 class ObjectDetection(BasePipeline):
-    """
-    Pipeline for object detection. 
-    """
+    """Pipeline for object detection."""
 
     def __init__(self,
                  model,
@@ -49,11 +47,11 @@ class ObjectDetection(BasePipeline):
                          **kwargs)
 
     def run_inference(self, data):
-        """
-        Run inference on given data.
+        """Run inference on given data.
 
         Args:
             data: A raw data.
+
         Returns:
             Returns the inference results.
         """
@@ -70,8 +68,8 @@ class ObjectDetection(BasePipeline):
         return boxes
 
     def run_test(self):
-        """
-        Run test with test data split, computes mean average precision of the prediction results.
+        """Run test with test data split, computes mean average precision of the
+        prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -120,8 +118,8 @@ class ObjectDetection(BasePipeline):
         #dataset.save_test_result(results, attr)
 
     def run_valid(self):
-        """
-        Run validation with validation data split, computes mean average precision and the loss of the prediction results.
+        """Run validation with validation data split, computes mean average
+        precision and the loss of the prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -225,9 +223,7 @@ class ObjectDetection(BasePipeline):
         self.valid_losses["mAP 3D"] = np.mean(ap[:, -1])
 
     def run_train(self):
-        """
-        Run training with train data split.
-        """
+        """Run training with train data split."""
         model = self.model
         device = self.device
         dataset = self.dataset
@@ -366,9 +362,7 @@ class ObjectDetection(BasePipeline):
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
     def save_config(self, writer):
-        '''
-        Save experiment configuration with tensorboard summary
-        '''
+        """Save experiment configuration with tensorboard summary."""
         writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
         writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
         writer.add_text('Configuration/Dataset',

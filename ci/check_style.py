@@ -46,8 +46,7 @@ CPP_FORMAT_DIRS = ["."]
 
 
 def _glob_files(directories, extensions):
-    """
-    Find files with certain extensions in directories recursively.
+    """Find files with certain extensions in directories recursively.
 
     Args:
         directories: list of directories, relative to the root Open3D repo directory.
@@ -78,9 +77,7 @@ class PythonFormatter:
 
     @staticmethod
     def _check_style(file_path, style_config):
-        """
-        Returns true if style is valid.
-        """
+        """Returns true if style is valid."""
         _, _, changed = yapf.yapflib.yapf_api.FormatFile(
             file_path, style_config=style_config, in_place=False)
         return not changed
@@ -132,8 +129,7 @@ class JupyterFormatter:
 
     @staticmethod
     def _check_or_apply_style(file_path, style_config, do_apply_style):
-        """
-        Returns true if style is valid.
+        """Returns true if style is valid.
 
         Since there are common code for check and apply style, the two functions
         are merged into one.

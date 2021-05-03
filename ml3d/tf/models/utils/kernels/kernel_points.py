@@ -37,13 +37,13 @@ from os.path import join, exists
 
 
 def create_3D_rotations(axis, angle):
-    """
-    Create rotation matrices from a list of axes and angles. Code from wikipedia on quaternions
+    """Create rotation matrices from a list of axes and angles. Code from
+    wikipedia on quaternions.
+
     :param axis: float32[N, 3]
     :param angle: float32[N,]
     :return: float32[N, 3, 3]
     """
-
     t1 = np.cos(angle)
     t2 = 1 - t1
     t3 = axis[:, 0] * axis[:, 0]
@@ -75,9 +75,10 @@ def spherical_Lloyd(radius,
                     max_iter=500,
                     momentum=0.9,
                     verbose=0):
-    """
-    Creation of kernel point via Lloyd algorithm. We use an approximation of the algorithm, and compute the Voronoi
-    cell centers with discretization  of space. The exact formula is not trivial with part of the sphere as sides.
+    """Creation of kernel point via Lloyd algorithm. We use an approximation of
+    the algorithm, and compute the Voronoi cell centers with discretization  of
+    space. The exact formula is not trivial with part of the sphere as sides.
+
     :param radius: Radius of the kernels
     :param num_cells: Number of cell (kernel points) in the Voronoi diagram.
     :param dimension: dimension of the space
@@ -89,7 +90,6 @@ def spherical_Lloyd(radius,
     :param verbose: display option
     :return: points [num_kernels, num_points, dimension]
     """
-
     #######################
     # Parameters definition
     #######################
@@ -275,8 +275,8 @@ def kernel_point_optimization_debug(radius,
                                     fixed='center',
                                     ratio=0.66,
                                     verbose=0):
-    """
-    Creation of kernel point via optimization of potentials.
+    """Creation of kernel point via optimization of potentials.
+
     :param radius: Radius of the kernels
     :param num_points: points composing kernels
     :param num_kernels: number of wanted kernels
@@ -286,7 +286,6 @@ def kernel_point_optimization_debug(radius,
     :param verbose: display option
     :return: points [num_kernels, num_points, dimension]
     """
-
     #######################
     # Parameters definition
     #######################

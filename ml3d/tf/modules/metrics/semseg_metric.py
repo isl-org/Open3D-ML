@@ -3,7 +3,6 @@ import numpy as np
 
 
 class SemSegMetric(object):
-    """docstring for SemSegLoss"""
 
     def __init__(self, pipeline, model, dataset):
         super(SemSegMetric, self).__init__()
@@ -13,20 +12,19 @@ class SemSegMetric(object):
         self.dataset = dataset
 
     def acc(self, scores, labels):
-        r"""
-            Compute the per-class accuracies and the overall accuracy 
+        r"""Compute the per-class accuracies and the overall accuracy.
 
-            Parameters
-            ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
-                raw scores for each class
-            labels: torch.LongTensor, shape (B?, N)
-                ground truth labels
+        Parameters
+        ----------
+        scores: torch.FloatTensor, shape (B?, C, N)
+            raw scores for each class
+        labels: torch.LongTensor, shape (B?, N)
+            ground truth labels
 
-            Returns
-            -------
-            list of floats of length num_classes+1 
-            (last item is overall accuracy)
+        Returns
+        -------
+        list of floats of length num_classes+1
+        (last item is overall accuracy)
         """
         correct_prediction = tf.nn.in_top_k(labels, scores, 1)
         acc = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
@@ -53,19 +51,18 @@ class SemSegMetric(object):
         return accuracies
 
     def iou(self, scores, labels):
-        r"""
-            Compute the per-class IoU and the mean IoU 
+        r"""Compute the per-class IoU and the mean IoU.
 
-            Parameters
-            ----------
-            scores: torch.FloatTensor, shape (B?, C, N)
-                raw scores for each class
-            labels: torch.LongTensor, shape (B?, N)
-                ground truth labels
+        Parameters
+        ----------
+        scores: torch.FloatTensor, shape (B?, C, N)
+            raw scores for each class
+        labels: torch.LongTensor, shape (B?, N)
+            ground truth labels
 
-            Returns
-            -------
-            list of floats of length num_classes+1 (last item is mIoU)
+        Returns
+        -------
+        list of floats of length num_classes+1 (last item is mIoU)
         """
         num_classes = scores.shape[-1]
         predictions = tf.argmax(scores, axis=-1).numpy()

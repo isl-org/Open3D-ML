@@ -7,8 +7,11 @@ import numpy as np
 
 
 def enlarge_box3d(boxes3d, extra_width):
-    """
-    :param boxes3d: (N, 7) [x, y, z, h, w, l, ry]
+    """Enlarge 3D boxes.
+
+    Args:
+        boxes3d: (N, 7) [x, y, z, h, w, l, ry]
+        extra_width: Extra width.
     """
     trans = np.zeros((boxes3d.shape[-1],))
     trans[1] = extra_width

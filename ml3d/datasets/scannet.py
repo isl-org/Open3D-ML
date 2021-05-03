@@ -19,8 +19,8 @@ log = logging.getLogger(__name__)
 
 
 class Scannet(BaseDataset):
-    """
-    Scannet 3D dataset for Object Detection, used in visualizer, training, or test
+    """Scannet 3D dataset for Object Detection, used in visualizer, training, or
+    test.
     """
 
     def __init__(self,
@@ -29,10 +29,13 @@ class Scannet(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  **kwargs):
-        """
-        Initialize
+        """Initialize.
+
         Args:
             dataset_path (str): path to the dataset
+            name (str): Dataset name.
+            cache_dir (str): Path to cache the dataset.
+            use_cache (bool): Whether to cache the data.
             kwargs:
         """
         super().__init__(dataset_path=dataset_path,
@@ -197,9 +200,7 @@ class ScannetSplit():
 
 
 class Object3d(BEVBox3D):
-    """
-    Stores object specific details like bbox coordinates.
-    """
+    """Stores object specific details like bbox coordinates."""
 
     def __init__(self, name, center, size, yaw):
         super().__init__(center, size, yaw, name, -1.0)

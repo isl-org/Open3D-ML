@@ -21,8 +21,9 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
-    """
-    Class defining RandLANet. A model for Semantic Segmentation.
+    """Class defining RandLANet.
+
+    A model for Semantic Segmentation.
     """
 
     def __init__(
@@ -114,11 +115,14 @@ class RandLANet(BaseModel):
         return optimizer, scheduler
 
     def get_loss(self, Loss, results, inputs, device):
-        """
-        Runs the loss on outputs of the model
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
+        """Runs the loss on outputs of the model.
+
+        Args:
+            outputs: logits
+            labels: labels
+
+        Returns:
+             loss
         """
         cfg = self.cfg
         labels = inputs['data']['labels']
@@ -517,11 +521,13 @@ class RandLANet(BaseModel):
     @staticmethod
     def random_sample(feature, pool_idx):
         """
-        :param feature: [B, d, N, 1] input features matrix
-        :param pool_idx: [B, N', max_num] N' < N, N' is the selected position after pooling
-        :return: pool_features = [B, N', d] pooled features matrix
-        """
+        Args:
+            feature: [B, d, N, 1] input features matrix
+            pool_idx: [B, N', max_num] N' < N, N' is the selected position after pooling
 
+        Returns:
+             pool_features = [B, N', d] pooled features matrix
+        """
         feature = feature.squeeze(3)
         num_neigh = pool_idx.size()[2]
         batch_size = feature.size()[0]
@@ -543,9 +549,12 @@ class RandLANet(BaseModel):
     @staticmethod
     def nearest_interpolation(feature, interp_idx):
         """
-        :param feature: [B, d, N] input features matrix
-        :param interp_idx: [B, up_num_points, 1] nearest neighbour index
-        :return: [B, up_num_points, d] interpolated features matrix
+        Args:
+            feature: [B, d, N] input features matrix
+            interp_idx: [B, up_num_points, 1] nearest neighbour index
+
+        Returns:
+             [B, up_num_points, d] interpolated features matrix
         """
         feature = feature.squeeze(3)
         d = feature.size(1)

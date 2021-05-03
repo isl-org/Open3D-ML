@@ -19,8 +19,8 @@ log = logging.getLogger(__name__)
 
 
 class SunRGBD(BaseDataset):
-    """
-    SunRGBD 3D dataset for Object Detection, used in visualizer, training, or test
+    """SunRGBD 3D dataset for Object Detection, used in visualizer, training, or
+    test.
     """
 
     def __init__(self,
@@ -29,11 +29,13 @@ class SunRGBD(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  **kwargs):
-        """
-        Initialize
+        """Initialize
+
         Args:
-            dataset_path (str): path to the dataset
-            kwargs:
+            dataset_path (str): path to the dataset.
+            name (str): Dataset name.
+            cache_dir (str): Path to cache the dataset.
+            use_cache (bool): Whether to cache the data.
         """
         super().__init__(dataset_path=dataset_path,
                          name=name,
@@ -173,9 +175,7 @@ class SunRGBDSplit():
 
 
 class Object3d(BEVBox3D):
-    """
-    Stores object specific details like bbox coordinates.
-    """
+    """Stores object specific details like bbox coordinates."""
 
     def __init__(self, name, center, size, yaw, box2d):
         super().__init__(center, size, yaw, name, -1.0)

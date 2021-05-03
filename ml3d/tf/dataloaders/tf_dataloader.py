@@ -19,14 +19,14 @@ class TFDataloader():
         This example loads the SemanticKITTI dataset using the a point
         cloud to the visualizer::
 
-        import tensorflow as tf
-        from ..dataloaders import TFDataloader
+            import tensorflow as tf
+            from ..dataloaders import TFDataloader
 
-        train_split = TFDataloader(dataset=tf.dataset.get_split('training'),
-                        model=model,
-                        use_cache=tf.dataset.cfg.use_cache,
-                        steps_per_epoch=tf.dataset.cfg.get(
-                        'steps_per_epoch_train', None))
+            train_split = TFDataloader(dataset=tf.dataset.get_split('training'),
+                            model=model,
+                            use_cache=tf.dataset.cfg.use_cache,
+                            steps_per_epoch=tf.dataset.cfg.get(
+                            'steps_per_epoch_train', None))
     """
 
     def __init__(self,
@@ -55,7 +55,6 @@ class TFDataloader():
 
         **Returns:**
             class: The corresponding class.
-
         """
         self.dataset = dataset
         self.model = model

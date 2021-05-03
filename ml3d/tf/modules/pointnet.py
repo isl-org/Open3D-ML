@@ -91,7 +91,7 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
         self.pool_method = 'max_pool'
 
     def call(self, xyz, features=None, new_xyz=None, training=True):
-        """
+        r"""
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
         :param new_xyz:
@@ -129,7 +129,7 @@ class _PointnetSAModuleBase(tf.keras.layers.Layer):
 
 
 class PointnetSAModuleMSG(_PointnetSAModuleBase):
-    """Pointnet set abstraction layer with multiscale grouping"""
+    """Pointnet set abstraction layer with multiscale grouping."""
 
     def __init__(self,
                  *,
@@ -177,7 +177,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
 
 
 class PointnetSAModule(PointnetSAModuleMSG):
-    """Pointnet set abstraction layer"""
+    """Pointnet set abstraction layer."""
 
     def __init__(self,
                  *,

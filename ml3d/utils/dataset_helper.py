@@ -8,7 +8,10 @@ from os.path import exists, join, isfile, dirname, abspath, splitext
 
 
 def make_dir(folder_name):
-    """Create a directory. If already exists, do nothing"""
+    """Create a directory.
+
+    If already exists, do nothing
+    """
     if not exists(folder_name):
         makedirs(folder_name)
 
@@ -20,13 +23,10 @@ def get_hash(x: str):
 
 
 class Cache(object):
-    """
-    Cache converter for preprocessed data.
-    """
+    """Cache converter for preprocessed data."""
 
     def __init__(self, func: Callable, cache_dir: str, cache_key: str):
-        """
-        Initialize
+        """Initialize.
 
         Args:
             func: preprocess function of a model.
@@ -41,13 +41,13 @@ class Cache(object):
         self.cached_ids = [splitext(p)[0] for p in listdir(self.cache_dir)]
 
     def __call__(self, unique_id: str, *data):
-        """
-        Call the converter. If the cache exists, load and return the cache,
-        otherwise run the preprocess function and store the cache
+        """Call the converter. If the cache exists, load and return the cache,
+        otherwise run the preprocess function and store the cache.
 
         Args:
             unique_id: A unique key of this data.
             data: Input to the preprocess function.
+
         Returns:
             class: Preprocessed (cache) data.
         """

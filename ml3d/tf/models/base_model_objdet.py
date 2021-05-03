@@ -45,7 +45,6 @@ class BaseModel(ABC, tf.keras.Model):
         Returns:
             Returns a new optimizer object.
         """
-
         return
 
     @abstractmethod
@@ -83,6 +82,7 @@ class BaseModel(ABC, tf.keras.Model):
         Args:
             results: The model outputs as returned by the call() function.
                 Post-processing is applied on this object.
+
         Returns:
             Returns True if the inference is complete and otherwise False.
             Returning False can be used to implement inference for large point
