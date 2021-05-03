@@ -29,4 +29,4 @@ jobs:
           python ci/check_style.py
       - name: Run docstring style check
         run: |
-          pydocstyle --convention=google --add-ignore=D1,D205,D415,D212 . ||true
+          pydocstyle --convention=google --add-ignore=D1,D205,D415,D212 .
