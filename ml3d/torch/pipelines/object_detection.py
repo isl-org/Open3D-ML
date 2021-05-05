@@ -23,6 +23,8 @@ from ...metrics.mAP import mAP
 # import pyprof
 # pyprof.init(enable_function_stack=True)
 
+import open3d as o3d
+
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
     level=logging.INFO,
@@ -188,8 +190,8 @@ class ObjectDetection(BasePipeline):
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
                 # Record visualization for the last iteration
-                if process_bar.n == process_bar.total - 1:
-                    self.visual['valid'] = self.get_visual(boxes, data)
+                # if process_bar.n == process_bar.total - 1:
+                self.visual['valid'] = self.get_visual(boxes, data)
 
             if no_bboxes > 0:
                 log.warning("No bounding box labels in " +
@@ -307,7 +309,8 @@ class ObjectDetection(BasePipeline):
             no_bboxes = 0
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
-                if any([bbox.numel() == 0 for bbox in data.bboxes]):
+                if (len(data.bboxes) == 0 or
+                        any([bbox.numel() == 0 for bbox in data.bboxes])):
                     no_bboxes += 1
                     continue
                 data.to(device)
@@ -371,12 +374,14 @@ class ObjectDetection(BasePipeline):
         max_pts = 0
         max_faces = 0
         pcd_range = np.array(self.model.point_cloud_range).reshape((2, 3))
-        pcd_range_bbox = BoundingBox3D(pcd_range.mean(axis=0), [0, 1, 0],
-                                       [0, 0, 1], [1, 0, 0],
+        pcd_range_bbox = BoundingBox3D(pcd_range.mean(axis=0), [0, 0, 1],
+                                       [0, 1, 0], [1, 0, 0],
                                        pcd_range[1] - pcd_range[0], 0, 1.0)
         for infer_bboxes, gt_bboxes, pointcloud in zip(infer_bboxes_batch,
                                                        inputs_batch.bbox_objs,
                                                        inputs_batch.point):
+            for bb in gt_bboxes:  # LUT needs label_class to be int id, not str
+                bb.label_class = self.dataset.cat2label[bb.label_class]
             gt_bboxes.append(pcd_range_bbox)
             gt_points, gt_colors, gt_faces = BoundingBox3D.create_trimesh(
                 gt_bboxes, lut=self.dataset.label_lut)
@@ -394,6 +399,15 @@ class ObjectDetection(BasePipeline):
                                         dtype=int)
             input_pcd.append(
                 pointcloud[pcd_subsample, :].cpu().detach().numpy())
+
+            # pcd = o3d.geometry.PointCloud()
+            # pcd.points = o3d.utility.Vector3dVector(input_pcd[-1])
+            # o3d.visualization.draw_geometries([
+            #     pcd,
+            #     BoundingBox3D.create_lines(gt_bboxes,
+            #                                lut=self.dataset.label_lut),
+            #     BoundingBox3D.create_lines(infer_bboxes)
+            # ])
 
         points = np.stack(
             [np.pad(p, ((0, max_pts - p.shape[0]), (0, 0))) for p in points])
@@ -415,28 +429,36 @@ class ObjectDetection(BasePipeline):
         return visual_dict
 
     def save_logs(self, writer, epoch):
+        # orthographic_camera = {
+        #     "cls": "OrthographicCamera",
+        #     "left": self.model.point_cloud_range[0],
+        #     "bottom": self.model.point_cloud_range[1],
+        #     "near": self.model.point_cloud_range[2],
+        #     "right": self.model.point_cloud_range[3],
+        #     "top": self.model.point_cloud_range[4],
+        #     "far": self.model.point_cloud_range[5]
+        # }
+        # perspective_camera = {
+        #     "cls": "PerspectiveCamera",
+        #     "fov": 45,
+        #     "aspect": 4. / 3.,  # TODO
+        #     "near": self.model.point_cloud_range[2],
+        #     "far": self.model.point_cloud_range[5]
+        # }
         bbox_config = {
             "material": {
                 "cls": "MeshBasicMaterial",
                 "wireframe": True
             },
-            "camera": {
-                "cls": "OrthographicCamera",
-                "near": 0.25,
-                "far": 3.5
-            }
+            # "camera": camera
         }
-        pcd_config = {
-            "camera": {
-                "cls": "OrthographicCamera",
-                "near": 0.25,
-                "far": 3.5
-            }
-        }
+        pcd_config = {}  # {"camera": perspective_camera}
+        # Losses / metrics
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
         for key, value in self.valid_losses.items():
             writer.add_scalar("valid/" + key, np.mean(value), epoch)
+        # Inputs / feaatures / outputs
         for stage in ('train', 'valid'):
             for key, value in self.visual[stage].items():
                 if key == "bboxes":
@@ -451,7 +473,11 @@ class ObjectDetection(BasePipeline):
                                     vertices=torch.from_numpy(value),
                                     config_dict=pcd_config,
                                     global_step=epoch)
-                else:
+                elif key == "weights":  # Weights / biases
+                    for weights_key, weights_value in value.items():
+                        writer.add_histogram(weights_key, weights_value, epoch)
+
+                else:  # Intermediate features
                     writer.add_images(f"{stage}/features/{key}",
                                       value,
                                       global_step=epoch)

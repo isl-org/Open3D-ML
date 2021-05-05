@@ -472,7 +472,7 @@ class ScannetProcess():
             if n_pts_inside > self.min_instance_pts:
                 bev_bbox_cam = bev_bbox.to_camera_bev()
                 frame_instance_bboxes.append(
-                    np.append(bev_bbox_cam.to_xyzwlhyc(),
+                    np.append(bev_bbox_cam.to_xyz_dxdydz_yc(),
                               [truncation, n_pts_inside]))
         # Don't save empty frames
         if frame_instance_bboxes:

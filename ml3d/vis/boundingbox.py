@@ -33,14 +33,15 @@ class BoundingBox3D:
             direction of the box
         left (ArrayLike[3]): normalized (i, j, k) that defines the left (X)
             direction of the box
-        size (ArrayLike[3]): (width, height, depth) that defines the size of the box, as
-            measured from edge to edge
-        label_class (int): integer specifying the classification label. If an LUT is
-            specified in create_lines() this will be used to determine the color
-            of the box.
+        size (ArrayLike[3]): (width, height, depth) that defines the size of the
+            box, as measured from edge to edge
+        label_class (int): integer specifying the classification label. If an
+            LUT is specified in create_lines() this will be used to determine
+            the color of the box.
         confidence (float): confidence level of the box
         meta (str): a user-defined string (optional)
-        show_class (bool, optional): displays the class label in text near the box
+        show_class (bool, optional): displays the class label in text near the
+            box
         show_confidence (bool, optional): displays the confidence value in text
             near the box
         show_meta (bool, optional): displays the meta string in text near the
@@ -100,6 +101,7 @@ class BoundingBox3D:
     def inside(self, points):
         """
         Return indices of points inside the BoundingBox3D
+
         Args:
             points ((N,3) array): list of points
         Returns: Indices of `points` inside the BoundingBox3D
@@ -115,10 +117,11 @@ class BoundingBox3D:
         """Creates and returns an open3d.geometry.LineSet that can be used to
         render the boxes.
 
-        boxes: the list of bounding boxes
-        lut: a ml3d.vis.LabelLUT that is used to look up the color based on the
-            label_class argument of the BoundingBox3D constructor. If not
-            provided, a color of 50% grey will be used. (optional)
+        Args:
+            boxes: the list of bounding boxes
+            lut: a ml3d.vis.LabelLUT that is used to look up the color based on
+                the label_class argument of the BoundingBox3D constructor. If
+                not provided, a color of 50% grey will be used. (optional)
         """
         nverts = 14
         nlines = 17

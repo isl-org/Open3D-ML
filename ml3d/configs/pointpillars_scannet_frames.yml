@@ -5,7 +5,7 @@ dataset:
   # path/to/your/dataset
   dataset_path: /mnt/beegfs/tier1/vcl-nfs-work/ssheorey/Open3D/Datasets/ScanNet-cache
   cache_dir: ./logs/cache
-  max_size: [100, 10, 10]
+  max_size: [1000, 200, null]
   #  steps_per_epoch_train: 5000
 
 model:
@@ -13,7 +13,7 @@ model:
   # path/to/your/checkpoint
   ckpt_path:
 
-  point_cloud_range: [-2, -1.5, 0, 2, 1.5, 3.5]   # TBC
+  point_cloud_range: &point_cloud_range [-2.4, -1.8, 0, 2.4, 1.8, 4.5]   # TBC
   classes: [
     'cabinet', 'bed', 'chair', 'sofa', 'table', 'door', 'window',
     'bookshelf', 'picture', 'counter', 'desk', 'curtain',
@@ -30,18 +30,18 @@ model:
       beta: 0.11
       loss_weight: 1.0  # =
     cross_entropy:
-      loss_weight: 0.02  # /5
+      loss_weight: 0.001  # /100
 
   voxelize:
     max_num_points: 16 # 256
     voxel_size: &vsize
-      [0.025, 0.025, 3.5]             # TBC
+      [0.03, 0.03, 4.5]             # TBC
       # [0.125, 0.125, 3.5]             # TBC
     max_voxels: [16000, 19200] # [768, 768]      # [P_train, P_test]
 
   voxel_encoder:
     in_channels: 3
-    feat_channels: [64]
+    feat_channels: [64, 64, 64]  # 1 -> 3 layers
     voxel_size: *vsize
 
   scatter:
@@ -64,9 +64,9 @@ model:
     in_channels: 384
     feat_channels: 384
     nms_pre: 100
-    score_thr: 0.1
+    score_thr: 0.5
     ranges: [                   # TBC
-      [-2, -1.5, 0, 2, 1.5, 3.5]
+      [-2.4, -1.8, 0, 2.4, 1.8, 4.5]
     ]
     # Anchor box set spacing in voxels along each dimension
     stride: 2
@@ -218,18 +218,32 @@ model:
   augment:
     PointShuffle: true
     ObjectRangeFilter: true
+    # random rotation of up to +- 45 degree for all axes
+    Rotation:
+      rotation_method: all
+      rotation_range: [90, 90, 90] # [15, 15, 15]
+    CameraDolly:  # depth camera translation along camera axis
+      trans_range: [-0.5, 0.5]
+      motion_axis: Z
+      point_cloud_range: *point_cloud_range
+    SensorNoise:
+      type: stereo  # quadratic multiplicative noise in Z
+      quad_mult_coeff: 0.003    # 30mm @ 3m for Occipital ST1
+    # type: lidar   # noise std increases linearly with Z
+    # linear_coeff: 0.0017      # 15.5mm @ 9m for L515
+
 
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 1
-  val_batch_size: 1
+  batch_size: 4
+  val_batch_size: 4
   save_ckpt_freq: 5
-  max_epoch: 200
+  max_epoch: 600
   main_log_dir: ./logs
   train_sum_dir: ./logs/train_log
   grad_clip_norm: 2
-  num_workers: 8
+  num_workers: 4
 
   optimizer:
     lr: 0.001

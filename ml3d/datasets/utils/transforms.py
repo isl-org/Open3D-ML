@@ -1,6 +1,6 @@
+import logging as log
 import numpy as np
 import random
-import pickle
 from .operations import *
 
 
@@ -26,43 +26,62 @@ def trans_normalize(pc, feat, t_normalize):
     return pc, feat
 
 
+def create_random_rotation(rotation_method='all',
+                           rotation_range=[np.pi, np.pi / 2, np.pi]):
+    """ Create rotation matrix for a random rotation in a bounded interval
+
+    Args:
+        rotation_method (str): 'vertical' or 'z' for rotation around Z axis only.
+            'all' for 3D rotation
+        rotation_range (ArrayLike[3]): Rotation is bounded in the interval
+            [-theta, theta] around each axis.
+
+    Returns:
+        ArrayLike[3,3]: Rotation matrix
+    """
+
+    if rotation_method in ('vertical', 'z'):
+
+        # Create random rotations
+        theta = (2 * np.random.rand() - 1) * rotation_range[2]
+        c, s = np.cos(theta), np.sin(theta)
+        R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
+
+    elif rotation_method == 'all':
+
+        rnd_num = np.full((3,), np.pi / 2)  # (2 * np.random.rand(3) - 1)
+        # Choose two random angles for the first vector in polar coordinates
+        theta = rnd_num[0] * rotation_range[0]
+        phi = rnd_num[1] * rotation_range[1]
+
+        # Create the first vector in Cartesian coordinates
+        u = np.array([
+            np.cos(theta) * np.cos(phi),
+            np.sin(theta) * np.cos(phi),
+            np.sin(phi)
+        ])
+
+        # Choose a random rotation angle
+        alpha = rnd_num[2] * rotation_range[2]
+
+        # Create the rotation matrix with this vector and angle
+        R = create_3D_rotations(np.reshape(u, (1, -1)),
+                                np.reshape(alpha, (1, -1)))[0]
+    else:
+        raise ValueError(f"Unknown rotation method {rotation_method}.")
+
+    return R
+
+
 def trans_augment(points, t_augment):
     """Implementation of an augmentation transform for point clouds."""
 
     if t_augment is None or not t_augment.get('turn_on', True):
         return points
 
-    # Initialize rotation matrix
-    R = np.eye(points.shape[1])
-
     if points.shape[1] == 3:
         rotation_method = t_augment.get('rotation_method', None)
-        if rotation_method == 'vertical':
-
-            # Create random rotations
-            theta = np.random.rand() * 2 * np.pi
-            c, s = np.cos(theta), np.sin(theta)
-            R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
-
-        elif rotation_method == 'all':
-
-            # Choose two random angles for the first vector in polar coordinates
-            theta = np.random.rand() * 2 * np.pi
-            phi = (np.random.rand() - 0.5) * np.pi
-
-            # Create the first vector in carthesian coordinates
-            u = np.array([
-                np.cos(theta) * np.cos(phi),
-                np.sin(theta) * np.cos(phi),
-                np.sin(phi)
-            ])
-
-            # Choose a random rotation angle
-            alpha = np.random.rand() * 2 * np.pi
-
-            # Create the rotation matrix with this vector and angle
-            R = create_3D_rotations(np.reshape(u, (1, -1)),
-                                    np.reshape(alpha, (1, -1)))[0]
+        R = create_random_rotation(rotation_method)
 
     R = R.astype(np.float32)
 
@@ -140,6 +159,8 @@ class ObjdetAugmentation():
 
     @staticmethod
     def ObjectRangeFilter(data, pcd_range):
+        """ used last to ensure model gets points and boxes only inside the
+        declared range after other augmentations."""
         pcd_range = np.array(pcd_range)
         bev_range = pcd_range[[0, 1, 3, 4]]
 
@@ -147,12 +168,19 @@ class ObjdetAugmentation():
         for box in data['bbox_objs']:
             if in_range_bev(bev_range, box.to_xyzwhlr()):
                 filtered_boxes.append(box)
+        data['bbox_objs'] = filtered_boxes
 
-        return {
-            'point': data['point'],
-            'bbox_objs': filtered_boxes,
-            'calib': data['calib']
-        }
+        pcd = data['point']
+        in_range_idx = np.logical_and.reduce((
+            pcd[:, 0] > pcd_range[0],
+            pcd[:, 0] < pcd_range[3],
+            pcd[:, 1] > pcd_range[1],
+            pcd[:, 1] < pcd_range[4],
+            pcd[:, 2] > pcd_range[2],
+            pcd[:, 2] < pcd_range[5],
+        ))
+        data['point'] = pcd[in_range_idx, :]
+        return data
 
     @staticmethod
     def ObjectSample(data, db_boxes_dict, sample_dict):
@@ -197,3 +225,72 @@ class ObjdetAugmentation():
                     rot_range=[-0.15707963267, 0.15707963267],
                     num_try=100):
         raise NotImplementedError
+
+    @staticmethod
+    def SensorNoise(data,
+                    type='stereo',
+                    quad_mult_coeff=0.003,
+                    linear_coeff=0.0017):
+        pcd = data['point']
+        if type == 'stereo':
+            pcd[:, 2] += np.random.rand(
+                pcd.shape[0]) * pcd[:, 2]**2 * quad_mult_coeff
+        elif type == 'lidar':
+            pcd[:, 2] *= 1 + np.random.rand(pcd.shape[0]) * linear_coeff
+
+        data.update({'point': pcd})
+        return data
+
+    @staticmethod
+    def CameraDolly(data,
+                    trans_range=(-1, 1),
+                    motion_axis='Z',
+                    point_cloud_range=[-2, -1.5, 0, 2, 1.5, 3.5]):
+        axis_idx = "XYZ".find(motion_axis)
+        if axis_idx < 0:
+            log.error(f"Unsupported motion_axis {motion_axis}")
+        if trans_range[1] > point_cloud_range[3 + axis_idx]:
+            log.error(
+                "Max dolly translation must be within the point_cloud_range")
+        pcd = data['point']
+        trans_range[0] = max(trans_range[0], 0.5 - np.min(pcd[:, axis_idx]))
+        shift = trans_range[0] + np.random.rand() * (trans_range[1] -
+                                                     trans_range[0])
+        for k in range(len(data['bbox_objs'])):
+            data['bbox_objs'][k].center[axis_idx] += shift
+        pcd[:, axis_idx] += shift
+        sample_ratio = (point_cloud_range[3 + axis_idx] +
+                        shift) / point_cloud_range[3 + axis_idx]
+        if shift > 0:  # dolly out -> subsample points
+            pcd = pcd[np.arange(0, pcd.shape[0] -
+                                1e-3, sample_ratio).astype(int), :]
+        elif shift < 0:  # dolly in -> crop and nearest neighbor upsample
+            new_min = np.array(point_cloud_range[:3]) * sample_ratio
+            new_max = np.array(point_cloud_range[3:6]) * sample_ratio
+            dim0, dim1 = {0, 1, 2} - {axis_idx}
+            in_view_idx = np.logical_and.reduce(
+                (pcd[:, dim0] > new_min[dim0], pcd[:, dim0] < new_max[dim0],
+                 pcd[:, dim1] > new_min[dim1], pcd[:, dim1] < new_max[dim1]))
+            pcd = pcd[in_view_idx, :]
+            # TODO(Sameer): Linear interpolation for PCD upsampling
+            pcd = pcd[np.arange(0, pcd.shape[0] -
+                                1e-3, sample_ratio).astype(int), :]
+
+        data.update({'point': pcd})
+        return data
+
+    @staticmethod
+    def Rotation(data, rotation_method='all', rotation_range=[180, 90, 180]):
+        """ Output points may be out of range """
+
+        R = create_random_rotation(rotation_method, np.deg2rad(rotation_range))
+        pcd = data['point']
+        assert pcd.shape[1] == 3, "data['point'] shape is not (N,3)"
+        data['point'] = pcd @ R
+        R_homo = np.eye(4)
+        R_homo[:3, :3] = R
+        for k in range(len(data['bbox_objs'])):
+            data['bbox_objs'][k].transform(R_homo)
+            data['bbox_objs'][k].get_yaw()
+
+        return data

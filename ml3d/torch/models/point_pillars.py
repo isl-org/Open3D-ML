@@ -1,4 +1,4 @@
-#***************************************************************************************/
+#******************************************************************************/
 #
 #    Based on MMDetection3D Library (Apache 2.0 license):
 #    https://github.com/open-mmlab/mmdetection3d
@@ -17,7 +17,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
-#***************************************************************************************/
+#******************************************************************************/
 
 import torch
 import pickle
@@ -25,7 +25,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
 
-from functools import partial
+# from functools import partial
 import os
 import logging
 import numpy as np
@@ -42,8 +42,8 @@ from ..modules.losses.cross_entropy import CrossEntropyLoss
 from ...datasets.utils import ObjdetAugmentation, BEVBox3D
 from ...datasets.utils.operations import filter_by_min_points
 
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import ImageGrid
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.axes_grid1 import ImageGrid
 
 
 class PointPillars(BaseModel):
@@ -110,8 +110,8 @@ class PointPillars(BaseModel):
             scatter['output_shape'] % np.prod(backbone["layer_strides"]) == 0
         ), "scatter.output_shape should be a multiple of prod(backbone.layer_strides)"
         point_cloud_range = np.array(self.point_cloud_range)
-        pseudo_image_shape = (point_cloud_range[3:] -
-                              point_cloud_range[:3]) / voxelize["voxel_size"]
+        pseudo_image_shape = ((point_cloud_range[3:] - point_cloud_range[:3]) /
+                              voxelize["voxel_size"]).astype(np.int)
         assert all(pseudo_image_shape[[1, 0]] == scatter["output_shape"]), \
             "scatter.output_shape does not match the Y,X extent of the voxelized point cloud range"
         if any(
@@ -145,6 +145,19 @@ class PointPillars(BaseModel):
             for n, feat in enumerate(scatter_features)
         })
 
+        visual_dict.update({
+            'weights': {
+                "backbone/0/0/weight": self.backbone.blocks[0][0].weight,
+                "backbone/1/0/weight": self.backbone.blocks[1][0].weight,
+                "backbone/2/0/weight": self.backbone.blocks[2][0].weight,
+                "neck/0/0/weight": self.neck.deblocks[0][0].weight,
+                "neck/1/0/weight": self.neck.deblocks[1][0].weight,
+                "neck/2/0/weight": self.neck.deblocks[2][0].weight,
+                "head/cls/weight": self.bbox_head.conv_cls.weight,
+                "head/reg/weight": self.bbox_head.conv_reg.weight,
+            }
+        })
+
         return visual_dict
 
     @torch.no_grad()
@@ -161,6 +174,12 @@ class PointPillars(BaseModel):
 
             avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
             vis_coords = res_coors.to(torch.long)
+            vc_min = vis_coords.min(axis=0)[0].cpu().numpy()
+            vc_max = vis_coords.max(axis=0)[0].cpu().numpy()
+            assert (np.all(vc_min[1:3] >= 0) and
+                    np.all(vc_max[1:3] < self.pseudo_image.shape[2:4])), \
+                            "Voxels out of bounds!"
+
             self.pseudo_image[k, 0, vis_coords[:, 1],
                               vis_coords[:,
                                          2]] = (255 * avg_depth /
@@ -322,17 +341,31 @@ class PointPillars(BaseModel):
                 db_boxes_dict=self.db_boxes_dict,
                 sample_dict=cfg['ObjectSample']['sample_dict'])
 
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        if cfg.get('CameraDolly', False):
+            data = ObjdetAugmentation.CameraDolly(data, **cfg['CameraDolly'])
+
+        if cfg.get('Rotation', False):
+            data = ObjdetAugmentation.Rotation(data, **cfg['Rotation'])
+
+        if cfg.get('SensorNoise', False):
+            data = ObjdetAugmentation.SensorNoise(data, **cfg['SensorNoise'])
+
         if cfg.get('ObjectRangeFilter', False):
             data = ObjdetAugmentation.ObjectRangeFilter(
                 data, self.cfg.point_cloud_range)
 
-        if cfg.get('PointShuffle', False):
-            data = ObjdetAugmentation.PointShuffle(data)
+        assert np.all(
+            data['point'].min(axis=0) > self.cfg.point_cloud_range[:3])
+        assert np.all(
+            data['point'].max(axis=0) < self.cfg.point_cloud_range[3:6])
 
         return data
 
     def transform(self, data, attr):
-        #Augment data
+        # Augment data
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
@@ -436,7 +469,7 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         assert (points.le(self.points_range_max.to(device=points.device)).all() and
                 points.ge(self.points_range_min.to(device=points.device)).all()), \
-                "Input point cloud exceeds pre-defined point cloud range!"
+            "Input point cloud exceeds pre-defined point cloud range!"
 
         ans = voxelize(points, self.voxel_size, self.points_range_min,
                        self.points_range_max, self.max_num_points, max_voxels)
@@ -755,6 +788,8 @@ class SECOND(nn.Module):
             blocks.append(block)
 
         self.blocks = nn.ModuleList(blocks)
+        # Do not initialize weights in the conv layers to follow the original
+        # implementation
 
     def forward(self, x):
         """Forward function.
@@ -892,15 +927,15 @@ class Anchor3DHead(nn.Module):
         self.cls_out_channels = self.num_anchors * self.num_classes
         self.conv_cls = nn.Conv2d(self.feat_channels,
                                   self.cls_out_channels,
-                                  2 * stride + 1,
+                                  2 * stride[0] - 1,
                                   stride=stride)
         self.conv_reg = nn.Conv2d(self.feat_channels,
                                   self.num_anchors * self.box_code_size,
-                                  2 * stride + 1,
+                                  2 * stride[0] - 1,
                                   stride=stride)
         self.conv_dir_cls = nn.Conv2d(self.feat_channels,
                                       self.num_anchors * 2,
-                                      2 * stride + 1,
+                                      2 * stride[0] - 1,
                                       stride=stride)
 
         self.init_weights()
@@ -1087,6 +1122,10 @@ class Anchor3DHead(nn.Module):
             dir_scores = dir_scores[topk_inds]
 
         bboxes = self.bbox_coder.decode(anchors, bbox_preds)
+        # keep = (bboxes[:, [3, 4, 5]] < 5).all(axis=1)  # TODO
+        # bboxes = bboxes[keep, :]
+        # scores = scores[keep, :]
+        # dir_scores = dir_scores[keep]
 
         idxs = multiclass_nms(bboxes, scores, self.score_thr)
 
