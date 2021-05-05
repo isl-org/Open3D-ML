@@ -1279,9 +1279,9 @@ class Visualizer:
 
         self._update_geometry_colors()
 
-    def _on_layout(self, theme):
+    def _on_layout(self, context):
         frame = self.window.content_rect
-        em = theme.font_size
+        em = context.theme.font_size
         panel_width = 20 * em
         panel_rect = gui.Rect(frame.get_right() - panel_width, frame.y,
                               panel_width, frame.height - frame.y)
