@@ -1,4 +1,4 @@
-#***************************************************************************************/
+#******************************************************************************/
 #
 #    Based on MMDetection3D Library (Apache 2.0 license):
 #    https://github.com/open-mmlab/mmdetection3d
@@ -17,7 +17,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 #
-#***************************************************************************************/
+#******************************************************************************/
 
 import torch
 import pickle
@@ -25,9 +25,10 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
 
-from functools import partial
-import numpy as np
+# from functools import partial
 import os
+import logging
+import numpy as np
 
 from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
@@ -43,8 +44,8 @@ from ...datasets.utils.operations import filter_by_min_points
 
 
 class PointPillars(BaseModel):
-    """Object detection model. 
-    Based on the PointPillars architecture 
+    """Object detection model.
+    Based on the PointPillars architecture
     https://github.com/nutonomy/second.pytorch.
 
     Args:
@@ -88,6 +89,9 @@ class PointPillars(BaseModel):
             point_cloud_range=point_cloud_range, **voxelize)
         self.voxel_encoder = PillarFeatureNet(
             point_cloud_range=point_cloud_range, **voxel_encoder)
+        # in_channels - cluster and voxel center (5)
+        self.in_channels = self.voxel_encoder.in_channels - 5
+        self.pi_ny, self.pi_nx = scatter['output_shape']  # pseudo image size
         self.middle_encoder = PointPillarsScatter(**scatter)
 
         self.backbone = SECOND(**backbone)
@@ -98,6 +102,21 @@ class PointPillars(BaseModel):
         self.loss_bbox = SmoothL1Loss(**loss.get("smooth_l1", {}))
         self.loss_dir = CrossEntropyLoss(**loss.get("cross_entropy", {}))
 
+        # Config sanity checks
+        assert all(
+            scatter['output_shape'] % np.prod(backbone["layer_strides"]) == 0
+        ), "scatter.output_shape should be a multiple of prod(backbone.layer_strides)"
+        point_cloud_range = np.array(self.point_cloud_range)
+        pseudo_image_shape = ((point_cloud_range[3:] - point_cloud_range[:3]) /
+                              voxelize["voxel_size"]).astype(np.int)
+        assert all(pseudo_image_shape[[1, 0]] == scatter["output_shape"]), \
+            "scatter.output_shape does not match the Y,X extent of the voxelized point cloud range"
+        if any(
+                np.prod(scatter["output_shape"]) < np.array(
+                    voxelize["max_voxels"])):
+            logging.warn(
+                "voxelize.max_voxels is larger than prod(scatter.output_shape)")
+
         self.device = device
         self.to(device)
 
@@ -107,19 +126,67 @@ class PointPillars(BaseModel):
         voxel_features = self.voxel_encoder(voxels, num_points, coors)
         batch_size = coors[-1, 0].item() + 1
         x = self.middle_encoder(voxel_features, coors, batch_size)
+        self.scatter_features = x
         x = self.backbone(x)
         x = self.neck(x)
         return x
+
+    def get_visual(self):
+        """Returns (Dict) containing tensors to visualize intermediate features
+        """
+        visual_dict = {"pseudo_image": self.pseudo_image}
+        scatter_features = (255 * self.scatter_features /
+                            self.scatter_features.max()).type(torch.uint8)
+        visual_dict.update({
+            f"voxel_features/{n}": feat[:, np.newaxis, ...]  # N1HW data format
+            for n, feat in enumerate(scatter_features)
+        })
+
+        visual_dict.update({
+            'weights': {
+                "backbone/0/0/weight": self.backbone.blocks[0][0].weight,
+                "backbone/1/0/weight": self.backbone.blocks[1][0].weight,
+                "backbone/2/0/weight": self.backbone.blocks[2][0].weight,
+                "neck/0/0/weight": self.neck.deblocks[0][0].weight,
+                "neck/1/0/weight": self.neck.deblocks[1][0].weight,
+                "neck/2/0/weight": self.neck.deblocks[2][0].weight,
+                "head/cls/weight": self.bbox_head.conv_cls.weight,
+                "head/reg/weight": self.bbox_head.conv_reg.weight,
+            }
+        })
+
+        return visual_dict
 
     @torch.no_grad()
     def voxelize(self, points):
         """Apply hard voxelization to points."""
         voxels, coors, num_points = [], [], []
-        for res in points:
+        # N1HW format
+        self.pseudo_image = torch.zeros(
+            (len(points), 1, self.pi_ny, self.pi_nx),
+            dtype=torch.uint8,
+            device=points[0].device)
+        for k, res in enumerate(points):
             res_voxels, res_coors, res_num_points = self.voxel_layer(res)
+
+            avg_depth = res_voxels[:, :, 2].sum(axis=1) / res_num_points
+            vis_coords = res_coors.to(torch.long)
+            vc_min = vis_coords.min(axis=0)[0].cpu().numpy()
+            vc_max = vis_coords.max(axis=0)[0].cpu().numpy()
+            assert (np.all(vc_min[1:3] >= 0) and
+                    np.all(vc_max[1:3] < self.pseudo_image.shape[2:4])), \
+                            "Voxels out of bounds!"
+
+            self.pseudo_image[k, 0, vis_coords[:, 1],
+                              vis_coords[:,
+                                         2]] = (255 * avg_depth /
+                                                self.point_cloud_range[5]).to(
+                                                    torch.uint8)
+
             voxels.append(res_voxels)
             coors.append(res_coors)
             num_points.append(res_num_points)
+
         voxels = torch.cat(voxels, dim=0)
         num_points = torch.cat(num_points, dim=0)
         coors_batch = []
@@ -206,7 +273,8 @@ class PointPillars(BaseModel):
         }
 
     def preprocess(self, data, attr):
-        points = np.array(data['point'][:, 0:4], dtype=np.float32)
+        points = np.array(data['point'][:, 0:self.in_channels],
+                          dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
         max_val = np.array(self.point_cloud_range[3:])
@@ -279,7 +347,7 @@ class PointPillars(BaseModel):
         return data
 
     def transform(self, data, attr):
-        #Augment data
+        # Augment data
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
 
@@ -303,9 +371,9 @@ class PointPillars(BaseModel):
         inference_result = []
         for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
                                                      scores_b, labels_b):
-            bboxes = _bboxes.cpu().numpy()
-            scores = _scores.cpu().numpy()
-            labels = _labels.cpu().numpy()
+            bboxes = _bboxes.cpu().detach().numpy()
+            scores = _scores.cpu().detach().numpy()
+            labels = _labels.cpu().detach().numpy()
             inference_result.append([])
 
             world_cam, cam_img = None, None
@@ -361,11 +429,11 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         Args:
             points_feats: Tensor with point coordinates and features. The shape
-                is [N, 3+C] with N as the number of points and C as the number 
+                is [N, 3+C] with N as the number of points and C as the number
                 of feature channels.
         Returns:
             (out_voxels, out_coords, out_num_points).
-            - out_voxels is a dense list of point coordinates and features for 
+            - out_voxels is a dense list of point coordinates and features for
               each voxel. The shape is [num_voxels, max_num_points, 3+C].
             - out_coords is tensor with the integer voxel coords and shape
               [num_voxels,3]. Note that the order of dims is [z,y,x].
@@ -378,6 +446,10 @@ class PointPillarsVoxelization(torch.nn.Module):
             max_voxels = self.max_voxels[1]
 
         points = points_feats[:, :3]
+
+        assert (points.le(self.points_range_max.to(device=points.device)).all() and
+                points.ge(self.points_range_min.to(device=points.device)).all()), \
+            "Input point cloud exceeds pre-defined point cloud range!"
 
         ans = voxelize(points, self.voxel_size, self.points_range_min,
                        self.points_range_max, self.max_num_points, max_voxels)
@@ -531,8 +603,8 @@ class PillarFeatureNet(nn.Module):
 
         Args:
             features (torch.Tensor): Point features or raw points in shape
-                (N, M, C).
-            num_points (torch.Tensor): Number of points in each pillar.
+                (N, M, C) = (n_batch, max_pillars(P), in_channels(D)).
+            num_points (torch.Tensor): Number of points in each pillar (N).
             coors (torch.Tensor): Coordinates of each voxel.
 
         Returns:
@@ -599,6 +671,9 @@ class PointPillarsScatter(nn.Module):
             coors (torch.Tensor): Coordinates of each voxel in shape (N, 4).
                 The first column indicates the sample ID.
             batch_size (int): Number of samples in the current batch.
+
+        Returns:
+            batch_canvas (torch.Tensor (N,C,H,W))
         """
         # batch_canvas will be the final output.
         batch_canvas = []
@@ -682,6 +757,8 @@ class SECOND(nn.Module):
             blocks.append(block)
 
         self.blocks = nn.ModuleList(blocks)
+        # Do not initialize weights in the conv layers to follow the original
+        # implementation
 
     def forward(self, x):
         """Forward function.
@@ -886,7 +963,10 @@ class Anchor3DHead(nn.Module):
         assigned_bboxes, target_idxs, pos_idxs, neg_idxs = [], [], [], []
 
         def flatten_idx(idx, j):
-            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""
+            """inject class dimension in the given indices
+            (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j *
+                                          rot_angles + x)
+            """
             z = idx // rot_angles
             x = idx % rot_angles
 
@@ -952,7 +1032,7 @@ class Anchor3DHead(nn.Module):
                 class predictions.
 
         Returns:
-            tuple[torch.Tensor]: Prediction results of batches 
+            tuple[torch.Tensor]: Prediction results of batches
                 (bboxes, scores, labels).
         """
         bboxes, scores, labels = [], [], []
@@ -974,7 +1054,7 @@ class Anchor3DHead(nn.Module):
                 class predictions.
 
         Returns:
-            tuple[torch.Tensor]: Prediction results of batches 
+            tuple[torch.Tensor]: Prediction results of batches
                 (bboxes, scores, labels).
         """
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]

@@ -16,8 +16,10 @@ from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 from ...datasets.utils import BEVBox3D
-
+from ...vis import BoundingBox3D
 from ...metrics.mAP import mAP
+
+import open3d as o3d
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -29,7 +31,7 @@ log = logging.getLogger(__name__)
 
 class ObjectDetection(BasePipeline):
     """
-    Pipeline for object detection. 
+    Pipeline for object detection.
     """
 
     def __init__(self,
@@ -162,13 +164,18 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         gt = []
+        no_bboxes = 0
         with torch.no_grad():
-            for data in tqdm(valid_loader, desc='validation'):
+            process_bar = tqdm(valid_loader, desc='validation')
+            for data in process_bar:
+                if any([bbox.numel() == 0 for bbox in data.bboxes]):
+                    no_bboxes += 1
+                    continue
                 data.to(device)
                 results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
-                    if not l in self.valid_losses:
+                    if l not in self.valid_losses:
                         self.valid_losses[l] = []
                     self.valid_losses[l].append(v.cpu().numpy())
 
@@ -177,6 +184,9 @@ class ObjectDetection(BasePipeline):
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
 
+            if no_bboxes > 0:
+                log.warning("No bounding box labels in " +
+                            f"{no_bboxes}/{len(process_bar)} cases.")
         sum_loss = 0
         desc = "validation - "
         for l, v in self.valid_losses.items():
@@ -266,6 +276,8 @@ class ObjectDetection(BasePipeline):
         start_ep = self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
 
         dataset_name = dataset.name if dataset is not None else ''
+        if hasattr(dataset, 'portion'):
+            dataset_name += "_" + dataset.portion
         tensorboard_dir = join(
             self.cfg.train_sum_dir,
             model.__class__.__name__ + '_' + dataset_name + '_torch')
@@ -283,13 +295,22 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-
+            self.visual = {'train': {}, 'valid': {}}
+            no_bboxes = 0
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
+                if (len(data.bboxes) == 0 or
+                        any([bbox.numel() == 0 for bbox in data.bboxes])):
+                    no_bboxes += 1
+                    continue
                 data.to(device)
                 results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
+                # Record visualization for the last iteration
+                if process_bar.n == process_bar.total - 1:
+                    boxes = model.inference_end(results, data)
+                    self.visual['train'] = self.get_visual(boxes, data)
 
                 self.optimizer.zero_grad()
                 loss_sum.backward()
@@ -299,7 +320,7 @@ class ObjectDetection(BasePipeline):
                 self.optimizer.step()
                 desc = "training - "
                 for l, v in loss.items():
-                    if not l in self.losses:
+                    if l not in self.losses:
                         self.losses[l] = []
                     self.losses[l].append(v.cpu().detach().numpy())
                     desc += " %s: %.03f" % (l, v.cpu().detach().numpy())
@@ -307,7 +328,10 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
-            #self.scheduler.step()
+            if no_bboxes > 0:
+                log.warning("No bounding box labels in " +
+                            f"{no_bboxes}/{len(process_bar)} cases.")
+            # self.scheduler.step()
 
             # --------------------- validation
             self.run_valid()
@@ -317,12 +341,134 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
+    def get_visual(self, infer_bboxes_batch, inputs_batch):
+        """
+        Create visualization for network inputs and outputs. Add visualizations
+        of  intermediate features from the model, if any.
+
+        Args:
+            infer_bboxes_batch (Sequence[Sequence[BoundingBox3D]):
+            inputs_batch (Sequence[Sequence[bbox_objs: Object3D, point:
+                array(N,3)]]):
+
+        Returns:
+            [Dict] visualizations of inputs, intermediate features and outputs
+        """
+        points = []
+        colors = []
+        faces = []
+        input_pcd = []
+        max_pcd_pts = 4900
+        max_pts = 0
+        max_faces = 0
+        pcd_range = np.array(self.model.point_cloud_range).reshape((2, 3))
+        pcd_range_bbox = BoundingBox3D(pcd_range.mean(axis=0), [0, 0, 1],
+                                       [0, 1, 0], [1, 0, 0],
+                                       pcd_range[1] - pcd_range[0], 0, 1.0)
+        for infer_bboxes, gt_bboxes, pointcloud in zip(infer_bboxes_batch,
+                                                       inputs_batch.bbox_objs,
+                                                       inputs_batch.point):
+            for bb in gt_bboxes:  # LUT needs label_class to be int id, not str
+                bb.label_class = self.dataset.cat2label[bb.label_class]
+            gt_bboxes.append(pcd_range_bbox)
+            gt_points, gt_colors, gt_faces = BoundingBox3D.create_trimesh(
+                gt_bboxes, lut=self.dataset.label_lut)
+            pred_points, pred_colors, pred_faces = BoundingBox3D.create_trimesh(
+                infer_bboxes)
+            pred_faces += gt_points.shape[0]
+            max_pts = max(max_pts, gt_points.shape[0] + pred_points.shape[0])
+            max_faces = max(max_faces, gt_faces.shape[0] + pred_faces.shape[0])
+            points.append(np.vstack((gt_points, pred_points)))
+            colors.append(np.vstack((gt_colors, pred_colors)))
+            faces.append(np.vstack((gt_faces, pred_faces)))
+            pcd_subsample = np.linspace(0,
+                                        pointcloud.shape[0] - 1,
+                                        num=max_pcd_pts,
+                                        dtype=int)
+            input_pcd.append(
+                pointcloud[pcd_subsample, :].cpu().detach().numpy())
+
+            # pcd = o3d.geometry.PointCloud()
+            # pcd.points = o3d.utility.Vector3dVector(input_pcd[-1])
+            # o3d.visualization.draw_geometries([
+            #     pcd,
+            #     BoundingBox3D.create_lines(gt_bboxes,
+            #                                lut=self.dataset.label_lut),
+            #     BoundingBox3D.create_lines(infer_bboxes)
+            # ])
+
+        points = np.stack(
+            [np.pad(p, ((0, max_pts - p.shape[0]), (0, 0))) for p in points])
+        colors = np.stack(
+            [np.pad(c, ((0, max_pts - c.shape[0]), (0, 0))) for c in colors])
+        faces = np.stack(
+            [np.pad(f, ((0, max_faces - f.shape[0]), (0, 0))) for f in faces])
+        input_pcd = np.stack(input_pcd)
+
+        visual_dict = {
+            'input_pcd': input_pcd,
+            'bboxes': {
+                'points': points,
+                'colors': colors,
+                'faces': faces
+            }
+        }
+        visual_dict.update(self.model.get_visual())
+        return visual_dict
+
     def save_logs(self, writer, epoch):
+        # orthographic_camera = {
+        #     "cls": "OrthographicCamera",
+        #     "left": self.model.point_cloud_range[0],
+        #     "bottom": self.model.point_cloud_range[1],
+        #     "near": self.model.point_cloud_range[2],
+        #     "right": self.model.point_cloud_range[3],
+        #     "top": self.model.point_cloud_range[4],
+        #     "far": self.model.point_cloud_range[5]
+        # }
+        # perspective_camera = {
+        #     "cls": "PerspectiveCamera",
+        #     "fov": 45,
+        #     "aspect": 4. / 3.,  # TODO
+        #     "near": self.model.point_cloud_range[2],
+        #     "far": self.model.point_cloud_range[5]
+        # }
+        bbox_config = {
+            "material": {
+                "cls": "MeshBasicMaterial",
+                "wireframe": True
+            },
+            # "camera": camera
+        }
+        pcd_config = {}  # {"camera": perspective_camera}
+        # Losses / metrics
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
+        for key, value in self.valid_losses.items():
+            writer.add_scalar("valid/" + key, np.mean(value), epoch)
+        # Inputs / feaatures / outputs
+        for stage in ('train', 'valid'):
+            for key, value in self.visual[stage].items():
+                if key == "bboxes":
+                    writer.add_mesh(f"{stage}/bboxes",
+                                    vertices=torch.from_numpy(value['points']),
+                                    colors=torch.from_numpy(value['colors']),
+                                    faces=torch.from_numpy(value['faces']),
+                                    config_dict=bbox_config,
+                                    global_step=epoch)
+                elif key == "input_pcd":
+                    writer.add_mesh(f"{stage}/input_pcd",
+                                    vertices=torch.from_numpy(value),
+                                    config_dict=pcd_config,
+                                    global_step=epoch)
+                elif key == "weights":  # Weights / biases
+                    for weights_key, weights_value in value.items():
+                        writer.add_histogram(weights_key, weights_value, epoch)
 
-        for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+                else:  # Intermediate features
+                    writer.add_images(f"{stage}/features/{key}",
+                                      value,
+                                      global_step=epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -346,13 +492,13 @@ class ObjectDetection(BasePipeline):
 
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
-            log.info(f'Loading checkpoint optimizer_state_dict')
+            log.info('Loading checkpoint optimizer_state_dict')
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
-            log.info(f'Loading checkpoint scheduler_state_dict')
+            log.info('Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
-        return epoch
+        return ckpt['epoch'] + 1
 
     def save_ckpt(self, epoch):
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')

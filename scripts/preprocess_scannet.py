@@ -23,6 +23,7 @@ from open3d.core import Tensor
 from open3d.ml.datasets import utils
 from open3d.ml.datasets import Scannet
 from open3d.ml import vis
+
 BoundingBox3D = vis.boundingbox.BoundingBox3D
 PointCloud = o3d.t.geometry.PointCloud
 BEVBox3D = utils.bev_box.BEVBox3D
@@ -851,7 +852,7 @@ if __name__ == '__main__':
     if args.out_path is None:
         args.out_path = args.dataset_path
 
-    max_processes = 1  # n_cpu // 4
+    max_processes = n_cpu // 3
     if not args.only_stats:
         with concurrent.futures.ProcessPoolExecutor(
                 max_workers=max_processes) as executor:

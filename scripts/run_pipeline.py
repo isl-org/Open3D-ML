@@ -36,6 +36,7 @@ def parse_args():
     parser.add_argument('--batch_size', help='batch size', default=None)
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
+    parser.add_argument('--about', help="Descriptive message for training run")
 
     args, unknown = parser.parse_known_args()
 
@@ -134,6 +135,8 @@ def main():
         'model': pprint.pformat(cfg_dict_model, indent=2),
         'pipeline': pprint.pformat(cfg_dict_pipeline, indent=2)
     }
+    if args.about is not None:
+        pipeline.cfg_tb['about'] = args.about
 
     if args.split == 'test':
         pipeline.run_test()
