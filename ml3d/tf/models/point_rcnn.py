@@ -389,14 +389,24 @@ class PointRCNN(BaseModel):
                 pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
                                       dtype=np.float32)
                 for j in range(len(bboxes)):
-                    pad_bboxes[i, :bboxes[j].shape[0], :] = bboxes[j]
+                    pad_bboxes[j, :bboxes[j].shape[0], :] = bboxes[j]
                 bboxes = tf.constant(pad_bboxes)
 
-                labels = tf.stack([
+                labels = [
                     b.get('labels', tf.zeros((0,), dtype=tf.int32))
                     for b in batch
-                ],
-                                  axis=0)
+                ]
+
+                if 'labels' in batch[
+                        0] and labels[0].shape[0] != points.shape[1]:
+                    pad_labels = np.ones(
+                        (len(labels), max_gt), dtype=np.int32) * (-1)
+                    for j in range(len(labels)):
+                        pad_labels[j, :labels[j].shape[0]] = labels[j]
+                    labels = tf.constant(pad_labels)
+
+                else:
+                    labels = tf.stack(labels, axis=0)
 
                 calib = [
                     tf.constant([
