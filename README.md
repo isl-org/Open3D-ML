@@ -60,7 +60,7 @@ $ python -c "import open3d.ml.tf as ml3d"
 ```
 
 If you need to use different versions of the ML frameworks or CUDA we recommend
-to 
+to
 [build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
 
 ## Getting started
@@ -95,7 +95,7 @@ vis.visualize_dataset(dataset, 'all', indices=range(100))
 Configs of models, datasets, and pipelines are stored in `ml3d/configs`. Users can also construct their own yaml files to keep record of their customized configurations. Here is an example of reading a config file and constructing modules from it.
 ```python
 import open3d.ml as _ml3d
-import open3d.ml.torch as ml3d # or open3d.ml.tf as ml3d  
+import open3d.ml.torch as ml3d # or open3d.ml.tf as ml3d
 
 framework = "torch" # or tf
 cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
@@ -106,7 +106,7 @@ Pipeline = _ml3d.utils.get_module("pipeline", cfg.pipeline.name, framework)
 Model = _ml3d.utils.get_module("model", cfg.model.name, framework)
 Dataset = _ml3d.utils.get_module("dataset", cfg.dataset.name)
 
-# use the arguments in the config file to construct the instances 
+# use the arguments in the config file to construct the instances
 cfg.dataset['dataset_path'] = "/path/to/your/dataset"
 dataset = Dataset(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
 model = Model(**cfg.model)
@@ -142,7 +142,7 @@ randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randla
 if not os.path.exists(ckpt_path):
     cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
     os.system(cmd)
-    
+
 # load the parameters.
 pipeline.load_ckpt(ckpt_path=ckpt_path)
 
@@ -206,7 +206,7 @@ pointpillar_url = "https://storage.googleapis.com/open3d-releases/model-zoo/poin
 if not os.path.exists(ckpt_path):
     cmd = "wget {} -O {}".format(pointpillar_url, ckpt_path)
     os.system(cmd)
-    
+
 # load the parameters.
 pipeline.load_ckpt(ckpt_path=ckpt_path)
 
@@ -287,7 +287,7 @@ setting up a training pipeline or running a network on a dataset.
 ├─ ml3d                   # Package root dir that is integrated in open3d
      ├─ configs           # Model configuration files
      ├─ datasets          # Generic dataset code; will be integratede as open3d.ml.{tf,torch}.datasets
-     ├─ metrics           # Metrics available for evaluating ML models     
+     ├─ metrics           # Metrics available for evaluating ML models
      ├─ utils             # Framework independent utilities; available as open3d.ml.{tf,torch}.utils
      ├─ vis               # ML specific visualization functions
      ├─ tf                # Directory for TensorFlow specific code. same structure as ml3d/torch.

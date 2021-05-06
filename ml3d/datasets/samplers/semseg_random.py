@@ -5,7 +5,7 @@ from ...utils import SAMPLER
 
 
 class SemSegRandomSampler(object):
-    """Random sampler for semantic segmentation datsets"""
+    """Random sampler for semantic segmentation datsets."""
 
     def __init__(self, dataset):
         self.dataset = dataset

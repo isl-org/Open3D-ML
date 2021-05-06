@@ -1,6 +1,4 @@
-"""
-I/O, attributes, and processing for different datasets.
-"""
+"""I/O, attributes, and processing for different datasets."""
 
 from .semantickitti import SemanticKITTI
 from .s3dis import S3DIS

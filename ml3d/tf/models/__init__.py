@@ -1,6 +1,4 @@
-"""
-Tensorflow network models.
-"""
+"""Tensorflow network models."""
 
 from .randlanet import RandLANet
 from .kpconv import KPFCNN

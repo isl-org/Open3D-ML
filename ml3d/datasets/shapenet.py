@@ -18,8 +18,10 @@ log = logging.getLogger(__name__)
 
 
 class ShapeNet(BaseDataset):
-    """
-    This class is used to create a dataset based on the ShapeNet dataset, and used in object detection, visualizer, training, or testing. The ShapeNet dataset includes a large set of 3D shapes.
+    """This class is used to create a dataset based on the ShapeNet dataset, and
+    used in object detection, visualizer, training, or testing.
+
+    The ShapeNet dataset includes a large set of 3D shapes.
     """
 
     def __init__(self,
@@ -33,18 +35,17 @@ class ShapeNet(BaseDataset):
                  test_result_folder='./test',
                  task="classification",
                  **kwargs):
-        """
-		Initialize the function by passing the dataset and other details.
-	
-		Args:
-			dataset_path: The path to the dataset to use.
-			name: The name of the dataset (ShapeNet in this case).
-			class_weights: The class weights to use in the dataset.
-			ignored_label_inds: A list of labels that should be ignored in the dataset.
+        """Initialize the function by passing the dataset and other details.
+
+        Args:
+            dataset_path: The path to the dataset to use.
+            name: The name of the dataset (ShapeNet in this case).
+            class_weights: The class weights to use in the dataset.
+            ignored_label_inds: A list of labels that should be ignored in the dataset.
             test_result_folder: The folder where the test results should be stored.
-            task: The task that identifies the purpose. The valid values are classification and segmentation.	
-			
-		Returns:
+            task: The task that identifies the purpose. The valid values are classification and segmentation.
+
+        Returns:
             class: The corresponding class.
         """
         super().__init__(dataset_path=dataset_path,
@@ -120,12 +121,12 @@ class ShapeNet(BaseDataset):
 
     @staticmethod
     def get_label_to_names(task="classification"):
-        """
-        Returns a label to names dictonary object depending on the task. The valid values for task for classification and segmentation.
-        
+        """Returns a label to names dictonary object depending on the task. The
+        valid values for task for classification and segmentation.
+
         Returns:
-            A dict where keys are label numbers and 
-            values are the corresponding names.
+            A dict where keys are label numbers and values are the corresponding
+            names.
         """
         if task == "classification":
             label_to_names = {
@@ -156,7 +157,7 @@ class ShapeNet(BaseDataset):
 
     def get_split(self, split):
         """Returns a dataset split.
-        
+
         Args:
             split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.
@@ -168,16 +169,16 @@ class ShapeNet(BaseDataset):
 
     def get_split_list(self, split):
         """Returns the list of data splits available.
-        
+
         Args:
             split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.
 
         Returns:
             A dataset split object providing the requested subset of the data.
-			
-		Raises:
-			ValueError: Indicates that the split name passed is incorrect. The split name should be one of
+
+        Raises:
+            ValueError: Indicates that the split name passed is incorrect. The split name should be one of
             'training', 'test', 'validation', or 'all'.
         """
         if split in ['test', 'testing']:
@@ -194,15 +195,14 @@ class ShapeNet(BaseDataset):
 
     def is_tested(self, attr):
         """Checks if a datum in the dataset has been tested.
-        
+
         Args:
-            dataset: The current dataset to which the datum belongs to.
-			attr: The attribute that needs to be checked.
+            attr: The attribute that needs to be checked.
 
         Returns:
-            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
-			
-	    """
+            If the datum attribute is tested, then return the path where the
+                attribute is stored; else, returns false.
+        """
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -234,9 +234,8 @@ class ShapeNet(BaseDataset):
 
 
 class ShapeNetSplit:
-    """
-    The class gets data and atributes based on the split and classification.
-    
+    """The class gets data and atributes based on the split and
+    classification.
     """
 
     def __init__(self, dataset, split='training', task='classification'):

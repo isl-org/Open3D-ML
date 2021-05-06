@@ -38,7 +38,9 @@ def parse_args():
 
 class SunRGBDProcess():
     """Preprocess SunRGBD.
+
     This class converts Sunrgbd raw data into npy files.
+
     Args:
         dataset_path (str): Directory to load sunrgbd data.
         out_path (str): Directory to save pickle file(infos).

@@ -22,8 +22,9 @@ from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
 
 
 class KPFCNN(BaseModel):
-    """
-    Class defining KPFCNN. A model for Semantic Segmentation.
+    """Class defining KPFCNN.
+
+    A model for Semantic Segmentation.
     """
 
     def __init__(
@@ -313,8 +314,8 @@ class KPFCNN(BaseModel):
         return optimizer
 
     def get_loss(self, Loss, logits, inputs):
-        """
-        Runs the loss on outputs of the model
+        """Runs the loss on outputs of the model.
+
         :param outputs: logits
         :param labels: labels
         :return: loss
@@ -330,9 +331,10 @@ class KPFCNN(BaseModel):
         return loss, labels, scores
 
     def big_neighborhood_filter(self, neighbors, layer):
-        """
-        Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
-        Limit is computed at initialization
+        """Filter neighborhoods with max number of neighbors.
+
+        Limit is set to keep XX% of the neighborhoods untouched. Limit is
+        computed at initialization
         """
         # crop neighbors matrix
         if len(self.neighborhood_limits) > 0:
@@ -341,11 +343,12 @@ class KPFCNN(BaseModel):
             return neighbors
 
     def get_batch_inds(self, stacks_len):
-        """
-        Method computing the batch indices of all points, given the batch element sizes (stack lengths). Example:
+        """Method computing the batch indices of all points, given the batch
+        element sizes (stack lengths).
+
+        Example:
         From [3, 2, 5], it would return [0, 0, 0, 1, 1, 2, 2, 2, 2, 2]
         """
-
         # Initiate batch inds tensor
         num_batches = tf.shape(stacks_len)[0]
         num_points = tf.reduce_sum(stacks_len)
@@ -669,9 +672,7 @@ class KPFCNN(BaseModel):
                   point_inds,
                   cloud_inds,
                   is_test=False):
-        """
-        [None, 3], [None, 3], [None], [None]
-        """
+        """[None, 3], [None, 3], [None], [None]"""
         cfg = self.cfg
         # Get batch indice for each point
         batch_inds = self.get_batch_inds(stacks_lengths)

@@ -47,7 +47,8 @@ class _PointnetSAModuleBase(nn.Module):
                 xyz: torch.Tensor,
                 features: torch.Tensor = None,
                 new_xyz=None) -> (torch.Tensor, torch.Tensor):
-        """
+        r"""Forward.
+
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
         :param new_xyz:
@@ -88,7 +89,7 @@ class _PointnetSAModuleBase(nn.Module):
 
 
 class PointnetSAModuleMSG(_PointnetSAModuleBase):
-    """Pointnet set abstraction layer with multiscale grouping"""
+    """Pointnet set abstraction layer with multiscale grouping."""
 
     def __init__(self,
                  *,
@@ -134,7 +135,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
 
 
 class PointnetSAModule(PointnetSAModuleMSG):
-    """Pointnet set abstraction layer"""
+    """Pointnet set abstraction layer."""
 
     def __init__(self,
                  *,
@@ -146,7 +147,8 @@ class PointnetSAModule(PointnetSAModuleMSG):
                  use_xyz: bool = True,
                  pool_method='max_pool',
                  instance_norm=False):
-        """
+        """PointnetSAModule.
+
         :param mlp: list of int, spec of the pointnet before the global max_pool
         :param npoint: int, number of features
         :param radius: float, radius of ball
@@ -167,7 +169,7 @@ class PointnetSAModule(PointnetSAModuleMSG):
 
 
 class PointnetFPModule(nn.Module):
-    r"""Propigates the features of one set to another"""
+    r"""Propagates the features of one set to another."""
 
     def __init__(self, *, mlp: List[int], bn: bool = True):
         """

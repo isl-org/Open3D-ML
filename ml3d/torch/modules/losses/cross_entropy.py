@@ -30,10 +30,10 @@ class CrossEntropyLoss(nn.Module):
             weight (torch.Tensor, optional): Sample-wise loss weight.
             avg_factor (int, optional): Average factor that is used to average
                 the loss. Defaults to None.
+
         Returns:
             torch.Tensor: The calculated loss
         """
-
         loss = F.cross_entropy(cls_score, label, reduction='none')
 
         if weight is not None:

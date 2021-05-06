@@ -8,9 +8,9 @@ if open3d.core.cuda.device_count() > 0:
 
 
 def furthest_point_sample(xyz, npoint):
-    """
-    Uses iterative furthest point sampling to select a set of npoint features that have the largest
-    minimum distance
+    """Uses iterative furthest point sampling to select a set of npoint features
+    that have the largest minimum distance.
+
     :param xyz: (B, N, 3) where N > npoint
     :param npoint: int, number of features in the sampled set
     :return:tensor containing the set
@@ -26,8 +26,8 @@ ops.NoGradient('Open3DFurthestPointSampling')
 
 
 def three_nn_gpu(query_pts, data_pts):
-    """
-    Find the three nearest neighbors of query_pts in data_pts
+    """Find the three nearest neighbors of query_pts in data_pts.
+
     :param query_pts: (B, N, 3)
     :param data_pts: (B, M, 3)
     :return:
@@ -45,14 +45,14 @@ ops.NoGradient("Open3DTreeNN")
 
 
 def three_interpolate_gpu(features, idx, weight):
+    """Performs weight linear interpolation on 3 features.
+
+    :param features: (B, C, M) Features descriptors to be interpolated from
+    :param idx: (B, n, 3) three nearest neighbors of the target features in features
+    :param weight: (B, n, 3) weights
+    :return:
+        output: (B, C, N) tensor of the interpolated features
     """
-        Performs weight linear interpolation on 3 features
-        :param features: (B, C, M) Features descriptors to be interpolated from
-        :param idx: (B, n, 3) three nearest neighbors of the target features in features
-        :param weight: (B, n, 3) weights
-        :return:
-            output: (B, C, N) tensor of the interpolated features
-        """
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
@@ -77,13 +77,13 @@ def _tree_interpolate_gradient(op, grad_out):
 
 def ball_query_gpu(radius, nsample, xyz, new_xyz):
     """
-        :param radius: float, radius of the balls
-        :param nsample: int, maximum number of features in the balls
-        :param xyz: (B, N, 3) xyz coordinates of the features
-        :param new_xyz: (B, npoint, 3) centers of the ball query
-        :return:
-            idx: (B, npoint, nsample) tensor with the indicies of the features that form the query balls
-        """
+    :param radius: float, radius of the balls
+    :param nsample: int, maximum number of features in the balls
+    :param xyz: (B, N, 3) xyz coordinates of the features
+    :param new_xyz: (B, npoint, 3) centers of the ball query
+    :return:
+        idx: (B, npoint, nsample) tensor with the indicies of the features that form the query balls
+    """
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 

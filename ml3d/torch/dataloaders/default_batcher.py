@@ -35,7 +35,6 @@ default_collate_err_msg_format = (
 
 def default_collate(batch):
     r"""Puts each data field into a tensor with outer dimension batch size"""
-
     elem = batch[0]
     elem_type = type(elem)
     if isinstance(elem, torch.Tensor):
@@ -82,7 +81,7 @@ def default_collate(batch):
 
 
 class DefaultBatcher(object):
-    """DefaultBatcher of PyTorch dataloader"""
+    """DefaultBatcher of PyTorch dataloader."""
 
     def __init__(self):
         super(DefaultBatcher, self).__init__()
