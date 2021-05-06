@@ -5,7 +5,7 @@ from ...utils import SAMPLER
 
 
 class SemSegRandomSampler(object):
-    """Random sampler for semantic segmentation datsets"""
+    """Random sampler for semantic segmentation datsets."""
 
     def __init__(self, dataset):
         self.dataset = dataset
@@ -45,6 +45,7 @@ class SemSegRandomSampler(object):
                 diff = num_points - pc.shape[0]
                 idxs = np.array(range(pc.shape[0]))
                 idxs = list(idxs) + list(random.choices(idxs, k=diff))
+                idxs = np.asarray(idxs)
             else:
                 idxs = search_tree.query(center_point, k=num_points)[1][0]
             random.shuffle(idxs)

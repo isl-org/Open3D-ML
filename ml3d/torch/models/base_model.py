@@ -10,20 +10,15 @@ from ...datasets.samplers import SemSegRandomSampler
 
 
 class BaseModel(ABC, torch.nn.Module):
-    """
-    Base dataset class
-    """
+    """Base dataset class."""
 
     def __init__(self, **kwargs):
-        """
-        Initialize
+        """Initialize.
+
         Args:
             cfg (cfg object or str): cfg object or path to cfg file
             dataset_path (str): path to the dataset
-            args (dict): dict of args 
-            kwargs:
-        Returns:
-            class: The corresponding class.
+            **kwargs (dict): Dict of args
         """
         super().__init__()
 
@@ -78,7 +73,7 @@ class BaseModel(ABC, torch.nn.Module):
         """Transform function for the point cloud and features.
 
         Args:
-            args: A list of tf Tensors.
+            cfg_pipeline: config file for pipeline.
         """
         return
 
@@ -93,7 +88,7 @@ class BaseModel(ABC, torch.nn.Module):
 
     @abstractmethod
     def inference_preprocess(self):
-        """This function prepares the inputs for the model
+        """This function prepares the inputs for the model.
 
         Returns:
             The inputs to be consumed by the call() function of the model.
@@ -110,6 +105,7 @@ class BaseModel(ABC, torch.nn.Module):
         Args:
             results: The model outputs as returned by the call() function.
                 Post-processing is applied on this object.
+
         Returns:
             Returns True if the inference is complete and otherwise False.
             Returning False can be used to implement inference for large point

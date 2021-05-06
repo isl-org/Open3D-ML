@@ -6,8 +6,11 @@ import numpy as np
 
 
 def enlarge_box3d(boxes3d, extra_width):
-    """
-    :param boxes3d: (N, 7) [x, y, z, h, w, l, ry]
+    """Enlarge 3D box.
+
+    Args:
+        boxes3d: (N, 7) [x, y, z, h, w, l, ry]
+        extra_width: extra width
     """
     if isinstance(boxes3d, np.ndarray):
         large_boxes3d = boxes3d.copy()
@@ -23,13 +26,16 @@ def roipool3d_gpu(pts,
                   boxes3d,
                   pool_extra_width,
                   sampled_pt_num=512):
-    """
-    :param pts: (B, N, 3)
-    :param pts_feature: (B, N, C)
-    :param boxes3d: (B, M, 7)
-    :param pool_extra_width: float
-    :param sampled_pt_num: int
-    :return:
+    """Roipool3D GPU.
+
+    Args:
+        pts: (B, N, 3)
+        pts_feature: (B, N, C)
+        boxes3d: (B, M, 7)
+        pool_extra_width: float
+        sampled_pt_num: int
+
+    Returns:
         pooled_features: (B, M, 512, 3 + C)
         pooled_empty_flag: (B, M)
     """

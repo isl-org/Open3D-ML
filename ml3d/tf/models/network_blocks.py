@@ -7,8 +7,8 @@ from .utils.kernels.kernel_points import load_kernels as create_kernel_points
 
 
 def radius_gaussian(sq_r, sig, eps=1e-9):
-    """
-    Compute a radius gaussian (gaussian of distance)
+    """Compute a radius gaussian (gaussian of distance)
+
     :param sq_r: input radiuses [dn, ..., d1, d0]
     :param sig: extents of gaussians [d1, d0] or [d0] or float
     :return: gaussian of sq_r [dn, ..., d1, d0]
@@ -17,13 +17,12 @@ def radius_gaussian(sq_r, sig, eps=1e-9):
 
 
 def max_pool(x, inds):
-    """
-    Pools features with the maximum values.
+    """Pools features with the maximum values.
+
     :param x: [n1, d] features matrix
     :param inds: [n2, max_num] pooling indices
     :return: [n2, d] pooled features matrix
     """
-
     # Add a last row with minimum features for shadow pools
     x = tf.concat([x, tf.math.reduce_min(x, axis=0, keepdims=True)],
                   axis=0)  # TODO : different in pytorch.
@@ -36,13 +35,13 @@ def max_pool(x, inds):
 
 
 def closest_pool(x, inds):
-    """
-    This tensorflow operation compute a pooling according to the list of indices 'inds'.
+    """This tensorflow operation compute a pooling according to the list of
+    indices 'inds'.
+
     > x = [n1, d] features matrix
     > inds = [n2, max_num] We only use the first column of this which should be the closest points too pooled positions
     >> output = [n2, d] pooled features matrix
     """
-
     # Add a last row with minimum features for shadow pools
     x = tf.concat([x, tf.zeros((1, int(x.shape[1])), x.dtype)], axis=0)
 
@@ -53,13 +52,12 @@ def closest_pool(x, inds):
 
 
 def global_average(x, batch_lengths):
-    """
-    Block performing a global average over batch pooling
+    """Block performing a global average over batch pooling.
+
     :param x: [N, D] input features
     :param batch_lengths: [B] list of batch lengths
     :return: [B, D] averaged features
     """
-
     # Loop over the clouds of the batch
     averaged_features = []
     i = 0
@@ -132,8 +130,8 @@ class KPConv(tf.keras.layers.Layer):
                  deform_fitting_power=1.0,
                  offset_param=False,
                  **kwargs):
-        """
-        Initialize parameters for Kernel Point Convolution.
+        """Initialize parameters for Kernel Point Convolution.
+
         :param kernel_size: Number of kernel points.
         :param p_dim: dimension of the point space.
         :param in_channels: dimension of input features.
@@ -413,8 +411,9 @@ class KPConv(tf.keras.layers.Layer):
 class BatchNormBlock(tf.keras.layers.Layer):
 
     def __init__(self, in_dim, use_bn, bn_momentum):
-        """
-        Initialize a batch normalization block. If network does not use batch normalization, replace with biases.
+        """Initialize a batch normalization block. If network does not use batch
+        normalization, replace with biases.
+
         :param in_dim: dimension input features.
         :param use_bn: boolean indicating if we use Batch Norm.
         :param bn_momentum: Batch norm momentum.
@@ -453,8 +452,8 @@ class UnaryBlock(tf.keras.layers.Layer):
                  bn_momentum,
                  no_relu=False,
                  l_relu=0.2):
-        """
-        Initialize a standard unary block with its ReLU and BatchNorm.
+        """Initialize a standard unary block with its ReLU and BatchNorm.
+
         :param in_dim: dimension input features.
         :param out_dim: dimension input features.
         :param use_bn: boolean indicating if we use Batch Norm.
@@ -488,8 +487,8 @@ class UnaryBlock(tf.keras.layers.Layer):
 class SimpleBlock(tf.keras.layers.Layer):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
-        """
-        Initialize a simple convolution block with its ReLU and BatchNorm.
+        """Initialize a simple convolution block with its ReLU and BatchNorm.
+
         :param in_dim: dimension input features.
         :param out_dim: dimension input features.
         :param radius: current radius of convolution.
@@ -541,9 +540,7 @@ class SimpleBlock(tf.keras.layers.Layer):
 class IdentityBlock(tf.keras.layers.Layer):
 
     def __init__(self):
-        """
-        Initialize an Identity block.
-        """
+        """Initialize an Identity block."""
         super(IdentityBlock, self).__init__()
 
     def call(self, x, training=False):
@@ -553,14 +550,13 @@ class IdentityBlock(tf.keras.layers.Layer):
 class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, cfg):
-        """
-        Initialize a resnet bottleneck block.
+        """Initialize a resnet bottleneck block.
+
         :param in_dim: dimension input features.
         :param out_dim: dimension input features.
         :param radius: current radius of convolution.
         :param cfg: parameters.
         """
-
         super(ResnetBottleneckBlock, self).__init__()
 
         # get KP_extent from current radius
@@ -665,9 +661,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 class NearestUpsampleBlock(tf.keras.layers.Layer):
 
     def __init__(self, layer_ind):
-        """
-        Initialize a nearest upsampling block.
-        """
+        """Initialize a nearest upsampling block."""
         super(NearestUpsampleBlock, self).__init__()
         self.layer_ind = layer_ind
         return
@@ -683,9 +677,7 @@ class NearestUpsampleBlock(tf.keras.layers.Layer):
 class MaxPoolBlock(tf.keras.layers.Layer):
 
     def __init__(self, layer_ind):
-        """
-        Initialize a Max Pool block.
-        """
+        """Initialize a Max Pool block."""
         super(MaxPoolBlock, self).__init__()
         self.layer_ind = layer_ind
         return
@@ -697,9 +689,7 @@ class MaxPoolBlock(tf.keras.layers.Layer):
 class GlobalAverageBlock(tf.keras.layers.Layer):
 
     def __init__(self):
-        """
-        Initialize a global average block.
-        """
+        """Initialize a global average block."""
         super(GlobalAverageBlock, self).__init__()
         return
 

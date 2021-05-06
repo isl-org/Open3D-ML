@@ -28,7 +28,6 @@ def trans_normalize(pc, feat, t_normalize):
 
 def trans_augment(points, t_augment):
     """Implementation of an augmentation transform for point clouds."""
-
     if t_augment is None or not t_augment.get('turn_on', True):
         return points
 
@@ -132,7 +131,7 @@ def in_range_bev(box_range, box):
 
 
 class ObjdetAugmentation():
-    """Class consisting different augmentation for Object Detection"""
+    """Class consisting different augmentation for Object Detection."""
 
     @staticmethod
     def PointShuffle(data):

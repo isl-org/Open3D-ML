@@ -4,7 +4,7 @@ from ....datasets.utils import DataProcessing as DP
 
 
 class SemSegLoss(object):
-    """Loss functions for semantic segmentation"""
+    """Loss functions for semantic segmentation."""
 
     def __init__(self, pipeline, model, dataset):
         super(SemSegLoss, self).__init__()
@@ -34,7 +34,7 @@ class SemSegLoss(object):
             return output_loss
 
     def filter_valid_label(self, scores, labels):
-        """filter out invalid points"""
+        """Filter out invalid points."""
         logits = tf.reshape(scores, [-1, self.num_classes])
         labels = tf.reshape(labels, [-1])
 

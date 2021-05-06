@@ -43,8 +43,7 @@ from ...datasets.utils.operations import filter_by_min_points
 
 
 class PointPillars(BaseModel):
-    """Object detection model. 
-    Based on the PointPillars architecture 
+    """Object detection model. Based on the PointPillars architecture
     https://github.com/nutonomy/second.pytorch.
 
     Args:
@@ -357,19 +356,20 @@ class PointPillarsVoxelization(torch.nn.Module):
             self.max_voxels = _pair(max_voxels)
 
     def forward(self, points_feats):
-        """Forward function
+        """Forward function.
 
         Args:
             points_feats: Tensor with point coordinates and features. The shape
-                is [N, 3+C] with N as the number of points and C as the number 
+                is [N, 3+C] with N as the number of points and C as the number
                 of feature channels.
+
         Returns:
             (out_voxels, out_coords, out_num_points).
-            - out_voxels is a dense list of point coordinates and features for 
+            * out_voxels is a dense list of point coordinates and features for
               each voxel. The shape is [num_voxels, max_num_points, 3+C].
-            - out_coords is tensor with the integer voxel coords and shape
+            * out_coords is tensor with the integer voxel coords and shape
               [num_voxels,3]. Note that the order of dims is [z,y,x].
-            - out_num_points is a 1D tensor with the number of points for each
+            * out_num_points is a 1D tensor with the number of points for each
               voxel.
         """
         if self.training:
@@ -748,7 +748,7 @@ class SECONDFPN(nn.Module):
         self.init_weights()
 
     def init_weights(self):
-        """Initialize weights of FPN"""
+        """Initialize weights of FPN."""
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out')
@@ -824,7 +824,7 @@ class Anchor3DHead(nn.Module):
 
     @staticmethod
     def bias_init_with_prob(prior_prob):
-        """initialize conv/fc bias value according to giving probablity."""
+        """Initialize conv/fc bias value according to giving probablity."""
         bias_init = float(-np.log((1 - prior_prob) / prior_prob))
 
         return bias_init
@@ -870,7 +870,6 @@ class Anchor3DHead(nn.Module):
             torch.Tensor: Index of positive matches.
             torch.Tensor: Index of negative matches.
         """
-
         # compute all anchors
         anchors = [
             self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:],
@@ -886,7 +885,10 @@ class Anchor3DHead(nn.Module):
         assigned_bboxes, target_idxs, pos_idxs, neg_idxs = [], [], [], []
 
         def flatten_idx(idx, j):
-            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""
+            """Inject class dimension in the given indices (...
+
+            z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)
+            """
             z = idx // rot_angles
             x = idx % rot_angles
 
@@ -952,7 +954,7 @@ class Anchor3DHead(nn.Module):
                 class predictions.
 
         Returns:
-            tuple[torch.Tensor]: Prediction results of batches 
+            tuple[torch.Tensor]: Prediction results of batches
                 (bboxes, scores, labels).
         """
         bboxes, scores, labels = [], [], []
@@ -974,7 +976,7 @@ class Anchor3DHead(nn.Module):
                 class predictions.
 
         Returns:
-            tuple[torch.Tensor]: Prediction results of batches 
+            tuple[torch.Tensor]: Prediction results of batches
                 (bboxes, scores, labels).
         """
         assert cls_scores.size()[-2:] == bbox_preds.size()[-2:]

@@ -4,9 +4,7 @@ from pathlib import Path
 
 
 class LogRecord(logging.LogRecord):
-    """
-    Class for logging information.
-    """
+    """Class for logging information."""
 
     def getMessage(self):
         msg = self.msg
@@ -19,7 +17,7 @@ class LogRecord(logging.LogRecord):
 
 
 def get_runid(path):
-    """Get runid or an experiment"""
+    """Get runid or an experiment."""
     name = Path(path).name
     if not os.path.exists(Path(path).parent):
         return '00001'
@@ -37,9 +35,7 @@ def get_runid(path):
 
 
 def code2md(code_text, language=None):
-    """
-    Format code as markdown for display (eg in tensorboard)
-    """
+    """Format code as markdown for display (eg in tensorboard)"""
     four_spaces = '    '
     code_md = four_spaces + code_text.replace(os.linesep,
                                               os.linesep + four_spaces)

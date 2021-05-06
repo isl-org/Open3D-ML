@@ -5,7 +5,7 @@ from ....datasets.utils import DataProcessing
 
 
 def filter_valid_label(scores, labels, num_classes, ignored_label_inds, device):
-    """Loss functions for semantic segmentation"""
+    """Loss functions for semantic segmentation."""
     valid_scores = scores.reshape(-1, num_classes)
     valid_labels = labels.reshape(-1).to(device)
 
@@ -38,7 +38,7 @@ def filter_valid_label(scores, labels, num_classes, ignored_label_inds, device):
 
 
 class SemSegLoss(object):
-    """Loss functions for semantic segmentation"""
+    """Loss functions for semantic segmentation."""
 
     def __init__(self, pipeline, model, dataset, device):
         super(SemSegLoss, self).__init__()

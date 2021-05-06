@@ -34,8 +34,10 @@ def parse_args():
 
 def represents_int(s):
     """Judge whether string s represents an int.
+
     Args:
         s(str): The input string to be judged.
+
     Returns:
         bool: Whether s represents int or not.
     """
@@ -48,7 +50,9 @@ def represents_int(s):
 
 class ScannetProcess():
     """Preprocess Scannet.
+
     This class converts Scannet raw data into npy files.
+
     Args:
         dataset_path (str): Directory to load argoverse data.
         out_path (str): Directory to save pickle file(infos).
@@ -199,8 +203,10 @@ class ScannetProcess():
     @staticmethod
     def read_mesh_vertices_rgb(filename):
         """Read XYZ and RGB for each vertex.
+
         Args:
             filename(str): The name of the mesh vertices file.
+
         Returns:
             Vertices. Note that RGB values are in 0-255.
         """

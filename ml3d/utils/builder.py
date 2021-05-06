@@ -15,7 +15,7 @@ def build_network(cfg):
 
 
 def convert_device_name(framework):
-    """Convert device to either cpu or cuda"""
+    """Convert device to either cpu or cuda."""
     gpu_names = ["gpu", "cuda"]
     cpu_names = ["cpu"]
     if framework not in cpu_names + gpu_names:
@@ -28,7 +28,7 @@ def convert_device_name(framework):
 
 
 def convert_framework_name(framework):
-    """Convert framework to either tf or torch"""
+    """Convert framework to either tf or torch."""
     tf_names = ["tf", "tensorflow", "TF"]
     torch_names = ["torch", "pytorch", "PyTorch"]
     if framework not in tf_names + torch_names:
