@@ -183,16 +183,15 @@ class PointRCNN(BaseModel):
 
         return optimizer, scheduler
 
-    """Load ground truth object database.
-
-    Args:
-        pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
-        min_points_dict: A dictionary to filter objects based on number of points inside.
-        sample_dict: A dictionary to decide number of objects to sample.
-
-    """
-
     def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
+        """Load ground truth object database.
+
+        Args:
+            pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
+            min_points_dict: A dictionary to filter objects based on number of points inside.
+            sample_dict: A dictionary to decide number of objects to sample.
+
+        """
         db_boxes = pickle.load(open(pickle_path, 'rb'))
 
         if min_points_dict is not None:
@@ -208,23 +207,22 @@ class PointRCNN(BaseModel):
 
         self.db_boxes_dict = db_boxes_dict
 
-    """Augment object detection data.
-
-    Available augmentations are:
-        `ObjectSample`: Insert objects from ground truth database.
-        `ObjectRangeFilter`: Filter pointcloud from given bounds.
-        `PointShuffle`: Shuffle the pointcloud.
-
-    Args:
-        data: A dictionary object returned from the dataset class.
-        attr: Attributes for current pointcloud.
-
-    Returns:
-        Augmented `data` dictionary.
-
-    """
-
     def augment_data(self, data, attr):
+        """Augment object detection data.
+
+        Available augmentations are:
+            `ObjectSample`: Insert objects from ground truth database.
+            `ObjectRangeFilter`: Filter pointcloud from given bounds.
+            `PointShuffle`: Shuffle the pointcloud.
+
+        Args:
+            data: A dictionary object returned from the dataset class.
+            attr: Attributes for current pointcloud.
+
+        Returns:
+            Augmented `data` dictionary.
+
+        """
         cfg = self.cfg.augment
 
         if 'ObjectSample' in cfg.keys():
@@ -258,17 +256,16 @@ class PointRCNN(BaseModel):
                 return {}
             return self.rcnn.loss(results, inputs)
 
-    """Filter objects based on classes to train.
-
-    Args:
-        bbox_objs: Bounding box objects from dataset class.
-
-    Returns:
-        Filtered bounding box objects.
-
-    """
-
     def filter_objects(self, bbox_objs):
+        """Filter objects based on classes to train.
+
+        Args:
+            bbox_objs: Bounding box objects from dataset class.
+
+        Returns:
+            Filtered bounding box objects.
+
+        """
         filtered = []
         for bb in bbox_objs:
             if bb.label_class in self.classes:
@@ -297,26 +294,25 @@ class PointRCNN(BaseModel):
 
         return new_data
 
-    """Generates labels for RPN network.
-
-    Classifies each point as foreground/background based on points inside bbox.
-    We don't train on ambigious points which are just outside bounding boxes(calculated
-    by `extended_boxes`).
-    Also computes regression labels for bounding box proposals(in bounding box frame).
-
-    Args:
-        points: Input pointcloud.
-        bboxes: bounding boxes in camera frame.
-        bboxes_world: bounding boxes in world frame.
-        calib: Calibration file for cam_to_world matrix.
-
-    Returns:
-        Classification and Regression labels.
-
-    """
-
     @staticmethod
     def generate_rpn_training_labels(points, bboxes, bboxes_world, calib=None):
+        """Generates labels for RPN network.
+
+        Classifies each point as foreground/background based on points inside bbox.
+        We don't train on ambigious points which are just outside bounding boxes(calculated
+        by `extended_boxes`).
+        Also computes regression labels for bounding box proposals(in bounding box frame).
+
+        Args:
+            points: Input pointcloud.
+            bboxes: bounding boxes in camera frame.
+            bboxes_world: bounding boxes in world frame.
+            calib: Calibration file for cam_to_world matrix.
+
+        Returns:
+            Classification and Regression labels.
+
+        """
         cls_label = np.zeros((points.shape[0]), dtype=np.int32)
         reg_label = np.zeros((points.shape[0], 7),
                              dtype=np.float32)  # dx, dy, dz, ry, h, w, l
