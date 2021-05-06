@@ -125,15 +125,13 @@ class PointRCNN(BaseModel):
     def get_optimizer(self, cfg):
 
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
-        optimizer = tf.optimizers.Adam(learning_rate=cfg['lr'],
+        lr_scheduler = OneCycleScheduler(40800, cfg.lr, cfg.div_factor)
+
+        optimizer = tf.optimizers.Adam(learning_rate=lr_scheduler,
                                        beta_1=beta1,
                                        beta_2=beta2)
 
-        lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
-                                         list(cfg.moms), cfg.div_factor,
-                                         cfg.pct_start)
-
-        return optimizer, lr_scheduler
+        return optimizer
 
     def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
         db_boxes = pickle.load(open(pickle_path, 'rb'))

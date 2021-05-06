@@ -167,18 +167,7 @@ class PointRCNN(BaseModel):
                                          list(cfg.moms), cfg.div_factor,
                                          cfg.pct_start)
 
-        # def bnm_lmbd(cur_epoch):
-        #     cur_decay = 1
-        #     for decay_step in cfg.bn_decay_step_list:
-        #         if cur_epoch >= decay_step:
-        #             cur_decay = cur_decay * cfg.bn_decay
-        #     return max(cfg.bn_momentum * cur_decay, cfg.bnm_clip)
-        # bnm_scheduler = BNMomentumScheduler(self.model, bnm_lmbd, last_epoch=last_epoch)
-
-        # lr_warmup_scheduler = CosineWarmupLR(optimizer, T_max=cfg.warmup_epoch * len(train_loader),
-        #                                               eta_min=cfg.warmup_min)
-
-        return optimizer, lr_scheduler  #, bnm_scheduler
+        return optimizer, lr_scheduler
 
     def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
         db_boxes = pickle.load(open(pickle_path, 'rb'))
