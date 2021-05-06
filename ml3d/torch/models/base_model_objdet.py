@@ -16,12 +16,8 @@ class BaseModel(ABC, torch.nn.Module):
 
         Args:
             cfg (cfg object or str): cfg object or path to cfg file
-            dataset_path (str): path to the dataset
-            args (dict): dict of args
-            kwargs:
-
-        Returns:
-            class: The corresponding class.
+            dataset_path (str): Path to the dataset
+            **kwargs (dict): Dict of args
         """
         super().__init__()
 

@@ -152,11 +152,11 @@ class Toronto3D(BaseDataset):
         """Checks if a datum in the dataset has been tested.
 
         Args:
-            dataset: The current dataset to which the datum belongs to.
-                        attr: The attribute that needs to be checked.
+            attr: The attribute that needs to be checked.
 
         Returns:
-            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+            If the datum attribute is tested, then return the path where the
+                attribute is stored; else, returns false.
         """
         cfg = self.cfg
         name = attr['name']

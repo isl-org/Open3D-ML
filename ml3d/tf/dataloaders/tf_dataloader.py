@@ -39,22 +39,22 @@ class TFDataloader():
                  transform=None,
                  get_batch_gen=None,
                  **kwargs):
-        """Initializes the class, and includes the following steps:
+        """Initializes the object, and includes the following steps:
 
          * Checks if preprocess is available. If yes, then uses the preprocessed data.
          * Checks if cache is used. If not, then uses data from the cache.
 
         **Args:**
-            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            dataset: The 3DML dataset object. You can use the base dataset,
+                sample datasets, or a custom dataset.
+            model: 3DML model object.
+            use_cache: Indicates if preprocessed data should be cached.
+            steps_per_epoch: The number of steps per epoch that indicates the
+                batches of samples to train. If it is None, then the step number
+                will be the number of samples in the data.
             preprocess: The model's preprocess method.
             transform: The model's transform method.
-            use_cache: Indicates if preprocessed data should be cached.
             get_batch_gen: <NTD>
-            model_cfg: The configuration file of the model.
-            steps_per_epoch: The number of steps per epoch that indicates the bactches of samples to train. If it is None, then the step number will be the number of samples in the data.
-
-        **Returns:**
-            class: The corresponding class.
         """
         self.dataset = dataset
         self.model = model

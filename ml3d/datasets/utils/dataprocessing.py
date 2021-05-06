@@ -24,11 +24,11 @@ class DataProcessing:
             points: (N, 3) matrix of input points
             features: optional (N, d) matrix of features (floating number)
             labels: optional (N,) matrix of integer labels
-            sampleDl: parameter defining the size of grid voxels
+            grid_size: parameter defining the size of grid voxels
             verbose: 1 to display
 
         Returns:
-            subsampled points, with features and/or labels depending of the input
+            Subsampled points, with features and/or labels depending of the input
         """
         if (features is None) and (labels is None):
             return subsample(points, sampleDl=grid_size, verbose=verbose)

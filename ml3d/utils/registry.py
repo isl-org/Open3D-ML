@@ -2,7 +2,6 @@ import inspect
 
 
 class Registry(object):
-    """docstring for Registry."""
 
     def __init__(self, name):
         self._name = name

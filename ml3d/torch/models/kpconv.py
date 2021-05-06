@@ -770,8 +770,8 @@ def gather(x, idx, method=2):
     """Implementation of a custom gather operation for faster backwards.
 
     Args:
-        x: input with shape [N, D_1, ... D_d]
-        idx: indexing with shape [n_1, ..., n_m]
+        x: Input with shape [N, D_1, ... D_d]
+        idx: Indexing with shape [n_1, ..., n_m]
         method: Choice of the method
 
     Returns:

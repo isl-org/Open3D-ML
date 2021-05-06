@@ -29,13 +29,13 @@ class SunRGBD(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  **kwargs):
-        """Initialize
+        """Initialize the dataset by passing the dataset and other details.
 
         Args:
-            dataset_path (str): path to the dataset.
-            name (str): Dataset name.
-            cache_dir (str): Path to cache the dataset.
-            use_cache (bool): Whether to cache the data.
+            dataset_path (str): The path to the dataset to use.
+            name (str): The name of the dataset (SunRGBD in this case).
+            cache_dir (str): The directory where the cache is stored.
+            use_cache (bool): Indicates if the dataset should be cached.
         """
         super().__init__(dataset_path=dataset_path,
                          name=name,

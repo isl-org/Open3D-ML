@@ -31,9 +31,9 @@ class BEVBox3D(BoundingBox3D):
 
         Args:
             center: (x, y, z) that defines the center of the box
-            yaw: yaw angle of box
             size: (width, height, depth) that defines the size of the box, as
                 measured from edge to edge
+            yaw: yaw angle of box
             label_class: integer specifying the classification label. If an LUT is
                 specified in create_lines() this will be used to determine the color
                 of the box.
@@ -63,7 +63,7 @@ class BEVBox3D(BoundingBox3D):
         """Generate corners3d representation for this object.
 
         Returns:
-            corners_3d: (8, 3) corners of box3d in camera coord
+            corners_3d: (8, 3) corners of box3d in camera coordinates.
         """
         w, h, l = self.size
         x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
@@ -82,9 +82,10 @@ class BEVBox3D(BoundingBox3D):
     def to_xyzwhlr(self):
         """Returns box in the common 7-sized vector representation: (x, y, z, w,
         l, h, a), where (x, y, z) is the bottom center of the box, (w, l, h) is
-        the width, lenght and height of the box a is the yaw angle.
+        the width, length and height of the box a is the yaw angle.
 
-        :return box: (7,)
+        Returns:
+            box: (7,)
         """
         bbox = np.zeros((7,))
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
@@ -106,7 +107,9 @@ class BEVBox3D(BoundingBox3D):
         (x, y, z) is the bottom center of the box,
         (l, h, w) is the length, height, width of the box
         a is the yaw angle
-        :return transformed box: (7,)
+
+        Returns:
+            transformed box: (7,)
         """
         if self.world_cam is None:
             return self.to_xyzwhlr()[[1, 2, 0, 4, 5, 3, 6]]
@@ -121,7 +124,8 @@ class BEVBox3D(BoundingBox3D):
     def to_img(self):
         """Transforms box into 2d box.
 
-        :return transformed box: (4,)
+        Returns:
+            transformed box: (4,)
         """
         if self.cam_img is None:
             return None
@@ -144,7 +148,8 @@ class BEVBox3D(BoundingBox3D):
     def get_difficulty(self):
         """General method to compute difficulty, can be overloaded.
 
-        Return difficulty depending on projected height of box.
+        Returns:
+            Difficulty depending on projected height of box.
         """
         if self.cam_img is None:
             return 0

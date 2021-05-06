@@ -56,8 +56,8 @@ class S3DIS(BaseDataset):
             class_weights: The class weights to use in the dataset.
             num_points: The maximum number of points to use when splitting the dataset.
             test_area_idx: The area to use for testing. The valid values are 1 through 6.
-            ignored_objects: Ignored objects
             ignored_label_inds: A list of labels that should be ignored in the dataset.
+            ignored_objects: Ignored objects
             test_result_folder: The folder where the test results should be stored.
         """
         super().__init__(dataset_path=dataset_path,

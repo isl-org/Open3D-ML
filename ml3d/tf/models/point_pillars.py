@@ -696,7 +696,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
             coors (tf.Tensor): Coordinates of each voxel in shape (N, 4).
                 The first column indicates the sample ID.
             batch_size (int): Number of samples in the current batch.
-            training (bool): Are we training?
+            training (bool): Whether we are training or not?
         """
         # batch_canvas will be the final output.
         batch_canvas = []

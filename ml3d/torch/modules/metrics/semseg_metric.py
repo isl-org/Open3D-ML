@@ -14,18 +14,16 @@ class SemSegMetric(object):
         self.device = device
 
     def confusion_matrix(self, scores, labels):
-        r"""Compute the confusion matrix of one batch
+        r"""Compute the confusion matrix of one batch.
 
-        Parameters
-        ----------
-        scores: torch.FloatTensor, shape (B?, C, N)
-            raw scores for each class
-        labels: torch.LongTensor, shape (B?, N)
-            ground truth labels
+        Args:
+            scores (torch.FloatTensor, shape (B?, C, N)):
+                Raw scores for each class.
+            labels (torch.LongTensor, shape (B?, N)):
+                Ground truth labels.
 
-        Returns
-        -------
-        confusion matrix of this batch
+        Returns:
+            Confusion matrix of this batch.
         """
         num_classes = scores.size(-2)
         predictions = torch.max(scores, dim=-2).indices.cpu().data.numpy()
@@ -40,19 +38,17 @@ class SemSegMetric(object):
         return conf_m
 
     def acc(self, scores, labels):
-        r"""Compute the per-class accuracies and the overall accuracy
+        r"""Compute the per-class accuracies and the overall accuracy.
 
-        Parameters
-        ----------
-        scores: torch.FloatTensor, shape (B?, C, N)
-            raw scores for each class
-        labels: torch.LongTensor, shape (B?, N)
-            ground truth labels
+        Args:
+            scores (torch.FloatTensor, shape (B?, C, N)):
+                Raw scores for each class.
+            labels (torch.LongTensor, shape (B?, N)):
+                Ground truth labels.
 
-        Returns
-        -------
-        list of floats of length num_classes+1
-        (last item is overall accuracy)
+        Returns:
+            List of floats of length num_classes+1.
+                (last item is overall accuracy)
         """
         num_classes = scores.size(-2)
         predictions = torch.max(scores, dim=-2).indices
@@ -76,18 +72,16 @@ class SemSegMetric(object):
         return accuracies
 
     def iou(self, scores, labels):
-        r"""Compute the per-class IoU and the mean IoU
+        r"""Compute the per-class IoU and the mean IoU.
 
-        Parameters
-        ----------
-        scores: torch.FloatTensor, shape (B?, C, N)
-            raw scores for each class
-        labels: torch.LongTensor, shape (B?, N)
-            ground truth labels
+        Args:
+            scores (torch.FloatTensor, shape (B?, C, N)):
+                Raw scores for each class.
+            labels (torch.LongTensor, shape (B?, N)):
+                Ground truth labels.
 
-        Returns
-        -------
-        list of floats of length num_classes+1 (last item is mIoU)
+        Returns:
+            List of floats of length num_classes+1 (last item is mIoU).
         """
         num_classes = scores.size(-2)
         predictions = torch.max(scores, dim=-2).indices

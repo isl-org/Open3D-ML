@@ -360,15 +360,15 @@ def get_reg_loss(pred_reg,
     Args:
         pred_reg: (N, C)
         reg_label: (N, 7) [dx, dy, dz, h, w, l, ry]
-        loc_scope: constant
-        loc_bin_size: constant
-        num_head_bin: constant
+        loc_scope: Constant
+        loc_bin_size: Constant
+        num_head_bin: Constant
         anchor_size: (N, 3) or (3)
-        get_xz_fine: whether to get fine xz loss.
-        get_y_by_bin: whether to divide y coordinate into bin.
-        loc_y_scope: scope length for y coordinate.
-        loc_y_bin_size: bin size for classifying y coordinate.
-        get_ry_fine: whether use fine yaw loss.
+        get_xz_fine: Whether to get fine xz loss.
+        get_y_by_bin: Whether to divide y coordinate into bin.
+        loc_y_scope: Scope length for y coordinate.
+        loc_y_bin_size: Bin size for classifying y coordinate.
+        get_ry_fine: Whether to use fine yaw loss.
     """
     per_loc_bin_num = int(loc_scope / loc_bin_size) * 2
     loc_y_bin_num = int(loc_y_scope / loc_y_bin_size) * 2
@@ -1040,11 +1040,12 @@ class ProposalLayer(tf.keras.layers.Layer):
         return ret_bbox3d, ret_scores
 
     def distance_based_proposal(self, scores, proposals, order, training=True):
-        """Propose rois in two area based on the distance.
+        """Propose ROIs in two area based on the distance.
 
-        :param scores: (N)
-        :param proposals: (N, 7)
-        :param order: (N)
+        Args:
+            scores: (N)
+            proposals: (N, 7)
+            order: (N)
         """
         nms_post = self.nms_post
         nms_thres = self.nms_thres
@@ -1582,7 +1583,7 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
     @staticmethod
     def random_aug_box3d(box3d):
         """
-        Random shift, scale, orientation
+        Random shift, scale, orientation.
 
         Args:
             box3d: (7) [x, y, z, h, w, l, ry]
