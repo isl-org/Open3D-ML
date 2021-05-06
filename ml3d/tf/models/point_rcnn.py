@@ -1046,6 +1046,7 @@ class ProposalLayer(tf.keras.layers.Layer):
             scores: (N)
             proposals: (N, 7)
             order: (N)
+            training (bool): Whether we are training?
         """
         nms_post = self.nms_post
         nms_thres = self.nms_thres
