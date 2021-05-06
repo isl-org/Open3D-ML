@@ -627,46 +627,47 @@ class UNet(tf.keras.layers.Layer):
         self.residual_blocks = residual_blocks
 
     @staticmethod
-    def block(m, a, b, residual_blocks):
+    def block(layers, a, b, residual_blocks):
         if residual_blocks:
-            m.append(ResidualBlock(a, b))
+            layers.append(ResidualBlock(a, b))
         else:
-            m.append(BatchNormBlock())
-            m.append(ReLUBlock())
-            m.append(
+            layers.append(BatchNormBlock())
+            layers.append(ReLUBlock())
+            layers.append(
                 SubmanifoldSparseConv(in_channels=a,
                                       filters=b,
                                       kernel_size=[3, 3, 3]))
 
     @staticmethod
     def get_UNet(nPlanes, residual_blocks, conv_block_reps):
-        m = []
+        layers = []
         for i in range(conv_block_reps):
-            UNet.block(m, nPlanes[0], nPlanes[0], residual_blocks)
+            UNet.block(layers, nPlanes[0], nPlanes[0], residual_blocks)
 
         if len(nPlanes) > 1:
-            m.append(ConcatFeat())
-            m.append(BatchNormBlock())
-            m.append(ReLUBlock())
-            m.append(
+            layers.append(ConcatFeat())
+            layers.append(BatchNormBlock())
+            layers.append(ReLUBlock())
+            layers.append(
                 Convolution(in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
-            m = m + UNet.get_UNet(nPlanes[1:], residual_blocks, conv_block_reps)
-            m.append(BatchNormBlock())
-            m.append(ReLUBlock())
-            m.append(
+            layers = layers + UNet.get_UNet(nPlanes[1:], residual_blocks,
+                                            conv_block_reps)
+            layers.append(BatchNormBlock())
+            layers.append(ReLUBlock())
+            layers.append(
                 DeConvolution(in_channels=nPlanes[1],
                               filters=nPlanes[0],
                               kernel_size=[2, 2, 2]))
 
-            m.append(JoinFeat())
+            layers.append(JoinFeat())
 
             for i in range(conv_block_reps):
-                UNet.block(m, nPlanes[0] * (2 if i == 0 else 1), nPlanes[0],
-                           residual_blocks)
+                UNet.block(layers, nPlanes[0] * (2 if i == 0 else 1),
+                           nPlanes[0], residual_blocks)
 
-        return m
+        return layers
 
     def call(self, pos_list, feat_list, training):
         conv_pos = []
@@ -677,26 +678,26 @@ class UNet(tf.keras.layers.Layer):
             elif isinstance(module, ReLUBlock):
                 feat_list = module(feat_list)
 
-            elif module.__name__() == "ResidualBlock":
+            elif isinstance(module, ResidualBlock):
                 feat_list = module(feat_list, pos_list, training=training)
 
-            elif module.__name__() == "SubmanifoldSparseConv":
+            elif isinstance(module, SubmanifoldSparseConv):
                 feat_list = module(feat_list, pos_list)
 
-            elif module.__name__() == "Convolution":
+            elif isinstance(module, Convolution):
                 conv_pos.append([tf.identity(pos) for pos in pos_list])
                 feat_list, pos_list = module(feat_list, pos_list)
 
-            elif module.__name__() == "DeConvolution":
+            elif isinstance(module, DeConvolution):
                 feat_list = module(feat_list, [2 * pos for pos in pos_list],
                                    conv_pos[-1])
                 pos_list = conv_pos.pop()
 
-            elif module.__name__() == "ConcatFeat":
+            elif isinstance(module, ConcatFeat):
                 concat_feat.append(
                     [tf.identity(feat) for feat in module(feat_list)])
 
-            elif module.__name__() == "JoinFeat":
+            elif isinstance(module, JoinFeat):
                 feat_list = module(concat_feat.pop(), feat_list)
 
             else:
