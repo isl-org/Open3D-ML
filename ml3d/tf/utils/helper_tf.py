@@ -1,6 +1,4 @@
-""" Wrapper functions for TensorFlow layers.
-
-"""
+"""Wrapper functions for TensorFlow layers."""
 
 import numpy as np
 import tensorflow as tf
@@ -99,7 +97,7 @@ class conv2d_transpose(tf.keras.layers.Layer):
 
 
 def dropout(inputs, is_training, scope, keep_prob=0.5, noise_shape=None):
-    """ Dropout layer.
+    """Dropout layer.
 
     Args:
       inputs: tensor

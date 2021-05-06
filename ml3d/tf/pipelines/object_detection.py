@@ -25,9 +25,7 @@ log = logging.getLogger(__name__)
 
 
 class ObjectDetection(BasePipeline):
-    """
-    Pipeline for object detection. 
-    """
+    """Pipeline for object detection."""
 
     def __init__(self,
                  model,
@@ -46,11 +44,11 @@ class ObjectDetection(BasePipeline):
                          **kwargs)
 
     def run_inference(self, data):
-        """
-        Run inference on given data.
+        """Run inference on given data.
 
         Args:
             data: A raw data.
+
         Returns:
             Returns the inference results.
         """
@@ -62,8 +60,8 @@ class ObjectDetection(BasePipeline):
         return boxes
 
     def run_test(self):
-        """
-        Run test with test data split, computes mean average precision of the prediction results.
+        """Run test with test data split, computes mean average precision of the
+        prediction results.
         """
         model = self.model
         dataset = self.dataset

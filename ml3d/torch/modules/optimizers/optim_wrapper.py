@@ -33,7 +33,9 @@ bn_types = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)
 
 
 def split_bn_bias(layer_groups):
-    "Split the layers in `layer_groups` into batchnorm (`bn_types`) and non-batchnorm groups."
+    """Split the layers in `layer_groups` into batchnorm (`bn_types`) and non-
+    batchnorm groups.
+    """
     split_groups = []
     for l in layer_groups:
         l1, l2 = [], []
@@ -47,7 +49,7 @@ def split_bn_bias(layer_groups):
 
 
 def listify(p=None, q=None):
-    "Make `p` listy and the same length as `q`."
+    """Make `p` listy and the same length as `q`."""
     if p is None:
         p = []
     elif isinstance(p, str):
@@ -62,7 +64,7 @@ def listify(p=None, q=None):
 
 
 def trainable_params(m: nn.Module):
-    "Return list of trainable params in `m`."
+    """Return list of trainable params in `m`."""
     res = filter(lambda p: p.requires_grad, m.parameters())
     return res
 
@@ -73,7 +75,7 @@ def is_tuple(x) -> bool:
 
 # copy from fastai.
 class OptimWrapper():
-    "Basic wrapper around `opt` to simplify hyper-parameters changes."
+    """Basic wrapper around `opt` to simplify hyper-parameters changes."""
 
     def __init__(self, opt, wd, true_wd: bool = False, bn_wd: bool = True):
         self.opt, self.true_wd, self.bn_wd = opt, true_wd, bn_wd
@@ -84,7 +86,10 @@ class OptimWrapper():
 
     @classmethod
     def create(cls, opt_func, lr, layer_groups, **kwargs):
-        "Create an `optim.Optimizer` from `opt_func` with `lr`. Set lr on `layer_groups`."
+        """Create an `optim.Optimizer` from `opt_func` with `lr`.
+
+        Set lr on `layer_groups`.
+        """
         split_groups = split_bn_bias(layer_groups)
         opt = opt_func([{
             'params': trainable_params(l),
@@ -95,7 +100,9 @@ class OptimWrapper():
         return opt
 
     def new(self, layer_groups):
-        "Create a new `OptimWrapper` from `self` with another `layer_groups` but the same hyper-parameters."
+        """Create a new `OptimWrapper` from `self` with another `layer_groups`
+        but the same hyper-parameters.
+        """
         opt_func = getattr(self, 'opt_func', self.opt.__class__)
         return self.create(opt_func,
                            self.lr,
@@ -109,7 +116,7 @@ class OptimWrapper():
 
     # Pytorch optimizer methods
     def step(self) -> None:
-        "Set weight decay and step optimizer."
+        """Set weight decay and step optimizer."""
         # weight decay outside of optimizer step (AdamW)
         if self.true_wd:
             for lr, wd, pg1, pg2 in zip(self._lr, self._wd,
@@ -130,7 +137,7 @@ class OptimWrapper():
         self.opt.step()
 
     def zero_grad(self) -> None:
-        "Clear optimizer gradients."
+        """Clear optimizer gradients."""
         self.opt.zero_grad()
 
     # Passthrough to the inner opt.
@@ -138,7 +145,7 @@ class OptimWrapper():
         return getattr(self.opt, k, None)
 
     def clear(self):
-        "Reset the state of the inner optimizer."
+        """Reset the state of the inner optimizer."""
         sd = self.state_dict()
         sd['state'] = {}
         self.load_state_dict(sd)
@@ -170,7 +177,7 @@ class OptimWrapper():
 
     @beta.setter
     def beta(self, val: float) -> None:
-        "Set beta (or alpha as makes sense for given optimizer)."
+        """Set beta, or alpha as makes sense, for given optimizer."""
         if val is None:
             return
         if 'betas' in self.opt_keys:
@@ -185,7 +192,7 @@ class OptimWrapper():
 
     @wd.setter
     def wd(self, val: float) -> None:
-        "Set weight decay."
+        """Set weight decay."""
         if not self.true_wd:
             self.set_val('weight_decay',
                          listify(val, self._wd),
@@ -194,7 +201,7 @@ class OptimWrapper():
 
     # Helper functions
     def read_defaults(self) -> None:
-        "Read the values inside the optimizer for the hyper-parameters."
+        """Read the values inside the optimizer for the hyper-parameters."""
         self._beta = None
         if 'lr' in self.opt_keys:
             self._lr = self.read_val('lr')
@@ -208,7 +215,7 @@ class OptimWrapper():
             self._wd = self.read_val('weight_decay')
 
     def set_val(self, key: str, val, bn_groups: bool = True):
-        "Set `val` inside the optimizer dictionary at `key`."
+        """Set `val` inside the optimizer dictionary at `key`."""
         if is_tuple(val):
             val = [(v1, v2) for v1, v2 in zip(*val)]
         for v, pg1, pg2 in zip(val, self.opt.param_groups[::2],
@@ -219,7 +226,7 @@ class OptimWrapper():
         return val
 
     def read_val(self, key: str):
-        "Read a hyperparameter `key` in the optimizer dictionary."
+        """Read a hyperparameter `key` in the optimizer dictionary."""
         val = [pg[key] for pg in self.opt.param_groups[::2]]
         if is_tuple(val[0]):
             val = [o[0] for o in val], [o[1] for o in val]

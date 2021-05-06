@@ -41,9 +41,9 @@ class FurthestPointSampling(Function):
 
     @staticmethod
     def forward(ctx, xyz: torch.Tensor, npoint: int) -> torch.Tensor:
-        """
-        Uses iterative furthest point sampling to select a set of npoint features that have the largest
-        minimum distance
+        """Uses iterative furthest point sampling to select a set of npoint
+        features that have the largest minimum distance.
+
         :param ctx:
         :param xyz: (B, N, 3) where N > npoint
         :param npoint: int, number of features in the sampled set
@@ -69,8 +69,8 @@ class ThreeNN(Function):
     @staticmethod
     def forward(ctx, query_pts: torch.Tensor,
                 data_pts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Find the three nearest neighbors of query_pts in data_pts
+        """Find the three nearest neighbors of query_pts in data_pts.
+
         :param ctx:
         :param query_pts: (B, N, 3)
         :param data_pts: (B, M, 3)
@@ -100,8 +100,8 @@ class ThreeInterpolate(Function):
     @staticmethod
     def forward(ctx, features: torch.Tensor, idx: torch.Tensor,
                 weight: torch.Tensor) -> torch.Tensor:
-        """
-        Performs weight linear interpolation on 3 features
+        """Performs weight linear interpolation on 3 features.
+
         :param ctx:
         :param features: (B, C, M) Features descriptors to be interpolated from
         :param idx: (B, n, 3) three nearest neighbors of the target features in features
@@ -124,7 +124,8 @@ class ThreeInterpolate(Function):
     def backward(
         ctx, grad_out: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """
+        """Backward.
+
         :param ctx:
         :param grad_out: (B, C, N) tensor with gradients of outputs
         :return:
@@ -150,7 +151,8 @@ class BallQuery(Function):
     @staticmethod
     def forward(ctx, radius: float, nsample: int, xyz: torch.Tensor,
                 new_xyz: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward.
+
         :param ctx:
         :param radius: float, radius of the balls
         :param nsample: int, maximum number of features in the balls
@@ -179,7 +181,8 @@ ball_query_gpu = BallQuery.apply
 class QueryAndGroup(nn.Module):
 
     def __init__(self, radius: float, nsample: int, use_xyz: bool = True):
-        """
+        """QueryAndGroup.
+
         :param radius: float, radius of ball
         :param nsample: int, maximum number of features to gather in the ball
         :param use_xyz:
@@ -191,7 +194,8 @@ class QueryAndGroup(nn.Module):
                 xyz: torch.Tensor,
                 new_xyz: torch.Tensor,
                 features: torch.Tensor = None) -> Tuple[torch.Tensor]:
-        """
+        """Forward.
+
         :param xyz: (B, N, 3) xyz coordinates of the features
         :param new_xyz: (B, npoint, 3) centroids
         :param features: (B, C, N) descriptors of the features
@@ -242,7 +246,8 @@ class GroupAll(nn.Module):
                 xyz: torch.Tensor,
                 new_xyz: torch.Tensor,
                 features: torch.Tensor = None):
-        """
+        """Forward.
+
         :param xyz: (B, N, 3) xyz coordinates of the features
         :param new_xyz: ignored
         :param features: (B, C, N) descriptors of the features

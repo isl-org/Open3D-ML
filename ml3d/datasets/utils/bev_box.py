@@ -3,8 +3,9 @@ import numpy as np
 
 
 class BEVBox3D(BoundingBox3D):
-    """Class that defines a special bounding box for object detection, with only one rotation axis (yaw).
-                                        
+    """Class that defines a special bounding box for object detection, with only
+    one rotation axis (yaw).
+
                             up z    x front (yaw=0.5*pi)
                                 ^   ^
                                 |  /
@@ -14,7 +15,8 @@ class BEVBox3D(BoundingBox3D):
     The relative coordinate of bottom center in a BEV box is (0.5, 0.5, 0),
     and the yaw is around the z axis, thus the rotation axis=2.
     The yaw is 0 at the negative direction of y axis, and increases from
-    the negative direction of y to the positive direction of x."""
+    the negative direction of y to the positive direction of x.
+    """
 
     def __init__(self,
                  center,
@@ -25,19 +27,20 @@ class BEVBox3D(BoundingBox3D):
                  world_cam=None,
                  cam_img=None,
                  **kwargs):
-        """Creates a bounding box. 
+        """Creates a bounding box.
 
-        center: (x, y, z) that defines the center of the box
-        yaw: yaw angle of box
-        size: (width, height, depth) that defines the size of the box, as
-            measured from edge to edge
-        label_class: integer specifying the classification label. If an LUT is
-            specified in create_lines() this will be used to determine the color
-            of the box.
-        confidence: confidence level of the box
-        world_cam: world to camera transformation
-        cam_img: camera to image transformation"""
-
+        Args:
+            center: (x, y, z) that defines the center of the box
+            size: (width, height, depth) that defines the size of the box, as
+                measured from edge to edge
+            yaw: yaw angle of box
+            label_class: integer specifying the classification label. If an LUT is
+                specified in create_lines() this will be used to determine the color
+                of the box.
+            confidence: confidence level of the box
+            world_cam: world to camera transformation
+            cam_img: camera to image transformation
+        """
         self.yaw = yaw
         self.world_cam = world_cam
         self.cam_img = cam_img
@@ -57,9 +60,7 @@ class BEVBox3D(BoundingBox3D):
         self.dis_to_cam = np.linalg.norm(self.to_camera()[:3])
 
     def to_kitti_format(self, score=1.0):
-        """
-        This method transforms the class to KITTI format.
-        """
+        """This method transforms the class to KITTI format."""
         box2d = self.to_img()
         box2d[2:] += box2d[:2]  # Add w, h.
         truncation = -1
@@ -80,9 +81,10 @@ class BEVBox3D(BoundingBox3D):
         return kitti_str
 
     def generate_corners3d(self):
-        """
-        generate corners3d representation for this object
-        :return corners_3d: (8, 3) corners of box3d in camera coord
+        """Generate corners3d representation for this object.
+
+        Returns:
+            corners_3d: (8, 3) corners of box3d in camera coordinates.
         """
         w, h, l = self.size
         x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
@@ -99,13 +101,12 @@ class BEVBox3D(BoundingBox3D):
         return corners3d
 
     def to_xyzwhlr(self):
-        """
-        Returns box in the common 7-sized vector representation:
-        (x, y, z, w, l, h, a), where 
-        (x, y, z) is the bottom center of the box, 
-        (w, l, h) is the width, lenght and height of the box
-        a is the yaw angle
-        :return box: (7,)
+        """Returns box in the common 7-sized vector representation: (x, y, z, w,
+        l, h, a), where (x, y, z) is the bottom center of the box, (w, l, h) is
+        the width, length and height of the box a is the yaw angle.
+
+        Returns:
+            box: (7,)
         """
         bbox = np.zeros((7,))
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
@@ -114,21 +115,22 @@ class BEVBox3D(BoundingBox3D):
         return bbox
 
     def to_camera(self):
-        """
-        Transforms box into camera space.
+        """Transforms box into camera space.
 
-                     up x    y front 
+                     up x    y front
                         ^   ^
                         |  /
                         | /
          left z <------ 0
 
         Returns box in the common 7-sized vector representation:
-        (x, y, z, l, h, w, a), where 
-        (x, y, z) is the bottom center of the box, 
+        (x, y, z, l, h, w, a), where
+        (x, y, z) is the bottom center of the box,
         (l, h, w) is the length, height, width of the box
         a is the yaw angle
-        :return transformed box: (7,)
+
+        Returns:
+            transformed box: (7,)
         """
         if self.world_cam is None:
             return self.to_xyzwhlr()[[1, 2, 0, 4, 5, 3, 6]]
@@ -143,9 +145,10 @@ class BEVBox3D(BoundingBox3D):
         return bbox
 
     def to_img(self):
-        """
-        Transforms box into 2d box.
-        :return transformed box: (4,)
+        """Transforms box into 2d box.
+
+        Returns:
+            transformed box: (4,)
         """
         if self.cam_img is None:
             return None
@@ -166,11 +169,11 @@ class BEVBox3D(BoundingBox3D):
         return np.concatenate([center, size])
 
     def get_difficulty(self):
-        """
-        General method to compute difficulty, can be overloaded.
-        Return difficulty depending on projected height of box.
-        """
+        """General method to compute difficulty, can be overloaded.
 
+        Returns:
+            Difficulty depending on projected height of box.
+        """
         if self.cam_img is None:
             return 0
 
@@ -184,9 +187,7 @@ class BEVBox3D(BoundingBox3D):
         return diff
 
     def to_dict(self):
-        """
-        Convert data for evaluation:
-        """
+        """Convert data for evaluation:"""
         return {
             'bbox': self.to_camera(),
             'label': self.label_class,
@@ -196,8 +197,7 @@ class BEVBox3D(BoundingBox3D):
 
     @staticmethod
     def to_dicts(bboxes):
-        """
-        Convert data for evaluation:
+        """Convert data for evaluation:
 
         Args:
             bboxes: List of BEVBox3D bboxes.

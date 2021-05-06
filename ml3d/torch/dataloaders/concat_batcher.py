@@ -13,17 +13,17 @@ from torch.utils.data import Sampler, get_worker_info
 
 
 class KPConvBatch:
-    """Batched results for KPConv"""
+    """Batched results for KPConv."""
 
     def __init__(self, batches):
-        """
-        Initialize
+        """Initialize.
+
         Args:
             batches: A batch of data
+
         Returns:
             class: The corresponding class.
         """
-
         self.neighborhood_limits = []
         p_list = []
         f_list = []
@@ -171,11 +171,11 @@ class KPConvBatch:
         return
 
     def big_neighborhood_filter(self, neighbors, layer):
-        """
-        Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
-        Limit is computed at initialization
-        """
+        """Filter neighborhoods with max number of neighbors.
 
+        Limit is set to keep XX% of the neighborhoods untouched. Limit is
+        computed at initialization
+        """
         # crop neighbors matrix
         if len(self.neighborhood_limits) > 0:
             return neighbors[:, :self.neighborhood_limits[layer]]
@@ -304,10 +304,7 @@ class KPConvBatch:
         return li
 
     def pin_memory(self):
-        """
-        Manual pinning of the memory
-        """
-
+        """Manual pinning of the memory."""
         self.points = [in_tensor.pin_memory() for in_tensor in self.points]
         self.neighbors = [
             in_tensor.pin_memory() for in_tensor in self.neighbors
@@ -343,21 +340,22 @@ class KPConvBatch:
         return self
 
     def unstack_points(self, layer=None):
-        """Unstack the points"""
+        """Unstack the points."""
         return self.unstack_elements('points', layer)
 
     def unstack_neighbors(self, layer=None):
-        """Unstack the neighbors indices"""
+        """Unstack the neighbors indices."""
         return self.unstack_elements('neighbors', layer)
 
     def unstack_pools(self, layer=None):
-        """Unstack the pooling indices"""
+        """Unstack the pooling indices."""
         return self.unstack_elements('pools', layer)
 
     def unstack_elements(self, element_name, layer=None, to_numpy=True):
-        """
-        Return a list of the stacked elements in the batch at a certain layer. If no layer is given, then return all
-        layers
+        """Return a list of the stacked elements in the batch at a certain
+        layer.
+
+        If no layer is given, then return all layers
         """
         if element_name == 'points':
             elements = self.points
@@ -408,10 +406,11 @@ class KPConvBatch:
 class PointPillarsBatch:
 
     def __init__(self, batches):
-        """
-        Initialize
+        """Initialize.
+
         Args:
             batches: A batch of data
+
         Returns:
             class: The corresponding class.
         """
@@ -425,6 +424,11 @@ class PointPillarsBatch:
         for batch in batches:
             self.attr.append(batch['attr'])
             data = batch['data']
+            attr = batch['attr']
+            if 'test' not in attr['split'] and len(
+                    data['bboxes']
+            ) == 0:  # Skip training batch with no bounding box.
+                continue
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(
                 torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
@@ -455,13 +459,14 @@ class PointPillarsBatch:
 
 
 class ConcatBatcher(object):
-    """ConcatBatcher for KPConv"""
+    """ConcatBatcher for KPConv."""
 
     def __init__(self, device, model='KPConv'):
-        """
-        Initialize
+        """Initialize.
+
         Args:
             device: torch device 'gpu' or 'cpu'
+
         Returns:
             class: The corresponding class.
         """
@@ -470,10 +475,11 @@ class ConcatBatcher(object):
         self.model = model
 
     def collate_fn(self, batches):
-        """
-        collate_fn called by original PyTorch dataloader
+        """Collate function called by original PyTorch dataloader.
+
         Args:
             batches: a batch of data
+
         Returns:
             class: the batched result
         """

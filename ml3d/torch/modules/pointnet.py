@@ -120,7 +120,7 @@ class _PointnetSAModuleBase(nn.Module):
                 xyz: torch.Tensor,
                 features: torch.Tensor = None,
                 new_xyz=None) -> (torch.Tensor, torch.Tensor):
-        """
+        r"""
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
         :param new_xyz:
@@ -161,7 +161,7 @@ class _PointnetSAModuleBase(nn.Module):
 
 
 class PointnetSAModuleMSG(_PointnetSAModuleBase):
-    """Pointnet set abstraction layer with multiscale grouping"""
+    """Pointnet set abstraction layer with multiscale grouping."""
 
     def __init__(self,
                  *,
@@ -212,7 +212,7 @@ class PointnetSAModuleMSG(_PointnetSAModuleBase):
 
 
 class PointnetSAModule(PointnetSAModuleMSG):
-    """Pointnet set abstraction layer"""
+    """Pointnet set abstraction layer."""
 
     def __init__(self,
                  *,
@@ -250,7 +250,7 @@ MODEL._register_module(PointnetSAModule, 'torch')
 
 
 class PointnetFPModule(nn.Module):
-    r"""Propigates the features of one set to another"""
+    r"""Propagates the features of one set to another"""
 
     def __init__(self, *, mlp: List[int], batch_norm=None, bias=False):
         """

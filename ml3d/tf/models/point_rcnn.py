@@ -23,14 +23,15 @@ from ...metrics import iou_3d
 
 
 class PointRCNN(BaseModel):
-    """Object detection model. 
-    Based on the PoinRCNN architecture 
+    """Object detection model. Based on the PoinRCNN architecture
     https://github.com/sshaoshuai/PointRCNN.
 
-    The network is not trainable end-to-end, it requires pre-training of the RPN module, followed by training of the RCNN module. 
-    For this the mode must be set to 'RPN', with this, the network only outputs intermediate results. 
-    If the RPN module is trained, the mode can be set to 'RCNN' (default), with this, 
-    the second module can be trained and the output are the final predictions.
+    The network is not trainable end-to-end, it requires pre-training of the RPN
+    module, followed by training of the RCNN module.  For this the mode must be
+    set to 'RPN', with this, the network only outputs intermediate results.  If
+    the RPN module is trained, the mode can be set to 'RCNN' (default), with
+    this, the second module can be trained and the output are the final
+    predictions.
 
     For inference use the 'RCNN' mode.
 
@@ -493,21 +494,21 @@ def get_reg_loss(pred_reg,
                  loc_y_scope=0.5,
                  loc_y_bin_size=0.25,
                  get_ry_fine=False):
-    """
-    Bin-based 3D bounding boxes regression loss. See https://arxiv.org/abs/1812.04244 for more details.
-    
-    :param pred_reg: (N, C)
-    :param reg_label: (N, 7) [dx, dy, dz, h, w, l, ry]
-    :param loc_scope: constant
-    :param loc_bin_size: constant
-    :param num_head_bin: constant
-    :param anchor_size: (N, 3) or (3)
-    :param get_xz_fine:
-    :param get_y_by_bin:
-    :param loc_y_scope:
-    :param loc_y_bin_size:
-    :param get_ry_fine:
-    :return:
+    """Bin-based 3D bounding boxes regression loss. See
+    https://arxiv.org/abs/1812.04244 for more details.
+
+    Args:
+        pred_reg: (N, C)
+        reg_label: (N, 7) [dx, dy, dz, h, w, l, ry]
+        loc_scope: Constant
+        loc_bin_size: Constant
+        num_head_bin: Constant
+        anchor_size: (N, 3) or (3)
+        get_xz_fine: Whether to get fine xz loss.
+        get_y_by_bin: Whether to divide y coordinate into bin.
+        loc_y_scope: Scope length for y coordinate.
+        loc_y_bin_size: Bin size for classifying y coordinate.
+        get_ry_fine: Whether to use fine yaw loss.
     """
     per_loc_bin_num = int(loc_scope / loc_bin_size) * 2
     loc_y_bin_num = int(loc_y_scope / loc_y_bin_size) * 2
@@ -1054,9 +1055,12 @@ class RCNN(tf.keras.layers.Layer):
 
 def rotate_pc_along_y(pc, rot_angle):
     """
-    params pc: (N, 3+C), (N, 3) is in the rectified camera coordinate
-    params rot_angle: rad scalar
-    Output pc: updated pc with XYZ rotated
+    Args:
+        pc: (N, 3+C), (N, 3) is in the rectified camera coordinate.
+        rot_angle: rad scalar
+
+    Returns:
+        pc: updated pc with XYZ rotated.
     """
     cosval = np.cos(rot_angle)
     sinval = np.sin(rot_angle)
@@ -1176,13 +1180,14 @@ class ProposalLayer(tf.keras.layers.Layer):
         return ret_bbox3d, ret_scores
 
     def distance_based_proposal(self, scores, proposals, order, training=True):
-        """
-         propose rois in two area based on the distance
-        :param scores: (N)
-        :param proposals: (N, 7)
-        :param order: (N)
-        """
+        """Propose ROIs in two area based on the distance.
 
+        Args:
+            scores: (N)
+            proposals: (N, 7)
+            order: (N)
+            training (bool): Whether we are training?
+        """
         nms_post = self.nms_post
         nms_thres = self.nms_thres
         if not training:
@@ -1262,18 +1267,18 @@ def decode_bbox_target(roi_box3d,
                        loc_y_bin_size=0.25,
                        get_ry_fine=False):
     """
-    :param roi_box3d: (N, 7)
-    :param pred_reg: (N, C)
-    :param loc_scope:
-    :param loc_bin_size:
-    :param num_head_bin:
-    :param anchor_size:
-    :param get_xz_fine:
-    :param get_y_by_bin:
-    :param loc_y_scope:
-    :param loc_y_bin_size:
-    :param get_ry_fine:
-    :return:
+    Args:
+        roi_box3d: (N, 7)
+        pred_reg: (N, C)
+        loc_scope:
+        loc_bin_size:
+        num_head_bin:
+        anchor_size:
+        get_xz_fine:
+        get_y_by_bin:
+        loc_y_scope:
+        loc_y_bin_size:
+        get_ry_fine:
     """
     per_loc_bin_num = int(loc_scope / loc_bin_size) * 2
     loc_y_bin_num = int(loc_y_scope / loc_y_bin_size) * 2
@@ -1512,9 +1517,12 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
 
     def sample_rois_for_rcnn(self, roi_boxes3d, gt_boxes3d):
         """
-        :param roi_boxes3d: (B, M, 7)
-        :param gt_boxes3d: (B, N, 8) [x, y, z, h, w, l, ry, cls]
-        :return
+
+        Args:
+            roi_boxes3d: (B, M, 7)
+            gt_boxes3d: (B, N, 8) [x, y, z, h, w, l, ry, cls]
+
+        Returns:
             batch_rois: (B, N, 7)
             batch_gt_of_rois: (B, N, 8)
             batch_roi_iou: (B, N)
@@ -1716,8 +1724,10 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
     @staticmethod
     def random_aug_box3d(box3d):
         """
-        :param box3d: (7) [x, y, z, h, w, l, ry]
-        random shift, scale, orientation
+        Random shift, scale, orientation.
+
+        Args:
+            box3d: (7) [x, y, z, h, w, l, ry]
         """
         # pos_range, hwl_range, angle_range, mean_iou
         range_config = [[0.2, 0.1, np.pi / 12,
@@ -1746,10 +1756,10 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
 
     def data_augmentation(self, pts, rois, gt_of_rois):
         """
-        :param pts: (B, M, 512, 3)
-        :param rois: (B, M. 7)
-        :param gt_of_rois: (B, M, 7)
-        :return:
+        Args:
+            pts: (B, M, 512, 3)
+            rois: (B, M. 7)
+            gt_of_rois: (B, M, 7)
         """
         batch_size, boxes_num = pts.shape[0], pts.shape[1]
 

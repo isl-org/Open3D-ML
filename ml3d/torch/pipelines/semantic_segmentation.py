@@ -32,10 +32,11 @@ log = logging.getLogger(__name__)
 
 
 class SemanticSegmentation(BasePipeline):
-    """
-    This class allows you to perform semantic segmentation for both training and inference using the Torch. This pipeline has multiple stages: Pre-processing, loading dataset, testing, and inference or training.
-    
-    **Example:** 
+    """This class allows you to perform semantic segmentation for both training
+    and inference using the Torch. This pipeline has multiple stages: Pre-
+    processing, loading dataset, testing, and inference or training.
+
+    **Example:**
         This example loads the Semantic Segmentation and performs a training using the SemanticKITTI dataset.
 
             import torch, pickle
@@ -62,7 +63,7 @@ class SemanticSegmentation(BasePipeline):
             device='gpu',
             split='train',
             train_sum_dir='train_log')
-            
+
     **Args:**
             dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
             model: The model to be used for building the pipeline.
@@ -81,11 +82,9 @@ class SemanticSegmentation(BasePipeline):
             device: The device to be used for training.
             split: The dataset split to be used. In this example, we have used "train".
             train_sum_dir: The directory where the trainig summary is stored.
-            
+
     **Returns:**
             class: The corresponding class.
-        
-        
     """
 
     def __init__(
@@ -345,12 +344,16 @@ class SemanticSegmentation(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size,
-                                  sampler=get_sampler(train_sampler),
-                                  num_workers=cfg.get('num_workers', 4),
-                                  pin_memory=cfg.get('pin_memory', True),
-                                  collate_fn=self.batcher.collate_fn)
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            sampler=get_sampler(train_sampler),
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=self.batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed))
+        )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
         valid_dataset = dataset.get_split('validation')
         valid_sampler = valid_dataset.sampler
@@ -361,12 +364,15 @@ class SemanticSegmentation(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
-        valid_loader = DataLoader(valid_split,
-                                  batch_size=cfg.val_batch_size,
-                                  sampler=get_sampler(valid_sampler),
-                                  num_workers=cfg.get('num_workers', 4),
-                                  pin_memory=cfg.get('pin_memory', True),
-                                  collate_fn=self.batcher.collate_fn)
+        valid_loader = DataLoader(
+            valid_split,
+            batch_size=cfg.val_batch_size,
+            sampler=get_sampler(valid_sampler),
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=self.batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed)))
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 

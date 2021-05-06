@@ -45,7 +45,6 @@ def add_args(parser, cfg, prefix=''):
 
 
 class Config(object):
-    """docstring for Config"""
 
     def __init__(self, cfg_dict=None):
         if cfg_dict is None:
@@ -78,6 +77,7 @@ class Config(object):
     @staticmethod
     def merge_cfg_file(cfg, args, extra_dict):
         """Merge args and extra_dict from the input arguments.
+
         Merge the dict parsed by MultipleKVAction into this cfg.
         """
         # merge args to cfg
@@ -116,6 +116,7 @@ class Config(object):
     @staticmethod
     def merge_module_cfg_file(args, extra_dict):
         """Merge args and extra_dict from the input arguments.
+
         Merge the dict parsed by MultipleKVAction into this cfg.
         """
         # merge args to cfg

@@ -25,10 +25,11 @@ log = logging.getLogger(__name__)
 
 
 class SemanticSegmentation(BasePipeline):
-    """
-    This class allows you to perform semantic segmentation for both training and inference using the TensorFlow framework. This pipeline has multiple stages: Pre-processing, loading dataset, testing, and inference or training.
-    
-    **Example:** 
+    """This class allows you to perform semantic segmentation for both training
+    and inference using the TensorFlow framework. This pipeline has multiple
+    stages: Pre-processing, loading dataset, testing, and inference or training.
+
+    **Example:**
         This example loads the Semantic Segmentation and performs a training using the SemanticKITTI dataset.
 
             import tensorflow as tf
@@ -52,7 +53,7 @@ class SemanticSegmentation(BasePipeline):
             device='gpu',
             split='train',
             train_sum_dir='train_log')
-            
+
     **Args:**
             dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
             model: The model to be used for building the pipeline.
@@ -71,11 +72,9 @@ class SemanticSegmentation(BasePipeline):
             device: The device to be used for training.
             split: The dataset split to be used. In this example, we have used "train".
             train_sum_dir: The directory where the trainig summary is stored.
-            
+
     **Returns:**
             class: The corresponding class.
-        
-        
     """
 
     def __init__(

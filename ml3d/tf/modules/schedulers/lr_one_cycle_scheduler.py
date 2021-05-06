@@ -3,6 +3,13 @@ import numpy as np
 
 
 class OneCycleScheduler(tf.keras.optimizers.schedules.LearningRateSchedule):
+    """Scheduler class for cyclic learning rate scheduling.
+
+    Args:
+        total_step: number of steps for one cycle.
+        lr_max: maximum cyclic learning rate.
+        div_factor: factor by which initial learning starts.
+    """
 
     def __init__(self, total_step, lr_max=0.002, div_factor=10.0):
 

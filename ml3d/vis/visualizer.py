@@ -13,14 +13,18 @@ import time
 
 
 class Model:
-    """The class that helps build visualization models based on attributes, data, and methods."""
+    """The class that helps build visualization models based on attributes,
+    data, and methods.
+    """
     bounding_box_prefix = "Bounding Boxes/"
 
     class BoundingBoxData:
-        """The class to define a bounding box that is used to describe the target location.
-            Args:
-                name: The name of the pointcloud array.
-                boxes: The array of pointcloud that define the bounding box.
+        """The class to define a bounding box that is used to describe the
+        target location.
+
+        Args:
+            name: The name of the pointcloud array.
+            boxes: The array of pointcloud that define the bounding box.
         """
 
         def __init__(self, name, boxes):
@@ -65,7 +69,10 @@ class Model:
         assert (False)  # pure virtual
 
     def create_point_cloud(self, data):
-        """Create a point cloud based on the data provided. The data should include name and points."""
+        """Create a point cloud based on the data provided.
+
+        The data should include name and points.
+        """
         assert ("name" in data)  # name is a required field
         assert ("points" in data)  # 'points' is a required field
 
@@ -203,6 +210,7 @@ class Model:
 
 class DataModel(Model):
     """The class for data i/o and storage of visualization.
+
     Args:
         userdata: The dataset to be used in the visualization.
     """
@@ -233,6 +241,7 @@ class DataModel(Model):
 
 class DatasetModel(Model):
     """The class used to manage a dataset model.
+
     Args:
         dataset:  The 3D ML dataset to use. You can use the base dataset, sample datasets , or a custom dataset.
         split: A string identifying the dataset split that is usually one of 'training', 'test', 'validation', or 'all'.
@@ -363,7 +372,9 @@ class Visualizer:
     """The visualizer class for dataset objects and custom point clouds."""
 
     class LabelLUTEdit:
-        """This class includes functionality for managing a labellut (label look-up-table)."""
+        """This class includes functionality for managing a labellut (label
+        look-up-table).
+        """
 
         def __init__(self):
             self.widget = gui.TreeView()
@@ -442,7 +453,9 @@ class Visualizer:
                 self._on_changed()
 
     class ColormapEdit:
-        """This class is used to create a color map for visualization of points."""
+        """This class is used to create a color map for visualization of
+        points.
+        """
 
         def __init__(self, window, em):
             self.colormap = None
@@ -489,7 +502,9 @@ class Visualizer:
             self._on_changed = callback
 
         def update(self, colormap, min_val, max_val):
-            """Updates the colormap based on the minimum and maximum values passed."""
+            """Updates the colormap based on the minimum and maximum values
+            passed.
+            """
             self.colormap = colormap
 
             self._min_value = min_val
@@ -633,9 +648,9 @@ class Visualizer:
             gui.Application.instance.post_to_main_thread(self._window, update)
 
     class ProgressDialog:
-        """
-        This class is used to manage the progress dialog displayed during visualization.
-        
+        """This class is used to manage the progress dialog displayed during
+        visualization.
+
         Args:
             title: The title of the dialog box.
             window: The window where the progress dialog box should be displayed.
@@ -914,6 +929,7 @@ class Visualizer:
 
     def set_lut(self, attr_name, lut):
         """Set the LUT for a specific attribute.
+
         Args:
         attr_name: The attribute name as string.
         lut: The LabelLUT object that should be updated.
@@ -1279,9 +1295,9 @@ class Visualizer:
 
         self._update_geometry_colors()
 
-    def _on_layout(self, theme):
+    def _on_layout(self, context):
         frame = self.window.content_rect
-        em = theme.font_size
+        em = context.theme.font_size
         panel_width = 20 * em
         panel_rect = gui.Rect(frame.get_right() - panel_width, frame.y,
                               panel_width, frame.height - frame.y)
@@ -1454,8 +1470,7 @@ class Visualizer:
                           indices=None,
                           width=1024,
                           height=768):
-        """
-        Visualize a dataset.
+        """Visualize a dataset.
 
         Example:
             Minimal example for visualizing a dataset::
@@ -1488,12 +1503,12 @@ class Visualizer:
                   bounding_boxes=None,
                   width=1024,
                   height=768):
-        """
-        Visualize a custom point cloud data.
+        """Visualize a custom point cloud data.
 
         Example:
             Minimal example for visualizing a single point cloud with an
             attribute::
+
                 import numpy as np
                 import open3d.ml.torch as ml3d
                 # or import open3d.ml.tf as ml3d
@@ -1505,13 +1520,15 @@ class Visualizer:
                     } ]
 
                 vis = ml3d.vis.Visualizer()
-                vis.visualize(data) 
+                vis.visualize(data)
 
         Args:
             data: A list of dictionaries. Each dictionary is a point cloud with
                 attributes. Each dictionary must have the entries 'name' and
-                'points'. Points and point attributes can be passed as numpy 
+                'points'. Points and point attributes can be passed as numpy
                 arrays, PyTorch tensors or TensorFlow tensors.
+            lut: Optional lookup table for colors.
+            bounding_boxes: Optional bounding boxes.
             width: window width.
             height: window height.
         """

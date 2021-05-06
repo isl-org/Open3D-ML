@@ -20,9 +20,8 @@ from ...datasets.utils.operations import filter_by_min_points
 
 
 def unpack(flat_t, counts=None):
-    """
-    Converts flat tensor to list of tensors, 
-    with length according to counts.
+    """Converts flat tensor to list of tensors, with length according to
+    counts.
     """
     if counts is None:
         return [flat_t]
@@ -37,8 +36,7 @@ def unpack(flat_t, counts=None):
 
 
 class PointPillars(BaseModel):
-    """Object detection model. 
-    Based on the PointPillars architecture 
+    """Object detection model. Based on the PointPillars architecture
     https://github.com/nutonomy/second.pytorch.
 
     Args:
@@ -136,8 +134,8 @@ class PointPillars(BaseModel):
         return voxels, num_points, coors_batch
 
     def call(self, inputs, training=True):
-        """
-        Forward pass
+        """Forward pass.
+
         :param inputs: tuple/list of inputs (points, bboxes, labels, calib)
         :param training: toggle training run
         """
@@ -162,8 +160,8 @@ class PointPillars(BaseModel):
         #                            beta_2=beta2)
 
     def loss(self, results, inputs, training=True):
-        """
-        Computes loss
+        """Computes loss.
+
         :param results: results of forward pass (scores, bboxes, dirs)
         :param inputs: tuple/list of gt inputs (points, bboxes, labels, calib)
         """
@@ -429,19 +427,20 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
             self.max_voxels = (max_voxels, max_voxels)
 
     def call(self, points_feats, training=False):
-        """Forward function
+        """Forward function.
 
         Args:
             points_feats: Tensor with point coordinates and features. The shape
-                is [N, 3+C] with N as the number of points and C as the number 
+                is [N, 3+C] with N as the number of points and C as the number
                 of feature channels.
+
         Returns:
             (out_voxels, out_coords, out_num_points).
-            - out_voxels is a dense list of point coordinates and features for 
+            * out_voxels is a dense list of point coordinates and features for
               each voxel. The shape is [num_voxels, max_num_points, 3+C].
-            - out_coords is tensor with the integer voxel coords and shape
+            * out_coords is tensor with the integer voxel coords and shape
               [num_voxels,3]. Note that the order of dims is [z,y,x].
-            - out_num_points is a 1D tensor with the number of points for each
+            * out_num_points is a 1D tensor with the number of points for each
               voxel.
         """
         if training:
@@ -697,6 +696,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
             coors (tf.Tensor): Coordinates of each voxel in shape (N, 4).
                 The first column indicates the sample ID.
             batch_size (int): Number of samples in the current batch.
+            training (bool): Whether we are training or not?
         """
         # batch_canvas will be the final output.
         batch_canvas = []
@@ -960,7 +960,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
 
     @staticmethod
     def bias_init_with_prob(prior_prob):
-        """initialize conv/fc bias value according to giving probablity."""
+        """Initialize conv/fc bias value according to giving probablity."""
         bias_init = float(-np.log((1 - prior_prob) / prior_prob))
 
         return bias_init
@@ -1002,7 +1002,6 @@ class Anchor3DHead(tf.keras.layers.Layer):
             tf.Tensor: Index of positive matches.
             tf.Tensor: Index of negative matches.
         """
-
         # compute all anchors
         anchors = [
             self.anchor_generator.grid_anchors(pred_bboxes.shape[-2:])
@@ -1018,7 +1017,10 @@ class Anchor3DHead(tf.keras.layers.Layer):
         assigned_bboxes, target_idxs, pos_idxs, neg_idxs = [], [], [], []
 
         def flatten_idx(idx, j):
-            """inject class dimension in the given indices (... z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)"""
+            """Inject class dimension in the given indices (...
+
+            z * rot_angles + x) --> (.. z * num_classes * rot_angles + j * rot_angles + x)
+            """
             z = idx // rot_angles
             x = idx % rot_angles
 
@@ -1086,7 +1088,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
                 class predictions.
 
         Returns:
-            tuple[tf.Tensor]: Prediction results of batches 
+            tuple[tf.Tensor]: Prediction results of batches
                 (bboxes, scores, labels).
         """
         bboxes, scores, labels = [], [], []
@@ -1109,7 +1111,7 @@ class Anchor3DHead(tf.keras.layers.Layer):
                 class predictions.
 
         Returns:
-            tuple[tf.Tensor]: Prediction results of batches 
+            tuple[tf.Tensor]: Prediction results of batches
                 (bboxes, scores, labels).
         """
         assert cls_scores.shape[-2:] == bbox_preds.shape[-2:]

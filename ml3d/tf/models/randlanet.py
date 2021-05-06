@@ -293,8 +293,8 @@ class RandLANet(BaseModel):
         return optimizer
 
     def get_loss(self, Loss, results, inputs):
-        """
-        Runs the loss on outputs of the model
+        """Runs the loss on outputs of the model.
+
         :param outputs: logits
         :param labels: labels
         :return: loss
