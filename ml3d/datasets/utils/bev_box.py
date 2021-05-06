@@ -56,9 +56,9 @@ class BEVBox3D(BoundingBox3D):
         self.level = self.get_difficulty()
         self.dis_to_cam = np.linalg.norm(self.to_camera()[:3])
 
-    def to_kitti_format(self, score=1.):
+    def to_kitti_format(self, score=1.0):
         """
-        This method transforms the class to kitti format.
+        This method transforms the class to KITTI format.
         """
         box2d = self.to_img()
         box2d[2:] += box2d[:2]  # Add w, h.
@@ -134,11 +134,11 @@ class BEVBox3D(BoundingBox3D):
             return self.to_xyzwhlr()[[1, 2, 0, 4, 5, 3, 6]]
 
         bbox = np.zeros((7,))
+        # In camera space, we define center as center of the bottom face of bounding box.
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
+        # Transform center to camera frame of reference.
         bbox[0:3] = (np.array([*bbox[0:3], 1.0]) @ self.world_cam)[:3]
         bbox[3:6] = [self.size[1], self.size[0], self.size[2]]  # h, w, l
-        # TODO : Check implications.
-        # bbox[3:6] = self.size[2::-1]
         bbox[6] = self.yaw
         return bbox
 

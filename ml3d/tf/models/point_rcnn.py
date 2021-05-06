@@ -12,8 +12,8 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
-from ...datasets.utils import DataProcessing, BEVBox3D, ObjdetAugmentation
-from ...datasets.utils.operations import points_in_box, filter_by_min_points
+from ...datasets.utils import BEVBox3D, DataProcessing, ObjdetAugmentation
+from ...datasets.utils.operations import filter_by_min_points, points_in_box
 
 from ...utils import MODEL
 from ..modules.schedulers import OneCycleScheduler
@@ -133,6 +133,15 @@ class PointRCNN(BaseModel):
 
         return optimizer
 
+    """Load ground truth object database.
+
+    Args:
+        pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
+        min_points_dict: A dictionary to filter objects based on number of points inside.
+        sample_dict: A dictionary to decide number of objects to sample.
+
+    """
+
     def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
         db_boxes = pickle.load(open(pickle_path, 'rb'))
 
@@ -148,6 +157,22 @@ class PointRCNN(BaseModel):
                 db_boxes_dict[db_box.label_class].append(db_box)
 
         self.db_boxes_dict = db_boxes_dict
+
+    """Augment object detection data.
+
+    Available augmentations are:
+        `ObjectSample`: Insert objects from ground truth database.
+        `ObjectRangeFilter`: Filter pointcloud from given bounds.
+        `PointShuffle`: Shuffle the pointcloud.
+
+    Args:
+        data: A dictionary object returned from the dataset class.
+        attr: Attributes for current pointcloud.
+
+    Returns:
+        Augmented `data` dictionary.
+
+    """
 
     def augment_data(self, data, attr):
         cfg = self.cfg.augment
@@ -183,6 +208,16 @@ class PointRCNN(BaseModel):
                 return {"loss": tf.constant(0.0)}
             return self.rcnn.loss(results, inputs)
 
+    """Filter objects based on classes to train.
+
+    Args:
+        bbox_objs: Bounding box objects from dataset class.
+
+    Returns:
+        Filtered bounding box objects.
+
+    """
+
     def filter_objects(self, bbox_objs):
         filtered = []
         for bb in bbox_objs:
@@ -205,10 +240,30 @@ class PointRCNN(BaseModel):
 
         new_data = {'point': points, 'calib': calib}
 
+        # bounding_boxes are objects of type BEVBox3D. It is renamed to
+        # bbox_objs to clarify them as objects and not matrix of type [N, 7].
         if attr['split'] not in ['test', 'testing']:
             new_data['bbox_objs'] = data['bounding_boxes']
 
         return new_data
+
+    """Generates labels for RPN network.
+
+    Classifies each point as foreground/background based on points inside bbox.
+    We don't train on ambigious points which are just outside bounding boxes(calculated
+    by `extended_boxes`).
+    Also computes regression labels for bounding box proposals(in bounding box frame).
+
+    Args:
+        points: Input pointcloud.
+        bboxes: bounding boxes in camera frame.
+        bboxes_world: bounding boxes in world frame.
+        calib: Calibration file for cam_to_world matrix.
+
+    Returns:
+        Classification and Regression labels.
+
+    """
 
     @staticmethod
     def generate_rpn_training_labels(points, bboxes, bboxes_world, calib=None):
@@ -227,8 +282,9 @@ class PointRCNN(BaseModel):
 
         # enlarge the bbox3d, ignore nearby points
         extended_boxes = bboxes_world.copy()
+        # Enlarge box by 0.4m (from PointRCNN paper).
         extended_boxes[3:6] += 0.4
-        # extended_boxes[:, 1] += 0.2
+        # Decrease z coordinate, as z_center is at bottom face of box.
         extended_boxes[:, 2] -= 0.2
 
         pts_idx_ext = points_in_box(points.copy(),
@@ -308,7 +364,7 @@ class PointRCNN(BaseModel):
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes, bboxes_world, data['calib'])
             t_data['labels'] = labels
-            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['bbox_objs'] = data['bbox_objs']  # Objects of type BEVBox3D.
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
 

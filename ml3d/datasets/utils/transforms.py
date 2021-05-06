@@ -198,6 +198,6 @@ class ObjdetAugmentation():
     @staticmethod
     def ObjectNoise(input,
                     trans_std=[0.25, 0.25, 0.25],
-                    rot_range=[-0.15707963267, 0.15707963267],
+                    rot_range=[-np.pi / 2, np.pi / 2],
                     num_try=100):
         raise NotImplementedError

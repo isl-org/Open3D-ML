@@ -302,7 +302,8 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
-            #self.scheduler.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # --------------------- validation
             self.run_valid()

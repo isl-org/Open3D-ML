@@ -246,9 +246,9 @@ def mAP(pred,
                 prec[ti] = tp_acc / (tp_acc + fp_acc)
                 prec[ti] = np.max(prec[ti:], axis=-1)
 
-            if len(prec[::4]) < 11:
+            if len(prec[::4]) < int(samples / 4 + 1):
                 mAP[i, j] = np.sum(prec) / len(prec) * 100
             else:
-                mAP[i, j] = np.sum(prec[::4]) / 11 * 100
+                mAP[i, j] = np.sum(prec[::4]) / int(samples / 4 + 1) * 100
 
     return mAP
