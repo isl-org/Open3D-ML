@@ -35,7 +35,6 @@ class SemSegMetric(object):
             A list of floats of length num_classes+1.
             Consists of per class accuracy. Last item is Overall Accuracy.
         """
-
         if self.confusion_matrix is None:
             return None
 
@@ -68,7 +67,6 @@ class SemSegMetric(object):
             A list of floats of length num_classes+1.
             Consists of per class IoU. Last item is mIoU.
         """
-
         if self.confusion_matrix is None:
             return None
 

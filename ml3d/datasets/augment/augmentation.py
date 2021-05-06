@@ -5,8 +5,9 @@ from ..utils.operations import create_3D_rotations
 
 class SemsegAugmentation():
     """Class consisting different augmentation methods for Semantic Segmentation.
-        Args:
-            cfg: Config for augmentation.
+
+    Args:
+        cfg: Config for augmentation.
     """
 
     def __init__(self, cfg):
