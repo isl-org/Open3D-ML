@@ -333,8 +333,8 @@ For the evaluation, the models were evaluated using the validation subset, accor
 |--------------------|---------------|
 | PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) |
 | PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)   |
-| PointRCNN (tf)       | [78.2 / 60.2] |
-| PointRCNN (torch)    | [78.2 / 60.2] |
+| PointRCNN (tf)       | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.zip) |
+| PointRCNN (torch)    | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.pth) |
 
 
 #### Training PointRCNN
