@@ -1044,6 +1044,7 @@ class RCNN(tf.keras.layers.Layer):
             loss_size = 3 * loss_size  # consistent with old codes
             rcnn_loss_reg = loss_loc + loss_angle + loss_size
         else:
+            #  Regression loss is zero when no point is classified as foreground.
             rcnn_loss_reg = tf.reduce_mean(rcnn_reg * 0)
 
         return {"cls": rcnn_loss_cls, "reg": rcnn_loss_reg}
