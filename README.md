@@ -29,9 +29,9 @@ ML frameworks such as data visualization.
 Open3D-ML is integrated in the Open3D v0.11+ python distribution and is
 compatible with the following versions of ML frameworks.
 
- * PyTorch 1.6
- * TensorFlow 2.3
- * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
+ * PyTorch 1.7
+ * TensorFlow 2.4
+ * CUDA 10.1, 11.* (On `GNU/Linux x86_64`, optional)
 
 You can install Open3D with
 ```bash
