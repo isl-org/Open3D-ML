@@ -7,7 +7,7 @@ from glob import glob
 import logging
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
 from .utils import BEVBox3D
 
@@ -117,7 +117,7 @@ class Scannet(BaseDataset):
         # for i in range(semantic_mask.shape[0]):
         #     semantic_mask[i] = self.cat_ids2class.get(semantic_mask[i], 0)
 
-        remapper = np.ones(150) * (-100)
+        remapper = np.ones(150) * (-1)
         for i, x in enumerate(self.semantic_ids):
             remapper[x] = i
 
@@ -150,13 +150,25 @@ class Scannet(BaseDataset):
     def is_tested(self):
         pass
 
-    def save_test_result(self):
-        pass
+    def save_test_result(self, results, attr):
+        cfg = self.cfg
+        name = attr['name']
+        path = cfg.test_result_folder
+        make_dir(path)
+
+        pred = results['predict_labels']
+        pred = np.array(pred)[self.semantic_ids]
+
+        store_path = join(path, self.name, name + '.npy')
+        make_dir(Path(store_path).parent)
+        np.save(store_path, pred)
+        log.info("Saved {} in {}.".format(name, store_path))
 
 
-class ScannetSplit():
+class ScannetSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
+        super().__init__(dataset, split)
         self.cfg = dataset.cfg
 
         self.path_list = dataset.get_split_list(split)

@@ -1,0 +1,52 @@
+dataset:
+  name: Scannet
+  dataset_path:  # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [52539651, 40780759, 6961796, 4665739, 13155460, 4172698, 6368886, 7869501, 6780748, 4418153, 883498, 883847, 3330654, 3637628, 939700, 593984, 547679, 460448, 567893, 6490881]
+  test_result_folder: ./test
+  use_cache: False
+  sampler:
+    name: 'SemSegRandomSampler'
+model:
+  name: SparseConvUnet
+  batcher: ConcatBatcher
+  ckpt_path: # path/to/your/checkpoint
+  multiplier: 32
+  voxel_size: 0.02
+  residual_blocks: True
+  conv_block_reps: 1
+  in_channels: 3
+  num_classes: 20
+  grid_size: 4096
+  ignored_label_inds: [-1]
+  augment:
+    rotate:
+      method: vertical
+    scale:
+      min_s: 0.9
+      max_s: 1.1
+    noise:
+      noise_std: 0.01
+    RandomDropout:
+      dropout_ratio: 0.2
+    RandomHorizontalFlip:
+      axes: [0, 1]
+    ChromaticAutoContrast:
+      randomize_blend_factor: True
+      blend_factor: 0.5
+    ChromaticTranslation:
+      trans_range_ratio: 0.1
+    ChromaticJitter:
+      std: 0.05
+pipeline:
+  name: SemanticSegmentation
+  adam_lr: 0.001
+  batch_size: 8
+  learning_rate: 0.01
+  main_log_dir: ./logs
+  max_epoch: 512
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.99
+  test_batch_size: 1
+  train_sum_dir: train_log
+  val_batch_size: 8

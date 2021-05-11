@@ -61,7 +61,11 @@ class SemSegSpatiallyRegularSampler(object):
 
     def get_point_sampler(self):
 
-        def _random_centered_gen(**kwargs):
+        def _random_centered_gen(patchwise=True, **kwargs):
+            if not patchwise:
+                self.possibilities[self.cloud_id][:] = 1.
+                self.min_possibilities[self.cloud_id] = 1.
+                return
             pc = kwargs.get('pc', None)
             num_points = kwargs.get('num_points', None)
             radius = kwargs.get('radius', None)

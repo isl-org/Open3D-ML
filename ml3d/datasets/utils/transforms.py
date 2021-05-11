@@ -32,7 +32,8 @@ def trans_augment(points, t_augment):
         return points
 
     # Initialize rotation matrix
-    R = np.eye(points.shape[1])
+    R = np.eye(points.shape[1]) + np.random.rand(3, 3) * 0.1
+    R[0][0] *= np.random.randint(0, 2) * 2 - 1  # Randomply flip x dimension.
 
     if points.shape[1] == 3:
         rotation_method = t_augment.get('rotation_method', None)
@@ -41,7 +42,9 @@ def trans_augment(points, t_augment):
             # Create random rotations
             theta = np.random.rand() * 2 * np.pi
             c, s = np.cos(theta), np.sin(theta)
-            R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
+            R = np.matmul(
+                R, np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]],
+                            dtype=np.float32))
 
         elif rotation_method == 'all':
 
@@ -72,7 +75,7 @@ def trans_augment(points, t_augment):
     if scale_anisotropic:
         scale = np.random.rand(points.shape[1]) * (max_s - min_s) + min_s
     else:
-        scale = np.random.rand() * (max_s - min_s) - min_s
+        scale = np.random.rand() * (max_s - min_s) + min_s
 
     # TODO: add symmetric augmentation
     # # Add random symmetries to the scale factor
@@ -92,8 +95,7 @@ def trans_augment(points, t_augment):
     noise = (np.random.randn(points.shape[0], points.shape[1]) *
              noise_level).astype(np.float32)
 
-    augmented_points = np.sum(np.expand_dims(points, 2) * R,
-                              axis=1) * scale + noise
+    augmented_points = np.matmul(points, R) * scale + noise
 
     return augmented_points.astype(np.float32)
 

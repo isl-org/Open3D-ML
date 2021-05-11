@@ -153,11 +153,14 @@ class TFDataloader():
         gen_func, gen_types, gen_shapes = self.get_batch_gen(
             self, self.steps_per_epoch, batch_size)
 
-        loader = tf.data.Dataset.from_generator(gen_func, gen_types, gen_shapes)
+        loader = tf.data.Dataset.from_generator(
+            gen_func, gen_types,
+            gen_shapes).prefetch(tf.data.experimental.AUTOTUNE)
 
         if transform:
-            loader = loader.map(map_func=self.transform,
-                                num_parallel_calls=num_threads)
+            loader = loader.map(
+                map_func=self.transform,
+                num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
         if (self.model is None or 'batcher' not in self.model_cfg.keys() or
                 self.model_cfg.batcher == 'DefaultBatcher'):

@@ -3,7 +3,6 @@ import torch.nn as nn
 import numpy as np
 import logging
 import sys
-import warnings
 
 from datetime import datetime
 from tqdm import tqdm
@@ -136,30 +135,6 @@ class SemanticSegmentation(BasePipeline):
         """
 
     def run_inference(self, data):
-        if self.model.cfg.name == 'SparseConvUnet':
-            return self.run_inference_direct(data)
-        else:
-            return self.run_inference_patchwise(data)
-
-    def run_inference_direct(self, data):
-        model = self.model
-        device = self.device
-
-        model.to(device)
-        model.device = device
-        model.eval()
-
-        model.inference_begin(data)
-        inputs = model.inference_preprocess()
-
-        with torch.no_grad():
-            results = model(inputs)
-
-        results = model.inference_end(inputs, results)
-
-        return results
-
-    def run_inference_patchwise(self, data):
         cfg = self.cfg
         model = self.model
         device = self.device
@@ -216,7 +191,7 @@ class SemanticSegmentation(BasePipeline):
         model.eval()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-        metric = SemSegMetric(self, model, dataset, device)
+        metric = SemSegMetric()
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
@@ -301,8 +276,12 @@ class SemanticSegmentation(BasePipeline):
           == this_possiblility.shape[0]:
 
             proj_inds = self.model.preprocess(
-                self.dataset_split.get_data(self.curr_cloud_id),
-                {'split': split})['proj_inds']
+                self.dataset_split.get_data(self.curr_cloud_id), {
+                    'split': split
+                }).get('proj_inds', None)
+            if proj_inds is None:
+                proj_inds = np.arange(
+                    self.test_probs[self.curr_cloud_id].shape[0])
             self.ori_test_probs.append(
                 self.test_probs[self.curr_cloud_id][proj_inds])
             self.ori_test_labels.append(
@@ -331,7 +310,8 @@ class SemanticSegmentation(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLoss(self, model, dataset, device)
-        metric = SemSegMetric(self, model, dataset, device)
+        self.metric_train = SemSegMetric()
+        self.metric_val = SemSegMetric()
 
         self.batcher = self.get_batcher(device)
 
@@ -397,13 +377,15 @@ class SemanticSegmentation(BasePipeline):
 
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
+            self.metric_train.reset()
+            self.metric_val.reset()
             self.losses = []
-            self.accs = []
-            self.ious = []
-            self.train_conf_m = []
             model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
+                self.optimizer.zero_grad()
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
                     Loss, results, inputs, device)
@@ -411,35 +393,28 @@ class SemanticSegmentation(BasePipeline):
                 if predict_scores.size()[-1] == 0:
                     continue
 
-                self.optimizer.zero_grad()
-                # loss.backward()
+                loss.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
                     torch.nn.utils.clip_grad_value_(model.parameters(),
                                                     model.cfg.grad_clip_norm)
                 self.optimizer.step()
 
-                conf_m = metric.confusion_matrix(predict_scores, gt_labels)
-                acc = metric.acc(predict_scores, gt_labels)
-                iou = metric.iou(predict_scores, gt_labels)
+                self.metric_train.update(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
-                self.accs.append(acc)
-                self.ious.append(iou)
-                self.train_conf_m.append(conf_m)
 
             self.scheduler.step()
 
             # --------------------- validation
             model.eval()
             self.valid_losses = []
-            self.valid_accs = []
-            self.valid_ious = []
-            self.valid_conf_m = []
 
             model.trans_point_sampler = valid_sampler.get_point_sampler()
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
+                    if hasattr(inputs['data'], 'to'):
+                        inputs['data'].to(device)
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
@@ -447,14 +422,9 @@ class SemanticSegmentation(BasePipeline):
                     if predict_scores.size()[-1] == 0:
                         continue
 
-                    conf_m = metric.confusion_matrix(predict_scores, gt_labels)
-                    acc = metric.acc(predict_scores, gt_labels)
-                    iou = metric.iou(predict_scores, gt_labels)
+                    self.metric_val.update(predict_scores, gt_labels)
 
                     self.valid_losses.append(loss.cpu().item())
-                    self.valid_accs.append(acc)
-                    self.valid_ious.append(iou)
-                    self.valid_conf_m.append(conf_m)
 
             self.save_logs(writer, epoch)
 
@@ -473,7 +443,7 @@ class SemanticSegmentation(BasePipeline):
         if batcher_name == 'DefaultBatcher':
             batcher = DefaultBatcher()
         elif batcher_name == 'ConcatBatcher':
-            batcher = ConcatBatcher(device)
+            batcher = ConcatBatcher(device, self.model.cfg.name)
         else:
             batcher = None
         return batcher
@@ -485,25 +455,11 @@ class SemanticSegmentation(BasePipeline):
 
     def save_logs(self, writer, epoch):
 
-        with warnings.catch_warnings():  # ignore Mean of empty slice.
-            warnings.simplefilter('ignore', category=RuntimeWarning)
-            accs = np.nanmean(np.array(self.accs), axis=0)
-            ious = np.nanmean(np.array(self.ious), axis=0)
+        train_accs = self.metric_train.acc()
+        val_accs = self.metric_val.acc()
 
-            valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-            valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
-
-        valid_conf_m = np.array(self.valid_conf_m).sum(0)
-        valid_total_acc = np.sum(np.diag(valid_conf_m)) / np.sum(valid_conf_m)
-        valid_total_iou = np.nanmean([valid_conf_m[i][i] / \
-            (valid_conf_m[i].sum() + valid_conf_m[:,i].sum() - valid_conf_m[i][i]) \
-          for i in range(valid_conf_m.shape[0])])
-
-        train_conf_m = np.array(self.train_conf_m).sum(0)
-        train_total_acc = np.sum(np.diag(train_conf_m)) / np.sum(train_conf_m)
-        train_total_iou = np.nanmean([train_conf_m[i][i] / \
-            (train_conf_m[i].sum() + train_conf_m[:,i].sum() - train_conf_m[i][i]) \
-          for i in range(train_conf_m.shape[0])])
+        train_ious = self.metric_train.iou()
+        val_ious = self.metric_val.iou()
 
         loss_dict = {
             'Training loss': np.mean(self.losses),
@@ -512,11 +468,12 @@ class SemanticSegmentation(BasePipeline):
         acc_dicts = [{
             'Training accuracy': acc,
             'Validation accuracy': val_acc
-        } for acc, val_acc in zip(accs, valid_accs)]
+        } for acc, val_acc in zip(train_accs, val_accs)]
+
         iou_dicts = [{
             'Training IoU': iou,
             'Validation IoU': val_iou
-        } for iou, val_iou in zip(ious, valid_ious)]
+        } for iou, val_iou in zip(train_ious, val_ious)]
 
         for key, val in loss_dict.items():
             writer.add_scalar(key, val, epoch)
@@ -525,21 +482,12 @@ class SemanticSegmentation(BasePipeline):
         for key, val in iou_dicts[-1].items():
             writer.add_scalar("{}/ Overall".format(key), val, epoch)
 
-        writer.add_scalar("total acc train", train_total_acc, epoch)
-        writer.add_scalar("total iou train", train_total_iou, epoch)
-        writer.add_scalar("total acc valid", valid_total_acc, epoch)
-        writer.add_scalar("total iou valid", valid_total_iou, epoch)
-
-        log.info(f"loss train: {loss_dict['Training loss']:.3f} "
+        log.info(f"Loss train: {loss_dict['Training loss']:.3f} "
                  f" eval: {loss_dict['Validation loss']:.3f}")
-        log.info(f"mean acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
+        log.info(f"Mean acc train: {acc_dicts[-1]['Training accuracy']:.3f} "
                  f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
-        log.info(f"mean iou train: {iou_dicts[-1]['Training IoU']:.3f} "
+        log.info(f"Mean IoU train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
-        log.info(f"total iou train: {train_total_iou:.3f} "
-                 f" eval: {valid_total_iou:.3f}")
-        log.info(f"total acc train: {valid_total_acc:.3f} "
-                 f" eval: {valid_total_acc:.3f}")
 
     """
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.

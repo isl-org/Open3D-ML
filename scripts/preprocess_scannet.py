@@ -58,7 +58,7 @@ class ScannetProcess():
         out_path (str): Directory to save pickle file(infos).
     """
 
-    def __init__(self, dataset_path, out_path, max_num_point=100000):
+    def __init__(self, dataset_path, out_path, max_num_point=10000000):
 
         self.out_path = out_path
         self.dataset_path = dataset_path
@@ -79,7 +79,10 @@ class ScannetProcess():
 
     def convert(self):
         for scan in tqdm(self.scans):
-            self.process_scene(scan)
+            try:
+                self.process_scene(scan)
+            except Exception as e:
+                print(e)
 
     def process_scene(self, scan):
         in_path = join(self.dataset_path, scan)
@@ -208,11 +211,10 @@ class ScannetProcess():
             Vertices. Note that RGB values are in 0-255.
         """
         assert os.path.isfile(filename)
-        with open(filename, 'rb') as f:
-            data = o3d.t.io.read_point_cloud(f.name).point
-            points = data["points"].numpy().astype(np.float32)
-            colors = data["colors"].numpy().astype(np.float32)
-            vertices = np.concatenate([points, colors], axis=1)
+        data = o3d.t.io.read_point_cloud(filename)
+        points = data.point["points"].numpy().astype(np.float32)
+        colors = data.point["colors"].numpy().astype(np.float32)
+        vertices = np.concatenate([points, colors], axis=1)
         return vertices
 
     @staticmethod
