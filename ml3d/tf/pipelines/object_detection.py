@@ -209,7 +209,7 @@ class ObjectDetection(BasePipeline):
         train_loader, len_train = train_split.get_loader(cfg.batch_size,
                                                          transform=False)
 
-        self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
+        self.optimizer = model.get_optimizer(cfg.optimizer)
 
         is_resume = model.cfg.get('is_resume', True)
         start_ep = self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
@@ -258,8 +258,6 @@ class ObjectDetection(BasePipeline):
                 desc += " > loss: %.03f" % loss_sum.numpy()
                 process_bar.set_description(desc)
                 process_bar.refresh()
-
-            #self.scheduler.step()
 
             # --------------------- validation
             self.run_valid()

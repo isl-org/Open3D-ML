@@ -113,9 +113,8 @@ class ObjectDetection(BasePipeline):
         with torch.no_grad():
             for data in tqdm(test_loader, desc='testing'):
                 results = self.run_inference(data)
-                pred.append(results[0])
-
-        #dataset.save_test_result(results, attr)
+                pred.extend(results)
+                dataset.save_test_result(results, data.attr)
 
     def run_valid(self):
         """Run validation with validation data split, computes mean average
@@ -303,7 +302,8 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
-            #self.scheduler.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # --------------------- validation
             self.run_valid()

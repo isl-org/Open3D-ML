@@ -149,7 +149,7 @@ class PointPillars(BaseModel):
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
         return tf.optimizers.Adam(learning_rate=cfg['lr'],
                                   beta_1=beta1,
-                                  beta_2=beta2), None
+                                  beta_2=beta2)
 
         #used by torch, but doesn't perform well with TF:
         #import tensorflow_addons as tfa

@@ -28,6 +28,7 @@ class KITTI(BaseDataset):
                  cache_dir='./logs/cache',
                  use_cache=False,
                  val_split=3712,
+                 test_result_folder='./test',
                  **kwargs):
         """Initialize the function by passing the dataset and other details.
 
@@ -38,6 +39,7 @@ class KITTI(BaseDataset):
             use_cache: Indicates if the dataset should be cached.
             val_split: The split value to get a set of images for training,
             validation, for testing.
+            test_result_folder: Path to store test output.
 
         Returns:
             class: The corresponding class.
@@ -47,6 +49,7 @@ class KITTI(BaseDataset):
                          cache_dir=cache_dir,
                          use_cache=use_cache,
                          val_split=val_split,
+                         test_result_folder=test_result_folder,
                          **kwargs)
 
         cfg = self.cfg
@@ -232,16 +235,23 @@ class KITTI(BaseDataset):
         """
         pass
 
-    def save_test_result(self):
+    def save_test_result(self, results, attrs):
         """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the
             attribute passed.
-            attr: The attributes that correspond to the outputs passed in
+            attrs: The attributes that correspond to the outputs passed in
             results.
         """
-        pass
+        make_dir(cfg.test_result_folder)
+        for attr, res in zip(attrs, results):
+            name = attr['name']
+            path = join(cfg.test_result_folder, name + '.txt')
+            f = open(path, 'w')
+            for box in res:
+                f.write(box.to_kitti_format(box.confidence))
+                f.write('\n')
 
 
 class KITTISplit():
@@ -346,14 +356,6 @@ class Object3d(BEVBox3D):
                      % (self.label_class, self.truncation, self.occlusion, self.alpha, self.box2d, self.size[2], self.size[0], self.size[1],
                         self.center, self.yaw)
         return print_str
-
-    def to_kitti_format(self):
-        """This method transforms the class to kitti format."""
-        kitti_str = '%s %.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f' \
-                    % (self.label_class, self.truncation, int(self.occlusion), self.alpha, self.box2d[0], self.box2d[1],
-                       self.box2d[2], self.box2d[3], self.size[2], self.size[0], self.size[1], self.center[0], self.center[1], self.center[2],
-                       self.yaw)
-        return kitti_str
 
 
 DATASET._register_module(KITTI)

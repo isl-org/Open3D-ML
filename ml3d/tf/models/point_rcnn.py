@@ -1,6 +1,8 @@
 import tensorflow as tf
 
 import numpy as np
+import os
+import pickle
 
 from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
@@ -10,8 +12,8 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
-from ...datasets.utils import DataProcessing, BEVBox3D
-from ...datasets.utils.operations import points_in_box
+from ...datasets.utils import BEVBox3D, DataProcessing, ObjdetAugmentation
+from ...datasets.utils.operations import filter_by_min_points, points_in_box
 
 from ...utils import MODEL
 from ..modules.schedulers import OneCycleScheduler
@@ -124,15 +126,78 @@ class PointRCNN(BaseModel):
     def get_optimizer(self, cfg):
 
         beta1, beta2 = cfg.get('betas', [0.9, 0.99])
-        optimizer = tf.optimizers.Adam(learning_rate=cfg['lr'],
+        lr_scheduler = OneCycleScheduler(40800, cfg.lr, cfg.div_factor)
+
+        optimizer = tf.optimizers.Adam(learning_rate=lr_scheduler,
                                        beta_1=beta1,
                                        beta_2=beta2)
 
-        lr_scheduler = OneCycleScheduler(optimizer, 40800, cfg.lr,
-                                         list(cfg.moms), cfg.div_factor,
-                                         cfg.pct_start)
+        return optimizer
 
-        return optimizer, lr_scheduler
+    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
+        """Load ground truth object database.
+
+        Args:
+            pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
+            min_points_dict: A dictionary to filter objects based on number of points inside.
+            sample_dict: A dictionary to decide number of objects to sample.
+
+        """
+        db_boxes = pickle.load(open(pickle_path, 'rb'))
+
+        if min_points_dict is not None:
+            db_boxes = filter_by_min_points(db_boxes, min_points_dict)
+
+        db_boxes_dict = {}
+        for key in sample_dict.keys():
+            db_boxes_dict[key] = []
+
+        for db_box in db_boxes:
+            if db_box.label_class in sample_dict.keys():
+                db_boxes_dict[db_box.label_class].append(db_box)
+
+        self.db_boxes_dict = db_boxes_dict
+
+    def augment_data(self, data, attr):
+        """Augment object detection data.
+
+        Available augmentations are:
+            `ObjectSample`: Insert objects from ground truth database.
+            `ObjectRangeFilter`: Filter pointcloud from given bounds.
+            `PointShuffle`: Shuffle the pointcloud.
+
+        Args:
+            data: A dictionary object returned from the dataset class.
+            attr: Attributes for current pointcloud.
+
+        Returns:
+            Augmented `data` dictionary.
+
+        """
+        cfg = self.cfg.augment
+
+        if 'ObjectSample' in cfg.keys():
+            if not hasattr(self, 'db_boxes_dict'):
+                data_path = attr['path']
+                # remove tail of path to get root data path
+                for _ in range(3):
+                    data_path = os.path.split(data_path)[0]
+                pickle_path = os.path.join(data_path, 'bboxes.pkl')
+                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
+
+            data = ObjdetAugmentation.ObjectSample(
+                data,
+                db_boxes_dict=self.db_boxes_dict,
+                sample_dict=cfg['ObjectSample']['sample_dict'])
+
+        if cfg.get('ObjectRangeFilter', False):
+            data = ObjdetAugmentation.ObjectRangeFilter(
+                data, self.cfg.point_cloud_range)
+
+        if cfg.get('PointShuffle', False):
+            data = ObjdetAugmentation.PointShuffle(data)
+
+        return data
 
     def loss(self, results, inputs, training=True):
         if self.mode == "RPN":
@@ -142,34 +207,88 @@ class PointRCNN(BaseModel):
                 return {"loss": tf.constant(0.0)}
             return self.rcnn.loss(results, inputs)
 
+    def filter_objects(self, bbox_objs):
+        """Filter objects based on classes to train.
+
+        Args:
+            bbox_objs: Bounding box objects from dataset class.
+
+        Returns:
+            Filtered bounding box objects.
+
+        """
+        filtered = []
+        for bb in bbox_objs:
+            if bb.label_class in self.classes:
+                filtered.append(bb)
+        return filtered
+
     def preprocess(self, data, attr):
+        if attr['split'] in ['train', 'training']:
+            data = self.augment_data(data, attr)
+
+        data['bounding_boxes'] = self.filter_objects(data['bounding_boxes'])
+
         # remove intensity
         points = np.array(data['point'][..., :3], dtype=np.float32)
         calib = data['calib']
+
         # transform in cam space
         points = DataProcessing.world2cam(points, calib['world_cam'])
 
         new_data = {'point': points, 'calib': calib}
 
+        # bounding_boxes are objects of type BEVBox3D. It is renamed to
+        # bbox_objs to clarify them as objects and not matrix of type [N, 7].
         if attr['split'] not in ['test', 'testing']:
             new_data['bbox_objs'] = data['bounding_boxes']
 
         return new_data
 
     @staticmethod
-    def generate_rpn_training_labels(points, bboxes):
+    def generate_rpn_training_labels(points, bboxes, bboxes_world, calib=None):
+        """Generates labels for RPN network.
+
+        Classifies each point as foreground/background based on points inside bbox.
+        We don't train on ambigious points which are just outside bounding boxes(calculated
+        by `extended_boxes`).
+        Also computes regression labels for bounding box proposals(in bounding box frame).
+
+        Args:
+            points: Input pointcloud.
+            bboxes: bounding boxes in camera frame.
+            bboxes_world: bounding boxes in world frame.
+            calib: Calibration file for cam_to_world matrix.
+
+        Returns:
+            Classification and Regression labels.
+
+        """
         cls_label = np.zeros((points.shape[0]), dtype=np.int32)
         reg_label = np.zeros((points.shape[0], 7),
                              dtype=np.float32)  # dx, dy, dz, ry, h, w, l
 
-        pts_idx = points_in_box(points, bboxes)
+        if len(bboxes) == 0:
+            return cls_label, reg_label
+
+        pts_idx = points_in_box(points.copy(),
+                                bboxes_world,
+                                camera_frame=True,
+                                cam_world=DataProcessing.invT(
+                                    calib['world_cam']))
 
         # enlarge the bbox3d, ignore nearby points
-        extended_boxes = bboxes.copy()
+        extended_boxes = bboxes_world.copy()
+        # Enlarge box by 0.4m (from PointRCNN paper).
         extended_boxes[3:6] += 0.4
-        extended_boxes[:, 1] += 0.2
+        # Decrease z coordinate, as z_center is at bottom face of box.
+        extended_boxes[:, 2] -= 0.2
 
-        pts_idx_ext = points_in_box(points, extended_boxes)
+        pts_idx_ext = points_in_box(points.copy(),
+                                    extended_boxes,
+                                    camera_frame=True,
+                                    cam_world=DataProcessing.invT(
+                                        calib['world_cam']))
 
         for k in range(bboxes.shape[0]):
             fg_pt_flag = pts_idx[:, k]
@@ -224,18 +343,25 @@ class PointRCNN(BaseModel):
         t_data = {'point': points, 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
-            labels = np.stack([
-                self.name2lbl.get(bb.label_class, len(self.classes))
-                for bb in data['bbox_objs']
-            ])
+            labels = []
+            bboxes = []
+            bboxes_world = []
+            if len(data['bbox_objs']) != 0:
+                labels = np.stack([
+                    self.name2lbl.get(bb.label_class, len(self.classes))
+                    for bb in data['bbox_objs']
+                ])
 
-            bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']])
+                bboxes = np.stack([bb.to_camera() for bb in data['bbox_objs']
+                                  ])  # Camera frame.
+                bboxes_world = np.stack(
+                    [bb.to_xyzwhlr() for bb in data['bbox_objs']])
 
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
-                    points, bboxes)
+                    points, bboxes, bboxes_world, data['calib'])
             t_data['labels'] = labels
-            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['bbox_objs'] = data['bbox_objs']  # Objects of type BEVBox3D.
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
 
@@ -314,14 +440,24 @@ class PointRCNN(BaseModel):
                 pad_bboxes = np.zeros((len(bboxes), max_gt, 7),
                                       dtype=np.float32)
                 for j in range(len(bboxes)):
-                    pad_bboxes[i, :bboxes[j].shape[0], :] = bboxes[j]
+                    pad_bboxes[j, :bboxes[j].shape[0], :] = bboxes[j]
                 bboxes = tf.constant(pad_bboxes)
 
-                labels = tf.stack([
+                labels = [
                     b.get('labels', tf.zeros((0,), dtype=tf.int32))
                     for b in batch
-                ],
-                                  axis=0)
+                ]
+
+                if 'labels' in batch[
+                        0] and labels[0].shape[0] != points.shape[1]:
+                    pad_labels = np.ones(
+                        (len(labels), max_gt), dtype=np.int32) * (-1)
+                    for j in range(len(labels)):
+                        pad_labels[j, :labels[j].shape[0]] = labels[j]
+                    labels = tf.constant(pad_labels)
+
+                else:
+                    labels = tf.stack(labels, axis=0)
 
                 calib = [
                     tf.constant([
@@ -908,6 +1044,7 @@ class RCNN(tf.keras.layers.Layer):
             loss_size = 3 * loss_size  # consistent with old codes
             rcnn_loss_reg = loss_loc + loss_angle + loss_size
         else:
+            #  Regression loss is zero when no point is classified as foreground.
             rcnn_loss_reg = tf.reduce_mean(rcnn_reg * 0)
 
         return {"cls": rcnn_loss_cls, "reg": rcnn_loss_reg}

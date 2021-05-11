@@ -16,6 +16,15 @@ model:
   npoint: 16384
   score_thres: 0.3
 
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: False
+    ObjectSample:
+      min_points_dict:
+        Car: 50
+      sample_dict:
+        Car: 15
+
   rpn: # First module for bottom-up 3D proposal generation
     backbone: # backbone based on PointNet++
       in_channels: 0 # only xyz, no features

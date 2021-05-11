@@ -329,20 +329,35 @@ def points_in_convex_polygon_3d(points, polygon_surfaces, num_surfaces=None):
     return ret
 
 
-def points_in_box(points, rbbox, origin=(0.5, 0.5, 0)):
-    """Check points in rotated bbox and return indicces.
+def points_in_box(points,
+                  rbbox,
+                  origin=(0.5, 0.5, 0),
+                  camera_frame=False,
+                  cam_world=None):
+    """Check points in rotated bbox and return indices.
+
+    If `rbbox` is in camera frame, it is first converted to world frame using
+    `cam_world`. Returns a 2D array classifying each point for each box.
 
     Args:
         points (np.ndarray, shape=[N, 3+dim]): Points to query.
-        rbbox (np.ndarray, shape=[M, 7]): Boxes3d with rotation.
-        z_axis (int): Indicate which axis is height.
+        rbbox (np.ndarray, shape=[M, 7]): Boxes3d with rotation (camera/world frame).
         origin (tuple[int]): Indicate the position of box center.
+        camera_frame: True if `rbbox` are in camera frame(like kitti format, where y
+          coordinate is height), False for [x, y, z, dx, dy, dz, yaw] format.
+        cam_world: camera to world transformation matrix. Required when `camera_frame` is True.
 
     Returns:
         np.ndarray, shape=[N, M]: Indices of points in each box.
     """
-    # TODO: this function is different from PointCloud3D, be careful
-    # when start to use nuscene, check the input
+    if camera_frame:
+        assert cam_world is not None, "Provide cam_to_world matrix if points are in camera frame."
+
+        # transform in world space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        points = np.matmul(points, cam_world)[..., :3]
+
     rbbox = np.array(rbbox)
     rbbox_corners = center_to_corner_box3d(rbbox[:, :3],
                                            rbbox[:, 3:6],
