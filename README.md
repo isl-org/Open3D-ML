@@ -411,7 +411,7 @@ Please also check out our communication channels to get in contact with the comm
 ## Communication channels
 
 <!--* [GitHub Issue](https://github.com/intel-isl/Open3D/issues): bug reports, feature requests, etc.-->
-* [Forum](https://forum.open3d.org): discussion on the usage of Open3D.
+* [Forum](https://github.com/intel-isl/Open3D/discussions): discussion on the usage of Open3D.
 * [Discord Chat](https://discord.gg/D35BGvn): online chats, discussions,
   and collaboration with other users and developers.
 
