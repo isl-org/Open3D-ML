@@ -139,7 +139,7 @@ class BoundingBox3D:
                                                        pidx + 12), (pidx + 9,
                                                                     pidx + 13))
 
-            if lut is not None:
+            if lut is not None and box.label_class in lut.labels:
                 label = lut.labels[box.label_class]
                 c = (label.color[0], label.color[1], label.color[2])
             else:

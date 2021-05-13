@@ -82,7 +82,6 @@ class SunRGBD(BaseDataset):
 
     @staticmethod
     def read_lidar(path):
-        print(path)
         assert Path(path).exists()
         data = np.load(path).astype(np.float32)
 
@@ -135,19 +134,19 @@ class SunRGBDSplit():
     def __init__(self, dataset, split='train'):
         self.cfg = dataset.cfg
 
-        self.idx_list = dataset.get_split_list(split)
+        self.path_list = dataset.get_split_list(split)
 
-        log.info("Found {} pointclouds for {}".format(len(self.idx_list),
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
                                                       split))
 
         self.split = split
         self.dataset = dataset
 
     def __len__(self):
-        return len(self.idx_list)
+        return len(self.path_list)
 
     def get_data(self, idx):
-        idx = self.idx_list[idx]
+        idx = self.path_list[idx]
 
         pc = self.dataset.read_lidar(
             join(self.cfg.dataset_path, f'depth/{idx}.npy'))
@@ -159,7 +158,7 @@ class SunRGBDSplit():
 
         data = {
             'point': pc,
-            'feat': feat,
+            'feat': feat[:, [2, 1, 0]],
             'calib': None,
             'bounding_boxes': bboxes,
         }
