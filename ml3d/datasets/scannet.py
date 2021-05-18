@@ -157,7 +157,12 @@ class Scannet(BaseDataset):
         make_dir(path)
 
         pred = results['predict_labels']
-        pred = np.array(pred)[self.semantic_ids]
+        pred = np.array(pred)
+
+        remapper = np.ones(20) * -1
+        for i, x in enumerate(self.semantic_ids):
+            remapper[i] = x
+        pred = remapper[pred]
 
         store_path = join(path, self.name, name + '.npy')
         make_dir(Path(store_path).parent)

@@ -227,6 +227,8 @@ class SemanticSegmentation(BasePipeline):
 
         with torch.no_grad():
             for step, inputs in enumerate(test_loader):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
                 results = model(inputs['data'])
                 self.update_tests(test_sampler, inputs, results)
 
