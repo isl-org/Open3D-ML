@@ -360,7 +360,7 @@ class PointRCNN(BaseModel):
             if self.mode == "RPN":
                 labels, bboxes = PointRCNN.generate_rpn_training_labels(
                     points, bboxes, bboxes_world, data['calib'])
-            t_data['labels'] = labels
+            t_data['labels'] = np.array(labels)
             t_data['bbox_objs'] = data['bbox_objs']  # Objects of type BEVBox3D.
             if attr['split'] in ['train', 'training'] or self.mode == "RPN":
                 t_data['bboxes'] = bboxes
@@ -447,11 +447,14 @@ class PointRCNN(BaseModel):
                     b.get('labels', tf.zeros((0,), dtype=tf.int32))
                     for b in batch
                 ]
+                max_lab = 0
+                for lab in labels:
+                    max_lab = max(max_lab, lab.shape[0])
 
                 if 'labels' in batch[
                         0] and labels[0].shape[0] != points.shape[1]:
                     pad_labels = np.ones(
-                        (len(labels), max_gt), dtype=np.int32) * (-1)
+                        (len(labels), max_lab), dtype=np.int32) * (-1)
                     for j in range(len(labels)):
                         pad_labels[j, :labels[j].shape[0]] = labels[j]
                     labels = tf.constant(pad_labels)

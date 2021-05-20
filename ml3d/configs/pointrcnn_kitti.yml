@@ -2,7 +2,6 @@ dataset:
   name: KITTI
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  steps_per_epoch_train: 5000
 
 model:
   name: PointRCNN
