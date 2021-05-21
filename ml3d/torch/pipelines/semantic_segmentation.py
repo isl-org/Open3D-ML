@@ -208,7 +208,7 @@ class SemanticSegmentation(BasePipeline):
                                      sampler=test_sampler,
                                      use_cache=dataset.cfg.use_cache)
         test_loader = DataLoader(test_split,
-                                 batch_size=cfg.batch_size,
+                                 batch_size=cfg.test_batch_size,
                                  sampler=get_sampler(test_sampler),
                                  collate_fn=batcher.collate_fn)
 
