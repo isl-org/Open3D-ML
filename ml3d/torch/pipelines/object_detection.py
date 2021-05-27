@@ -59,6 +59,16 @@ class ObjectDetection(BasePipeline):
 
         model.eval()
 
+        # If run_inference is called on raw data.
+        if isinstance(data, dict):
+            batcher = ConcatBatcher(self.device, model.cfg.name)
+            data = batcher.collate_fn([{
+                'data': data,
+                'attr': {
+                    'split': 'test'
+                }
+            }])
+
         data.to(self.device)
 
         with torch.no_grad():
