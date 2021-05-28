@@ -1,9 +1,7 @@
 import numpy as np
-import os, sys, glob, pickle
+import os
 from pathlib import Path
-from os.path import join, exists, dirname, abspath
-from os import makedirs
-import random
+from os.path import join
 import argparse
 import json
 import csv

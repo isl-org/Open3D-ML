@@ -26,7 +26,6 @@
 #***************************************************************************************/
 
 import torch
-from torch.autograd import Variable
 from torch.autograd import Function
 import torch.nn as nn
 from typing import Tuple
