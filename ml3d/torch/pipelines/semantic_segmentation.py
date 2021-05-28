@@ -510,7 +510,6 @@ class SemanticSegmentation(BasePipeline):
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
     
     """
-
     """
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
     
