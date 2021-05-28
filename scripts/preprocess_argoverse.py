@@ -42,7 +42,9 @@ def parse_args():
 
 class ArgoverseProcess():
     """Preprocess Argoverse.
+
     This class collects paths and labels using argoverse-api.
+
     Args:
         dataset_path (str): Directory to load argoverse data.
         out_path (str): Directory to save pickle file(infos).

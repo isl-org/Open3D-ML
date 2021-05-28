@@ -1,7 +1,6 @@
 import numpy as np
 import logging
 import sys
-import warnings
 
 from tqdm import tqdm
 from datetime import datetime
@@ -25,10 +24,11 @@ log = logging.getLogger(__name__)
 
 
 class SemanticSegmentation(BasePipeline):
-    """
-    This class allows you to perform semantic segmentation for both training and inference using the TensorFlow framework. This pipeline has multiple stages: Pre-processing, loading dataset, testing, and inference or training.
-    
-    **Example:** 
+    """This class allows you to perform semantic segmentation for both training
+    and inference using the TensorFlow framework. This pipeline has multiple
+    stages: Pre-processing, loading dataset, testing, and inference or training.
+
+    **Example:**
         This example loads the Semantic Segmentation and performs a training using the SemanticKITTI dataset.
 
             import tensorflow as tf
@@ -52,7 +52,7 @@ class SemanticSegmentation(BasePipeline):
             device='gpu',
             split='train',
             train_sum_dir='train_log')
-            
+
     **Args:**
             dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
             model: The model to be used for building the pipeline.
@@ -71,11 +71,9 @@ class SemanticSegmentation(BasePipeline):
             device: The device to be used for training.
             split: The dataset split to be used. In this example, we have used "train".
             train_sum_dir: The directory where the trainig summary is stored.
-            
+
     **Returns:**
             class: The corresponding class.
-        
-        
     """
 
     def __init__(
@@ -126,7 +124,6 @@ class SemanticSegmentation(BasePipeline):
     def run_inference(self, data):
         cfg = self.cfg
         model = self.model
-        # model.eval()
         log.info("running inference")
 
         model.inference_begin(data)
@@ -158,11 +155,8 @@ class SemanticSegmentation(BasePipeline):
 
         log.info("Started testing")
 
-        Metric = SemSegMetric(self, model, dataset)
+        metric = SemSegMetric()
         Loss = SemSegLoss(self, model, dataset)
-
-        accs = []
-        ious = []
 
         test_split = dataset.get_split('test')
         for idx in tqdm(range(len(test_split)), desc='test'):
@@ -172,15 +166,12 @@ class SemanticSegmentation(BasePipeline):
             scores, labels = Loss.filter_valid_label(results['predict_scores'],
                                                      data['label'])
 
-            acc = Metric.acc(scores.numpy(), labels.numpy())
-            iou = Metric.iou(scores.numpy(), labels.numpy())
-            accs.append(acc)
-            ious.append(iou)
+            metric.update(scores, labels)
 
             dataset.save_test_result(results, attr)
 
-        accs = np.nanmean(np.array(accs), axis=0)
-        ious = np.nanmean(np.array(ious), axis=0)
+        accs = metric.acc()
+        ious = metric.iou()
 
         log.info("Per class Accuracy : {}".format(accs[:-1]))
         log.info("Per class IOUs : {}".format(ious[:-1]))
@@ -205,7 +196,8 @@ class SemanticSegmentation(BasePipeline):
         log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLoss(self, model, dataset)
-        Metric = SemSegMetric(self, model, dataset)
+        self.metric_train = SemSegMetric()
+        self.metric_val = SemSegMetric()
 
         train_split = TFDataloader(dataset=dataset.get_split('training'),
                                    model=model,
@@ -240,8 +232,8 @@ class SemanticSegmentation(BasePipeline):
         for epoch in range(0, cfg.max_epoch + 1):
             log.info("=== EPOCH {}/{} ===".format(epoch, cfg.max_epoch))
             # --------------------- training
-            self.accs = []
-            self.ious = []
+            self.metric_train.reset()
+            self.metric_val.reset()
             self.losses = []
             step = 0
 
@@ -281,17 +273,12 @@ class SemanticSegmentation(BasePipeline):
                     self.optimizer.apply_gradients(
                         zip(scaled_grads, scaled_params))
 
-                acc = Metric.acc(predict_scores, gt_labels)
-                iou = Metric.iou(predict_scores, gt_labels)
+                self.metric_train.update(predict_scores, gt_labels)
 
                 self.losses.append(loss.numpy())
-                self.accs.append(acc)
-                self.ious.append(iou)
                 step = step + 1
 
             # --------------------- validation
-            self.valid_accs = []
-            self.valid_ious = []
             self.valid_losses = []
             step = 0
 
@@ -305,12 +292,9 @@ class SemanticSegmentation(BasePipeline):
                 if len(predict_scores.shape) < 2:
                     continue
 
-                acc = Metric.acc(predict_scores, gt_labels)
-                iou = Metric.iou(predict_scores, gt_labels)
+                self.metric_val.update(predict_scores, gt_labels)
 
                 self.valid_losses.append(loss.numpy())
-                self.valid_accs.append(acc)
-                self.valid_ious.append(iou)
                 step = step + 1
 
             self.save_logs(writer, epoch)
@@ -325,13 +309,11 @@ class SemanticSegmentation(BasePipeline):
 
     def save_logs(self, writer, epoch):
 
-        with warnings.catch_warnings():  # ignore Mean of empty slice.
-            warnings.simplefilter('ignore', category=RuntimeWarning)
-            accs = np.nanmean(np.array(self.accs), axis=0)
-            ious = np.nanmean(np.array(self.ious), axis=0)
+        train_accs = self.metric_train.acc()
+        val_accs = self.metric_val.acc()
 
-            valid_accs = np.nanmean(np.array(self.valid_accs), axis=0)
-            valid_ious = np.nanmean(np.array(self.valid_ious), axis=0)
+        train_ious = self.metric_train.iou()
+        val_ious = self.metric_val.iou()
 
         loss_dict = {
             'Training loss': np.mean(self.losses),
@@ -340,11 +322,11 @@ class SemanticSegmentation(BasePipeline):
         acc_dicts = [{
             'Training accuracy': acc,
             'Validation accuracy': val_acc
-        } for acc, val_acc in zip(accs, valid_accs)]
+        } for acc, val_acc in zip(train_accs, val_accs)]
         iou_dicts = [{
             'Training IoU': iou,
             'Validation IoU': val_iou
-        } for iou, val_iou in zip(ious, valid_ious)]
+        } for iou, val_iou in zip(train_ious, val_ious)]
 
         log.info(f"loss train: {loss_dict['Training loss']:.3f} "
                  f" eval: {loss_dict['Validation loss']:.3f}")
@@ -362,8 +344,6 @@ class SemanticSegmentation(BasePipeline):
                 tf.summary.scalar("{}/ Overall".format(key), val, epoch)
             for key, val in iou_dicts[-1].items():
                 tf.summary.scalar("{}/ Overall".format(key), val, epoch)
-
-        # print(acc_dicts[-1])
 
     """
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.

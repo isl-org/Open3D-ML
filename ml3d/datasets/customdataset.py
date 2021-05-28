@@ -3,7 +3,6 @@ import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 import random
-from plyfile import PlyData, PlyElement
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -22,18 +21,23 @@ log = logging.getLogger(__name__)
 # For test files, format should be : ['x', 'y', 'z', 'feat_1', 'feat_2', ........,'feat_n'].
 
 
-class Custom3DSplit():
+class Custom3DSplit(BaseDatasetSplit):
     """This class is used to create a custom dataset split.
+
     Initialize the class.
+
     Args:
         dataset: The dataset to split.
-        split: A string identifying the dataset split that is usually one of 'training', 'test', 'validation', or 'all'.
+        split: A string identifying the dataset split that is usually one of
+        'training', 'test', 'validation', or 'all'.
         **kwargs: The configuration of the model as keyword arguments.
+
     Returns:
         A dataset split object providing the requested subset of the data.
     """
 
     def __init__(self, dataset, split='training'):
+        super().__init__(dataset, split=split)
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))
@@ -72,10 +76,11 @@ class Custom3DSplit():
 
 
 class Custom3D(BaseDataset):
-    """
-    A template for customized datasetthat you can use with a dataloader to feed data when training a model. This inherits all functions from the base dataset and can be modified by users.
-    Initialize the function by passing the dataset and other details.
-    
+    """A template for customized dataset that you can use with a dataloader to
+    feed data when training a model. This inherits all functions from the base
+    dataset and can be modified by users. Initialize the function by passing the
+    dataset and other details.
+
     Args:
         dataset_path: The path to the dataset to use.
         name: The name of the dataset.
@@ -125,14 +130,12 @@ class Custom3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """
-                Returns a label to names dictonary object.
-        
-        Returns:
-            A dict where keys are label numbers and 
-            values are the corresponding names.
-    """
+        """Returns a label to names dictonary object.
 
+        Returns:
+            A dict where keys are label numbers and
+            values are the corresponding names.
+        """
         label_to_names = {
             0: 'Unclassified',
             1: 'Ground',
@@ -148,32 +151,31 @@ class Custom3D(BaseDataset):
 
     def get_split(self, split):
         """Returns a dataset split.
-        
+
         Args:
             split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.
 
         Returns:
             A dataset split object providing the requested subset of the data.
-                """
-
+        """
         return Custom3DSplit(self, split=split)
 
     def get_split_list(self, split):
         """Returns a dataset split.
-        
+
         Args:
             split: A string identifying the dataset split that is usually one of
             'training', 'test', 'validation', or 'all'.
 
         Returns:
             A dataset split object providing the requested subset of the data.
-                                                
-                                Raises:
-                                     ValueError: Indicates that the split name passed is incorrect. The split name should be one of
-            'training', 'test', 'validation', or 'all'.
-        """
 
+        Raises:
+             ValueError: Indicates that the split name passed is incorrect. The
+             split name should be one of 'training', 'test', 'validation', or
+             'all'.
+        """
         if split in ['test', 'testing']:
             random.shuffle(self.test_files)
             return self.test_files
@@ -188,18 +190,18 @@ class Custom3D(BaseDataset):
             return files
         else:
             raise ValueError("Invalid split {}".format(split))
-        """Checks if a datum in the dataset has been tested.
-        
-        Args:
-            dataset: The current dataset to which the datum belongs to.
-                                                attr: The attribute that needs to be checked.
-
-        Returns:
-            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
-    """
 
     def is_tested(self, attr):
+        """Checks if a datum in the dataset has been tested.
 
+        Args:
+            dataset: The current dataset to which the datum belongs to.
+            attr: The attribute that needs to be checked.
+
+        Returns:
+            If the dataum attribute is tested, then resturn the path where the
+            attribute is stored; else, returns false.
+        """
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder
@@ -216,8 +218,7 @@ class Custom3D(BaseDataset):
         Args:
             results: The output of a model for the datum associated with the attribute passed.
             attr: The attributes that correspond to the outputs passed in results.
-    """
-
+        """
         cfg = self.cfg
         name = attr['name']
         path = cfg.test_result_folder

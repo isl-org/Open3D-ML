@@ -1,3 +1,1 @@
-"""
-Config files for ml3d.
-"""
+"""Config files for ml3d."""

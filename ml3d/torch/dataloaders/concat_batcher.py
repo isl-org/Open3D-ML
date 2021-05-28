@@ -12,12 +12,11 @@ from ..models.kpconv import batch_grid_subsampling, batch_neighbors
 from torch.utils.data import Sampler, get_worker_info
 
 
-class CustomBatch:
-    """Batched results for KPConv"""
+class KPConvBatch:
+    """Batched results for KPConv."""
 
     def __init__(self, batches):
-        """
-        Initialize
+        """Initialize.
 
         Args:
             batches: A batch of data
@@ -25,7 +24,6 @@ class CustomBatch:
         Returns:
             class: The corresponding class.
         """
-
         self.neighborhood_limits = []
         p_list = []
         f_list = []
@@ -173,11 +171,11 @@ class CustomBatch:
         return
 
     def big_neighborhood_filter(self, neighbors, layer):
-        """
-        Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
-        Limit is computed at initialization
-        """
+        """Filter neighborhoods with max number of neighbors.
 
+        Limit is set to keep XX% of the neighborhoods untouched. Limit is
+        computed at initialization
+        """
         # crop neighbors matrix
         if len(self.neighborhood_limits) > 0:
             return neighbors[:, :self.neighborhood_limits[layer]]
@@ -306,10 +304,7 @@ class CustomBatch:
         return li
 
     def pin_memory(self):
-        """
-        Manual pinning of the memory
-        """
-
+        """Manual pinning of the memory."""
         self.points = [in_tensor.pin_memory() for in_tensor in self.points]
         self.neighbors = [
             in_tensor.pin_memory() for in_tensor in self.neighbors
@@ -345,21 +340,22 @@ class CustomBatch:
         return self
 
     def unstack_points(self, layer=None):
-        """Unstack the points"""
+        """Unstack the points."""
         return self.unstack_elements('points', layer)
 
     def unstack_neighbors(self, layer=None):
-        """Unstack the neighbors indices"""
+        """Unstack the neighbors indices."""
         return self.unstack_elements('neighbors', layer)
 
     def unstack_pools(self, layer=None):
-        """Unstack the pooling indices"""
+        """Unstack the pooling indices."""
         return self.unstack_elements('pools', layer)
 
     def unstack_elements(self, element_name, layer=None, to_numpy=True):
-        """
-        Return a list of the stacked elements in the batch at a certain layer. If no layer is given, then return all
-        layers
+        """Return a list of the stacked elements in the batch at a certain
+        layer.
+
+        If no layer is given, then return all layers
         """
         if element_name == 'points':
             elements = self.points
@@ -407,12 +403,98 @@ class CustomBatch:
         return all_p_list
 
 
-class ConcatBatcher(object):
-    """ConcatBatcher for KPConv"""
+class SparseConvUnetBatch:
 
-    def __init__(self, device):
+    def __init__(self, batches):
+        pc = []
+        feat = []
+        label = []
+        lengths = []
+
+        for batch in batches:
+            data = batch['data']
+            pc.append(data['point'])
+            feat.append(data['feat'])
+            label.append(data['label'])
+            lengths.append(data['point'].shape[0])
+
+        self.point = pc
+        self.feat = feat
+        self.label = label
+        self.batch_lengths = lengths
+
+    def pin_memory(self):
+        self.point = [pc.pin_memory() for pc in self.point]
+        self.feat = [feat.pin_memory() for feat in self.feat]
+        self.label = [label.pin_memory() for label in self.label]
+        return self
+
+    def to(self, device):
+        self.point = [pc.to(device) for pc in self.point]
+        self.feat = [feat.to(device) for feat in self.feat]
+        self.label = [label.to(device) for label in self.label]
+
+
+class ObjectDetectBatch:
+
+    def __init__(self, batches):
+        """Initialize.
+
+        Args:
+            batches: A batch of data
+
+        Returns:
+            class: The corresponding class.
         """
-        Initialize
+        self.point = []
+        self.labels = []
+        self.bboxes = []
+        self.bbox_objs = []
+        self.calib = []
+        self.attr = []
+
+        for batch in batches:
+            self.attr.append(batch['attr'])
+            data = batch['data']
+            attr = batch['attr']
+            if 'test' not in attr['split'] and len(
+                    data['bboxes']
+            ) == 0:  # Skip training batch with no bounding box.
+                continue
+            self.point.append(torch.tensor(data['point'], dtype=torch.float32))
+            self.labels.append(
+                torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
+                data else None)
+            self.bboxes.append(
+                torch.tensor(data['bboxes'], dtype=torch.float32) if 'bboxes' in
+                data else None)
+            self.bbox_objs.append(data.get('bbox_objs'))
+            self.calib.append(data.get('calib'))
+
+    def pin_memory(self):
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].pin_memory()
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].pin_memory()
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].pin_memory()
+
+        return self
+
+    def to(self, device):
+        for i in range(len(self.point)):
+            self.point[i] = self.point[i].to(device)
+            if self.labels[i] is not None:
+                self.labels[i] = self.labels[i].to(device)
+            if self.bboxes[i] is not None:
+                self.bboxes[i] = self.bboxes[i].to(device)
+
+
+class ConcatBatcher(object):
+    """ConcatBatcher for KPConv."""
+
+    def __init__(self, device, model='KPConv'):
+        """Initialize.
 
         Args:
             device: torch device 'gpu' or 'cpu'
@@ -422,10 +504,10 @@ class ConcatBatcher(object):
         """
         super(ConcatBatcher, self).__init__()
         self.device = device
+        self.model = model
 
     def collate_fn(self, batches):
-        """
-        collate_fn called by original PyTorch dataloader
+        """Collate function called by original PyTorch dataloader.
 
         Args:
             batches: a batch of data
@@ -433,6 +515,19 @@ class ConcatBatcher(object):
         Returns:
             class: the batched result
         """
-        batching_result = CustomBatch(batches)
-        batching_result.to(self.device)
-        return {'data': batching_result, 'attr': []}
+        if self.model == "KPConv" or self.model == "KPFCNN":
+            batching_result = KPConvBatch(batches)
+            batching_result.to(self.device)
+            return {'data': batching_result, 'attr': []}
+
+        elif self.model == "SparseConvUnet":
+            return {'data': SparseConvUnetBatch(batches), 'attr': {}}
+
+        elif self.model == "PointPillars" or self.model == "PointRCNN":
+            batching_result = ObjectDetectBatch(batches)
+            return batching_result
+
+        else:
+            raise Exception(
+                f"Please define collate_fn for {self.model}, or use Default Batcher"
+            )

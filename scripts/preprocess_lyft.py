@@ -42,7 +42,9 @@ def parse_args():
 
 class LyftProcess():
     """Preprocess Lyft.
+
     This class collects paths and labels using lyft-devkit.
+
     Args:
         dataset_path (str): Directory to load lyft data.
         out_path (str): Directory to save pickle file(infos).

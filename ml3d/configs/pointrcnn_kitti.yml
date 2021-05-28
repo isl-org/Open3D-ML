@@ -1,0 +1,139 @@
+dataset:
+  name: KITTI
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+
+model:
+  name: PointRCNN
+  ckpt_path: # path/to/your/checkpoint
+  
+  batcher: "ignore" # for TF, does use the batcher of the model class
+
+  point_cloud_range: [0, -40, -1, 70.4, 40, 3]
+  classes: ['Car']
+
+  npoint: 16384
+  score_thres: 0.3
+
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter: False
+    ObjectSample:
+      min_points_dict:
+        Car: 50
+      sample_dict:
+        Car: 15
+
+  rpn: # First module for bottom-up 3D proposal generation
+    backbone: # backbone based on PointNet++
+      in_channels: 0 # only xyz, no features
+      SA_config: # multiscale pointnet config
+          npoints: [4096, 1024, 256, 64]
+          radius: [[0.1, 0.5], [0.5, 1.0], [1.0, 2.0], [2.0, 4.0]]
+          nsample: [[16, 32], [16, 32], [16, 32], [16, 32]]
+          mlps: [[[16, 16, 32], [32, 32, 64]],
+                 [[64, 64, 128], [64, 96, 128]],
+                 [[128, 196, 256], [128, 196, 256]],
+                 [[256, 256, 512], [256, 384, 512]]]
+      fp_mlps: [[128, 128], [256, 256], [512, 512], [512, 512]]
+
+    cls_in_ch: 128
+    cls_out_ch: [128]
+    reg_in_ch: 128
+    reg_out_ch: [128]
+    db_ratio: 0.5
+
+    focal_loss:
+      gamma: 2.0
+      alpha: 0.25
+      loss_weight: 1.0
+
+    loss_weight: [1.0, 1.0]
+
+    head: # config of bin-based loss
+        loc_xz_fine: True # False for pre-trained
+        loc_scope: 3.0
+        loc_bin_size: 0.5
+        num_head_bin: 12
+        nms_pre: 9000
+        nms_post: 512
+        nms_thres: 0.85
+        nms_post_val: 100
+        nms_thres_val: 0.8
+        mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
+
+  rcnn: # Second module for refinement of result
+    in_channels: 128
+    xyz_up_layer: [128, 128]
+    cls_out_ch: [256, 256]
+    reg_out_ch: [256, 256]
+
+    SA_config: # multiscale pointnet config
+      npoints: [128, 32, -1]
+      radius: [0.2, 0.4, 100]
+      nsample: [64, 64, 64]
+      mlps: [[128, 128, 128],
+              [128, 128, 256],
+              [256, 256, 512]]
+
+    head:
+      # config of bin-based loss
+      loc_xz_fine: True
+      get_y_by_bin: False
+      loc_y_scope: 0.5
+      loc_y_bin_size: 0.25
+      get_ry_fine: True
+      loc_scope: 1.5
+      loc_bin_size: 0.5
+      num_head_bin: 9
+      mean_size: [1.52563191462, 1.62856739989, 3.88311640418]
+      post_process: False
+      nms_thres: 0.1
+
+    target_head: # mapping of gt to pred boxes
+      pool_extra_width: 1.0
+      num_points: 512
+      reg_fg_thresh: 0.55
+      cls_fg_thresh: 0.6
+      cls_bg_thresh: 0.45
+      cls_bg_thresh_lo: 0.05
+      fg_ratio: 0.5
+      roi_per_image: 64
+      aug_rot_range: 18
+      hard_bg_ratio: 0.8
+      roi_fg_aug_times: 10
+
+
+pipeline:
+  name: ObjectDetection
+  test_compute_metric: true
+  batch_size: 1 #4
+  max_epoch: 200
+  val_batch_size: 1 #4
+  test_batch_size: 1
+  save_ckpt_freq: 5
+  main_log_dir: ./logs
+  train_sum_dir: train_log
+  grad_clip_norm: 2
+
+  optimizer:
+    lr: 0.002
+    betas: [0.9, 0.99]
+    weight_decay: 0.5
+    moms: [0.95, 0.85]
+    div_factor: 10.0
+    pct_start: 0.4
+    bn_decay_step_list: [1000]
+    bn_decay: 0.5
+    bnm_clip: 0.01
+    bn_momentum: 0.1
+    warmup_epoch: 1
+    warmup_min: 0.0002
+
+  # evaluation properties
+  overlaps: [0.7]
+  similar_classes: {
+    Van: Car
+  }
+  difficulties: [0, 1, 2]
+    

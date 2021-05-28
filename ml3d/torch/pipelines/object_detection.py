@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 
 from .base_pipeline import BasePipeline
-from ..dataloaders import TorchDataloader
+from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
@@ -28,9 +28,7 @@ log = logging.getLogger(__name__)
 
 
 class ObjectDetection(BasePipeline):
-    """
-    Pipeline for object detection. 
-    """
+    """Pipeline for object detection."""
 
     def __init__(self,
                  model,
@@ -49,11 +47,11 @@ class ObjectDetection(BasePipeline):
                          **kwargs)
 
     def run_inference(self, data):
-        """
-        Run inference on given data.
+        """Run inference on given data.
 
         Args:
             data: A raw data.
+
         Returns:
             Returns the inference results.
         """
@@ -61,19 +59,27 @@ class ObjectDetection(BasePipeline):
 
         model.eval()
 
+        # If run_inference is called on raw data.
+        if isinstance(data, dict):
+            batcher = ConcatBatcher(self.device, model.cfg.name)
+            data = batcher.collate_fn([{
+                'data': data,
+                'attr': {
+                    'split': 'test'
+                }
+            }])
+
+        data.to(self.device)
+
         with torch.no_grad():
-            inputs = torch.tensor(data['point'],
-                                  dtype=torch.float32,
-                                  device=self.device)
-            inputs = torch.reshape(inputs, (1, -1, inputs.shape[-1]))
-            results = model(inputs)
+            results = model(data)
             boxes = model.inference_end(results, data)
 
         return boxes
 
     def run_test(self):
-        """
-        Run test with test data split, computes mean average precision of the prediction results.
+        """Run test with test data split, computes mean average precision of the
+        prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -89,11 +95,21 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         test_split = TorchDataloader(dataset=dataset.get_split('test'),
                                      preprocess=model.preprocess,
-                                     transform=None,
+                                     transform=model.transform,
                                      use_cache=False,
                                      shuffle=False)
+        test_loader = DataLoader(
+            test_split,
+            batch_size=cfg.test_batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', True),
+            collate_fn=batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed)))
 
         self.load_ckpt(model.cfg.ckpt_path)
 
@@ -105,15 +121,14 @@ class ObjectDetection(BasePipeline):
 
         pred = []
         with torch.no_grad():
-            for i in tqdm(range(len(test_split)), desc='testing'):
-                results = self.run_inference(test_split[i]['data'])
-                pred.append(results[0])
-
-        #dataset.save_test_result(results, attr)
+            for data in tqdm(test_loader, desc='testing'):
+                results = self.run_inference(data)
+                pred.extend(results)
+                dataset.save_test_result(results, data.attr)
 
     def run_valid(self):
-        """
-        Run validation with validation data split, computes mean average precision and the loss of the prediction results.
+        """Run validation with validation data split, computes mean average
+        precision and the loss of the prediction results.
         """
         model = self.model
         dataset = self.dataset
@@ -129,14 +144,24 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         valid_dataset = dataset.get_split('validation')
-        valid_loader = TorchDataloader(dataset=valid_dataset,
-                                       preprocess=model.preprocess,
-                                       transform=model.transform,
-                                       use_cache=dataset.cfg.use_cache,
-                                       shuffle=True,
-                                       steps_per_epoch=dataset.cfg.get(
-                                           'steps_per_epoch_valid', None))
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      shuffle=True,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+        valid_loader = DataLoader(
+            valid_split,
+            batch_size=cfg.val_batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed)))
 
         log.info("Started validation")
 
@@ -145,19 +170,19 @@ class ObjectDetection(BasePipeline):
         pred = []
         gt = []
         with torch.no_grad():
-            for i in tqdm(range(len(valid_loader)), desc='validation'):
-                data = valid_loader[i]['data']
-                results = model(data['point'])
+            for data in tqdm(valid_loader, desc='validation'):
+                data.to(device)
+                results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
                         self.valid_losses[l] = []
-                    self.valid_losses[l].append(v.cpu().item())
+                    self.valid_losses[l].append(v.cpu().numpy())
 
                 # convert to bboxes for mAP evaluation
                 boxes = model.inference_end(results, data)
-                pred.append(BEVBox3D.to_dicts(boxes[0]))
-                gt.append(BEVBox3D.to_dicts(data['bbox_objs']))
+                pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
+                gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
 
         sum_loss = 0
         desc = "validation - "
@@ -207,9 +232,7 @@ class ObjectDetection(BasePipeline):
         self.valid_losses["mAP 3D"] = np.mean(ap[:, -1])
 
     def run_train(self):
-        """
-        Run training with train data split.
-        """
+        """Run training with train data split."""
         model = self.model
         device = self.device
         dataset = self.dataset
@@ -223,13 +246,24 @@ class ObjectDetection(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        batcher = ConcatBatcher(device, model.cfg.name)
+
         train_dataset = dataset.get_split('training')
-        train_loader = TorchDataloader(dataset=train_dataset,
-                                       preprocess=model.preprocess,
-                                       transform=model.transform,
-                                       use_cache=dataset.cfg.use_cache,
-                                       steps_per_epoch=dataset.cfg.get(
-                                           'steps_per_epoch_train', None))
+        train_split = TorchDataloader(dataset=train_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_train', None))
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.get('num_workers', 4),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed))
+        )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -254,11 +288,11 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            process_bar = tqdm(range(len(train_loader)), desc='training')
-            for i in process_bar:
-                data = train_loader[i]['data']
 
-                results = model(data['point'])
+            process_bar = tqdm(train_loader, desc='training')
+            for data in process_bar:
+                data.to(device)
+                results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
 
@@ -272,13 +306,14 @@ class ObjectDetection(BasePipeline):
                 for l, v in loss.items():
                     if not l in self.losses:
                         self.losses[l] = []
-                    self.losses[l].append(v.cpu().item())
-                    desc += " %s: %.03f" % (l, v.cpu().item())
-                desc += " > loss: %.03f" % loss_sum.cpu().item()
+                    self.losses[l].append(v.cpu().detach().numpy())
+                    desc += " %s: %.03f" % (l, v.cpu().detach().numpy())
+                desc += " > loss: %.03f" % loss_sum.cpu().detach().numpy()
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
-            #self.scheduler.step()
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # --------------------- validation
             self.run_valid()
@@ -314,6 +349,7 @@ class ObjectDetection(BasePipeline):
 
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
+
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
             log.info(f'Loading checkpoint optimizer_state_dict')
@@ -336,9 +372,7 @@ class ObjectDetection(BasePipeline):
         log.info(f'Epoch {epoch:3d}: save ckpt to {path_ckpt:s}')
 
     def save_config(self, writer):
-        '''
-        Save experiment configuration with tensorboard summary
-        '''
+        """Save experiment configuration with tensorboard summary."""
         writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
         writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
         writer.add_text('Configuration/Dataset',

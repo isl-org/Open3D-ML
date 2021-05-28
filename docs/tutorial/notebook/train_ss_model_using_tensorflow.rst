@@ -61,7 +61,6 @@ After you load a dataset, you can initialize any model and then train the model.
     dataset = ml3d.datasets.SemanticKITTI(dataset_path='../datasets/', cache_dir='./logs/cache',training_split=['00', '01', '02', '03', '04', '05', '06', '07', '09', '10'])
     #Initialize the RandLANet model with three layers.
     model = RandLANet(dim_input=3)
-    #The SemanticSegmentation class is a part ofof 
     pipeline = SemanticSegmentation(model=model, dataset=dataset, max_epoch=100)
     #Run the training
     pipeline.run_train()

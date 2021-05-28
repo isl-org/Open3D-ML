@@ -9,19 +9,17 @@ from ...utils import Config, make_dir
 
 
 class BasePipeline(ABC):
-    """
-    Base pipeline class
-    """
+    """Base pipeline class."""
 
     def __init__(self, model, dataset=None, **kwargs):
-        """
-        Initialize
+        """Initialize.
 
         Args:
             model: network
             dataset: dataset, or None for inference model
-            devce: 'gpu' or 'cpu'
+            device: 'gpu' or 'cpu'
             kwargs:
+
         Returns:
             class: The corresponding class.
         """
@@ -43,11 +41,11 @@ class BasePipeline(ABC):
 
     @abstractmethod
     def run_inference(self, data):
-        """
-        Run inference on a given data.
+        """Run inference on a given data.
 
         Args:
             data: A raw data.
+
         Returns:
             Returns the inference results.
         """
@@ -55,15 +53,10 @@ class BasePipeline(ABC):
 
     @abstractmethod
     def run_test(self):
-        """
-        Run testing on test sets.
-            
-        """
+        """Run testing on test sets."""
         return
 
     @abstractmethod
     def run_train(self):
-        """
-        Run training on train sets
-        """
+        """Run training on train sets."""
         return

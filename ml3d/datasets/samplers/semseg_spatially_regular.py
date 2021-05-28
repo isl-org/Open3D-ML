@@ -6,7 +6,7 @@ from ...utils import SAMPLER
 
 
 class SemSegSpatiallyRegularSampler(object):
-    """Spatially regularSampler sampler for semantic segmentation datsets"""
+    """Spatially regularSampler sampler for semantic segmentation datsets."""
 
     def __init__(self, dataset):
         self.dataset = dataset
@@ -61,7 +61,11 @@ class SemSegSpatiallyRegularSampler(object):
 
     def get_point_sampler(self):
 
-        def _random_centered_gen(**kwargs):
+        def _random_centered_gen(patchwise=True, **kwargs):
+            if not patchwise:
+                self.possibilities[self.cloud_id][:] = 1.
+                self.min_possibilities[self.cloud_id] = 1.
+                return
             pc = kwargs.get('pc', None)
             num_points = kwargs.get('num_points', None)
             radius = kwargs.get('radius', None)
@@ -82,8 +86,10 @@ class SemSegSpatiallyRegularSampler(object):
                     idxs = search_tree.query_radius(center_point, r=radius)[0]
                 elif num_points is not None:
                     if (pc.shape[0] < num_points):
+                        diff = num_points - pc.shape[0]
                         idxs = np.array(range(pc.shape[0]))
                         idxs = list(idxs) + list(random.choices(idxs, k=diff))
+                        idxs = np.asarray(idxs)
                     else:
                         idxs = search_tree.query(center_point,
                                                  k=num_points)[1][0]

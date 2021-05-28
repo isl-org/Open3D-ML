@@ -1,4 +1,6 @@
+https://github.com/intel-isl/open3d_downloads/releases/download/torch1.7.1/torch-1.7.1-cp36-cp36m-linux_x86_64.whl ; python_version == '3.6'
+https://github.com/intel-isl/open3d_downloads/releases/download/torch1.7.1/torch-1.7.1-cp37-cp37m-linux_x86_64.whl ; python_version == '3.7'
+https://github.com/intel-isl/open3d_downloads/releases/download/torch1.7.1/torch-1.7.1-cp38-cp38-linux_x86_64.whl ; python_version == '3.8'
 -f https://download.pytorch.org/whl/torch_stable.html
-torch==1.6.0+cu101
-torchvision==0.7.0+cu101
+torchvision==0.8.2+cu110
 tensorboard

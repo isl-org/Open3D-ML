@@ -17,16 +17,19 @@ class DataProcessing:
                          labels=None,
                          grid_size=0.1,
                          verbose=0):
-        """
-        CPP wrapper for a grid subsampling (method = barycenter for points and features)
-        :param points: (N, 3) matrix of input points
-        :param features: optional (N, d) matrix of features (floating number)
-        :param labels: optional (N,) matrix of integer labels
-        :param sampleDl: parameter defining the size of grid voxels
-        :param verbose: 1 to display
-        :return: subsampled points, with features and/or labels depending of the input
-        """
+        """CPP wrapper for a grid subsampling (method = barycenter for points and
+        features).
 
+        Args:
+            points: (N, 3) matrix of input points
+            features: optional (N, d) matrix of features (floating number)
+            labels: optional (N,) matrix of integer labels
+            grid_size: parameter defining the size of grid voxels
+            verbose: 1 to display
+
+        Returns:
+            Subsampled points, with features and/or labels depending of the input
+        """
         if (features is None) and (labels is None):
             return subsample(points, sampleDl=grid_size, verbose=verbose)
         elif (labels is None):
@@ -84,13 +87,16 @@ class DataProcessing:
 
     @staticmethod
     def knn_search(support_pts, query_pts, k):
-        """
-        :param support_pts: points you have, B*N1*3
-        :param query_pts: points you want to know the neighbour index, B*N2*3
-        :param k: Number of neighbours in knn search
-        :return: neighbor_idx: neighboring points indexes, B*N2*k
-        """
+        """KNN search.
 
+        Args:
+            support_pts: points you have, B*N1*3
+            query_pts: points you want to know the neighbour index, B*N2*3
+            k: Number of neighbours in knn search
+
+        Returns:
+            neighbor_idx: neighboring points indexes, B*N2*k
+        """
         neighbor_idx = knn_search(o3c.Tensor.from_numpy(query_pts),
                                   o3c.Tensor.from_numpy(support_pts),
                                   k).numpy()
@@ -126,13 +132,15 @@ class DataProcessing:
 
     @staticmethod
     def IoU_from_confusions(confusions):
-        """
-        Computes IoU from confusion matrices.
-        :param confusions: ([..., n_c, n_c] np.int32). Can be any dimension, the confusion matrices should be described by
-        the last axes. n_c = number of classes
-        :return: ([..., n_c] np.float32) IoU score
-        """
+        """Computes IoU from confusion matrices.
 
+        Args:
+            confusions: ([..., n_c, n_c] np.int32). Can be any dimension, the confusion matrices should be described by
+        the last axes. n_c = number of classes
+
+        Returns:
+            ([..., n_c] np.float32) IoU score
+        """
         # Compute TP, FP, FN. This assume that the second to last axis counts the truths (like the first axis of a
         # confusion matrix), and that the last axis counts the predictions (like the second axis of a confusion matrix)
         TP = np.diagonal(confusions, axis1=-2, axis2=-1)
@@ -166,8 +174,53 @@ class DataProcessing:
         return np.expand_dims(ce_label_weight, axis=0)
 
     @staticmethod
+    def invT(T):
+        R = T[:3, :3]  # 3x3 rotation + scale
+        t = T[3:, :3]  # 1x3 translation
+
+        R = np.linalg.inv(R)
+        t = t @ -R
+
+        M = np.concatenate([R, t], axis=0)
+        return np.concatenate([M, [[0], [0], [0], [1]]], axis=1)
+
+    @staticmethod
+    def world2cam(points, world_cam):
+        # transform in cam space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+
+        for i in range(len(points) // 10000 + 1):
+            points[i * 10000:(i + 1) * 10000] = np.matmul(
+                points[i * 10000:(i + 1) * 10000], world_cam)
+
+        return points[..., :3]
+
+    @staticmethod
+    def cam2img(points, cam_img):
+        # transform in image space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        for i in range(len(points) // 10000 + 1):
+            points[i * 10000:(i + 1) * 10000] = np.matmul(
+                points[i * 10000:(i + 1) * 10000], cam_img)
+        pts_img = (points[:, :2].T / points[:, 3]).T  # (N, 2)
+        depth = points[:, 2] - cam_img[3, 2]  # depth in rect camera coord
+        return pts_img, depth
+
+    @staticmethod
+    def cam2world(points, world_cam):
+        cam_world = DataProcessing.invT(world_cam)
+
+        # transform in world space
+        points = np.hstack(
+            (points, np.ones((points.shape[0], 1), dtype=np.float32)))
+        return np.matmul(points, cam_world)[..., :3]
+
+    @staticmethod
     def remove_outside_points(points, world_cam, cam_img, image_shape):
         """Remove points which are outside of image.
+
         Args:
             points (np.ndarray, shape=[N, 3+dims]): Total points.
             world_cam (np.ndarray, shape=[4, 4]): Matrix to project points in
@@ -175,17 +228,18 @@ class DataProcessing:
             cam_img (p.array, shape=[4, 4]): Matrix to project points in
                 camera coordinates to image coordinates.
             image_shape (list[int]): Shape of image.
+
         Returns:
             np.ndarray, shape=[N, 3+dims]: Filtered points.
         """
-        C, R, T = projection_matrix_to_CRT_kitti(cam_img.T)
-        image_bbox = [0, 0, image_shape[1], image_shape[0]]
-        frustum = get_frustum(image_bbox, C)
-        frustum -= T
-        frustum = np.linalg.inv(R) @ frustum.T
-        frustum = camera_to_lidar(frustum.T, world_cam)
-        frustum_surfaces = corner_to_surfaces_3d(frustum[np.newaxis, ...])
-        indices = points_in_convex_polygon_3d(points[:, :3], frustum_surfaces)
-        points = points[indices.reshape([-1])]
+        pts_cam = DataProcessing.world2cam(points[:, :3], world_cam)
+        pts_img, depth = DataProcessing.cam2img(pts_cam, cam_img)
 
-        return points
+        val_flag_1 = np.logical_and(pts_img[:, 0] >= 0,
+                                    pts_img[:, 0] < image_shape[1])
+        val_flag_2 = np.logical_and(pts_img[:, 1] >= 0,
+                                    pts_img[:, 1] < image_shape[0])
+        val_flag_merge = np.logical_and(val_flag_1, val_flag_2)
+        valid = np.logical_and(val_flag_merge, depth >= 0)
+
+        return points[valid]

@@ -76,7 +76,8 @@ def box3d_to_bev(boxes3d):
 
 
 def box3d_to_bev2d(boxes3d):
-    """Convert rotated 3d boxes in XYZWHDR format to neareset BEV without rotation.
+    """Convert rotated 3d boxes in XYZWHDR format to neareset BEV without
+    rotation.
 
     Args:
         boxes3d (torch.Tensor): Rotated boxes in XYZWHDR format.
@@ -84,7 +85,6 @@ def box3d_to_bev2d(boxes3d):
     Returns:
         tf.Tensor: Converted BEV boxes in XYWH format.
     """
-
     # Obtain BEV boxes with rotation in XYWHR format
     bev_rotated_boxes = box3d_to_bev(boxes3d)
     # convert the rotation to a valid range
@@ -149,7 +149,6 @@ class Anchor3DRangeGenerator(object):
         Returns:
             tf.Tensor: Anchors in the overall feature map.
         """
-
         mr_anchors = []
         for anchor_range, anchor_size in zip(self.ranges, self.sizes):
             mr_anchors.append(
@@ -223,8 +222,8 @@ class BBoxCoder(object):
 
     @staticmethod
     def encode(src_boxes, dst_boxes):
-        """Get box regression transformation deltas (dx, dy, dz, dw, dh, dl,
-        dr, dv*) that can be used to transform the `src_boxes` into the
+        """Get box regression transformation deltas (dx, dy, dz, dw, dh, dl, dr,
+        dv*) that can be used to transform the `src_boxes` into the
         `target_boxes`.
 
         Args:
@@ -294,7 +293,6 @@ def multiclass_nms(boxes, scores, score_thr):
         list[tf.Tensor]: Return a list of indices after nms,
             with an entry for each class.
     """
-
     idxs = []
     for i in range(scores.shape[1]):
         cls_inds = tf.where(scores[:, i] > score_thr)[:, 0]
@@ -311,9 +309,11 @@ def multiclass_nms(boxes, scores, score_thr):
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
     """Calculate overlap between two set of bboxes.
+
     If ``is_aligned `` is ``False``, then calculate the overlaps between each
     bbox of bboxes1 and bboxes2, otherwise the overlaps between each aligned
     pair of bboxes1 and bboxes2.
+
     Args:
         bboxes1 (Tensor): shape (B, m, 4) in <x1, y1, x2, y2> format or empty.
         bboxes2 (Tensor): shape (B, n, 4) in <x1, y1, x2, y2> format or empty.
@@ -325,10 +325,10 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
             Default False.
         eps (float, optional): A value added to the denominator for numerical
             stability. Default 1e-6.
+
     Returns:
         Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
     """
-
     assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
     # Either the boxes are empty or the length of boxes's last dimenstion is 4
     assert (bboxes1.shape[-1] == 4 or bboxes1.shape[-1] == 0)

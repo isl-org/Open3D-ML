@@ -29,9 +29,9 @@ ML frameworks such as data visualization.
 Open3D-ML is integrated in the Open3D v0.11+ python distribution and is
 compatible with the following versions of ML frameworks.
 
- * PyTorch 1.6
- * TensorFlow 2.3
- * CUDA 10.1 (On `GNU/Linux x86_64`, optional)
+ * PyTorch 1.7
+ * TensorFlow 2.4
+ * CUDA 10.1, 11.* (On `GNU/Linux x86_64`, optional)
 
 You can install Open3D with
 ```bash
@@ -60,7 +60,7 @@ $ python -c "import open3d.ml.tf as ml3d"
 ```
 
 If you need to use different versions of the ML frameworks or CUDA we recommend
-to 
+to
 [build Open3D from source](http://www.open3d.org/docs/release/compilation.html).
 
 ## Getting started
@@ -95,7 +95,7 @@ vis.visualize_dataset(dataset, 'all', indices=range(100))
 Configs of models, datasets, and pipelines are stored in `ml3d/configs`. Users can also construct their own yaml files to keep record of their customized configurations. Here is an example of reading a config file and constructing modules from it.
 ```python
 import open3d.ml as _ml3d
-import open3d.ml.torch as ml3d # or open3d.ml.tf as ml3d  
+import open3d.ml.torch as ml3d # or open3d.ml.tf as ml3d
 
 framework = "torch" # or tf
 cfg_file = "ml3d/configs/randlanet_semantickitti.yml"
@@ -106,7 +106,7 @@ Pipeline = _ml3d.utils.get_module("pipeline", cfg.pipeline.name, framework)
 Model = _ml3d.utils.get_module("model", cfg.model.name, framework)
 Dataset = _ml3d.utils.get_module("dataset", cfg.dataset.name)
 
-# use the arguments in the config file to construct the instances 
+# use the arguments in the config file to construct the instances
 cfg.dataset['dataset_path'] = "/path/to/your/dataset"
 dataset = Dataset(cfg.dataset.pop('dataset_path', None), **cfg.dataset)
 model = Model(**cfg.model)
@@ -142,7 +142,7 @@ randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randla
 if not os.path.exists(ckpt_path):
     cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
     os.system(cmd)
-    
+
 # load the parameters.
 pipeline.load_ckpt(ckpt_path=ckpt_path)
 
@@ -206,7 +206,7 @@ pointpillar_url = "https://storage.googleapis.com/open3d-releases/model-zoo/poin
 if not os.path.exists(ckpt_path):
     cmd = "wget {} -O {}".format(pointpillar_url, ckpt_path)
     os.system(cmd)
-    
+
 # load the parameters.
 pipeline.load_ckpt(ckpt_path=ckpt_path)
 
@@ -287,7 +287,7 @@ setting up a training pipeline or running a network on a dataset.
 ├─ ml3d                   # Package root dir that is integrated in open3d
      ├─ configs           # Model configuration files
      ├─ datasets          # Generic dataset code; will be integratede as open3d.ml.{tf,torch}.datasets
-     ├─ metrics           # Metrics available for evaluating ML models     
+     ├─ metrics           # Metrics available for evaluating ML models
      ├─ utils             # Framework independent utilities; available as open3d.ml.{tf,torch}.utils
      ├─ vis               # ML specific visualization functions
      ├─ tf                # Directory for TensorFlow specific code. same structure as ml3d/torch.
@@ -311,12 +311,15 @@ For the task of semantic segmentation, we measure the performance of different m
 The table shows the available models and datasets for the segmentation task and the respective scores. Each score links to the respective weight file.
 
 
-| Model / Dataset    | SemanticKITTI | Toronto 3D | S3DIS | Semantic3D | Paris-Lille3D |
-|--------------------|---------------|----------- |-------|--------------|-------------|
-| RandLA-Net (tf)    | [53.7](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |  [69.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.zip)    | [76.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantic3d_202012120312utc.zip) |  [70.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_parislille3d_202012160654utc.zip) |
-| RandLA-Net (torch) | [52.8](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth)        |     [71.2](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3D_202010091306.pth)  |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.pth)  | [76.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantic3d_202012120312utc.pth) |  [70.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_parislille3d_202012160654utc.pth) |
-| KPConv     (tf)    | [58.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.zip)  |  [65.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.zip) | - |  [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.zip) |
-| KPConv     (torch) | [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.pth) |  [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  | - | [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.pth) |
+| Model / Dataset    | SemanticKITTI | Toronto 3D | S3DIS | Semantic3D | Paris-Lille3D | ScanNet |
+|--------------------|---------------|----------- |-------|--------------|-------------|---------|
+| RandLA-Net (tf)    | [53.7](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip) |  [69.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091250.zip) |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.zip)    | [76.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantic3d_202012120312utc.zip) |  [70.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_parislille3d_202012160654utc.zip) | - |
+| RandLA-Net (torch) | [52.8](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth)        |     [71.2](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_toronto3d_202010091306utc.pth)  |  [67.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_s3dis_202010091238.pth)  | [76.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantic3d_202012120312utc.pth) |  [70.0](https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_parislille3d_202012160654utc.pth) | - |
+| KPConv     (tf)    | [58.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip)         |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.zip)  |  [65.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.zip) | - |  [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.zip) | - |
+| KPConv     (torch) | [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.pth) |  [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  | - | [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.pth) | - |
+| SparseConvUnet (torch)| - | - | - | - | - | [68](https://storage.googleapis.com/open3d-releases/model-zoo/sparseconvunet_scannet_202105031316utc.pth) |
+| SparseConvUnet (tf)| - | - | - | - | - | [68.2](https://storage.googleapis.com/open3d-releases/model-zoo/sparseconvunet_scannet_202105031316utc.zip) |
+
 
 
 ### Object Detection
@@ -326,10 +329,32 @@ The table shows the available models and datasets for the object detection task 
 For the evaluation, the models were evaluated using the validation subset, according to KITTI's validation criteria. The models were trained for three classes (car, pedestrian and cyclist). The calculated values are the mean value over the mAP of all classes for all difficulty levels.
 
 
-| Model / Dataset    | KITTI [BEV / 3D] |
+| Model / Dataset    | KITTI [BEV / 3D] @ 0.70|
 |--------------------|---------------|
 | PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) |
 | PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)   |
+| PointRCNN (tf)       | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.zip) |
+| PointRCNN (torch)    | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.pth) |
+
+
+#### Training PointRCNN
+
+To use ground truth sampling data augmentation for training, we can generate the ground truth database as follows:
+```
+python scripts/collect_bboxes.py --dataset_path <path_to_data_root>
+```
+This will generate a database consisting of objects from the train split. It is recommended to use this augmentation for dataset like KITTI where objects are sparse.
+
+The two stages of PointRCNN are trained separately. To train the proposal generation stage of PointRCNN with PyTorch, run the following command:
+```
+# Train RPN for 100 epochs.
+python scripts/run_pipeline.py torch -c ml3d/configs/pointrcnn_kitti.yml --dataset.dataset_path <path-to-dataset> --mode RPN --epochs 100
+```
+After getting a well trained RPN network, we can train RCNN network with frozen RPN weights.
+```
+# Train RCNN for 70 epochs.
+python scripts/run_pipeline.py torch -c ml3d/configs/pointrcnn_kitti.yml --dataset.dataset_path <path-to-dataset> --mode RCNN --model.ckpt_path <path_to_checkpoint> --epochs 100
+```
 
 
 
@@ -349,10 +374,11 @@ The following is a list of datasets for which we provide dataset reader classes.
 * S3DIS ([project-page](http://3dsemantics.stanford.edu/))
 * Paris-Lille 3D ([project-page](https://npm3d.fr/paris-lille-3d))
 * Argoverse ([project-page](https://www.argoverse.org/))
-* KITTI ([project-page](http://www.cvlibs.net/datasets/kitti/))
+* KITTI ([project-page](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d))
 * Lyft ([project-page](https://self-driving.lyft.com/level5/data/))
 * nuScenes ([project-page](https://www.nuscenes.org/))
-* Waymo ([project-page](https://waymo.com/open))
+* Waymo ([project-page](https://waymo.com/open/data/))
+* ScanNet([project-page](http://www.scan-net.org/))
 
 
 For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
@@ -385,7 +411,7 @@ Please also check out our communication channels to get in contact with the comm
 ## Communication channels
 
 <!--* [GitHub Issue](https://github.com/intel-isl/Open3D/issues): bug reports, feature requests, etc.-->
-* [Forum](https://forum.open3d.org): discussion on the usage of Open3D.
+* [Forum](https://github.com/intel-isl/Open3D/discussions): discussion on the usage of Open3D.
 * [Discord Chat](https://discord.gg/D35BGvn): online chats, discussions,
   and collaboration with other users and developers.
 

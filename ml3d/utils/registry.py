@@ -2,19 +2,17 @@ import inspect
 
 
 class Registry(object):
-    """
-    docstring for Registry
-    """
 
     def __init__(self, name):
         self._name = name
         self._module_dict = dict()
 
     def get(self, key, framework):
-        """
-        Get the registry record.
+        """Get the registry record.
+
         Args:
             key (str): The class name in string format.
+
         Returns:
             class: The corresponding class.
         """
@@ -65,10 +63,12 @@ class Registry(object):
 
 def get_from_name(module_name, registry, framework):
     """Build a module from config dict.
+
     Args:
         cfg (dict): Config dict. It should at least contain the key "type".
         registry (:obj:`Registry`): The registry to search the type from.
         default_args (dict, optional): Default initialization arguments.
+
     Returns:
         object: The constructed object.
     """

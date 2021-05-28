@@ -47,7 +47,7 @@ def precision_3d(pred,
         pred (dict): Dictionary with the prediction data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
+                'label':      [...],
                 'score':      [...],
                 'difficulty': [...],
                 ...
@@ -55,7 +55,7 @@ def precision_3d(pred,
         target (dict): Dictionary with the target data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
+                'label':      [...],
                 'difficulty': [...],
                 ...
             }
@@ -71,7 +71,7 @@ def precision_3d(pred,
             Default is {}.
 
     Returns:
-        A tuple with a list of detection quantities 
+        A tuple with a list of detection quantities
         (score, true pos., false. pos) for each box
         and a list of the false negatives.
     """
@@ -137,11 +137,13 @@ def precision_3d(pred,
 
 def sample_thresholds(scores, gt_cnt, sample_cnt=41):
     """Computes equally spaced sample thresholds from given scores
+
     Args:
         scores (list): list of scores
         gt_cnt (number): amount of gt samples
-        sample_cnt (number): amount of samples 
+        sample_cnt (number): amount of samples
             Default is 41.
+
     Returns:
         Returns a list of equally spaced samples of the input scores.
     """
@@ -168,18 +170,19 @@ def mAP(pred,
         samples=41,
         similar_classes={}):
     """Computes mAP of the given prediction (11-point interpolation).
+
     Args:
         pred (dict): List of dictionaries with the prediction data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],     
+                'label':      [...],
                 'score':      [...],
                 'difficulty': [...]
             }[]
         target (dict): List of dictionaries with the target data (as numpy arrays).
             {
                 'bbox':       [...],
-                'label':      [...],   
+                'label':      [...],
                 'difficulty': [...]
             }[]
         classes (number[]): List of classes which should be evaluated.
@@ -198,7 +201,6 @@ def mAP(pred,
     Returns:
         Returns the mAP for each class and difficulty specified.
     """
-
     if len(min_overlap) != len(classes):
         assert len(min_overlap) == 1
         min_overlap = min_overlap * len(classes)
@@ -210,7 +212,7 @@ def mAP(pred,
         cnt += len(filter_data(p, classes)[1])
         box_cnts.append(cnt)
 
-    gt_cnt = np.empty((len(classes), len(difficulties)))
+    gt_cnt = np.zeros((len(classes), len(difficulties)))
     for i, c in enumerate(classes):
         for j, d in enumerate(difficulties):
             for t in target:
@@ -246,6 +248,9 @@ def mAP(pred,
                 prec[ti] = tp_acc / (tp_acc + fp_acc)
                 prec[ti] = np.max(prec[ti:], axis=-1)
 
-            mAP[i, j] = np.sum(prec[::4]) / 11 * 100
+            if len(prec[::4]) < int(samples / 4 + 1):
+                mAP[i, j] = np.sum(prec) / len(prec) * 100
+            else:
+                mAP[i, j] = np.sum(prec[::4]) / int(samples / 4 + 1) * 100
 
     return mAP

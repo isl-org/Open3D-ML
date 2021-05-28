@@ -28,8 +28,6 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
-from .....utils.ply import read_ply, write_ply
-
 # ------------------------------------------------------------------------------------------
 #
 #           Functions
@@ -39,13 +37,13 @@ from .....utils.ply import read_ply, write_ply
 
 
 def create_3D_rotations(axis, angle):
-    """
-    Create rotation matrices from a list of axes and angles. Code from wikipedia on quaternions
+    """Create rotation matrices from a list of axes and angles. Code from
+    wikipedia on quaternions.
+
     :param axis: float32[N, 3]
     :param angle: float32[N,]
     :return: float32[N, 3, 3]
     """
-
     t1 = np.cos(angle)
     t2 = 1 - t1
     t3 = axis[:, 0] * axis[:, 0]
@@ -77,9 +75,10 @@ def spherical_Lloyd(radius,
                     max_iter=500,
                     momentum=0.9,
                     verbose=0):
-    """
-    Creation of kernel point via Lloyd algorithm. We use an approximation of the algorithm, and compute the Voronoi
-    cell centers with discretization  of space. The exact formula is not trivial with part of the sphere as sides.
+    """Creation of kernel point via Lloyd algorithm. We use an approximation of
+    the algorithm, and compute the Voronoi cell centers with discretization  of
+    space. The exact formula is not trivial with part of the sphere as sides.
+
     :param radius: Radius of the kernels
     :param num_cells: Number of cell (kernel points) in the Voronoi diagram.
     :param dimension: dimension of the space
@@ -91,7 +90,6 @@ def spherical_Lloyd(radius,
     :param verbose: display option
     :return: points [num_kernels, num_points, dimension]
     """
-
     #######################
     # Parameters definition
     #######################
@@ -277,8 +275,8 @@ def kernel_point_optimization_debug(radius,
                                     fixed='center',
                                     ratio=0.66,
                                     verbose=0):
-    """
-    Creation of kernel point via optimization of potentials.
+    """Creation of kernel point via optimization of potentials.
+
     :param radius: Radius of the kernels
     :param num_points: points composing kernels
     :param num_kernels: number of wanted kernels
@@ -288,7 +286,6 @@ def kernel_point_optimization_debug(radius,
     :param verbose: display option
     :return: points [num_kernels, num_points, dimension]
     """
-
     #######################
     # Parameters definition
     #######################
@@ -441,7 +438,7 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
 
     # Kernel_file
     kernel_file = join(
-        kernel_dir, 'k_{:03d}_{:s}_{:d}D.ply'.format(num_kpoints, fixed,
+        kernel_dir, 'k_{:03d}_{:s}_{:d}D.npy'.format(num_kpoints, fixed,
                                                      dimension))
 
     # Check if already done
@@ -470,11 +467,10 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
             # Save points
             kernel_points = kernel_points[best_k, :, :]
 
-        write_ply(kernel_file, kernel_points, ['x', 'y', 'z'])
+        np.save(kernel_file, kernel_points)
 
     else:
-        data = read_ply(kernel_file)
-        kernel_points = np.vstack((data['x'], data['y'], data['z'])).T
+        kernel_points = np.load(kernel_file)
 
     # Random roations for the kernel
     # N.B. 4D random rotations not supported yet

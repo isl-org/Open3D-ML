@@ -29,10 +29,10 @@ class CrossEntropyLoss(tf.Module):
             weight (tf.Tensor, optional): Sample-wise loss weight.
             avg_factor (int, optional): Average factor that is used to average
                 the loss. Defaults to None.
+
         Returns:
             tf.Tensor: The calculated loss
         """
-
         if weight is not None:
             loss = self.loss_fn(label, cls_score, sample_weight=weight)
         else:

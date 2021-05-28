@@ -1,7 +1,6 @@
 import numpy as np
 import random
 import pickle
-import copy
 from .operations import *
 
 
@@ -29,12 +28,12 @@ def trans_normalize(pc, feat, t_normalize):
 
 def trans_augment(points, t_augment):
     """Implementation of an augmentation transform for point clouds."""
-
     if t_augment is None or not t_augment.get('turn_on', True):
         return points
 
     # Initialize rotation matrix
-    R = np.eye(points.shape[1])
+    R = np.eye(points.shape[1]) + np.random.rand(3, 3) * 0.1
+    R[0][0] *= np.random.randint(0, 2) * 2 - 1  # Randomply flip x dimension.
 
     if points.shape[1] == 3:
         rotation_method = t_augment.get('rotation_method', None)
@@ -43,7 +42,9 @@ def trans_augment(points, t_augment):
             # Create random rotations
             theta = np.random.rand() * 2 * np.pi
             c, s = np.cos(theta), np.sin(theta)
-            R = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]], dtype=np.float32)
+            R = np.matmul(
+                R, np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]],
+                            dtype=np.float32))
 
         elif rotation_method == 'all':
 
@@ -74,7 +75,7 @@ def trans_augment(points, t_augment):
     if scale_anisotropic:
         scale = np.random.rand(points.shape[1]) * (max_s - min_s) + min_s
     else:
-        scale = np.random.rand() * (max_s - min_s) - min_s
+        scale = np.random.rand() * (max_s - min_s) + min_s
 
     # TODO: add symmetric augmentation
     # # Add random symmetries to the scale factor
@@ -94,8 +95,7 @@ def trans_augment(points, t_augment):
     noise = (np.random.randn(points.shape[0], points.shape[1]) *
              noise_level).astype(np.float32)
 
-    augmented_points = np.sum(np.expand_dims(points, 2) * R,
-                              axis=1) * scale + noise
+    augmented_points = np.matmul(points, R) * scale + noise
 
     return augmented_points.astype(np.float32)
 
@@ -131,7 +131,7 @@ def in_range_bev(box_range, box):
 
 
 class ObjdetAugmentation():
-    """Class consisting different augmentation for Object Detection"""
+    """Class consisting different augmentation for Object Detection."""
 
     @staticmethod
     def PointShuffle(data):
@@ -145,13 +145,13 @@ class ObjdetAugmentation():
         bev_range = pcd_range[[0, 1, 3, 4]]
 
         filtered_boxes = []
-        for box in data['bbox_objs']:
+        for box in data['bounding_boxes']:
             if in_range_bev(bev_range, box.to_xyzwhlr()):
                 filtered_boxes.append(box)
 
         return {
             'point': data['point'],
-            'bbox_objs': filtered_boxes,
+            'bounding_boxes': filtered_boxes,
             'calib': data['calib']
         }
 
@@ -159,9 +159,9 @@ class ObjdetAugmentation():
     def ObjectSample(data, db_boxes_dict, sample_dict):
         rate = 1.0
         points = data['point']
-        bboxes = data['bbox_objs']
+        bboxes = data['bounding_boxes']
 
-        gt_labels_3d = [box.label_class for box in data['bbox_objs']]
+        gt_labels_3d = [box.label_class for box in data['bounding_boxes']]
 
         sampled_num_dict = {}
 
@@ -174,34 +174,31 @@ class ObjdetAugmentation():
             sampled_num_dict[class_name] = sampled_num
 
         sampled = []
-        avoid_coll_boxes = copy.deepcopy(data['bbox_objs'])
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
             if sampled_num < 0:
                 continue
 
-            sampled_cls = sample_class(class_name, sampled_num,
-                                       avoid_coll_boxes,
+            sampled_cls = sample_class(class_name, sampled_num, bboxes,
                                        db_boxes_dict[class_name])
             sampled += sampled_cls
-
-            avoid_coll_boxes += sampled
+            bboxes = bboxes + sampled_cls
 
         if len(sampled) != 0:
-            sampled_points = sampled[0].points_inside_box.copy()
-            for box in sampled[1:]:
-                sampled_points = np.concatenate(
-                    [sampled_points, box.points_inside_box], axis=0)
-
+            sampled_points = np.concatenate(
+                [box.points_inside_box for box in sampled], axis=0)
             points = remove_points_in_boxes(points, sampled)
             points = np.concatenate([sampled_points, points], axis=0)
-            bboxes = data['bbox_objs'] + sampled
 
-        return {'point': points, 'bbox_objs': bboxes, 'calib': data['calib']}
+        return {
+            'point': points,
+            'bounding_boxes': bboxes,
+            'calib': data['calib']
+        }
 
     @staticmethod
     def ObjectNoise(input,
                     trans_std=[0.25, 0.25, 0.25],
-                    rot_range=[-0.15707963267, 0.15707963267],
+                    rot_range=[-np.pi / 2, np.pi / 2],
                     num_try=100):
         raise NotImplementedError

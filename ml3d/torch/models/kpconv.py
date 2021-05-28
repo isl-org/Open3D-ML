@@ -15,7 +15,6 @@ from open3d.ml.contrib import radius_search
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
 from ..modules.losses import filter_valid_label
-from ...utils.ply import write_ply, read_ply
 from ...utils import MODEL
 
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
@@ -23,8 +22,9 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
 
 
 class KPFCNN(BaseModel):
-    """
-    Class defining KPFCNN. A model for Semantic Segmentation.
+    """Class defining KPFCNN.
+
+    A model for Semantic Segmentation.
     """
 
     def __init__(
@@ -308,11 +308,14 @@ class KPFCNN(BaseModel):
         return optimizer, scheduler
 
     def get_loss(self, Loss, results, inputs, device):
-        """
-        Runs the loss on outputs of the model
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
+        """Runs the loss on outputs of the model.
+
+        Args:
+            outputs: logits
+            labels: labels
+
+        Returns:
+            loss
         """
         cfg = self.cfg
         labels = inputs['data'].labels
@@ -552,7 +555,7 @@ class KPFCNN(BaseModel):
     def update_probs(self, inputs, results, test_probs, test_labels):
         self.test_smooth = 0.95
         stk_probs = torch.nn.functional.softmax(results, dim=-1)
-        stk_probs = results.cpu().data.numpy()
+        stk_probs = stk_probs.cpu().data.numpy()
 
         batch = inputs['data']
         stk_labels = batch.labels.cpu().data.numpy()
@@ -627,11 +630,11 @@ class KPFCNN(BaseModel):
             return False
 
     def big_neighborhood_filter(self, neighbors, layer):
-        """
-        Filter neighborhoods with max number of neighbors. Limit is set to keep XX% of the neighborhoods untouched.
-        Limit is computed at initialization
-        """
+        """Filter neighborhoods with max number of neighbors.
 
+        Limit is set to keep XX% of the neighborhoods untouched. Limit is
+        computed at initialization
+        """
         # crop neighbors matrix
         if len(self.neighborhood_limits) > 0:
             return neighbors[:, :self.neighborhood_limits[layer]]
@@ -644,7 +647,6 @@ class KPFCNN(BaseModel):
                                verbose=False,
                                is_test=False):
         """Implementation of an augmentation transform for point clouds."""
-
         ##########
         # Rotation
         ##########
@@ -765,14 +767,16 @@ class KPFCNN(BaseModel):
 
 
 def gather(x, idx, method=2):
-    """
-    implementation of a custom gather operation for faster backwards.
-    :param x: input with shape [N, D_1, ... D_d]
-    :param idx: indexing with shape [n_1, ..., n_m]
-    :param method: Choice of the method
-    :return: x[idx] with shape [n_1, ..., n_m, D_1, ... D_d]
-    """
+    """Implementation of a custom gather operation for faster backwards.
 
+    Args:
+        x: Input with shape [N, D_1, ... D_d]
+        idx: Indexing with shape [n_1, ..., n_m]
+        method: Choice of the method
+
+    Returns:
+        x[idx] with shape [n_1, ..., n_m, D_1, ... D_d]
+    """
     if method == 0:
         return x[idx]
     elif method == 1:
@@ -799,23 +803,30 @@ def gather(x, idx, method=2):
 
 
 def radius_gaussian(sq_r, sig, eps=1e-9):
-    """
-    Compute a radius gaussian (gaussian of distance)
-    :param sq_r: input radiuses [dn, ..., d1, d0]
-    :param sig: extents of gaussians [d1, d0] or [d0] or float
-    :return: gaussian of sq_r [dn, ..., d1, d0]
+    """Compute a radius gaussian (gaussian of distance)
+
+    Args:
+        sq_r: input radiuses [dn, ..., d1, d0]
+        sig: extents of gaussians [d1, d0] or [d0] or float
+
+    Returns:
+        gaussian of sq_r [dn, ..., d1, d0]
     """
     return torch.exp(-sq_r / (2 * sig**2 + eps))
 
 
 def closest_pool(x, inds):
-    """
-    Pools features from the closest neighbors. WARNING: this function assumes the neighbors are ordered.
-    :param x: [n1, d] features matrix
-    :param inds: [n2, max_num] Only the first column is used for pooling
-    :return: [n2, d] pooled features matrix
-    """
+    """Pools features from the closest neighbors.
 
+    WARNING: this function assumes the neighbors are ordered.
+
+    Args:
+        x: [n1, d] features matrix
+        inds: [n2, max_num] Only the first column is used for pooling
+
+    Returns:
+        [n2, d] pooled features matrix
+    """
     # Add a last row with minimum features for shadow pools
     x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
 
@@ -824,13 +835,15 @@ def closest_pool(x, inds):
 
 
 def max_pool(x, inds):
-    """
-    Pools features with the maximum values.
-    :param x: [n1, d] features matrix
-    :param inds: [n2, max_num] pooling indices
-    :return: [n2, d] pooled features matrix
-    """
+    """Pools features with the maximum values.
 
+    Args:
+        x: [n1, d] features matrix
+        inds: [n2, max_num] pooling indices
+
+    Returns:
+        [n2, d] pooled features matrix
+    """
     # Add a last row with minimum features for shadow pools
     x = torch.cat((x, torch.zeros_like(x[:1, :])), 0)
 
@@ -843,13 +856,15 @@ def max_pool(x, inds):
 
 
 def global_average(x, batch_lengths):
-    """
-    Block performing a global average over batch pooling
-    :param x: [N, D] input features
-    :param batch_lengths: [B] list of batch lengths
-    :return: [B, D] averaged features
-    """
+    """Block performing a global average over batch pooling.
 
+    Args:
+        x: [N, D] input features
+        batch_lengths: [B] list of batch lengths
+
+    Returns:
+        [B, D] averaged features
+    """
     # Loop over the clouds of the batch
     averaged_features = []
     i0 = 0
@@ -886,19 +901,20 @@ class KPConv(nn.Module):
                  aggregation_mode='sum',
                  deformable=False,
                  modulated=False):
-        """
-        Initialize parameters for KPConvDeformable.
-        :param kernel_size: Number of kernel points.
-        :param p_dim: dimension of the point space.
-        :param in_channels: dimension of input features.
-        :param out_channels: dimension of output features.
-        :param KP_extent: influence radius of each kernel point.
-        :param radius: radius used for kernel point init. Even for deformable, use the config.conv_radius
-        :param fixed_kernel_points: fix position of certain kernel points ('none', 'center' or 'verticals').
-        :param KP_influence: influence function of the kernel points ('constant', 'linear', 'gaussian').
-        :param aggregation_mode: choose to sum influences, or only keep the closest ('closest', 'sum').
-        :param deformable: choose deformable or not
-        :param modulated: choose if kernel weights are modulated in addition to deformed
+        """Initialize parameters for KPConvDeformable.
+
+        Args:
+            kernel_size: Number of kernel points.
+            p_dim: dimension of the point space.
+            in_channels: dimension of input features.
+            out_channels: dimension of output features.
+            KP_extent: influence radius of each kernel point.
+            radius: radius used for kernel point init. Even for deformable, use the config.conv_radius
+            fixed_kernel_points: fix position of certain kernel points ('none', 'center' or 'verticals').
+            KP_influence: influence function of the kernel points ('constant', 'linear', 'gaussian').
+            aggregation_mode: choose to sum influences, or only keep the closest ('closest', 'sum').
+            deformable: choose deformable or not
+            modulated: choose if kernel weights are modulated in addition to deformed
         """
         super(KPConv, self).__init__()
 
@@ -969,11 +985,11 @@ class KPConv(nn.Module):
         return
 
     def init_KP(self):
-        """
-        Initialize the kernel point positions in a sphere
-        :return: the tensor of kernel points
-        """
+        """Initialize the kernel point positions in a sphere
 
+        Returns:
+            the tensor of kernel points
+        """
         # Create one kernel disposition (as numpy array). Choose the KP distance to center thanks to the KP extent
         K_points_numpy = load_kernels(self.radius,
                                       self.K,
@@ -1194,11 +1210,14 @@ def block_decider(block_name, radius, in_dim, out_dim, layer_ind, config):
 class BatchNormBlock(nn.Module):
 
     def __init__(self, in_dim, use_bn, bn_momentum):
-        """
-        Initialize a batch normalization block. If network does not use batch normalization, replace with biases.
-        :param in_dim: dimension input features
-        :param use_bn: boolean indicating if we use Batch Norm
-        :param bn_momentum: Batch norm momentum
+        """Initialize a batch normalization block.
+
+        If network does not use batch normalization, replace with biases.
+
+        Args:
+            in_dim: dimension input features
+            use_bn: boolean indicating if we use Batch Norm
+            bn_momentum: Batch norm momentum
         """
         super(BatchNormBlock, self).__init__()
         self.bn_momentum = 1 - bn_momentum
@@ -1239,14 +1258,16 @@ class UnaryBlock(nn.Module):
                  bn_momentum,
                  no_relu=False,
                  l_relu=0.1):
-        """
-        Initialize a standard unary block with its ReLU and BatchNorm.
-        :param in_dim: dimension input features
-        :param out_dim: dimension input features
-        :param use_bn: boolean indicating if we use Batch Norm
-        :param bn_momentum: Batch norm momentum
-        """
+        """Initialize a standard unary block with its ReLU and BatchNorm.
 
+        Args:
+            in_dim: dimension input features
+            out_dim: dimension input features
+            use_bn: boolean indicating if we use Batch Norm
+            bn_momentum: Batch norm momentum
+            no_relu: Do not use leaky ReLU
+            l_relu: Leaky ReLU factor
+        """
         super(UnaryBlock, self).__init__()
         self.bn_momentum = bn_momentum
         self.use_bn = use_bn
@@ -1274,12 +1295,15 @@ class UnaryBlock(nn.Module):
 class SimpleBlock(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
-        """
-        Initialize a simple convolution block with its ReLU and BatchNorm.
-        :param in_dim: dimension input features
-        :param out_dim: dimension input features
-        :param radius: current radius of convolution
-        :param config: parameters
+        """Initialize a simple convolution block with its ReLU and BatchNorm.
+
+        Args:
+            block_name: Block name
+            in_dim: dimension input features
+            out_dim: dimension input features
+            radius: current radius of convolution
+            layer_ind: Index for layer
+            config: parameters
         """
         super(SimpleBlock, self).__init__()
 
@@ -1333,12 +1357,15 @@ class SimpleBlock(nn.Module):
 class ResnetBottleneckBlock(nn.Module):
 
     def __init__(self, block_name, in_dim, out_dim, radius, layer_ind, config):
-        """
-        Initialize a resnet bottleneck block.
-        :param in_dim: dimension input features
-        :param out_dim: dimension input features
-        :param radius: current radius of convolution
-        :param config: parameters
+        """Initialize a resnet bottleneck block.
+
+        Args:
+            block_name: Block name
+            in_dim: dimension input features
+            out_dim: dimension input features
+            radius: current radius of convolution
+            layer_ind: Layer ind
+            config: parameters
         """
         super(ResnetBottleneckBlock, self).__init__()
 
@@ -1437,9 +1464,7 @@ class ResnetBottleneckBlock(nn.Module):
 class GlobalAverageBlock(nn.Module):
 
     def __init__(self):
-        """
-        Initialize a global average block with its ReLU and BatchNorm.
-        """
+        """Initialize a global average block with its ReLU and BatchNorm."""
         super(GlobalAverageBlock, self).__init__()
         return
 
@@ -1450,9 +1475,7 @@ class GlobalAverageBlock(nn.Module):
 class NearestUpsampleBlock(nn.Module):
 
     def __init__(self, layer_ind):
-        """
-        Initialize a nearest upsampling block with its ReLU and BatchNorm.
-        """
+        """Initialize a nearest upsampling block with its ReLU and BatchNorm."""
         super(NearestUpsampleBlock, self).__init__()
         self.layer_ind = layer_ind
         return
@@ -1468,9 +1491,7 @@ class NearestUpsampleBlock(nn.Module):
 class MaxPoolBlock(nn.Module):
 
     def __init__(self, layer_ind):
-        """
-        Initialize a max pooling block with its ReLU and BatchNorm.
-        """
+        """Initialize a max pooling block with its ReLU and BatchNorm."""
         super(MaxPoolBlock, self).__init__()
         self.layer_ind = layer_ind
         return
@@ -1526,21 +1547,24 @@ def spherical_Lloyd(radius,
                     max_iter=500,
                     momentum=0.9,
                     verbose=0):
-    """
-    Creation of kernel point via Lloyd algorithm. We use an approximation of the algorithm, and compute the Voronoi
-    cell centers with discretization  of space. The exact formula is not trivial with part of the sphere as sides.
-    :param radius: Radius of the kernels
-    :param num_cells: Number of cell (kernel points) in the Voronoi diagram.
-    :param dimension: dimension of the space
-    :param fixed: fix position of certain kernel points ('none', 'center' or 'verticals')
-    :param approximation: Approximation method for Lloyd's algorithm ('discretization', 'monte-carlo')
-    :param approx_n: Number of point used for approximation.
-    :param max_iter: Maximum nu;ber of iteration for the algorithm.
-    :param momentum: Momentum of the low pass filter smoothing kernel point positions
-    :param verbose: display option
-    :return: points [num_kernels, num_points, dimension]
-    """
+    """Creation of kernel point via Lloyd algorithm. We use an approximation of
+    the algorithm, and compute the Voronoi cell centers with discretization  of
+    space. The exact formula is not trivial with part of the sphere as sides.
 
+    Args:
+        radius: Radius of the kernels
+        num_cells: Number of cell (kernel points) in the Voronoi diagram.
+        dimension: dimension of the space
+        fixed: fix position of certain kernel points ('none', 'center' or 'verticals')
+        approximation: Approximation method for Lloyd's algorithm ('discretization', 'monte-carlo')
+        approx_n: Number of point used for approximation.
+        max_iter: Maximum nu;ber of iteration for the algorithm.
+        momentum: Momentum of the low pass filter smoothing kernel point positions
+        verbose: display option
+
+    Returns:
+        points [num_kernels, num_points, dimension]
+    """
     #######################
     # Parameters definition
     #######################
@@ -1726,18 +1750,20 @@ def kernel_point_optimization_debug(radius,
                                     fixed='center',
                                     ratio=0.66,
                                     verbose=0):
-    """
-    Creation of kernel point via optimization of potentials.
-    :param radius: Radius of the kernels
-    :param num_points: points composing kernels
-    :param num_kernels: number of wanted kernels
-    :param dimension: dimension of the space
-    :param fixed: fix position of certain kernel points ('none', 'center' or 'verticals')
-    :param ratio: ratio of the radius where you want the kernels points to be placed
-    :param verbose: display option
-    :return: points [num_kernels, num_points, dimension]
-    """
+    """Creation of kernel point via optimization of potentials.
 
+    Args:
+        radius: Radius of the kernels
+        num_points: points composing kernels
+        num_kernels: number of wanted kernels
+        dimension: dimension of the space
+        fixed: fix position of certain kernel points ('none', 'center' or 'verticals')
+        ratio: ratio of the radius where you want the kernels points to be placed
+        verbose: display option
+
+    Returns:
+        points [num_kernels, num_points, dimension]
+    """
     #######################
     # Parameters definition
     #######################
@@ -1890,7 +1916,7 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
 
     # Kernel_file
     kernel_file = join(
-        kernel_dir, 'k_{:03d}_{:s}_{:d}D.ply'.format(num_kpoints, fixed,
+        kernel_dir, 'k_{:03d}_{:s}_{:d}D.npy'.format(num_kpoints, fixed,
                                                      dimension))
 
     # Check if already done
@@ -1919,11 +1945,10 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
             # Save points
             kernel_points = kernel_points[best_k, :, :]
 
-        write_ply(kernel_file, kernel_points, ['x', 'y', 'z'])
+        np.save(kernel_file, kernel_points)
 
     else:
-        data = read_ply(kernel_file)
-        kernel_points = np.vstack((data['x'], data['y'], data['z'])).T
+        kernel_points = np.load(kernel_file)
 
     # Random roations for the kernel
     # N.B. 4D random rotations not supported yet
@@ -1972,16 +1997,18 @@ def load_kernels(radius, num_kpoints, dimension, fixed, lloyd=False):
 
 
 def batch_neighbors(queries, supports, q_batches, s_batches, radius):
-    """
-    Computes neighbors for a batch of queries and supports
-    :param queries: (N1, 3) the query points
-    :param supports: (N2, 3) the support points
-    :param q_batches: (B) the list of lengths of batch elements in queries
-    :param s_batches: (B)the list of lengths of batch elements in supports
-    :param radius: float32
-    :return: neighbors indices
-    """
+    """Computes neighbors for a batch of queries and supports.
 
+    Args:
+        queries: (N1, 3) the query points
+        supports: (N2, 3) the support points
+        q_batches: (B) the list of lengths of batch elements in queries
+        s_batches: (B)the list of lengths of batch elements in supports
+        radius: float32
+
+    Returns:
+        neighbors indices
+    """
     ret = radius_search(
         o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
         o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
@@ -2002,16 +2029,18 @@ def batch_grid_subsampling(points,
                            max_p=0,
                            verbose=0,
                            random_grid_orient=True):
-    """
-    CPP wrapper for a grid subsampling (method = barycenter for points and features)
-    :param points: (N, 3) matrix of input points
-    :param features: optional (N, d) matrix of features (floating number)
-    :param labels: optional (N,) matrix of integer labels
-    :param sampleDl: parameter defining the size of grid voxels
-    :param verbose: 1 to display
-    :return: subsampled points, with features and/or labels depending of the input
-    """
+    """CPP wrapper for a grid subsampling (method = barycenter for points and features)
 
+    Args:
+        points: (N, 3) matrix of input points
+        features: optional (N, d) matrix of features (floating number)
+        labels: optional (N,) matrix of integer labels
+        sampleDl: parameter defining the size of grid voxels
+        verbose: 1 to display
+
+    Returns:
+        subsampled points, with features and/or labels depending of the input
+    """
     R = None
     B = len(batches_len)
     if random_grid_orient:
