@@ -19,10 +19,8 @@ log = logging.getLogger(__name__)
 
 
 class Toronto3D(BaseDataset):
-    """This class is used to create a dataset based on the Toronto3D dataset,
-    and used in visualizer, training, or testing.
-
-    The dataset is best used for semantic segmentation of urban roadways.
+    """
+    Toronto3D dataset, used in visualizer, training, or test
     """
 
     def __init__(self,
