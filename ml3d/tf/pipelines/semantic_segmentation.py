@@ -134,6 +134,13 @@ class SemanticSegmentation(BasePipeline):
             if model.inference_end(results):
                 break
 
+        metric = SemSegMetric()
+        metric.update(
+            tf.convert_to_tensor(model.inference_result['predict_scores']),
+            tf.convert_to_tensor(data['label']))
+        log.info(f"Accuracy : {metric.acc()}")
+        log.info(f"IoU : {metric.iou()}")
+
         return model.inference_result
 
     """

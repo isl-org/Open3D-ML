@@ -174,6 +174,12 @@ class SemanticSegmentation(BasePipeline):
             'predict_scores': self.ori_test_probs.pop()
         }
 
+        metric = SemSegMetric()
+        metric.update(torch.tensor(inference_result['predict_scores']),
+                      torch.tensor(data['label']))
+        log.info(f"Accuracy : {metric.acc()}")
+        log.info(f"IoU : {metric.iou()}")
+
         return inference_result
 
     """
