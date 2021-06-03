@@ -548,14 +548,18 @@ class SemanticSegmentation(BasePipeline):
     """
 
     def save_config(self, writer):
-        writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
-        writer.add_text("Description/Command line", self.cfg_tb['cmd_line'], 0)
-        writer.add_text('Configuration/Dataset',
-                        code2md(self.cfg_tb['dataset'], language='json'), 0)
-        writer.add_text('Configuration/Model',
-                        code2md(self.cfg_tb['model'], language='json'), 0)
-        writer.add_text('Configuration/Pipeline',
-                        code2md(self.cfg_tb['pipeline'], language='json'), 0)
+        """Save experiment configuration with tensorboard summary."""
+        if hasattr(self, 'cfg_tb'):
+            writer.add_text("Description/Open3D-ML", self.cfg_tb['readme'], 0)
+            writer.add_text("Description/Command line", self.cfg_tb['cmd_line'],
+                            0)
+            writer.add_text('Configuration/Dataset',
+                            code2md(self.cfg_tb['dataset'], language='json'), 0)
+            writer.add_text('Configuration/Model',
+                            code2md(self.cfg_tb['model'], language='json'), 0)
+            writer.add_text('Configuration/Pipeline',
+                            code2md(self.cfg_tb['pipeline'], language='json'),
+                            0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "torch")
