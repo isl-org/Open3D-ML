@@ -13,10 +13,29 @@ class Augmentation():
 
     @staticmethod
     def recenter(data):
+        """Recenter pointcloud/features.
+
+        Typically used before rotating the pointcloud.
+
+        Args:
+            data: Pointcloud or features.
+
+        """
         return data - data.mean(0)
 
     @staticmethod
     def normalize(pc, feat, cfg):
+        """Normalize pointcloud and/or features.
+
+        Points are normalized in [0, 1] and features can take custom
+        scale and bias.
+
+        Args:
+            pc: Pointcloud.
+            feat: features.
+            cfg: configuration dictionary.
+
+        """
         if 'points' in cfg:
             cfg_p = cfg['points']
             if cfg_p.get('method', 'linear') == 'linear':
@@ -39,6 +58,16 @@ class Augmentation():
 
     @staticmethod
     def rotate(pc, cfg):
+        """Rotate the pointcloud.
+
+        Two methods are supported. `vertical` rotates the pointcloud
+        along yaw. `all` randomly rotates the pointcloud in all directions.
+
+        Args:
+            pc: Pointcloud to augment.
+            cfg: configuration dictionary.
+
+        """
         if np.abs(pc[:, :3].mean()) > 1e-2:
             warnings.warn(
                 f"It is recommended recenter the pointcloud before calling rotate."
@@ -83,7 +112,16 @@ class Augmentation():
 
     @staticmethod
     def scale(pc, cfg):
+        """Scale augmentation for pointcloud.
 
+        If `scale_anisotropic` is True, each point is scaled differently.
+        else, same scale is applied to each point in range (`max_s`, `min_s`).
+
+        Args:
+            pc: Pointcloud to scale.
+            cfg: configuration dict.
+
+        """
         # Choose random scales for each example
         scale_anisotropic = cfg.get('scale_anisotropic', False)
         min_s = cfg.get('min_s', 1.)
@@ -117,6 +155,14 @@ class SemsegAugmentation(Augmentation):
 
     @staticmethod
     def RandomDropout(pc, feats, labels, cfg):
+        """Randomly drops some points.
+
+        Args:
+            pc: Pointcloud.
+            feats: Features.
+            labels: Labels.
+            cfg: configuraiton dict.
+        """
         dropout_ratio = cfg.get('dropout_ratio', 0.2)
         if np.random.random() < dropout_ratio:
             N = len(pc)
@@ -128,6 +174,13 @@ class SemsegAugmentation(Augmentation):
 
     @staticmethod
     def RandomHorizontalFlip(pc, cfg):
+        """Randomly flips the given axes.
+
+        Args:
+            pc: Pointcloud.
+            cfg: configuraiton dict.
+
+        """
         axes = cfg.get('axes', [0, 1])
         if np.random.random() < 0.95:
             for curr_ax in axes:
@@ -139,6 +192,13 @@ class SemsegAugmentation(Augmentation):
 
     @staticmethod
     def ChromaticAutoContrast(feats, cfg):
+        """Improve contrast for RGB features.
+
+        Args:
+            feats: RGB features, should be in range [0-255].
+            cfg: configuration dict.
+
+        """
         randomize_blend_factor = cfg.get('randomize_blend_factor', True)
         blend_factor = cfg.get('blend_factor', 0.5)
         if np.random.random() < 0.2:
@@ -161,6 +221,13 @@ class SemsegAugmentation(Augmentation):
 
     @staticmethod
     def ChromaticTranslation(feats, cfg):
+        """Adds a small translation vector to features.
+
+        Args:
+            feats: Features.
+            cfg: configuration dict.
+
+        """
         trans_range_ratio = cfg.get('trans_range_ratio', 0.1)
         if np.random.random() < 0.95:
             tr = (np.random.rand(1, 3) - 0.5) * 255 * 2 * trans_range_ratio
@@ -169,6 +236,13 @@ class SemsegAugmentation(Augmentation):
 
     @staticmethod
     def ChromaticJitter(feats, cfg):
+        """Adds a small noise jitter to features.
+
+        Args:
+            feats: Features.
+            cfg: configuration dict.
+
+        """
         std = cfg.get('std', 0.01)
         if np.random.random() < 0.95:
             noise = np.random.randn(feats.shape[0], 3)
@@ -225,12 +299,14 @@ class ObjdetAugmentation(Augmentation):
 
     @staticmethod
     def PointShuffle(data):
+        """Shuffle Pointcloud."""
         np.random.shuffle(data['point'])
 
         return data
 
     @staticmethod
     def ObjectRangeFilter(data, pcd_range):
+        """Filter Objects in the given range."""
         pcd_range = np.array(pcd_range)
         bev_range = pcd_range[[0, 1, 3, 4]]
 
@@ -247,6 +323,17 @@ class ObjdetAugmentation(Augmentation):
 
     @staticmethod
     def ObjectSample(data, db_boxes_dict, sample_dict):
+        """Increase frequency of objects in a pointcloud.
+
+        Randomly place objects in a pointcloud from a database of
+        all objects within the dataset. Checks collision with existing objects.
+
+        Args:
+            data: Input data.
+            db_boxes_dict: dict for different objects.
+            sample_dict: dict for number of objects to sample.
+
+        """
         rate = 1.0
         points = data['point']
         bboxes = data['bounding_boxes']
