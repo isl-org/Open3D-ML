@@ -47,6 +47,7 @@ Train a model
 TensorFlow maps nearly all of GPU memory by default. This may result in `out_of_memory` error if some of the ops allocate memory independent to tensorflow. You may want to limit memory usage as and when needed by the process. Use following code right after importing tensorflow.
 
 .. code-block:: python
+
     import tensorflow as tf
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
