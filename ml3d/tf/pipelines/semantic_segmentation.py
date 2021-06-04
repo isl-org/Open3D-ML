@@ -115,6 +115,7 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
+        self.cfg.convert_to_tf_names('pipeline')
 
     """
     Run the inference using the data passed.
