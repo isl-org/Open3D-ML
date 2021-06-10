@@ -9,6 +9,15 @@ if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
 else:
     base = '.'
 
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    # Use first GPU and restrict memory growth.
+    try:
+        tf.config.experimental.set_visible_devices(gpus[0], 'GPU')
+        tf.config.set_memory_growth(gpu[0], True)
+    except RuntimeError as e:
+        print(e)
+
 
 def test_randlanet_torch():
     import open3d.ml.torch as ml3d
