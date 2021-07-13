@@ -11,11 +11,7 @@ from ...utils import MODEL
 from ..modules.losses import filter_valid_label
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
-# from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
-
-
-def furthest_point_sample_v2(p, o, no):
-    return torch.randint(low=0, high=o[-1].item(), size=(no[-1].item(),))
+from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
 
 def model_fn_decorator(criterion):

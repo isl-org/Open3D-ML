@@ -81,11 +81,12 @@ class FurthestPointSamplingV2(Function):
             npoint = new_row_splits[i + 1] - new_row_splits[i]
             start_i = row_splits[i]
             end_i = row_splits[i + 1]
-            out = furthest_point_sampling(xyz[start_i:end_i], npoint)
+            out = furthest_point_sampling(xyz[start_i:end_i].unsqueeze(0),
+                                          npoint)
 
             idx += out
 
-        return idx
+        return torch.cat(idx, 0)
 
     @staticmethod
     def backward(xyz, a=None, b=None):
