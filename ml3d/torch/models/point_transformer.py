@@ -1,8 +1,9 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.utils.dlpack
+import open3d.core as o3c
 
-from open3d.ml.torch.ops import knn_search
 from sklearn.neighbors import KDTree
 
 from .base_model import BaseModel
@@ -527,13 +528,12 @@ def queryandgroup(nsample,
     if queries is None:
         queries = points
     if idx is None:
-        ans = knn_search(points,
-                         queries,
-                         k=nsample,
-                         points_row_splits=points_row_splits,
-                         queries_row_splits=queries_row_splits,
-                         return_distances=False)
-        idx = ans.neighbors_index
+        idx = knn_batch(points,
+                        queries,
+                        k=nsample,
+                        points_row_splits=points_row_splits,
+                        queries_row_splits=queries_row_splits,
+                        return_distances=False)
         # idx = []
         # for i in range(0, ans.neighbors_row_splits):
         #     start = ans.neighbors_row_splits[i]
@@ -561,6 +561,36 @@ def queryandgroup(nsample,
         return grouped_feat
 
 
+def knn_batch(points,
+              queries,
+              k,
+              points_row_splits,
+              queries_row_splits,
+              return_distances=True):
+    assert points_row_splits.shape[0] == queries_row_splits.shape[
+        0], "KNN(points and queries must have same batch size)"
+
+    points = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(points))
+    queries = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(queries))
+    idxs = []
+    dists = []
+
+    for i in range(0, points_row_splits.shape[0] - 1):
+        curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
+        nns = o3c.nns.NearestNeighborSearch(curr_points)
+        nns.knn_index()
+        idx, dist = nns.knn_search(
+            queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
+        idx += points_row_splits[i]
+        idxs.append(torch.utils.dlpack.from_dlpack(idx.to_dlpack()))
+        dists.append(torch.utils.dlpack.from_dlpack(dist.to_dlpack()))
+
+    if return_distances:
+        return torch.cat(idxs, 0), torch.cat(dists, 0)
+    else:
+        return torch.cat(idxs, 0)
+
+
 def interpolation(points,
                   queries,
                   feat,
@@ -573,13 +603,13 @@ def interpolation(points,
     """
     assert points.is_contiguous() and queries.is_contiguous(
     ) and feat.is_contiguous()
-    ans = knn_search(points,
-                     queries,
-                     k=k,
-                     points_row_splits=points_row_splits,
-                     queries_row_splits=queries_row_splits,
-                     return_distances=True)
-    idx, dist = ans.neighbors_index, ans.neighbors_distance  # (n, 3), (n, 3)
+    idx, dist = knn_batch(points,
+                          queries,
+                          k=k,
+                          points_row_splits=points_row_splits,
+                          queries_row_splits=queries_row_splits,
+                          return_distances=True)  # (n, 3), (n, 3)
+
     # TODO : pad idx if num_points < nsample
 
     idx, dist = idx.reshape(-1, 3), dist.reshape(-1, 3)
