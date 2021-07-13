@@ -435,6 +435,38 @@ class SparseConvUnetBatch:
         self.label = [label.to(device) for label in self.label]
 
 
+class PointTransformerBatch:
+
+    def __init__(self, batches):
+        pc = []
+        feat = []
+        label = []
+        splits = [0]
+
+        for batch in batches:
+            data = batch['data']
+            pc.append(data['point'])
+            feat.append(data['feat'])
+            label.append(data['label'])
+            splits.append(splits[-1] + data['point'].shape[0])
+
+        self.point = torch.cat(pc, 0)
+        self.feat = torch.cat(feat, 0)
+        self.label = torch.cat(label, 0)
+        self.row_splits = torch.LongTensor(splits)
+
+    def pin_memory(self):
+        self.point = self.point.pin_memory()
+        self.feat = self.feat.pin_memory()
+        self.label = self.label.pin_memory()
+        return self
+
+    def to(self, device):
+        self.point = self.point.to(device)
+        self.feat = self.feat.to(device)
+        self.label = self.label.to(device)
+
+
 class ObjectDetectBatch:
 
     def __init__(self, batches):
@@ -522,6 +554,9 @@ class ConcatBatcher(object):
 
         elif self.model == "SparseConvUnet":
             return {'data': SparseConvUnetBatch(batches), 'attr': {}}
+
+        elif self.model == "PointTransformer":
+            return {'data': PointTransformerBatch(batches), 'attr': {}}
 
         elif self.model == "PointPillars" or self.model == "PointRCNN":
             batching_result = ObjectDetectBatch(batches)

@@ -63,6 +63,38 @@ class FurthestPointSampling(Function):
 furthest_point_sample = FurthestPointSampling.apply
 
 
+class FurthestPointSamplingV2(Function):
+
+    @staticmethod
+    def forward(ctx, xyz, row_splits, new_row_splits):
+        """
+        input: xyz: (n, 3), row_splits: (b+1), new_row_splits: (b+1)
+        output: idx: (m)
+        """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
+        assert xyz.is_contiguous()
+
+        idx = []
+        for i in range(0, row_splits.shape[0] - 1):
+            npoint = new_row_splits[i + 1] - new_row_splits[i]
+            start_i = row_splits[i]
+            end_i = row_splits[i + 1]
+            out = furthest_point_sampling(xyz[start_i:end_i], npoint)
+
+            idx += out
+
+        return idx
+
+    @staticmethod
+    def backward(xyz, a=None, b=None):
+        return None, None, None
+
+
+furthest_point_sample_v2 = FurthestPointSamplingV2.apply
+
+
 class ThreeNN(Function):
 
     @staticmethod
