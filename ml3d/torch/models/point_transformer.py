@@ -410,7 +410,6 @@ class TransitionDown(nn.Module):
 
     def forward(self, pxo):
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
-        p, x, o = pxo  # (n, 3), (n, c), (b)
         if self.stride != 1:
             new_row_splits = [0]
             count = 0
@@ -431,7 +430,7 @@ class TransitionDown(nn.Module):
                                  None,
                                  row_splits,
                                  new_row_splits,
-                                 use_xyz=True)  # (m, 3+c, nsample)
+                                 use_xyz=True)  # (m, nsample, 3+c)
             feat = self.relu(
                 self.bn(self.linear(feat).transpose(
                     1, 2).contiguous()))  # (m, c, nsample)
@@ -577,6 +576,10 @@ def knn_batch(points,
         nns.knn_index()
         idx, dist = nns.knn_search(
             queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
+        if idx.shape[1] < k:
+            oversample = np.random.choice(np.arange(idx.shape[1]), k)
+            idx = idx[:, oversample]
+            dist = dist[:, oversample]
         idx += points_row_splits[i]
         idxs.append(torch.utils.dlpack.from_dlpack(idx.to_dlpack()))
         dists.append(torch.utils.dlpack.from_dlpack(dist.to_dlpack()))

@@ -82,7 +82,7 @@ class FurthestPointSamplingV2(Function):
             start_i = row_splits[i]
             end_i = row_splits[i + 1]
             out = furthest_point_sampling(xyz[start_i:end_i].unsqueeze(0),
-                                          npoint)
+                                          npoint) + row_splits[i]
 
             idx += out
 

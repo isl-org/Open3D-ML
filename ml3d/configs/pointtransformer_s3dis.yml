@@ -13,7 +13,7 @@ model:
   name: PointTransformer
   batcher: ConcatBatcher
   ckpt_path: # path/to/your/checkpoint
-  in_channels: 3
+  in_channels: 6
   num_classes: 13
   ignored_label_inds: [-1]
   # augment:
