@@ -3,8 +3,8 @@
 # The following environment variables are required:
 # - NPROC
 #
-TENSORFLOW_VER="2.4.1"
-TORCH_GLNX_VER="1.7.1+cpu"
+TENSORFLOW_VER="2.5.0"
+TORCH_GLNX_VER="1.8.1+cpu"
 YAPF_VER="0.30.0"
 
 set -euo pipefail
@@ -25,7 +25,7 @@ python -m pip install -U Cython
 git clone --recursive --branch master  https://github.com/intel-isl/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
-python -m pip install -U tensorflow==$TENSORFLOW_VER
+python -m pip install -U tensorflow-cpu==$TENSORFLOW_VER
 python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.org/whl/torch_stable.html
 python -m pip install -U pytest
 python -m pip install -U yapf=="$YAPF_VER"
