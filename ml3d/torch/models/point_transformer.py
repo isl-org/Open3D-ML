@@ -39,7 +39,7 @@ class PointTransformer(BaseModel):
     def __init__(self,
                  name="PointTransformer",
                  blocks=[2, 2, 2, 2, 2],
-                 c=6,
+                 in_channels=6,
                  num_classes=13,
                  voxel_size=0.04,
                  max_voxels=80000,
@@ -47,13 +47,13 @@ class PointTransformer(BaseModel):
                  **kwargs):
         super(PointTransformer, self).__init__(name=name,
                                                blocks=blocks,
-                                               c=c,
+                                               in_channels=in_channels,
                                                num_classes=num_classes,
                                                voxel_size=voxel_size,
                                                max_voxels=max_voxels,
                                                batcher=batcher,
                                                **kwargs)
-        self.c = c
+        self.in_channels = in_channels
         self.in_planes, planes = c, [32, 64, 128, 256, 512]
         fpn_planes, fpnhead_planes, share_planes = 128, 64, 8
         stride, nsample = [1, 4, 4, 4, 4], [8, 16, 16, 16, 16]
@@ -162,8 +162,8 @@ class PointTransformer(BaseModel):
     def forward(self, batch):
         point_0, feat_0, row_splits_0 = batch.point, batch.feat, batch.row_splits  # (n, 3), (n, c), (b)
 
-        feat_0 = point_0 if self.c == 3 else torch.cat(
-            (point_0, feat_0), 1)  # maybe use feat for c == 3
+        feat_0 = point_0 if self.in_channels == 3 else torch.cat(
+            (point_0, feat_0), 1)  # maybe use feat for in_channels == 3
         point_1, feat_1, row_splits_1 = self.enc1(
             [point_0, feat_0, row_splits_0])
         point_2, feat_2, row_splits_2 = self.enc2(
@@ -565,6 +565,8 @@ def knn_batch(points,
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
 
+    points = points.cpu()
+    queries = queries.cpu()
     points = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(points))
     queries = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(queries))
     idxs = []
@@ -585,9 +587,9 @@ def knn_batch(points,
         dists.append(torch.utils.dlpack.from_dlpack(dist.to_dlpack()))
 
     if return_distances:
-        return torch.cat(idxs, 0), torch.cat(dists, 0)
+        return torch.cat(idxs, 0).cuda(), torch.cat(dists, 0).cuda()
     else:
-        return torch.cat(idxs, 0)
+        return torch.cat(idxs, 0).cuda()
 
 
 def interpolation(points,
