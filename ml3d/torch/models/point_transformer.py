@@ -44,6 +44,7 @@ class PointTransformer(BaseModel):
                  voxel_size=0.04,
                  max_voxels=80000,
                  batcher='ConcatBatcher',
+                 augment=None,
                  **kwargs):
         super(PointTransformer, self).__init__(name=name,
                                                blocks=blocks,
@@ -52,9 +53,12 @@ class PointTransformer(BaseModel):
                                                voxel_size=voxel_size,
                                                max_voxels=max_voxels,
                                                batcher=batcher,
+                                               augment=augment,
                                                **kwargs)
+        cfg = self.cfg
         self.in_channels = in_channels
-        self.in_planes, planes = c, [32, 64, 128, 256, 512]
+        self.augmenter = SemsegAugmentation(cfg.augment)
+        self.in_planes, planes = in_channels, [32, 64, 128, 256, 512]
         fpn_planes, fpnhead_planes, share_planes = 128, 64, 8
         stride, nsample = [1, 4, 4, 4, 4], [8, 16, 16, 16, 16]
         block = Bottleneck
@@ -251,9 +255,9 @@ class PointTransformer(BaseModel):
         feat = data['feat']
         labels = data['label']
 
-        # if attr['split'] in ['training', 'train']:
-        #     points, feat, labels = self.augmenter.augment(
-        #         points, feat, labels, self.cfg.get('augment', None))
+        if attr['split'] in ['training', 'train']:
+            points, feat, labels = self.augmenter.augment(
+                points, feat, labels, self.cfg.get('augment', None))
 
         if cfg.max_voxels and data['label'].shape[0] > cfg.max_voxels:
             init_idx = np.random.randint(
