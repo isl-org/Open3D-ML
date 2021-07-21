@@ -1427,7 +1427,7 @@ class Visualizer:
             self._lower_val.int_value = int(self._lower_val.minimum_value)
         self._uncheck_bw_lims()
         self._check_bw_lims()
-        self._prev_lower_val = int(val)
+        self._prev_lower_val = int(self._lower_val.int_value)
         
     def _on_upper_val(self, val):
         if val < self._lower_val.int_value:
@@ -1436,7 +1436,7 @@ class Visualizer:
             self._upper_val.int_value = int(self._upper_val.maximum_value)
         self._uncheck_bw_lims()
         self._check_bw_lims()
-        self._prev_upper_val = int(val)
+        self._prev_upper_val = int(self._upper_val.int_value)        
         
     def _uncheck_bw_lims(self):
         if self._prev_lower_val < self._lower_val.int_value:    
