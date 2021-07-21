@@ -1453,7 +1453,6 @@ class Visualizer:
             name = self._objects.data_names[i]
             self._name2treenode[name].checkbox.checked = True
         
-
     def _on_datasource_changed(self, attr_name, idx):
         selected_names = self._get_selected_names()
         n_channels = 1
