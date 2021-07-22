@@ -786,8 +786,9 @@ class Visualizer:
         bgcolor.set_on_value_changed(self._on_bgcolor_changed)
         vgrid.add_child(gui.Label("BG Color"))
         vgrid.add_child(bgcolor)
-        
-        list_selector = gui.CollapsableVert("List Selector", 0, indented_margins)
+
+        list_selector = gui.CollapsableVert("List Selector", 0,
+                                            indented_margins)
         model.add_child(list_selector)
         list_grid = gui.VGrid(4, 0.25 * em)
         list_grid.add_child(gui.Label("lower"))
@@ -797,7 +798,7 @@ class Visualizer:
         self._prev_lower_val = 0
         self._lower_val.set_limits(0, len(self._objects.data_names) - 1)
         self._lower_val.set_on_value_changed(self._on_lower_val)
-        list_grid.add_child(self._lower_val)  
+        list_grid.add_child(self._lower_val)
         list_grid.add_child(gui.Label("upper"))
         self._upper_val = gui.NumberEdit(gui.NumberEdit.INT)
         self._upper_val.int_value = 0
@@ -805,7 +806,7 @@ class Visualizer:
         self._upper_val.set_limits(0, len(self._objects.data_names) - 1)
         self._upper_val.set_on_value_changed(self._on_upper_val)
         list_grid.add_child(self._upper_val)
-        
+
         view_tab = gui.TabControl()
         view_tab.set_on_selected_tab_changed(self._on_display_tab_changed)
         model.add_child(view_tab)
@@ -847,7 +848,7 @@ class Visualizer:
         self._prev.horizontal_padding_em = 0.5
         self._prev.vertical_padding_em = 0
         self._prev.set_on_clicked(self._on_prev)
-        
+
         h = gui.Horiz()
         h.add_stretch()
         h.add_child(self._prev)
@@ -1408,11 +1409,11 @@ class Visualizer:
     def _on_next(self):
         self._slider.int_value += 1
         self._on_animation_slider_changed(self._slider.int_value)
-        
+
     def _on_prev(self):
         self._slider.int_value -= 1
         self._on_animation_slider_changed(self._slider.int_value)
-        
+
     def _on_bgcolor_changed(self, new_color):
         bg_color = [
             new_color.red, new_color.green, new_color.blue, new_color.alpha
@@ -1428,7 +1429,7 @@ class Visualizer:
         self._uncheck_bw_lims()
         self._check_bw_lims()
         self._prev_lower_val = int(self._lower_val.int_value)
-        
+
     def _on_upper_val(self, val):
         if val < self._lower_val.int_value:
             self._upper_val.int_value = self._lower_val.int_value
@@ -1436,23 +1437,25 @@ class Visualizer:
             self._upper_val.int_value = int(self._upper_val.maximum_value)
         self._uncheck_bw_lims()
         self._check_bw_lims()
-        self._prev_upper_val = int(self._upper_val.int_value)        
-        
+        self._prev_upper_val = int(self._upper_val.int_value)
+
     def _uncheck_bw_lims(self):
-        if self._prev_lower_val < self._lower_val.int_value:    
+        if self._prev_lower_val < self._lower_val.int_value:
             for i in range(self._prev_lower_val, self._lower_val.int_value):
                 name = self._objects.data_names[i]
                 self._name2treenode[name].checkbox.checked = False
-        if self._prev_upper_val > self._upper_val.int_value:    
-            for i in range(self._upper_val.int_value + 1, self._prev_upper_val + 1):
+        if self._prev_upper_val > self._upper_val.int_value:
+            for i in range(self._upper_val.int_value + 1,
+                           self._prev_upper_val + 1):
                 name = self._objects.data_names[i]
                 self._name2treenode[name].checkbox.checked = False
 
     def _check_bw_lims(self):
-        for i in range(self._lower_val.int_value, self._upper_val.int_value+1):
+        for i in range(self._lower_val.int_value,
+                       self._upper_val.int_value + 1):
             name = self._objects.data_names[i]
             self._name2treenode[name].checkbox.checked = True
-        
+
     def _on_datasource_changed(self, attr_name, idx):
         selected_names = self._get_selected_names()
         n_channels = 1
