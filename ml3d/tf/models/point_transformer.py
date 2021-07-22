@@ -13,9 +13,9 @@ def furthest_point_sample_v2(points, row_splits, new_row_splits):
     idxs = np.arange(points.shape[0])
     ret = []
     for i in range(1, row_splits.shape[0]):
-        count = new_row_splits[i] - new_row_splits[i-1]
-        ret += list(idxs[row_splits[i-1]:row_splits[i-1] + count])
-    
+        count = new_row_splits[i] - new_row_splits[i - 1]
+        ret += list(idxs[row_splits[i - 1]:row_splits[i - 1] + count])
+
     return np.array(ret, dtype=np.int64)
 
 
@@ -102,13 +102,11 @@ class PointTransformer(BaseModel):
                                    share_planes,
                                    nsample=nsample[0])  # fusion p2 and p1
 
-        self.cls = tf.keras.models.Sequential((
-            layers.Input(shape=(planes[0],)),
-            layers.Dense(planes[0]),
-            layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-            layers.ReLU(),
-            layers.Dense(num_classes))
-        )
+        self.cls = tf.keras.models.Sequential(
+            (layers.Input(shape=(planes[0],)), layers.Dense(planes[0]),
+             layers.BatchNormalization(momentum=0.9,
+                                       epsilon=1e-5), layers.ReLU(),
+             layers.Dense(num_classes)))
 
     def _make_enc(self,
                   block,
@@ -117,13 +115,23 @@ class PointTransformer(BaseModel):
                   share_planes=8,
                   stride=1,
                   nsample=16):
-        encoder_inputs = [layers.Input(shape=(3)), layers.Input(shape=(self.in_planes)), layers.Input(shape=(0,), dtype=tf.int64)]
-        x = TransitionDown(self.in_planes, planes * block.expansion, stride, nsample)(encoder_inputs)
+        encoder_inputs = [
+            layers.Input(shape=(3)),
+            layers.Input(shape=(self.in_planes)),
+            layers.Input(shape=(0,), dtype=tf.int64)
+        ]
+        x = TransitionDown(self.in_planes, planes * block.expansion, stride,
+                           nsample)(encoder_inputs)
         self.in_planes = planes * block.expansion
         for _ in range(1, blocks):
-            x = block(self.in_planes, self.in_planes, share_planes, nsample=nsample)(x)
+            x = block(self.in_planes,
+                      self.in_planes,
+                      share_planes,
+                      nsample=nsample)(x)
 
-        encoder = tf.keras.Model(inputs=encoder_inputs, outputs=x, name="encoder")
+        encoder = tf.keras.Model(inputs=encoder_inputs,
+                                 outputs=x,
+                                 name="encoder")
 
         # enc = tf.keras.Sequential()
         # enc.add(
@@ -152,15 +160,26 @@ class PointTransformer(BaseModel):
                          None if is_head else planes * block.expansion))
         self.in_planes = planes * block.expansion
 
-
         if is_head:
-            decoder_inputs = [layers.Input(shape=(3)), layers.Input(shape=(self.in_planes)), layers.Input(shape=(0,), dtype=tf.int64)]
+            decoder_inputs = [
+                layers.Input(shape=(3)),
+                layers.Input(shape=(self.in_planes)),
+                layers.Input(shape=(0,), dtype=tf.int64)
+            ]
         else:
-            decoder_inputs = [layers.Input(shape=(3)), layers.Input(shape=(planes * block.expansion)), layers.Input(shape=(0,), dtype=tf.int64)]
+            decoder_inputs = [
+                layers.Input(shape=(3)),
+                layers.Input(shape=(planes * block.expansion)),
+                layers.Input(shape=(0,), dtype=tf.int64)
+            ]
         for _ in range(1, blocks):
-            x = block(self.in_planes, self.in_planes, share_planes, nsample=nsample)(decoder_inputs)
+            x = block(self.in_planes,
+                      self.in_planes,
+                      share_planes,
+                      nsample=nsample)(decoder_inputs)
 
-        decoder.append(tf.keras.Model(inputs=decoder_inputs, outputs=x, name="decoder"))
+        decoder.append(
+            tf.keras.Model(inputs=decoder_inputs, outputs=x, name="decoder"))
 
         # for _ in range(1, blocks):
         #     decoder.append(
@@ -172,7 +191,8 @@ class PointTransformer(BaseModel):
         return decoder
 
     def call(self, inputs, training=False):
-        point_0, feat_0, row_splits_0 = inputs['point'], inputs['feat'], inputs['row_splits']  # (n, 3), (n, c), (b)
+        point_0, feat_0, row_splits_0 = inputs['point'], inputs['feat'], inputs[
+            'row_splits']  # (n, 3), (n, c), (b)
 
         feat_0 = point_0 if self.in_channels == 3 else tf.concat(
             (point_0, feat_0), 1)  # maybe use feat for in_channels == 3
@@ -209,13 +229,15 @@ class PointTransformer(BaseModel):
         feat = self.cls(feat_1)
         return feat
 
-
-
         feat_5 = self.dec5([point_5, feat_5, row_splits_5])[1]
-        feat_4 = self.dec4([point_4, feat_4, row_splits_4], [point_5, feat_5, row_splits_5])[1]
-        feat_3 = self.dec3([point_3, feat_3, row_splits_3], [point_4, feat_4, row_splits_4])[1]
-        feat_2 = self.dec2([point_2, feat_2, row_splits_2], [point_3, feat_3, row_splits_3])[1]
-        feat_1 = self.dec1([point_1, feat_1, row_splits_1], [point_2, feat_2, row_splits_2])[1]
+        feat_4 = self.dec4([point_4, feat_4, row_splits_4],
+                           [point_5, feat_5, row_splits_5])[1]
+        feat_3 = self.dec3([point_3, feat_3, row_splits_3],
+                           [point_4, feat_4, row_splits_4])[1]
+        feat_2 = self.dec2([point_2, feat_2, row_splits_2],
+                           [point_3, feat_3, row_splits_3])[1]
+        feat_1 = self.dec1([point_1, feat_1, row_splits_1],
+                           [point_2, feat_2, row_splits_2])[1]
 
         feat = self.cls(feat_1)
 
@@ -266,10 +288,11 @@ class PointTransformer(BaseModel):
                 np.sum(np.square(sub_points - sub_points[init_idx]),
                        1))[:cfg.max_voxels]
             if sub_feat is not None:
-                sub_points, sub_feat, sub_labels = sub_points[crop_idx], sub_feat[crop_idx], sub_labels[
-                    crop_idx]
+                sub_points, sub_feat, sub_labels = sub_points[
+                    crop_idx], sub_feat[crop_idx], sub_labels[crop_idx]
             else:
-                sub_points, sub_labels = sub_points[crop_idx], sub_labels[crop_idx]
+                sub_points, sub_labels = sub_points[crop_idx], sub_labels[
+                    crop_idx]
 
         search_tree = KDTree(sub_points)
 
@@ -297,7 +320,6 @@ class PointTransformer(BaseModel):
             'label': label,
             'row_splits': splits
         }
-
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
 
@@ -333,7 +355,6 @@ class PointTransformer(BaseModel):
         gen_shapes = ([None, 3], [None, 3], [None], [None])
 
         return gen_func, gen_types, gen_shapes
-
 
     def inference_begin(self):
         pass
@@ -373,26 +394,22 @@ class Transformer(layers.Layer):
         self.linear_k = layers.Dense(mid_planes)
         self.linear_v = layers.Dense(out_planes)
 
-        self.linear_p = tf.keras.models.Sequential((
-            layers.Input(shape=(self.nsample, 3)),
-            layers.Dense(3),
-            layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-            layers.ReLU(),
-            layers.Dense(out_planes))
-        )
+        self.linear_p = tf.keras.models.Sequential(
+            (layers.Input(shape=(self.nsample, 3)), layers.Dense(3),
+             layers.BatchNormalization(momentum=0.9,
+                                       epsilon=1e-5), layers.ReLU(),
+             layers.Dense(out_planes)))
 
-        self.linear_w = tf.keras.models.Sequential((
-            layers.Input(shape=(self.nsample, mid_planes)),
-            layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-            layers.ReLU(),
-            layers.Dense(mid_planes // share_planes),
-            layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-            layers.ReLU(),
-            layers.Dense(out_planes // share_planes))
-        )
+        self.linear_w = tf.keras.models.Sequential(
+            (layers.Input(shape=(self.nsample, mid_planes)),
+             layers.BatchNormalization(momentum=0.9,
+                                       epsilon=1e-5), layers.ReLU(),
+             layers.Dense(mid_planes // share_planes),
+             layers.BatchNormalization(momentum=0.9,
+                                       epsilon=1e-5), layers.ReLU(),
+             layers.Dense(out_planes // share_planes)))
 
         self.softmax = layers.Softmax(axis=-1)
-
 
     def call(self, pxo, training):
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
@@ -418,7 +435,10 @@ class Transformer(layers.Layer):
 
         point_r = self.linear_p(point_r)
 
-        w = feat_k - tf.expand_dims(feat_q, 1) + tf.reduce_sum(tf.reshape(point_r, (-1, self.nsample, self.out_planes // self.mid_planes, self.mid_planes)), 2)
+        w = feat_k - tf.expand_dims(feat_q, 1) + tf.reduce_sum(
+            tf.reshape(point_r,
+                       (-1, self.nsample, self.out_planes // self.mid_planes,
+                        self.mid_planes)), 2)
 
         w = self.linear_w(w)
 
@@ -426,8 +446,12 @@ class Transformer(layers.Layer):
 
         n, nsample, c = feat_v.shape
         s = self.share_planes
-        
-        feat = tf.reshape(tf.reduce_sum(tf.reshape(feat_v + point_r, (-1, nsample, s, c // s)) * tf.expand_dims(w, 2), 1), (-1, c))
+
+        feat = tf.reshape(
+            tf.reduce_sum(
+                tf.reshape(feat_v + point_r,
+                           (-1, nsample, s, c // s)) * tf.expand_dims(w, 2), 1),
+            (-1, c))
 
         return feat
 
@@ -450,18 +474,21 @@ class TransitionDown(layers.Layer):
         new_row_splits = [0]
         count = 0
         for i in range(1, row_splits.shape[0]):
-            count += (row_splits[i].item() -
-                        row_splits[i - 1].item()) // stride
+            count += (row_splits[i].item() - row_splits[i - 1].item()) // stride
             new_row_splits.append(count)
-        
+
         return np.array(new_row_splits, dtype=np.int64)
 
     def call(self, pxo, training):
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
         if self.stride != 1:
-            new_row_splits = tf.numpy_function(self.compute_new_row_splits, [row_splits, self.stride], tf.int64)
+            new_row_splits = tf.numpy_function(self.compute_new_row_splits,
+                                               [row_splits, self.stride],
+                                               tf.int64)
 
-            idx = tf.numpy_function(furthest_point_sample_v2, [point, row_splits, new_row_splits], tf.int64)
+            idx = tf.numpy_function(furthest_point_sample_v2,
+                                    [point, row_splits, new_row_splits],
+                                    tf.int64)
             # idx = furthest_point_sample_v2(point, row_splits,
             #                                new_row_splits)  # (m)
             new_point = tf.gather(point, tf.reshape(idx, (-1,)))
@@ -487,42 +514,37 @@ class TransitionUp(layers.Layer):
     def __init__(self, in_planes, out_planes=None):
         super().__init__()
         if out_planes is None:
-            self.linear1 = tf.keras.models.Sequential((
-                layers.Input(shape=(2*in_planes,)),
-                layers.Dense(in_planes),
-                layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-                layers.ReLU())
-            )
-            self.linear2 = tf.keras.models.Sequential((
-                layers.Input(shape=(in_planes,)),
-                layers.Dense(in_planes),
-                layers.ReLU())
-            )
+            self.linear1 = tf.keras.models.Sequential(
+                (layers.Input(shape=(2 * in_planes,)), layers.Dense(in_planes),
+                 layers.BatchNormalization(momentum=0.9,
+                                           epsilon=1e-5), layers.ReLU()))
+            self.linear2 = tf.keras.models.Sequential(
+                (layers.Input(shape=(in_planes,)), layers.Dense(in_planes),
+                 layers.ReLU()))
         else:
-            self.linear1 = tf.keras.models.Sequential((
-                layers.Input(shape=(out_planes,)),
-                layers.Dense(out_planes),
-                layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-                layers.ReLU())
-            )
-            self.linear2 = tf.keras.models.Sequential((
-                layers.Input(shape=(in_planes,)),
-                layers.Dense(out_planes),
-                layers.BatchNormalization(momentum=0.9, epsilon=1e-5),
-                layers.ReLU())
-            )
+            self.linear1 = tf.keras.models.Sequential(
+                (layers.Input(shape=(out_planes,)), layers.Dense(out_planes),
+                 layers.BatchNormalization(momentum=0.9,
+                                           epsilon=1e-5), layers.ReLU()))
+            self.linear2 = tf.keras.models.Sequential(
+                (layers.Input(shape=(in_planes,)), layers.Dense(out_planes),
+                 layers.BatchNormalization(momentum=0.9,
+                                           epsilon=1e-5), layers.ReLU()))
 
     def call(self, pxo1, pxo2=None, training=False):
         if pxo2 is None:
             _, feat, row_splits = pxo1  # (n, 3), (n, c), (b)
             feat_tmp = []
             for i in range(0, tf.shape(row_splits)[0] - 1):
-                start_i, end_i, count = row_splits[i], row_splits[
-                    i + 1], (row_splits[i + 1] - row_splits[i]).numpy()
+                start_i, end_i, count = row_splits[i], row_splits[i + 1], (
+                    row_splits[i + 1] - row_splits[i]).numpy()
                 feat_b = feat[start_i:end_i, :]
-                
-                tmp = self.linear2(tf.reduce_sum(feat_b, 0, keepdims=True) / count)
-                tmp = tf.reshape(tf.repeat(tf.expand_dims(tmp, 0), repeats=count, axis=0), (-1, tmp.shape[1]))
+
+                tmp = self.linear2(
+                    tf.reduce_sum(feat_b, 0, keepdims=True) / count)
+                tmp = tf.reshape(
+                    tf.repeat(tf.expand_dims(tmp, 0), repeats=count, axis=0),
+                    (-1, tmp.shape[1]))
                 feat_b = tf.concat((feat_b, tmp), 1)
                 feat_tmp.append(feat_b)
             feat = tf.concat(feat_tmp, 0)
@@ -560,7 +582,6 @@ class Bottleneck(layers.Layer):
         return [point, feat, row_splits]
 
 
-
 def queryandgroup(nsample,
                   points,
                   queries,
@@ -578,13 +599,20 @@ def queryandgroup(nsample,
     if queries is None:
         queries = points
     if idx is None:
-        idx = tf.py_function(knn_batch, inp=[points, queries, nsample, points_row_splits, queries_row_splits, False], Tout=tf.int64)
+        idx = tf.py_function(knn_batch,
+                             inp=[
+                                 points, queries, nsample, points_row_splits,
+                                 queries_row_splits, False
+                             ],
+                             Tout=tf.int64)
 
     n, m, c = points.shape[0], queries.shape[0], feat.shape[1]
-    grouped_xyz = tf.reshape(tf.gather(points, tf.reshape(idx, (-1,))), (-1, nsample, 3))
+    grouped_xyz = tf.reshape(tf.gather(points, tf.reshape(idx, (-1,))),
+                             (-1, nsample, 3))
     grouped_xyz -= tf.expand_dims(queries, 1)  # (m, nsample, 3)
 
-    grouped_feat = tf.reshape(tf.gather(feat, tf.reshape(idx, (-1,))), (-1, nsample, c))
+    grouped_feat = tf.reshape(tf.gather(feat, tf.reshape(idx, (-1,))),
+                              (-1, nsample, c))
 
     if use_xyz:
         return tf.concat((grouped_xyz, grouped_feat), -1)  # (m, nsample, 3+c)
@@ -604,7 +632,10 @@ def knn_batch(points,
     idxs = []
     dists = []
     for i in range(0, points_row_splits.shape[0] - 1):
-        idx = np.random.randint(0, points_row_splits[i+1] - points_row_splits[i], size=(queries_row_splits[i+1] - queries_row_splits[i], k))
+        idx = np.random.randint(0,
+                                points_row_splits[i + 1] - points_row_splits[i],
+                                size=(queries_row_splits[i + 1] -
+                                      queries_row_splits[i], k))
         dist = np.ones(idx.shape, dtype=np.float32)
         idx += points_row_splits[i]
         idxs.append(tf.convert_to_tensor(idx))
@@ -614,7 +645,6 @@ def knn_batch(points,
         return tf.concat(idxs, 0), tf.concat(dists, 0)
     else:
         return tf.concat(idxs, 0)
-
 
     points = points.cpu()
     queries = queries.cpu()
@@ -655,7 +685,10 @@ def interpolation(points,
     """
     # assert points.is_contiguous() and queries.is_contiguous(
     # ) and feat.is_contiguous()
-    idx, dist = tf.py_function(knn_batch, inp=[points, queries, k, points_row_splits, queries_row_splits, True], Tout=[tf.int64, tf.float32])
+    idx, dist = tf.py_function(
+        knn_batch,
+        inp=[points, queries, k, points_row_splits, queries_row_splits, True],
+        Tout=[tf.int64, tf.float32])
     idx, dist = knn_batch(points,
                           queries,
                           k=k,
@@ -672,6 +705,7 @@ def interpolation(points,
     new_feat = tf.zeros((queries.shape[0], feat.shape[1]))
 
     for i in range(k):
-        new_feat += tf.gather(feat, idx[:, i]) * tf.expand_dims(weight[:, i], -1)
+        new_feat += tf.gather(feat, idx[:, i]) * tf.expand_dims(
+            weight[:, i], -1)
 
     return new_feat

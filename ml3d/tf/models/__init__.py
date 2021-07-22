@@ -7,4 +7,7 @@ from .sparseconvnet import SparseConvUnet
 from .point_rcnn import PointRCNN
 from .point_transformer import PointTransformer
 
-__all__ = ['RandLANet', 'KPFCNN', 'PointPillars', 'SparseConvUnet', 'PointRCNN', 'PointTransformer']
+__all__ = [
+    'RandLANet', 'KPFCNN', 'PointPillars', 'SparseConvUnet', 'PointRCNN',
+    'PointTransformer'
+]
