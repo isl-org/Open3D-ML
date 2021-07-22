@@ -103,7 +103,8 @@ class PointTransformer(BaseModel):
                                    nsample=nsample[0])  # fusion p2 and p1
 
         self.cls = tf.keras.models.Sequential(
-            (layers.Input(shape=(planes[0],)), layers.Dense(planes[0]),
+            (layers.InputLayer(input_shape=(planes[0],)),
+             layers.Dense(planes[0]),
              layers.BatchNormalization(momentum=0.9,
                                        epsilon=1e-5), layers.ReLU(),
              layers.Dense(num_classes)))
@@ -395,13 +396,13 @@ class Transformer(layers.Layer):
         self.linear_v = layers.Dense(out_planes)
 
         self.linear_p = tf.keras.models.Sequential(
-            (layers.Input(shape=(self.nsample, 3)), layers.Dense(3),
+            (layers.InputLayer(input_shape=(self.nsample, 3)), layers.Dense(3),
              layers.BatchNormalization(momentum=0.9,
                                        epsilon=1e-5), layers.ReLU(),
              layers.Dense(out_planes)))
 
         self.linear_w = tf.keras.models.Sequential(
-            (layers.Input(shape=(self.nsample, mid_planes)),
+            (layers.InputLayer(input_shape=(self.nsample, mid_planes)),
              layers.BatchNormalization(momentum=0.9,
                                        epsilon=1e-5), layers.ReLU(),
              layers.Dense(mid_planes // share_planes),
@@ -515,19 +516,22 @@ class TransitionUp(layers.Layer):
         super().__init__()
         if out_planes is None:
             self.linear1 = tf.keras.models.Sequential(
-                (layers.Input(shape=(2 * in_planes,)), layers.Dense(in_planes),
+                (layers.InputLayer(input_shape=(2 * in_planes,)),
+                 layers.Dense(in_planes),
                  layers.BatchNormalization(momentum=0.9,
                                            epsilon=1e-5), layers.ReLU()))
             self.linear2 = tf.keras.models.Sequential(
-                (layers.Input(shape=(in_planes,)), layers.Dense(in_planes),
-                 layers.ReLU()))
+                (layers.InputLayer(input_shape=(in_planes,)),
+                 layers.Dense(in_planes), layers.ReLU()))
         else:
             self.linear1 = tf.keras.models.Sequential(
-                (layers.Input(shape=(out_planes,)), layers.Dense(out_planes),
+                (layers.InputLayer(input_shape=(out_planes,)),
+                 layers.Dense(out_planes),
                  layers.BatchNormalization(momentum=0.9,
                                            epsilon=1e-5), layers.ReLU()))
             self.linear2 = tf.keras.models.Sequential(
-                (layers.Input(shape=(in_planes,)), layers.Dense(out_planes),
+                (layers.InputLayer(input_shape=(in_planes,)),
+                 layers.Dense(out_planes),
                  layers.BatchNormalization(momentum=0.9,
                                            epsilon=1e-5), layers.ReLU()))
 
