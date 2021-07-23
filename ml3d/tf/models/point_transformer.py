@@ -2,11 +2,13 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as layers
 from sklearn.neighbors import KDTree
+import open3d.core as o3c
 
 from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
+# from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
 
 def furthest_point_sample_v2(points, row_splits, new_row_splits):
@@ -134,17 +136,6 @@ class PointTransformer(BaseModel):
                                  outputs=x,
                                  name="encoder")
 
-        # enc = tf.keras.Sequential()
-        # enc.add(
-        #     TransitionDown(self.in_planes, planes * block.expansion, stride,
-        #                    nsample))
-        # self.in_planes = planes * block.expansion
-        # for _ in range(1, blocks):
-        #     enc.add(
-        #         block(self.in_planes,
-        #               self.in_planes,
-        #               share_planes,
-        #               nsample=nsample))
         return encoder
 
     def _make_dec(self,
@@ -181,13 +172,6 @@ class PointTransformer(BaseModel):
 
         decoder.append(
             tf.keras.Model(inputs=decoder_inputs, outputs=x, name="decoder"))
-
-        # for _ in range(1, blocks):
-        #     decoder.append(
-        #         block(self.in_planes,
-        #               self.in_planes,
-        #               share_planes,
-        #               nsample=nsample))
 
         return decoder
 
@@ -227,19 +211,6 @@ class PointTransformer(BaseModel):
             point_1, self.dec1[0]([point_1, feat_1, row_splits_1],
                                   [point_2, feat_2, row_splits_2]), row_splits_1
         ])[1]
-        feat = self.cls(feat_1)
-        return feat
-
-        feat_5 = self.dec5([point_5, feat_5, row_splits_5])[1]
-        feat_4 = self.dec4([point_4, feat_4, row_splits_4],
-                           [point_5, feat_5, row_splits_5])[1]
-        feat_3 = self.dec3([point_3, feat_3, row_splits_3],
-                           [point_4, feat_4, row_splits_4])[1]
-        feat_2 = self.dec2([point_2, feat_2, row_splits_2],
-                           [point_3, feat_3, row_splits_3])[1]
-        feat_1 = self.dec1([point_1, feat_1, row_splits_1],
-                           [point_2, feat_2, row_splits_2])[1]
-
         feat = self.cls(feat_1)
 
         return feat
@@ -490,8 +461,6 @@ class TransitionDown(layers.Layer):
             idx = tf.numpy_function(furthest_point_sample_v2,
                                     [point, row_splits, new_row_splits],
                                     tf.int64)
-            # idx = furthest_point_sample_v2(point, row_splits,
-            #                                new_row_splits)  # (m)
             new_point = tf.gather(point, tf.reshape(idx, (-1,)))
             feat = queryandgroup(self.nsample,
                                  point,
@@ -633,23 +602,6 @@ def knn_batch(points,
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
 
-    idxs = []
-    dists = []
-    for i in range(0, points_row_splits.shape[0] - 1):
-        idx = np.random.randint(0,
-                                points_row_splits[i + 1] - points_row_splits[i],
-                                size=(queries_row_splits[i + 1] -
-                                      queries_row_splits[i], k))
-        dist = np.ones(idx.shape, dtype=np.float32)
-        idx += points_row_splits[i]
-        idxs.append(tf.convert_to_tensor(idx))
-        dists.append(tf.convert_to_tensor(dist))
-
-    if return_distances:
-        return tf.concat(idxs, 0), tf.concat(dists, 0)
-    else:
-        return tf.concat(idxs, 0)
-
     points = points.cpu()
     queries = queries.cpu()
     points = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(points))
@@ -668,13 +620,13 @@ def knn_batch(points,
             idx = idx[:, oversample]
             dist = dist[:, oversample]
         idx += points_row_splits[i]
-        idxs.append(tf.experimental.dlpack.from_dlpack(idx.to_dlpack()))
-        dists.append(tf.experimental.dlpack.from_dlpack(dist.to_dlpack()))
+        idxs.append(tf.convert_to_tensor(idx.numpy()))
+        dists.append(tf.convert_to_tensor(dist.numpy()))
 
     if return_distances:
-        return tf.concat(idxs, 0).cuda(), tf.concat(dists, 0).cuda()
+        return tf.concat(idxs, 0), tf.concat(dists, 0)
     else:
-        return tf.concat(idxs, 0).cuda()
+        return tf.concat(idxs, 0)
 
 
 def interpolation(points,
@@ -687,8 +639,6 @@ def interpolation(points,
     input: xyz: (m, 3), new_xyz: (n, 3), feat: (m, c), offset: (b), new_offset: (b)
     output: (n, c)
     """
-    # assert points.is_contiguous() and queries.is_contiguous(
-    # ) and feat.is_contiguous()
     idx, dist = tf.py_function(
         knn_batch,
         inp=[points, queries, k, points_row_splits, queries_row_splits, True],

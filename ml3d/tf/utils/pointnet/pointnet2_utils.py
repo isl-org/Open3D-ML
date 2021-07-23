@@ -30,14 +30,14 @@ def furthest_point_sample_v2(xyz, row_splits, new_row_splits):
         raise NotImplementedError
 
     idx = []
-    for i in range(tf.get_shape(row_splits)[0] - 1):
+    for i in range(tf.shape(row_splits)[0] - 1):
         npoint = new_row_splits[i + 1] - new_row_splits[i]
         start_i = row_splits[i]
         end_i = row_splits[i + 1]
-        out = furthest_point_sampling(tf.expand_dims(xyz[start_i:end_i], 0),
-                                      npoint) + row_splits[i]
+        out = ml_ops.furthest_point_sampling(
+            tf.expand_dims(xyz[start_i:end_i], 0), npoint) + row_splits[i]
 
-        idx += out
+        idx.append(out[0])
 
     return tf.concat(idx, 0)
 
