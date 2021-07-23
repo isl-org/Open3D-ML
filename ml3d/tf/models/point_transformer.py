@@ -182,36 +182,46 @@ class PointTransformer(BaseModel):
         feat_0 = point_0 if self.in_channels == 3 else tf.concat(
             (point_0, feat_0), 1)  # maybe use feat for in_channels == 3
         point_1, feat_1, row_splits_1 = self.enc1(
-            [point_0, feat_0, row_splits_0])
+            [point_0, feat_0, row_splits_0], training=training)
         point_2, feat_2, row_splits_2 = self.enc2(
-            [point_1, feat_1, row_splits_1])
+            [point_1, feat_1, row_splits_1], training=training)
         point_3, feat_3, row_splits_3 = self.enc3(
-            [point_2, feat_2, row_splits_2])
+            [point_2, feat_2, row_splits_2], training=training)
         point_4, feat_4, row_splits_4 = self.enc4(
-            [point_3, feat_3, row_splits_3])
+            [point_3, feat_3, row_splits_3], training=training)
         point_5, feat_5, row_splits_5 = self.enc5(
-            [point_4, feat_4, row_splits_4])
+            [point_4, feat_4, row_splits_4], training=training)
 
         feat_5 = self.dec5[1]([
-            point_5, self.dec5[0]([point_5, feat_5, row_splits_5]), row_splits_5
-        ])[1]
+            point_5, self.dec5[0]([point_5, feat_5, row_splits_5],
+                                  training=training), row_splits_5
+        ],
+                              training=training)[1]
         feat_4 = self.dec4[1]([
             point_4, self.dec4[0]([point_4, feat_4, row_splits_4],
-                                  [point_5, feat_5, row_splits_5]), row_splits_4
-        ])[1]
+                                  [point_5, feat_5, row_splits_5],
+                                  training=training), row_splits_4
+        ],
+                              training=training)[1]
         feat_3 = self.dec3[1]([
             point_3, self.dec3[0]([point_3, feat_3, row_splits_3],
-                                  [point_4, feat_4, row_splits_4]), row_splits_3
-        ])[1]
+                                  [point_4, feat_4, row_splits_4],
+                                  training=training), row_splits_3
+        ],
+                              training=training)[1]
         feat_2 = self.dec2[1]([
             point_2, self.dec2[0]([point_2, feat_2, row_splits_2],
-                                  [point_3, feat_3, row_splits_3]), row_splits_2
-        ])[1]
+                                  [point_3, feat_3, row_splits_3],
+                                  training=training), row_splits_2
+        ],
+                              training=training)[1]
         feat_1 = self.dec1[1]([
             point_1, self.dec1[0]([point_1, feat_1, row_splits_1],
-                                  [point_2, feat_2, row_splits_2]), row_splits_1
-        ])[1]
-        feat = self.cls(feat_1)
+                                  [point_2, feat_2, row_splits_2],
+                                  training=training), row_splits_1
+        ],
+                              training=training)[1]
+        feat = self.cls(feat_1, training=training)
 
         return feat
 
@@ -405,14 +415,14 @@ class Transformer(layers.Layer):
                                use_xyz=False)  # (n, nsample, c)
         point_r, feat_k = feat_k[:, :, 0:3], feat_k[:, :, 3:]
 
-        point_r = self.linear_p(point_r)
+        point_r = self.linear_p(point_r, training=training)
 
         w = feat_k - tf.expand_dims(feat_q, 1) + tf.reduce_sum(
             tf.reshape(point_r,
                        (-1, self.nsample, self.out_planes // self.mid_planes,
                         self.mid_planes)), 2)
 
-        w = self.linear_w(w)
+        w = self.linear_w(w, training=training)
 
         w = self.softmax(w)  # (n, nsample, c)
 
@@ -470,12 +480,14 @@ class TransitionDown(layers.Layer):
                                  row_splits,
                                  new_row_splits,
                                  use_xyz=True)  # (m, nsample, 3+c)
-            feat = self.relu(self.bn(self.linear(feat)))  # (m, c, nsample)
+            feat = self.relu(self.bn(self.linear(feat),
+                                     training=training))  # (m, c, nsample)
             feat = tf.squeeze(self.pool(feat), 1)  # (m, c)
 
             point, row_splits = new_point, new_row_splits
         else:
-            feat = self.relu(self.bn(self.linear(feat)))  # (n, c)
+            feat = self.relu(self.bn(self.linear(feat),
+                                     training=training))  # (n, c)
         return [point, feat, row_splits]
 
 
@@ -513,21 +525,22 @@ class TransitionUp(layers.Layer):
                     row_splits[i + 1] - row_splits[i]).numpy()
                 feat_b = feat[start_i:end_i, :]
 
-                tmp = self.linear2(
-                    tf.reduce_sum(feat_b, 0, keepdims=True) / count)
+                tmp = self.linear2(tf.reduce_sum(feat_b, 0, keepdims=True) /
+                                   count,
+                                   training=training)
                 tmp = tf.reshape(
                     tf.repeat(tf.expand_dims(tmp, 0), repeats=count, axis=0),
                     (-1, tmp.shape[1]))
                 feat_b = tf.concat((feat_b, tmp), 1)
                 feat_tmp.append(feat_b)
             feat = tf.concat(feat_tmp, 0)
-            feat = self.linear1(feat)
+            feat = self.linear1(feat, training=training)
         else:
             point_1, feat_1, row_splits_1 = pxo1
             point_2, feat_2, row_splits_2 = pxo2
-            feat = self.linear1(feat_1) + interpolation(
-                point_2, point_1, self.linear2(feat_2), row_splits_2,
-                row_splits_1)
+            feat = self.linear1(feat_1, training=training) + interpolation(
+                point_2, point_1, self.linear2(feat_2, training=training),
+                row_splits_2, row_splits_1)
         return feat
 
 
@@ -547,9 +560,12 @@ class Bottleneck(layers.Layer):
     def call(self, pxo, training):
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
         identity = feat
-        feat = self.relu(self.bn1(self.linear1(feat)))
-        feat = self.relu(self.bn2(self.transformer2([point, feat, row_splits])))
-        feat = self.bn3(self.linear3(feat))
+        feat = self.relu(self.bn1(self.linear1(feat), training=training))
+        feat = self.relu(
+            self.bn2(self.transformer2([point, feat, row_splits],
+                                       training=training),
+                     training=training))
+        feat = self.bn3(self.linear3(feat), training=training)
         feat += identity
         feat = self.relu(feat)
         return [point, feat, row_splits]
