@@ -25,9 +25,8 @@
 #
 #***************************************************************************************/
 
+from collections.abc import Iterable
 from torch import nn
-
-from collections import Iterable
 
 bn_types = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)
 
