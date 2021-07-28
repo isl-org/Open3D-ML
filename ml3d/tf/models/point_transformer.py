@@ -21,6 +21,20 @@ from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
 
 class PointTransformer(BaseModel):
+    """Semantic Segmentation model.
+
+    Uses Encoder-Decoder architecture with Transformer layers.
+
+    Attributes:
+        name: Name of model.
+          Default to "PointTransformer".
+        blocks: Number of Bottleneck layers.
+        in_channels: Number of features(default 6).
+        num_classes: Number of classes.
+        voxel_size: Voxel length for subsampling.
+        max_voxels: Maximum number of voxels.
+        augment: dictionary for augmentation.
+    """
 
     def __init__(self,
                  name="PointTransformer",
@@ -371,6 +385,17 @@ class PointTransformer(BaseModel):
         return True
 
     def get_loss(self, Loss, results, inputs):
+        """Calculate the loss on output of the model.
+
+        Attributes:
+            Loss: Object of type `SemSegLoss`.
+            results: Output of the model.
+            inputs: Input of the model.
+            device: device(cpu or cuda).
+
+        Returns:
+            Returns loss, labels and scores.
+        """
         labels = inputs['label']
         scores, labels = Loss.filter_valid_label(results, labels)
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
@@ -602,9 +627,20 @@ def queryandgroup(nsample,
                   points_row_splits,
                   queries_row_splits,
                   use_xyz=True):
-    """
-    input: xyz: (n, 3), new_xyz: (m, 3), feat: (n, c), idx: (m, nsample), offset: (b), new_offset: (b)
-    output: new_feat: (m, c+3, nsample), grouped_idx: (m, nsample)
+    """Find nearest neighbours and returns grouped features.
+
+    Attributes:
+        nsample: Number of neighbours (k).
+        points: Input pointcloud (n, 3).
+        queries: Queries for Knn (m, 3).
+        feat: features (n, c).
+        idx: Optional knn index list.
+        points_row_splits: row_splits for batching points.
+        queries_row_splits: row_splits for batching queries.
+        use_xyz: Whether to return xyz concatenated with features.
+
+    Returns:
+        Returns grouped features (m, nsample, c) or (m, nsample, 3+c).
     """
     # assert points.is_contiguous() and queries.is_contiguous(
     # ) and feat.is_contiguous()
@@ -638,6 +674,17 @@ def knn_batch(points,
               points_row_splits,
               queries_row_splits,
               return_distances=True):
+    """K nearest neighbour with batch support.
+
+    Attributes:
+        points: Input pointcloud.
+        queries: Queries for Knn.
+        k: Number of neighbours.
+        points_row_splits: row_splits for batching points.
+        queries_row_splits: row_splits for batching queries.
+        return_distances: Whether to return distance with neighbours.
+
+    """
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
 
@@ -691,9 +738,18 @@ def interpolation(points,
                   points_row_splits,
                   queries_row_splits,
                   k=3):
-    """
-    input: xyz: (m, 3), new_xyz: (n, 3), feat: (m, c), offset: (b), new_offset: (b)
-    output: (n, c)
+    """Interpolation of features with nearest neighbours.
+
+    Attributes:
+        points: Input pointcloud (m, 3).
+        queries: Queries for Knn (n, 3).
+        feat: features (m, c).
+        points_row_splits: row_splits for batching points.
+        queries_row_splits: row_splits for batching queries.
+        k: Number of neighbours.
+
+    Returns:
+        Returns interpolated features (n, c).
     """
     idx, dist = tf.py_function(
         knn_batch,

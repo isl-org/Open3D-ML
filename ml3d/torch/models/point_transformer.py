@@ -14,27 +14,22 @@ from ...datasets.utils import DataProcessing
 from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
 
-def model_fn_decorator(criterion):
-    from collections import namedtuple
-    ModelReturn = namedtuple("ModelReturn", ['pred', 'loss', 'acc'])
-
-    def model_fn(model, data, epoch=0, eval=False):
-        with torch.set_grad_enabled(not eval):
-            coord, feat, label, offset = data
-            pred = model([coord, feat, offset])
-            print("pred = ", pred)
-            loss = criterion(pred, label)
-            _, classes = torch.max(pred, 1)
-            acc = (classes == label).float().sum() / label.numel()
-            return ModelReturn(pred, loss, {
-                "acc": acc.item(),
-                'loss': loss.item()
-            })
-
-    return model_fn
-
-
 class PointTransformer(BaseModel):
+    """Semantic Segmentation model.
+
+    Uses Encoder-Decoder architecture with Transformer layers.
+
+    Attributes:
+        name: Name of model.
+          Default to "PointTransformer".
+        blocks: Number of Bottleneck layers.
+        in_channels: Number of features(default 6).
+        num_classes: Number of classes.
+        voxel_size: Voxel length for subsampling.
+        max_voxels: Maximum number of voxels.
+        batcher: Batching method for dataloader.
+        augment: dictionary for augmentation.
+    """
 
     def __init__(self,
                  name="PointTransformer",
@@ -317,6 +312,17 @@ class PointTransformer(BaseModel):
         return {'predict_labels': pred_l, 'predict_scores': probs}
 
     def get_loss(self, Loss, results, inputs, device):
+        """Calculate the loss on output of the model.
+
+        Attributes:
+            Loss: Object of type `SemSegLoss`.
+            results: Output of the model.
+            inputs: Input of the model.
+            device: device(cpu or cuda).
+
+        Returns:
+            Returns loss, labels and scores.
+        """
         cfg = self.cfg
         labels = inputs['data'].label
 
@@ -332,11 +338,6 @@ class PointTransformer(BaseModel):
                                     lr=cfg_pipeline.adam_lr,
                                     momentum=cfg_pipeline.momentum,
                                     weight_decay=cfg_pipeline.weight_decay)
-        # optimizer = torch.optim.Adam(model.parameters(), lr=args.base_lr, weight_decay=args.weight_decay)
-        # optimizer = torch.optim.AdamW(model.parameters(), lr=args.base_lr, weight_decay=args.weight_decay)
-        # scheduler = lr_scheduler.StepLR(optimizer, step_size=args.step_epoch, gamma=args.multiplier)
-        # scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
-        # scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer,
             milestones=[
@@ -543,9 +544,20 @@ def queryandgroup(nsample,
                   points_row_splits,
                   queries_row_splits,
                   use_xyz=True):
-    """
-    input: xyz: (n, 3), new_xyz: (m, 3), feat: (n, c), idx: (m, nsample), offset: (b), new_offset: (b)
-    output: new_feat: (m, c+3, nsample), grouped_idx: (m, nsample)
+    """Find nearest neighbours and returns grouped features.
+
+    Attributes:
+        nsample: Number of neighbours (k).
+        points: Input pointcloud (n, 3).
+        queries: Queries for Knn (m, 3).
+        feat: features (n, c).
+        idx: Optional knn index list.
+        points_row_splits: row_splits for batching points.
+        queries_row_splits: row_splits for batching queries.
+        use_xyz: Whether to return xyz concatenated with features.
+
+    Returns:
+        Returns grouped features (m, nsample, c) or (m, nsample, 3+c).
     """
     assert points.is_contiguous() and queries.is_contiguous(
     ) and feat.is_contiguous()
@@ -558,17 +570,6 @@ def queryandgroup(nsample,
                         points_row_splits=points_row_splits,
                         queries_row_splits=queries_row_splits,
                         return_distances=False)
-        # idx = []
-        # for i in range(0, ans.neighbors_row_splits):
-        #     start = ans.neighbors_row_splits[i]
-        #     end = ans.neighbors_row_splits[i+1]
-        #     if (end - start) < nsample:
-        #         idx += ans.neighbors_index[start:end]
-        #     else:
-        #         idx += ans.neighbors_index[start:end]
-        # exit(0)
-
-        # TODO : pad idx if num_points < nsample
 
     n, m, c = points.shape[0], queries.shape[0], feat.shape[1]
     grouped_xyz = points[idx.view(-1).long(), :].view(m, nsample,
@@ -591,6 +592,17 @@ def knn_batch(points,
               points_row_splits,
               queries_row_splits,
               return_distances=True):
+    """K nearest neighbour with batch support.
+
+    Attributes:
+        points: Input pointcloud.
+        queries: Queries for Knn.
+        k: Number of neighbours.
+        points_row_splits: row_splits for batching points.
+        queries_row_splits: row_splits for batching queries.
+        return_distances: Whether to return distance with neighbours.
+
+    """
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
 
@@ -627,9 +639,18 @@ def interpolation(points,
                   points_row_splits,
                   queries_row_splits,
                   k=3):
-    """
-    input: xyz: (m, 3), new_xyz: (n, 3), feat: (m, c), offset: (b), new_offset: (b)
-    output: (n, c)
+    """Interpolation of features with nearest neighbours.
+
+    Attributes:
+        points: Input pointcloud (m, 3).
+        queries: Queries for Knn (n, 3).
+        feat: features (m, c).
+        points_row_splits: row_splits for batching points.
+        queries_row_splits: row_splits for batching queries.
+        k: Number of neighbours.
+
+    Returns:
+        Returns interpolated features (n, c).
     """
     assert points.is_contiguous() and queries.is_contiguous(
     ) and feat.is_contiguous()
@@ -653,37 +674,3 @@ def interpolation(points,
     for i in range(k):
         new_feat += feat[idx[:, i].long(), :] * weight[:, i].unsqueeze(-1)
     return new_feat
-
-
-if __name__ == "__main__":
-    import numpy as np, time
-    import torch.optim as optim
-    import random
-    manual_seed = 123
-    random.seed(manual_seed)
-    np.random.seed(manual_seed)
-    torch.manual_seed(manual_seed)
-    num = 40960
-    # num = 100000
-    n, c, k = 4 * num, 6, 13
-    input = torch.randn(n, c) * 10
-    offset = torch.IntTensor([0, num, num * 2, num * 3,
-                              num * 4]).to(torch.int64)
-    label = torch.from_numpy(np.random.randint(0, k, size=(n)))
-    # model = pointtransformer_seg26(c=c, k=k)
-    model = PointTransformerSeg(Bottleneck, [2, 2, 2, 2, 2], c=c, k=k)
-    print(model)
-    optimizer = optim.Adam(model.parameters(), lr=1e-2)
-    model_fn = model_fn_decorator(nn.CrossEntropyLoss())
-    coord, feat = input[:, 0:3].contiguous(), input[:, 3:6].contiguous()
-    for _ in range(10):
-        t0 = time.time()
-        optimizer.zero_grad()
-        _, loss, _ = model_fn(model, (coord, feat, label, offset))
-        t1 = time.time()
-        loss.backward()
-        optimizer.step()
-        #torch.cuda.empty_cache()
-        t2 = time.time()
-        print("loss-{:.2f}-time-{:.2f}-l1-{:.2f}-l2-{:.2f}".format(
-            loss.item(), t2 - t0, t1 - t0, t2 - t1))

@@ -26,6 +26,13 @@ ops.NoGradient('Open3DFurthestPointSampling')
 
 
 def furthest_point_sample_v2(xyz, row_splits, new_row_splits):
+    """Furthest Point Sampling with variable length batch support.
+
+    Attributes:
+        xyz: Input pointcloud (N, 3).
+        row_splits: splits to define batch.
+        new_row_splits: splits for output batch lengths.
+    """
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 

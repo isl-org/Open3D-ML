@@ -64,12 +64,16 @@ furthest_point_sample = FurthestPointSampling.apply
 
 
 class FurthestPointSamplingV2(Function):
-
+    """Furthest Point Sampling with variable length batch support."""
     @staticmethod
     def forward(ctx, xyz, row_splits, new_row_splits):
-        """
-        input: xyz: (n, 3), row_splits: (b+1), new_row_splits: (b+1)
-        output: idx: (m)
+        """Forward pass.
+
+        Attributes:
+            ctx: Context.
+            xyz: Input pointcloud (N, 3).
+            row_splits: splits to define batch.
+            new_row_splits: splits for output batch lengths.
         """
         if not open3d.core.cuda.device_count() > 0:
             raise NotImplementedError
