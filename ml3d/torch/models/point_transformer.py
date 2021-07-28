@@ -259,18 +259,19 @@ class PointTransformer(BaseModel):
             points, feat, labels = self.augmenter.augment(
                 points, feat, labels, self.cfg.get('augment', None))
 
-        if cfg.max_voxels and data['label'].shape[0] > cfg.max_voxels:
-            init_idx = np.random.randint(
-                labels.shape[0]
-            ) if 'train' in attr['split'] else labels.shape[0] // 2
-            crop_idx = np.argsort(
-                np.sum(np.square(points - points[init_idx]),
-                       1))[:cfg.max_voxels]
-            if feat is not None:
-                points, feat, labels = points[crop_idx], feat[crop_idx], labels[
-                    crop_idx]
-            else:
-                points, labels = points[crop_idx], labels[crop_idx]
+        if attr['split'] not in ['test', 'testing']:
+            if cfg.max_voxels and data['label'].shape[0] > cfg.max_voxels:
+                init_idx = np.random.randint(
+                    labels.shape[0]
+                ) if 'train' in attr['split'] else labels.shape[0] // 2
+                crop_idx = np.argsort(
+                    np.sum(np.square(points - points[init_idx]),
+                           1))[:cfg.max_voxels]
+                if feat is not None:
+                    points, feat, labels = points[crop_idx], feat[
+                        crop_idx], labels[crop_idx]
+                else:
+                    points, labels = points[crop_idx], labels[crop_idx]
 
         points_min, points_max = np.min(points, 0), np.max(points, 0)
         points -= (points_min + points_max) / 2.0
@@ -282,14 +283,38 @@ class PointTransformer(BaseModel):
 
         return data
 
+    def update_probs(self, inputs, results, test_probs, test_labels):
+        result = results.reshape(-1, self.cfg.num_classes)
+        probs = torch.nn.functional.softmax(result, dim=-1).cpu().data.numpy()
+        labels = np.argmax(probs, 1)
+
+        self.trans_point_sampler(patchwise=False)
+
+        return probs, labels
+
     def inference_begin(self):
-        pass
+        data = self.preprocess(data, {'split': 'test'})
+        data = self.transform(data, {'split': 'test'})
+
+        self.inference_input = data
 
     def inference_preprocess(self):
-        pass
+        return self.inference_input
 
-    def inference_end(self):
-        pass
+    def inference_end(self, inputs, results):
+        results = torch.reshape(results, (-1, self.cfg.num_classes))
+
+        m_softmax = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        reproj_inds = self.inference_input['proj_inds']
+        probs = probs[reproj_inds]
+
+        pred_l = np.argmax(probs, 1)
+
+        return {'predict_labels': pred_l, 'predict_scores': probs}
 
     def get_loss(self, Loss, results, inputs, device):
         cfg = self.cfg

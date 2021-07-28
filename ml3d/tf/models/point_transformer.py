@@ -8,17 +8,16 @@ from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
-# from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
+from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
+# def furthest_point_sample_v2(points, row_splits, new_row_splits):
+#     idxs = np.arange(points.shape[0])
+#     ret = []
+#     for i in range(1, row_splits.shape[0]):
+#         count = new_row_splits[i] - new_row_splits[i - 1]
+#         ret += list(idxs[row_splits[i - 1]:row_splits[i - 1] + count])
 
-def furthest_point_sample_v2(points, row_splits, new_row_splits):
-    idxs = np.arange(points.shape[0])
-    ret = []
-    for i in range(1, row_splits.shape[0]):
-        count = new_row_splits[i] - new_row_splits[i - 1]
-        ret += list(idxs[row_splits[i - 1]:row_splits[i - 1] + count])
-
-    return np.array(ret, dtype=np.int64)
+#     return np.array(ret, dtype=np.int64)
 
 
 class PointTransformer(BaseModel):
@@ -262,19 +261,20 @@ class PointTransformer(BaseModel):
         else:
             sub_points, sub_feat, sub_labels = points, feat, labels
 
-        if cfg.max_voxels and sub_labels.shape[0] > cfg.max_voxels:
-            init_idx = np.random.randint(
-                sub_labels.shape[0]
-            ) if 'train' in attr['split'] else sub_labels.shape[0] // 2
-            crop_idx = np.argsort(
-                np.sum(np.square(sub_points - sub_points[init_idx]),
-                       1))[:cfg.max_voxels]
-            if sub_feat is not None:
-                sub_points, sub_feat, sub_labels = sub_points[
-                    crop_idx], sub_feat[crop_idx], sub_labels[crop_idx]
-            else:
-                sub_points, sub_labels = sub_points[crop_idx], sub_labels[
-                    crop_idx]
+        if attr['split'] not in ['test', 'testing']:
+            if cfg.max_voxels and sub_labels.shape[0] > cfg.max_voxels:
+                init_idx = np.random.randint(
+                    sub_labels.shape[0]
+                ) if 'train' in attr['split'] else sub_labels.shape[0] // 2
+                crop_idx = np.argsort(
+                    np.sum(np.square(sub_points - sub_points[init_idx]),
+                           1))[:cfg.max_voxels]
+                if sub_feat is not None:
+                    sub_points, sub_feat, sub_labels = sub_points[
+                        crop_idx], sub_feat[crop_idx], sub_labels[crop_idx]
+                else:
+                    sub_points, sub_labels = sub_points[crop_idx], sub_labels[
+                        crop_idx]
 
         search_tree = KDTree(sub_points)
 
@@ -338,14 +338,37 @@ class PointTransformer(BaseModel):
 
         return gen_func, gen_types, gen_shapes
 
-    def inference_begin(self):
-        pass
+    def inference_begin(self, data):
+        data = self.preprocess(data, {'split': 'test'})
+
+        self.inference_input = self.transform(
+            tf.constant(data['point']), tf.constant(data['feat']),
+            tf.constant(data['label']), tf.constant([0,
+                                                     data['point'].shape[0]]))
+        self.inference_input['proj_inds'] = data['proj_inds']
 
     def inference_preprocess(self):
-        pass
+        return self.inference_input
 
-    def inference_end(self):
-        pass
+    def inference_end(self, results):
+        results = tf.reshape(results, [-1, self.cfg.num_classes])
+
+        m_softmax = tf.keras.layers.Softmax(axis=-1)
+        results = m_softmax(results)
+        results = results.numpy()
+
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+        reproj_inds = self.inference_input['proj_inds']
+        probs = probs[reproj_inds]
+
+        pred_l = np.argmax(probs, 1)
+
+        self.inference_result = {
+            'predict_labels': pred_l,
+            'predict_scores': probs
+        }
+
+        return True
 
     def get_loss(self, Loss, results, inputs):
         labels = inputs['label']
@@ -617,6 +640,23 @@ def knn_batch(points,
               return_distances=True):
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
+
+    # idxs = []
+    # dists = []
+    # for i in range(0, points_row_splits.shape[0] - 1):
+    #     idx = np.random.randint(0,
+    #                             points_row_splits[i + 1] - points_row_splits[i],
+    #                             size=(queries_row_splits[i + 1] -
+    #                                   queries_row_splits[i], k))
+    #     dist = np.ones(idx.shape, dtype=np.float32)
+    #     idx += points_row_splits[i]
+    #     idxs.append(tf.convert_to_tensor(idx))
+    #     dists.append(tf.convert_to_tensor(dist))
+
+    # if return_distances:
+    #     return tf.concat(idxs, 0), tf.concat(dists, 0)
+    # else:
+    #     return tf.concat(idxs, 0)
 
     points = points.cpu()
     queries = queries.cpu()
