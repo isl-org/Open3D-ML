@@ -1,11 +1,11 @@
 
 <p align="center">
-<img src="https://raw.githubusercontent.com/intel-isl/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
+<img src="https://raw.githubusercontent.com/isl-org/Open3D/master/docs/_static/open3d_logo_horizontal.png" width="320" />
 <span style="font-size: 220%"><b>ML</b></span>
 </p>
 
-![Ubuntu CI](https://github.com/intel-isl/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
-![Style check](https://github.com/intel-isl/Open3D-ML/workflows/Style%20check/badge.svg)
+![Ubuntu CI](https://github.com/isl-org/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
+![Style check](https://github.com/isl-org/Open3D-ML/workflows/Style%20check/badge.svg)
 ![PyTorch badge](https://img.shields.io/badge/PyTorch-supported-brightgreen?style=flat&logo=pytorch)
 ![TensorFlow badge](https://img.shields.io/badge/TensorFlow-supported-brightgreen?style=flat&logo=tensorflow)
 
@@ -178,8 +178,8 @@ pipeline.run_train()
 
 ```
 
-For more examples see [`examples/`](https://github.com/intel-isl/Open3D-ML/tree/master/examples)
-and the [`scripts/`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts) directories.
+For more examples see [`examples/`](https://github.com/isl-org/Open3D-ML/tree/master/examples)
+and the [`scripts/`](https://github.com/isl-org/Open3D-ML/tree/master/scripts) directories.
 
 ### 3D Object Detection
 
@@ -243,16 +243,16 @@ pipeline.run_train()
 
 Below is an example of visualization using KITTI. The example shows the use of bounding boxes for the KITTI dataset.
 
-<img width="480" src="https://github.com/intel-isl/Open3D-ML/blob/master/docs/images/visualizer_BoundingBoxes.png?raw=true">
+<img width="480" src="https://github.com/isl-org/Open3D-ML/blob/master/docs/images/visualizer_BoundingBoxes.png?raw=true">
 
 
-For more examples see [`examples/`](https://github.com/intel-isl/Open3D-ML/tree/master/examples)
-and the [`scripts/`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts) directories.
+For more examples see [`examples/`](https://github.com/isl-org/Open3D-ML/tree/master/examples)
+and the [`scripts/`](https://github.com/isl-org/Open3D-ML/tree/master/scripts) directories.
 
 
 ### Using predefined scripts
 
-[`scripts/run_pipeline.py`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/run_pipeline.py)
+[`scripts/run_pipeline.py`](https://github.com/isl-org/Open3D-ML/tree/master/scripts/run_pipeline.py)
 provides an easy interface for training and evaluating a model on a dataset. It saves
 the trouble of defining specific model and passing exact configuration.
 
@@ -381,7 +381,7 @@ The following is a list of datasets for which we provide dataset reader classes.
 * ScanNet([project-page](http://www.scan-net.org/))
 
 
-For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/intel-isl/Open3D-ML/tree/master/scripts/download_datasets).
+For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/isl-org/Open3D-ML/tree/master/scripts/download_datasets).
 
 
 
@@ -399,19 +399,19 @@ There are many ways to contribute to this project. You can:
 * Share parameters and weights for an existing model
 * Report problems and bugs
 
-Please, **make your pull requests to the** [**dev**](https://github.com/intel-isl/Open3D-ML/tree/dev) branch.
+Please, **make your pull requests to the** [**dev**](https://github.com/isl-org/Open3D-ML/tree/dev) branch.
 Open3D is a community effort. We welcome and celebrate contributions from the
 community!
 
 If you want to share weights for a model you trained please attach or link the
 weights file in the pull request.
-For bugs and problems, [open an issue](https://github.com/intel-isl/Open3D-ML/issues).
+For bugs and problems, [open an issue](https://github.com/isl-org/Open3D-ML/issues).
 Please also check out our communication channels to get in contact with the community.
 
 ## Communication channels
 
-<!--* [GitHub Issue](https://github.com/intel-isl/Open3D/issues): bug reports, feature requests, etc.-->
-* [Forum](https://github.com/intel-isl/Open3D/discussions): discussion on the usage of Open3D.
+<!--* [GitHub Issue](https://github.com/isl-org/Open3D/issues): bug reports, feature requests, etc.-->
+* [Forum](https://github.com/isl-org/Open3D/discussions): discussion on the usage of Open3D.
 * [Discord Chat](https://discord.gg/D35BGvn): online chats, discussions,
   and collaboration with other users and developers.
 
