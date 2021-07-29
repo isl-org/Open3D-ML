@@ -3,6 +3,7 @@ import tensorflow as tf
 import tensorflow.keras.layers as layers
 from sklearn.neighbors import KDTree
 import open3d.core as o3c
+import open3d.ml.tf.ops as ml_ops
 
 from .base_model import BaseModel
 from ...utils import MODEL
@@ -688,48 +689,48 @@ def knn_batch(points,
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
 
+    points = points.cpu()
+    queries = queries.cpu()
+
+    # ml3d knn.
+    idxs = []
+    dists = []
+    ans = ml_ops.knn_search(points,
+                            queries,
+                            k=k,
+                            points_row_splits=points_row_splits,
+                            queries_row_splits=queries_row_splits,
+                            return_distances=True)
+    if return_distances:
+        return tf.cast(tf.reshape(ans.neighbors_index, (-1, k)),
+                       tf.int64), tf.reshape(ans.neighbors_distance, (-1, k))
+    else:
+        return tf.cast(tf.reshape(ans.neighbors_index, (-1, k)), tf.int64)
+
+    # o3d.core knn
+    # points = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(points))
+    # queries = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(queries))
     # idxs = []
     # dists = []
+
     # for i in range(0, points_row_splits.shape[0] - 1):
-    #     idx = np.random.randint(0,
-    #                             points_row_splits[i + 1] - points_row_splits[i],
-    #                             size=(queries_row_splits[i + 1] -
-    #                                   queries_row_splits[i], k))
-    #     dist = np.ones(idx.shape, dtype=np.float32)
+    #     curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
+    #     nns = o3c.nns.NearestNeighborSearch(curr_points)
+    #     nns.knn_index()
+    #     idx, dist = nns.knn_search(
+    #         queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
+    #     if idx.shape[1] < k:
+    #         oversample = np.random.choice(np.arange(idx.shape[1]), k)
+    #         idx = idx[:, oversample]
+    #         dist = dist[:, oversample]
     #     idx += points_row_splits[i]
-    #     idxs.append(tf.convert_to_tensor(idx))
-    #     dists.append(tf.convert_to_tensor(dist))
+    #     idxs.append(tf.convert_to_tensor(idx.numpy()))
+    #     dists.append(tf.convert_to_tensor(dist.numpy()))
 
     # if return_distances:
     #     return tf.concat(idxs, 0), tf.concat(dists, 0)
     # else:
     #     return tf.concat(idxs, 0)
-
-    points = points.cpu()
-    queries = queries.cpu()
-    points = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(points))
-    queries = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(queries))
-    idxs = []
-    dists = []
-
-    for i in range(0, points_row_splits.shape[0] - 1):
-        curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
-        nns = o3c.nns.NearestNeighborSearch(curr_points)
-        nns.knn_index()
-        idx, dist = nns.knn_search(
-            queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
-        if idx.shape[1] < k:
-            oversample = np.random.choice(np.arange(idx.shape[1]), k)
-            idx = idx[:, oversample]
-            dist = dist[:, oversample]
-        idx += points_row_splits[i]
-        idxs.append(tf.convert_to_tensor(idx.numpy()))
-        dists.append(tf.convert_to_tensor(dist.numpy()))
-
-    if return_distances:
-        return tf.concat(idxs, 0), tf.concat(dists, 0)
-    else:
-        return tf.concat(idxs, 0)
 
 
 def interpolation(points,

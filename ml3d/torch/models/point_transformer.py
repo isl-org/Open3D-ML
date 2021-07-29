@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.utils.dlpack
 import open3d.core as o3c
+import open3d.ml.torch.ops as ml_ops
 
 from sklearn.neighbors import KDTree
 
@@ -12,6 +13,15 @@ from ..modules.losses import filter_valid_label
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
 from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
+
+# def furthest_point_sample_v2(points, row_splits, new_row_splits):
+#     idxs = np.arange(points.shape[0])
+#     ret = []
+#     for i in range(1, row_splits.shape[0]):
+#         count = new_row_splits[i] - new_row_splits[i - 1]
+#         ret += list(idxs[row_splits[i - 1]:row_splits[i - 1] + count])
+
+#     return torch.from_numpy(np.array(ret, dtype=np.int64))
 
 
 class PointTransformer(BaseModel):
@@ -608,6 +618,22 @@ def knn_batch(points,
 
     points = points.cpu()
     queries = queries.cpu()
+
+    # ml3d knn.
+    idxs = []
+    dists = []
+    ans = ml_ops.knn_search(points,
+                            queries,
+                            k=k,
+                            points_row_splits=points_row_splits,
+                            queries_row_splits=queries_row_splits,
+                            return_distances=True)
+    if return_distances:
+        return ans.neighbors_index.reshape(
+            -1, k).long(), ans.neighbors_distance.reshape(-1, k)
+    else:
+        return ans.neighbors_index.reshape(-1, k).long()
+
     points = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(points))
     queries = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(queries))
     idxs = []

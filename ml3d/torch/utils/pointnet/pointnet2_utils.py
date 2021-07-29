@@ -65,6 +65,7 @@ furthest_point_sample = FurthestPointSampling.apply
 
 class FurthestPointSamplingV2(Function):
     """Furthest Point Sampling with variable length batch support."""
+
     @staticmethod
     def forward(ctx, xyz, row_splits, new_row_splits):
         """Forward pass.
