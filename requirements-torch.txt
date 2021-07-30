@@ -1,6 +1,6 @@
--f https://download.pytorch.org/whl/torch_stable.html
-torch==1.7.1+cpu ; sys_platform != 'darwin'
+-f https://download.pytorch.org/whl/lts/1.8/torch_lts.html
+torch==1.8.1+cpu ; sys_platform != 'darwin'
 torchvision==0.8.2+cpu ; sys_platform != 'darwin'
-torch==1.7.1 ; sys_platform == 'darwin'
-torchvision==0.8.2 ; sys_platform == 'darwin'
+torch==1.8.1 ; sys_platform == 'darwin'
+torchvision==0.9.1 ; sys_platform == 'darwin'
 tensorboard
