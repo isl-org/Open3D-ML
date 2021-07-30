@@ -1,25 +1,18 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as layers
-from sklearn.neighbors import KDTree
 import open3d.core as o3c
-import open3d.ml.tf.ops as ml_ops
+
+from sklearn.neighbors import KDTree
+from open3d.ml.tf.ops import knn_search
 
 from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
 from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
+
 tf.no_gradient("Open3DKnnSearch")
-
-# def furthest_point_sample_v2(points, row_splits, new_row_splits):
-#     idxs = np.arange(points.shape[0])
-#     ret = []
-#     for i in range(1, row_splits.shape[0]):
-#         count = new_row_splits[i] - new_row_splits[i - 1]
-#         ret += list(idxs[row_splits[i - 1]:row_splits[i - 1] + count])
-
-#     return np.array(ret, dtype=np.int64)
 
 
 class PointTransformer(BaseModel):
@@ -650,12 +643,12 @@ def queryandgroup(nsample,
     if idx is None:
         points_row_splits = tf.reshape(points_row_splits, (-1,))
         queries_row_splits = tf.reshape(queries_row_splits, (-1,))
-        ans = ml_ops.knn_search(points,
-                                queries,
-                                k=nsample,
-                                points_row_splits=points_row_splits,
-                                queries_row_splits=queries_row_splits,
-                                return_distances=False)  # (n, 3)
+        ans = knn_search(points,
+                         queries,
+                         k=nsample,
+                         points_row_splits=points_row_splits,
+                         queries_row_splits=queries_row_splits,
+                         return_distances=False)  # (n, 3)
         idx = tf.cast(tf.reshape(ans.neighbors_index, (-1, nsample)), tf.int64)
 
     n, m, c = points.shape[0], queries.shape[0], feat.shape[1]

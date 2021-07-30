@@ -3,9 +3,9 @@ import torch
 import torch.nn as nn
 import torch.utils.dlpack
 import open3d.core as o3c
-import open3d.ml.torch.ops as ml_ops
 
 from sklearn.neighbors import KDTree
+from open3d.ml.torch.ops import knn_search
 
 from .base_model import BaseModel
 from ...utils import MODEL
@@ -13,15 +13,6 @@ from ..modules.losses import filter_valid_label
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
 from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
-
-# def furthest_point_sample_v2(points, row_splits, new_row_splits):
-#     idxs = np.arange(points.shape[0])
-#     ret = []
-#     for i in range(1, row_splits.shape[0]):
-#         count = new_row_splits[i] - new_row_splits[i - 1]
-#         ret += list(idxs[row_splits[i - 1]:row_splits[i - 1] + count])
-
-#     return torch.from_numpy(np.array(ret, dtype=np.int64))
 
 
 class PointTransformer(BaseModel):
@@ -620,43 +611,17 @@ def knn_batch(points,
     queries = queries.cpu()
 
     # ml3d knn.
-    idxs = []
-    dists = []
-    ans = ml_ops.knn_search(points,
-                            queries,
-                            k=k,
-                            points_row_splits=points_row_splits,
-                            queries_row_splits=queries_row_splits,
-                            return_distances=True)
+    ans = knn_search(points,
+                     queries,
+                     k=k,
+                     points_row_splits=points_row_splits,
+                     queries_row_splits=queries_row_splits,
+                     return_distances=True)
     if return_distances:
         return ans.neighbors_index.reshape(
-            -1, k).long(), ans.neighbors_distance.reshape(-1, k)
+            -1, k).long().cuda(), ans.neighbors_distance.reshape(-1, k).cuda()
     else:
-        return ans.neighbors_index.reshape(-1, k).long()
-
-    points = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(points))
-    queries = o3c.Tensor.from_dlpack(torch.utils.dlpack.to_dlpack(queries))
-    idxs = []
-    dists = []
-
-    for i in range(0, points_row_splits.shape[0] - 1):
-        curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
-        nns = o3c.nns.NearestNeighborSearch(curr_points)
-        nns.knn_index()
-        idx, dist = nns.knn_search(
-            queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
-        if idx.shape[1] < k:
-            oversample = np.random.choice(np.arange(idx.shape[1]), k)
-            idx = idx[:, oversample]
-            dist = dist[:, oversample]
-        idx += points_row_splits[i]
-        idxs.append(torch.utils.dlpack.from_dlpack(idx.to_dlpack()))
-        dists.append(torch.utils.dlpack.from_dlpack(dist.to_dlpack()))
-
-    if return_distances:
-        return torch.cat(idxs, 0).cuda(), torch.cat(dists, 0).cuda()
-    else:
-        return torch.cat(idxs, 0).cuda()
+        return ans.neighbors_index.reshape(-1, k).long().cuda()
 
 
 def interpolation(points,
