@@ -637,7 +637,6 @@ def queryandgroup(nsample,
     Returns:
         Returns grouped features (m, nsample, c) or (m, nsample, 3+c).
     """
-
     if queries is None:
         queries = points
     if idx is None:
