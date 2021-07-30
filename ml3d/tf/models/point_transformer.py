@@ -10,6 +10,7 @@ from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
 from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
+tf.no_gradient("Open3DKnnSearch")
 
 # def furthest_point_sample_v2(points, row_splits, new_row_splits):
 #     idxs = np.arange(points.shape[0])
@@ -643,17 +644,19 @@ def queryandgroup(nsample,
     Returns:
         Returns grouped features (m, nsample, c) or (m, nsample, 3+c).
     """
-    # assert points.is_contiguous() and queries.is_contiguous(
-    # ) and feat.is_contiguous()
+
     if queries is None:
         queries = points
     if idx is None:
-        idx = tf.py_function(knn_batch,
-                             inp=[
-                                 points, queries, nsample, points_row_splits,
-                                 queries_row_splits, False
-                             ],
-                             Tout=tf.int64)
+        points_row_splits = tf.reshape(points_row_splits, (-1,))
+        queries_row_splits = tf.reshape(queries_row_splits, (-1,))
+        ans = ml_ops.knn_search(points,
+                                queries,
+                                k=nsample,
+                                points_row_splits=points_row_splits,
+                                queries_row_splits=queries_row_splits,
+                                return_distances=False)  # (n, 3)
+        idx = tf.cast(tf.reshape(ans.neighbors_index, (-1, nsample)), tf.int64)
 
     n, m, c = points.shape[0], queries.shape[0], feat.shape[1]
     grouped_xyz = tf.reshape(tf.gather(points, tf.reshape(idx, (-1,))),
@@ -669,12 +672,7 @@ def queryandgroup(nsample,
         return grouped_feat
 
 
-def knn_batch(points,
-              queries,
-              k,
-              points_row_splits,
-              queries_row_splits,
-              return_distances=True):
+def knn_batch(points, queries, k, points_row_splits, queries_row_splits):
     """K nearest neighbour with batch support.
 
     Attributes:
@@ -689,48 +687,30 @@ def knn_batch(points,
     assert points_row_splits.shape[0] == queries_row_splits.shape[
         0], "KNN(points and queries must have same batch size)"
 
-    points = points.cpu()
-    queries = queries.cpu()
-
-    # ml3d knn.
+    # o3d.core knn
+    points = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(points))
+    queries = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(queries))
     idxs = []
     dists = []
-    ans = ml_ops.knn_search(points,
-                            queries,
-                            k=k,
-                            points_row_splits=points_row_splits,
-                            queries_row_splits=queries_row_splits,
-                            return_distances=True)
+
+    for i in range(0, points_row_splits.shape[0] - 1):
+        curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
+        nns = o3c.nns.NearestNeighborSearch(curr_points)
+        nns.knn_index()
+        idx, dist = nns.knn_search(
+            queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
+        if idx.shape[1] < k:
+            oversample = np.random.choice(np.arange(idx.shape[1]), k)
+            idx = idx[:, oversample]
+            dist = dist[:, oversample]
+        idx += points_row_splits[i]
+        idxs.append(tf.convert_to_tensor(idx.numpy()))
+        dists.append(tf.convert_to_tensor(dist.numpy()))
+
     if return_distances:
-        return tf.cast(tf.reshape(ans.neighbors_index, (-1, k)),
-                       tf.int64), tf.reshape(ans.neighbors_distance, (-1, k))
+        return tf.concat(idxs, 0), tf.concat(dists, 0)
     else:
-        return tf.cast(tf.reshape(ans.neighbors_index, (-1, k)), tf.int64)
-
-    # o3d.core knn
-    # points = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(points))
-    # queries = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(queries))
-    # idxs = []
-    # dists = []
-
-    # for i in range(0, points_row_splits.shape[0] - 1):
-    #     curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
-    #     nns = o3c.nns.NearestNeighborSearch(curr_points)
-    #     nns.knn_index()
-    #     idx, dist = nns.knn_search(
-    #         queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
-    #     if idx.shape[1] < k:
-    #         oversample = np.random.choice(np.arange(idx.shape[1]), k)
-    #         idx = idx[:, oversample]
-    #         dist = dist[:, oversample]
-    #     idx += points_row_splits[i]
-    #     idxs.append(tf.convert_to_tensor(idx.numpy()))
-    #     dists.append(tf.convert_to_tensor(dist.numpy()))
-
-    # if return_distances:
-    #     return tf.concat(idxs, 0), tf.concat(dists, 0)
-    # else:
-    #     return tf.concat(idxs, 0)
+        return tf.concat(idxs, 0)
 
 
 def interpolation(points,
@@ -752,18 +732,14 @@ def interpolation(points,
     Returns:
         Returns interpolated features (n, c).
     """
-    idx, dist = tf.py_function(
-        knn_batch,
-        inp=[points, queries, k, points_row_splits, queries_row_splits, True],
-        Tout=[tf.int64, tf.float32])
-    idx, dist = knn_batch(points,
-                          queries,
-                          k=k,
-                          points_row_splits=points_row_splits,
-                          queries_row_splits=queries_row_splits,
-                          return_distances=True)  # (n, 3), (n, 3)
-
-    idx, dist = tf.reshape(idx, (-1, 3)), tf.reshape(dist, (-1, 3))
+    ans = ml_ops.knn_search(points,
+                            queries,
+                            k=k,
+                            points_row_splits=points_row_splits,
+                            queries_row_splits=queries_row_splits,
+                            return_distances=True)
+    idx = tf.cast(tf.reshape(ans.neighbors_index, (-1, k)), tf.int64)
+    dist = tf.reshape(ans.neighbors_distance, (-1, k))
 
     dist_recip = 1.0 / (dist + 1e-8)  # (n, 3)
     norm = tf.reduce_sum(dist_recip, 1, keepdims=True)
