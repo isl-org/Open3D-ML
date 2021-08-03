@@ -319,6 +319,8 @@ The table shows the available models and datasets for the segmentation task and 
 | KPConv     (torch) | [58.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth)          |     [65.6](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_toronto3d_202012221551utc.pth) |  [60.0](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_s3dis_202010091238.pth)  | - | [76.7](https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_parislille3d_202011241550utc.pth) | - |
 | SparseConvUnet (torch)| - | - | - | - | - | [68](https://storage.googleapis.com/open3d-releases/model-zoo/sparseconvunet_scannet_202105031316utc.pth) |
 | SparseConvUnet (tf)| - | - | - | - | - | [68.2](https://storage.googleapis.com/open3d-releases/model-zoo/sparseconvunet_scannet_202105031316utc.zip) |
+| PointTransformer (torch)| - | - | [65.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointtransformer_s3dis_202108030845utc.pth) | - | - | - |
+| PointTransformer (tf)| - | - | [65.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointtransformer_s3dis_202108030845utc.zip) | - | - | - |
 
 
 
