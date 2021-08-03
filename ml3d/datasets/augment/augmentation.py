@@ -13,7 +13,7 @@ class Augmentation():
 
     @staticmethod
     def recenter(data):
-        """Recenter pointcloud/features.
+        """Recenter pointcloud/features to origin.
 
         Typically used before rotating the pointcloud.
 
@@ -70,7 +70,7 @@ class Augmentation():
         """
         if np.abs(pc[:, :3].mean()) > 1e-2:
             warnings.warn(
-                f"It is recommended recenter the pointcloud before calling rotate."
+                f"It is recommended to recenter the pointcloud before calling rotate."
             )
 
         # Initialize rotation matrix
@@ -115,7 +115,7 @@ class Augmentation():
         """Scale augmentation for pointcloud.
 
         If `scale_anisotropic` is True, each point is scaled differently.
-        else, same scale is applied to each point in range (`max_s`, `min_s`).
+        else, same scale from range ['min_s', 'max_s') is applied to each point.
 
         Args:
             pc: Pointcloud to scale.
@@ -142,9 +142,13 @@ class Augmentation():
 
         return pc + noise
 
+    def augment(self, data):
+        raise NotImplementedError(
+            "Please use one of SemsegAugmentation or ObjdetAugmentation.")
+
 
 class SemsegAugmentation(Augmentation):
-    """Class consisting different augmentation methods for Semantic Segmentation.
+    """Class consisting of different augmentation methods for Semantic Segmentation.
 
     Args:
         cfg: Config for augmentation.
@@ -152,6 +156,18 @@ class SemsegAugmentation(Augmentation):
 
     def __init__(self, cfg):
         super(SemsegAugmentation, self).__init__(cfg)
+
+        # Raise warnings for misspelled/unimplemented methods.
+        all_methods = [
+            'recenter', 'normalize', 'rotate', 'scale', 'noise',
+            'RandomDropout', 'RandomHorizontalFlip', 'ChromaticAutoContrast',
+            'ChromaticTranslation', 'ChromaticJitter'
+        ]
+        for method in cfg:
+            if method not in all_methods:
+                warnings.warn(
+                    f"Augmentation method : {method} does not exist. Please verify!"
+                )
 
     @staticmethod
     def RandomDropout(pc, feats, labels, cfg):
@@ -161,7 +177,7 @@ class SemsegAugmentation(Augmentation):
             pc: Pointcloud.
             feats: Features.
             labels: Labels.
-            cfg: configuraiton dict.
+            cfg: configuration dict.
         """
         dropout_ratio = cfg.get('dropout_ratio', 0.2)
         if np.random.random() < dropout_ratio:
@@ -297,6 +313,17 @@ class ObjdetAugmentation(Augmentation):
     def __init__(self, cfg):
         super(ObjdetAugmentation, self).__init__(cfg)
 
+        # Raise warnings for misspelled/unimplemented methods.
+        all_methods = [
+            'recenter', 'normalize', 'rotate', 'scale', 'noise', 'PointShuffle',
+            'ObjectRangeFilter', 'ObjectSample'
+        ]
+        for method in cfg:
+            if method not in all_methods:
+                warnings.warn(
+                    f"Augmentation method : {method} does not exist. Please verify!"
+                )
+
     @staticmethod
     def PointShuffle(data):
         """Shuffle Pointcloud."""
@@ -329,7 +356,7 @@ class ObjdetAugmentation(Augmentation):
         all objects within the dataset. Checks collision with existing objects.
 
         Args:
-            data: Input data.
+            data: Input data dict with keys ('point', 'bounding_boxes', 'calib').
             db_boxes_dict: dict for different objects.
             sample_dict: dict for number of objects to sample.
 
@@ -379,7 +406,9 @@ class ObjdetAugmentation(Augmentation):
         Args:
             pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
             min_points_dict: A dictionary to filter objects based on number of points inside.
+                Format of dict {'class_name': num_points}.
             sample_dict: A dictionary to decide number of objects to sample.
+                Format of dict {'class_name': num_instance}
 
         """
         db_boxes = pickle.load(open(pickle_path, 'rb'))
@@ -414,6 +443,27 @@ class ObjdetAugmentation(Augmentation):
 
         """
         cfg = self.cfg
+
+        if cfg is None:
+            return data
+
+        if 'recenter' in cfg:
+            if cfg['recenter']:
+                data['point'] = self.recenter(data['point'])
+
+        if 'normalize' in cfg:
+            data['point'], _ = self.normalize(data['point'], None,
+                                              cfg['normalize'])
+
+        if 'rotate' in cfg:
+            data['point'] = self.rotate(data['point'], cfg['rotate'])
+
+        if 'scale' in cfg:
+            data['point'] = self.scale(data['point'], cfg['scale'])
+
+        if 'noise' in cfg:
+            data['point'] = self.noise(data['point'], cfg['noise'])
+
         if 'ObjectSample' in cfg:
             if not hasattr(self, 'db_boxes_dict'):
                 data_path = attr['path']
