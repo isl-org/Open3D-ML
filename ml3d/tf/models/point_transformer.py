@@ -724,12 +724,12 @@ def interpolation(points,
     Returns:
         Returns interpolated features (n, c).
     """
-    ans = ml_ops.knn_search(points,
-                            queries,
-                            k=k,
-                            points_row_splits=points_row_splits,
-                            queries_row_splits=queries_row_splits,
-                            return_distances=True)
+    ans = knn_search(points,
+                     queries,
+                     k=k,
+                     points_row_splits=points_row_splits,
+                     queries_row_splits=queries_row_splits,
+                     return_distances=True)
     idx = tf.cast(tf.reshape(ans.neighbors_index, (-1, k)), tf.int64)
     dist = tf.reshape(ans.neighbors_distance, (-1, k))
 
