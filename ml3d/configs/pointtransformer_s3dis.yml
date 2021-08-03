@@ -17,30 +17,26 @@ model:
   blocks: [2, 2, 2, 2, 2]
   num_classes: 13
   voxel_size: 0.04
-  max_voxels: 80000
+  max_voxels: 50000
   ignored_label_inds: [-1]
   augment:
     rotate:
       method: vertical
     scale:
-      min_s: 0.9
-      max_s: 1.1
+      min_s: 0.95
+      max_s: 1.05
     noise:
-      noise_std: 0.01
-    RandomDropout:
-      dropout_ratio: 0.2
-    RandomHorizontalFlip:
-      axes: [0, 1]
+      noise_std: 0.005
     ChromaticAutoContrast:
       randomize_blend_factor: True
-      blend_factor: 0.5
+      blend_factor: 0.2
     ChromaticTranslation:
-      trans_range_ratio: 0.1
+      trans_range_ratio: 0.05
     ChromaticJitter:
-      std: 0.05
+      std: 0.01
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.01
+  adam_lr: 0.02
   momentum: 0.9
   weight_decay: 0.0001
   batch_size: 4
