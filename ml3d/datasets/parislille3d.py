@@ -79,7 +79,7 @@ class ParisLille3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -146,7 +146,7 @@ class ParisLille3D(BaseDataset):
                         attr: The attribute that needs to be checked.
 
         Returns:
-            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+            If the dataum attribute is tested, then return the path where the attribute is stored; else, returns false.
         """
         cfg = self.cfg
         name = attr['name']

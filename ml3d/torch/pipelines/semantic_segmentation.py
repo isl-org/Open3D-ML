@@ -240,7 +240,7 @@ class SemanticSegmentation(BasePipeline):
                     attr = self.dataset_split.get_attr(test_sampler.cloud_id)
                     dataset.save_test_result(inference_result, attr)
 
-        log.info("Finshed testing")
+        log.info("Finished testing")
 
     """
     Update tests using sampler, inputs, and results.

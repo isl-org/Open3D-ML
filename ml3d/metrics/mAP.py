@@ -16,7 +16,7 @@ def filter_data(data, labels, diffs=None):
             (optional)
 
     Returns:
-        Tuple wit dictionary with same as format as input, with only the given labels
+        Tuple with dictionary with same as format as input, with only the given labels
         and difficulties and the indices.
     """
     cond = np.any([data['label'] == label for label in labels], axis=0)

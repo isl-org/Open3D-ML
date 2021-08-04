@@ -631,10 +631,10 @@ class KPFCNN(BaseModel):
                 break
 
         # Return inputs
-        # Batch unstacking (with last layer indices for optionnal classif loss)
+        # Batch unstacking (with last layer indices for optional classif loss)
         stacked_batch_inds_0 = self.stack_batch_inds(input_batches_len[0])
 
-        # Batch unstacking (with last layer indices for optionnal classif loss)
+        # Batch unstacking (with last layer indices for optional classif loss)
         stacked_batch_inds_1 = self.stack_batch_inds(input_batches_len[-1])
 
         if object_labels is None:
