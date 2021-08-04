@@ -1,8 +1,5 @@
 import tensorflow as tf
-
 import numpy as np
-import os
-import pickle
 
 from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss

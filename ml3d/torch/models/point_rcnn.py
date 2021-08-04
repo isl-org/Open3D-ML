@@ -30,8 +30,6 @@ from torch import nn
 from torch.nn import functional as F
 
 import numpy as np
-import os
-import pickle
 from functools import partial
 
 from .base_model_objdet import BaseModel

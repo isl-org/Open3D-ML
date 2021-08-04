@@ -73,9 +73,6 @@ class Augmentation():
                 f"It is recommended to recenter the pointcloud before calling rotate."
             )
 
-        # Initialize rotation matrix
-        R = np.eye(pc.shape[1])
-
         method = cfg.get('method', 'vertical')
 
         if method == 'vertical':
