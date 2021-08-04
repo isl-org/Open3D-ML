@@ -3,6 +3,7 @@ import shutil
 import sys
 import tempfile
 import yaml
+from collections import abc
 from importlib import import_module
 from addict import Dict
 
