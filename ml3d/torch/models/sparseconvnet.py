@@ -278,8 +278,12 @@ class InputLayer(nn.Module):
         self.voxel_size = torch.Tensor([voxel_size, voxel_size, voxel_size])
 
     def forward(self, features, in_positions):
-        v = voxelize(in_positions, self.voxel_size, torch.Tensor([0, 0, 0]),
-                     torch.Tensor([40960, 40960, 40960]))
+        v = voxelize(
+            in_positions,
+            torch.LongTensor([0,
+                              in_positions.shape[0]]).to(in_positions.device),
+            self.voxel_size, torch.Tensor([0, 0, 0]),
+            torch.Tensor([40960, 40960, 40960]))
 
         # Contiguous repeating positions.
         in_positions = in_positions[v.voxel_point_indices]
