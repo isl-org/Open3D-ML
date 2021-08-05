@@ -1,8 +1,5 @@
 import tensorflow as tf
-
 import numpy as np
-import os
-import pickle
 
 from .base_model_objdet import BaseModel
 from ..modules.losses.smooth_L1 import SmoothL1Loss
@@ -13,7 +10,8 @@ from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
 from ...datasets.utils import BEVBox3D, DataProcessing, ObjdetAugmentation
-from ...datasets.utils.operations import filter_by_min_points, points_in_box
+from ...datasets.utils.operations import points_in_box
+from ...datasets.augment import ObjdetAugmentation
 
 from ...utils import MODEL
 from ..modules.schedulers import OneCycleScheduler
@@ -67,6 +65,7 @@ class PointRCNN(BaseModel):
         assert mode == "RPN" or mode == "RCNN"
         self.mode = mode
 
+        self.augmenter = ObjdetAugmentation(self.cfg.augment)
         self.npoints = npoints
         self.classes = classes
         self.name2lbl = {n: i for i, n in enumerate(classes)}
@@ -134,71 +133,6 @@ class PointRCNN(BaseModel):
 
         return optimizer
 
-    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
-        """Load ground truth object database.
-
-        Args:
-            pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
-            min_points_dict: A dictionary to filter objects based on number of points inside.
-            sample_dict: A dictionary to decide number of objects to sample.
-
-        """
-        db_boxes = pickle.load(open(pickle_path, 'rb'))
-
-        if min_points_dict is not None:
-            db_boxes = filter_by_min_points(db_boxes, min_points_dict)
-
-        db_boxes_dict = {}
-        for key in sample_dict.keys():
-            db_boxes_dict[key] = []
-
-        for db_box in db_boxes:
-            if db_box.label_class in sample_dict.keys():
-                db_boxes_dict[db_box.label_class].append(db_box)
-
-        self.db_boxes_dict = db_boxes_dict
-
-    def augment_data(self, data, attr):
-        """Augment object detection data.
-
-        Available augmentations are:
-            `ObjectSample`: Insert objects from ground truth database.
-            `ObjectRangeFilter`: Filter pointcloud from given bounds.
-            `PointShuffle`: Shuffle the pointcloud.
-
-        Args:
-            data: A dictionary object returned from the dataset class.
-            attr: Attributes for current pointcloud.
-
-        Returns:
-            Augmented `data` dictionary.
-
-        """
-        cfg = self.cfg.augment
-
-        if 'ObjectSample' in cfg.keys():
-            if not hasattr(self, 'db_boxes_dict'):
-                data_path = attr['path']
-                # remove tail of path to get root data path
-                for _ in range(3):
-                    data_path = os.path.split(data_path)[0]
-                pickle_path = os.path.join(data_path, 'bboxes.pkl')
-                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
-
-            data = ObjdetAugmentation.ObjectSample(
-                data,
-                db_boxes_dict=self.db_boxes_dict,
-                sample_dict=cfg['ObjectSample']['sample_dict'])
-
-        if cfg.get('ObjectRangeFilter', False):
-            data = ObjdetAugmentation.ObjectRangeFilter(
-                data, self.cfg.point_cloud_range)
-
-        if cfg.get('PointShuffle', False):
-            data = ObjdetAugmentation.PointShuffle(data)
-
-        return data
-
     def loss(self, results, inputs, training=True):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
@@ -225,7 +159,7 @@ class PointRCNN(BaseModel):
 
     def preprocess(self, data, attr):
         if attr['split'] in ['train', 'training']:
-            data = self.augment_data(data, attr)
+            data = self.augmenter.augment(data, attr)
 
         data['bounding_boxes'] = self.filter_objects(data['bounding_boxes'])
 

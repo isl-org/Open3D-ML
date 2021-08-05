@@ -201,7 +201,8 @@ class SparseConvUnet(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     **cfg_pipeline.optimizer)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
 

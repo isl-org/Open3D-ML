@@ -230,8 +230,7 @@ class SparseConvUnet(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=cfg_pipeline.adam_lr)
+        optimizer = tf.keras.optimizers.Adam(**cfg_pipeline.optimizer)
 
         return optimizer
 
