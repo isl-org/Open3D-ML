@@ -37,6 +37,7 @@ class Model:
         # "colors"). So the tpointcloud exists for rendering and initially only
         # contains the "points" array.
         self.tclouds = {}  # name -> tpointcloud
+        self.tcams = {}  # name -> tcams
         self.data_names = []  # the order data will be displayed / animated
         self.bounding_box_data = []  # [BoundingBoxData]
 
@@ -49,6 +50,8 @@ class Model:
     def _init_data(self, name):
         tcloud = o3d.t.geometry.PointCloud(o3d.core.Device("CPU:0"))
         self.tclouds[name] = tcloud
+        tcam = dict()
+        self.tcams[name] = tcam
         self._data[name] = {}
         self.data_names.append(name)
 
@@ -91,11 +94,19 @@ class Model:
             tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
         self.tclouds[name] = tcloud
 
+        tcam = dict()
+        if 'cam' in data:
+            for k, v in data['cam'].items():
+                img = self._convert_to_numpy(v)
+                tcam[k] = o3d.t.geometry.Image(
+                    Visualizer._make_tcloud_array(img))
+        self.tcams[name] = tcam
+
         # Add scalar attributes and vector3 attributes
         attrs = {}
         for k, v in data.items():
             attr = self._convert_to_numpy(v)
-            if attr is None:
+            if attr is None or isinstance(v, dict):
                 continue
             attr_name = k
             if attr_name == "point":
@@ -322,7 +333,8 @@ class DatasetModel(Model):
                 Model.BoundingBoxData(name, data['bounding_boxes']))
 
         self.create_point_cloud(data)
-        size = self._calc_pointcloud_size(self._data[name], self.tclouds[name])
+        size = self._calc_pointcloud_size(self._data[name], self.tclouds[name],
+                                          self.tcams[name])
         if size + self._current_memory_usage > self._memory_limit:
             if fail_if_no_space:
                 self.unload(name)
@@ -343,13 +355,15 @@ class DatasetModel(Model):
             self._cached_data.append(name)
             return True
 
-    def _calc_pointcloud_size(self, raw_data, pcloud):
+    def _calc_pointcloud_size(self, raw_data, pcloud, cams={}):
         """Calcute the size of the pointcloud based on the rawdata."""
         pcloud_size = 0
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
         pcloud_size += pcloud.point["points"].num_elements() * 64
+        # TODO: add memory for point cloud color and semantics
+        # TODO: add memory for cam images
         return pcloud_size
 
     def unload(self, name):
@@ -360,6 +374,8 @@ class DatasetModel(Model):
             tcloud = o3d.t.geometry.PointCloud(o3d.core.Device("CPU:0"))
             self.tclouds[name] = tcloud
             self._data[name] = {}
+
+            self.tcams[name] = {}
 
             bbox_name = Model.bounding_box_prefix + name
             for i in range(0, len(self.bounding_box_data)):
@@ -857,6 +873,20 @@ class Visualizer:
         h.add_stretch()
         v.add_child(h)
 
+        if 'modality' in self._objects._dataset.cfg.cfg_dict and self._objects._dataset.cfg.cfg_dict[
+                'modality']['use_camera']:
+            w = gui.CollapsableVert("Cameras", 0, indented_margins)
+            cam_grid = gui.VGrid(self._objects._dataset.dataset.cam_cols, 0,
+                                 indented_margins)
+            # cam_grid.preferred_width = 60 * em
+
+            self._img = dict()
+            w.add_child(cam_grid)
+            v.add_child(w)
+            for cam in self._objects._dataset.dataset.cam_names:
+                self._img[cam] = gui.ImageWidget(o3d.t.geometry.Image())
+                cam_grid.add_child(self._img[cam])
+
         self._panel.add_child(model)
 
         # Coloring
@@ -1326,10 +1356,10 @@ class Visualizer:
 
         self._update_geometry_colors()
 
-    def _on_layout(self, context):
+    def _on_layout(self, context=None):
         frame = self.window.content_rect
-        em = context.theme.font_size
-        panel_width = 20 * em
+        em = self.window.theme.font_size
+        panel_width = 60 * em  #20 * em
         panel_rect = gui.Rect(frame.get_right() - panel_width, frame.y,
                               panel_width, frame.height - frame.y)
         self._panel.frame = panel_rect
@@ -1373,6 +1403,9 @@ class Visualizer:
         idx = int(new_value)
         for i in range(0, len(self._animation_frames)):
             self._3d.scene.show_geometry(self._animation_frames[i], (i == idx))
+        for cam in self._objects._dataset.dataset.cam_names:
+            self._img[cam].update_image(
+                self._objects.tcams[self._animation_frames[idx]][cam])
         self._update_bounding_boxes(animation_frame=idx)
         self._3d.force_redraw()
         self._slider_current.text = self._animation_frames[idx]
@@ -1538,12 +1571,13 @@ class Visualizer:
         else:
             return o3d.core.Tensor.from_numpy(np_array)
 
-    def visualize_dataset(self,
-                          dataset,
-                          split,
-                          indices=None,
-                          width=1024,
-                          height=768):
+    def visualize_dataset(
+            self,
+            dataset,
+            split,
+            indices=None,
+            width=1920,  #1024,
+            height=1208):  #768):
         """Visualize a dataset.
 
         Example:
