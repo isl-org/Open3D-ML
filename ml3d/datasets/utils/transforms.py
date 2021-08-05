@@ -157,6 +157,7 @@ class ObjdetAugmentation():
 
     @staticmethod
     def ObjectSample(data, db_boxes_dict, sample_dict):
+        print("ObjectSample before")
         rate = 1.0
         points = data['point']
         bboxes = data['bounding_boxes']
@@ -172,7 +173,9 @@ class ObjdetAugmentation():
             sampled_num = int(max_sample_num - existing)
             sampled_num = np.round(rate * sampled_num).astype(np.int64)
             sampled_num_dict[class_name] = sampled_num
+        print("ObjectSample iterate over keys")
 
+        print("ObjectSample before sample_class")
         sampled = []
         for class_name in sampled_num_dict.keys():
             sampled_num = sampled_num_dict[class_name]
@@ -183,13 +186,15 @@ class ObjdetAugmentation():
                                        db_boxes_dict[class_name])
             sampled += sampled_cls
             bboxes = bboxes + sampled_cls
+        print("ObjectSample after sample_class")
 
         if len(sampled) != 0:
             sampled_points = np.concatenate(
                 [box.points_inside_box for box in sampled], axis=0)
             points = remove_points_in_boxes(points, sampled)
             points = np.concatenate([sampled_points, points], axis=0)
-
+        
+        print("ObjectSample return")
         return {
             'point': points,
             'bounding_boxes': bboxes,

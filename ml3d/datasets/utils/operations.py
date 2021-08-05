@@ -417,21 +417,28 @@ def box_collision_test(boxes, qboxes):
         boxes (np.ndarray): Corners of current boxes.
         qboxes (np.ndarray): Boxes to be avoid colliding.
     """
+    print("Before def box_collision_test")
     boxes = np.array([box.to_xyzwhlr() for box in boxes], dtype=np.float32)
     qboxes = np.array([box.to_xyzwhlr() for box in qboxes], dtype=np.float32)
+
+    
 
     boxes = boxes[:, [0, 1, 3, 4, 6]]
     qboxes = qboxes[:, [0, 1, 3, 4, 6]]
 
+    print("Before iou_bev", flush=True)
     coll_mat = iou_bev(boxes, qboxes)
+    print("After iou_bev")
 
     coll_mat[coll_mat != 0] = 1
-
+    print("After def box_collision_test")
     return coll_mat.astype(np.bool)
 
 
 def sample_class(class_name, num, gt_boxes, db_boxes):
+    print("Before sample_class")
     if num == 0:
+        print("sample_class exit early")
         return []
 
     sampled = random_sample(db_boxes, num)
@@ -444,7 +451,10 @@ def sample_class(class_name, num, gt_boxes, db_boxes):
 
     boxes = (gt_boxes + sampled).copy()
 
+    print("Before box_collision_test")
+
     coll_mat = box_collision_test(boxes, boxes)
+    print("After box_collision_test")
 
     diag = np.arange(len(boxes))
     coll_mat[diag, diag] = False
@@ -457,6 +467,7 @@ def sample_class(class_name, num, gt_boxes, db_boxes):
         else:
             valid_samples.append(sampled[i - num_gt])
 
+    print("After sample_class")
     return valid_samples
 
 

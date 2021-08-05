@@ -74,23 +74,31 @@ class TorchDataloader(Dataset):
             sampler.initialize_with_dataloader(self)
 
     def __getitem__(self, index):
+        print(f"__getitem__(index={index})")
         """Returns the item at index position (idx)."""
         dataset = self.dataset
         index = index % len(dataset)
 
         attr = dataset.get_attr(index)
+        print(f"__getitem__(index={index}) got attr")
         if self.cache_convert:
+            print(f"__getitem__(index={index}) cache_convert before")
             data = self.cache_convert(attr['name'])
+            print(f"__getitem__(index={index}) cache_convert after")
         elif self.preprocess:
+            print(f"__getitem__(index={index}) preprocess before")
             data = self.preprocess(dataset.get_data(index), attr)
+            print(f"__getitem__(index={index}) preprocess after")
         else:
+            print(f"__getitem__(index={index}) get_data before")            
             data = dataset.get_data(index)
+            print(f"__getitem__(index={index}) get_data after")
 
         if self.transform is not None:
             data = self.transform(data, attr)
 
         inputs = {'data': data, 'attr': attr}
-
+        print(f"__getitem__(index={index}) returned")
         return inputs
 
     def __len__(self):

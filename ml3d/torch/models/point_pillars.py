@@ -205,6 +205,7 @@ class PointPillars(BaseModel):
         }
 
     def preprocess(self, data, attr):
+        print("Preprocess before", flush=True)
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
@@ -217,6 +218,7 @@ class PointPillars(BaseModel):
 
         data['point'] = points
 
+        print("Preprocess before aug", flush=True)
         #Augment data
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
             data = self.augment_data(data, attr)
@@ -226,6 +228,7 @@ class PointPillars(BaseModel):
         if attr['split'] not in ['test', 'testing']:
             new_data['bbox_objs'] = data['bounding_boxes']
 
+        print("Preprocess before full_point", flush=True)
         if 'full_point' in data:
             points = np.array(data['full_point'][:, 0:4], dtype=np.float32)
 
@@ -239,6 +242,7 @@ class PointPillars(BaseModel):
 
             new_data['full_point'] = points
 
+        print("Preprocess after", flush=True)
         return new_data
 
     def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
@@ -260,6 +264,7 @@ class PointPillars(BaseModel):
     def augment_data(self, data, attr):
         cfg = self.cfg.augment
 
+        print("Before ObjectSample")
         if 'ObjectSample' in cfg.keys():
             if not hasattr(self, 'db_boxes_dict'):
                 data_path = attr['path']
@@ -268,12 +273,14 @@ class PointPillars(BaseModel):
                     data_path = os.path.split(data_path)[0]
                 pickle_path = os.path.join(data_path, 'bboxes.pkl')
                 self.load_gt_database(pickle_path, **cfg['ObjectSample'])
-
+            print("Before ObjdetAugmentation.ObjectSample")
             data = ObjdetAugmentation.ObjectSample(
                 data,
                 db_boxes_dict=self.db_boxes_dict,
                 sample_dict=cfg['ObjectSample']['sample_dict'])
+            print("After ObjdetAugmentation.ObjectSample")
 
+        print("Before ObjectRangeFilter")
         if cfg.get('ObjectRangeFilter', False):
             data = ObjdetAugmentation.ObjectRangeFilter(
                 data, self.cfg.point_cloud_range)

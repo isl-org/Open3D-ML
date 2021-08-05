@@ -286,13 +286,18 @@ class ObjectDetection(BasePipeline):
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             model.train()
+            log.info("after model.train()")
 
             self.losses = {}
 
             process_bar = tqdm(train_loader, desc='training')
+            log.info("after bar creation")
             for data in process_bar:
+                log.info("before to(device)")
                 data.to(device)
+                log.info("after to(device)")
                 results = model(data)
+                log.info("after forward pass")
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
 
