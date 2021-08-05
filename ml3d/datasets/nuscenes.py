@@ -10,6 +10,7 @@ from scipy.spatial.transform import Rotation as R
 from .base_dataset import BaseDataset
 from ..utils import Config, make_dir, DATASET
 from .utils import BEVBox3D
+import open3d as o3d
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,6 +78,14 @@ class NuScenes(BaseDataset):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
 
+        if 'modality' in self.cfg.cfg_dict and self.cfg.cfg_dict['modality'][
+                'use_camera']:
+            self.cam_names = [
+                'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT',
+                'CAM_BACK_LEFT', 'CAM_BACK', 'CAM_BACK_RIGHT'
+            ]
+            self.cam_cols = 3
+
     @staticmethod
     def get_label_to_names():
         """Returns a label to names dictonary object.
@@ -138,6 +147,21 @@ class NuScenes(BaseDataset):
             objects[-1].yaw = ry
 
         return objects
+
+    # @staticmethod
+    def read_imgs(self, cam_dict):
+        """Reads img data from the cam dict provided.
+
+        Returns:
+            A dict with keys as cam names and value as images.
+        """
+        assert [Path(val['data_path']).exists() for _, val in cam_dict.items()]
+
+        res_dict = dict()
+        for cam in self.cam_names:
+            res_dict[cam] = np.array(
+                o3d.io.read_image(cam_dict[cam]['data_path']))
+        return res_dict
 
     def get_split(self, split):
         """Returns a dataset split.
@@ -225,12 +249,14 @@ class NuSceneSplit():
 
         pc = self.dataset.read_lidar(lidar_path)
         label = self.dataset.read_label(info, calib)
+        cam_dict = self.dataset.read_imgs(info['cams'])
 
         data = {
             'point': pc,
             'feat': None,
             'calib': calib,
             'bounding_boxes': label,
+            'cam': cam_dict
         }
 
         return data
