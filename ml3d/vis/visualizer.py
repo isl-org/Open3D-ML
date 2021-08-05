@@ -803,25 +803,23 @@ class Visualizer:
         vgrid.add_child(gui.Label("BG Color"))
         vgrid.add_child(bgcolor)
 
-        list_selector = gui.CollapsableVert("List Selector", 0,
-                                            indented_margins)
-        model.add_child(list_selector)
-        list_grid = gui.VGrid(4, 0.25 * em)
-        list_grid.add_child(gui.Label("lower"))
-        list_selector.add_child(list_grid)
+        list_selector = gui.CollapsableVert("Selector", 0, indented_margins)
+        list_selector_grid = gui.VGrid(4, 0.25 * em)
+        list_selector_grid.add_child(gui.Label("lower"))
+        list_selector.add_child(list_selector_grid)
         self._lower_val = gui.NumberEdit(gui.NumberEdit.INT)
         self._lower_val.int_value = 0
         self._prev_lower_val = 0
         self._lower_val.set_limits(0, len(self._objects.data_names) - 1)
         self._lower_val.set_on_value_changed(self._on_lower_val)
-        list_grid.add_child(self._lower_val)
-        list_grid.add_child(gui.Label("upper"))
+        list_selector_grid.add_child(self._lower_val)
+        list_selector_grid.add_child(gui.Label("upper"))
         self._upper_val = gui.NumberEdit(gui.NumberEdit.INT)
         self._upper_val.int_value = 0
         self._prev_upper_val = 0
         self._upper_val.set_limits(0, len(self._objects.data_names) - 1)
         self._upper_val.set_on_value_changed(self._on_upper_val)
-        list_grid.add_child(self._upper_val)
+        list_selector_grid.add_child(self._upper_val)
 
         view_tab = gui.TabControl()
         view_tab.set_on_selected_tab_changed(self._on_display_tab_changed)
@@ -831,7 +829,10 @@ class Visualizer:
         self._dataset = gui.TreeView()
         self._dataset.set_on_selection_changed(
             self._on_dataset_selection_changed)
-        view_tab.add_tab("List", self._dataset)
+        list_grid = gui.Vert(2)
+        list_grid.add_child(list_selector)
+        list_grid.add_child(self._dataset)
+        view_tab.add_tab("List", list_grid)
 
         # ... animation slider
         v = gui.Vert()
@@ -1477,17 +1478,23 @@ class Visualizer:
             for i in range(self._prev_lower_val, self._lower_val.int_value):
                 name = self._objects.data_names[i]
                 self._name2treenode[name].checkbox.checked = False
+                item = [j for j, k in self._treeid2name.items() if name == k][0]
+                self._on_dataset_selection_changed(item)
         if self._prev_upper_val > self._upper_val.int_value:
             for i in range(self._upper_val.int_value + 1,
                            self._prev_upper_val + 1):
                 name = self._objects.data_names[i]
                 self._name2treenode[name].checkbox.checked = False
+                item = [j for j, k in self._treeid2name.items() if name == k][0]
+                self._on_dataset_selection_changed(item)
 
     def _check_bw_lims(self):
         for i in range(self._lower_val.int_value,
                        self._upper_val.int_value + 1):
             name = self._objects.data_names[i]
             self._name2treenode[name].checkbox.checked = True
+            item = [j for j, k in self._treeid2name.items() if name == k][0]
+            self._on_dataset_selection_changed(item)
 
     def _on_datasource_changed(self, attr_name, idx):
         selected_names = self._get_selected_names()
