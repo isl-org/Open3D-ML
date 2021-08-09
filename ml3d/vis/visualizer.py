@@ -373,6 +373,7 @@ class DatasetModel(Model):
         """Calcute the size of the pointcloud based on the rawdata."""
         pcloud_size = 0
         for (attr, arr) in raw_data.items():
+            if not isinstance(arr, dict):
             pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
         pcloud_size += pcloud.point["points"].num_elements() * 64
