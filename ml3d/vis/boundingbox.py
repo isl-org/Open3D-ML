@@ -143,7 +143,12 @@ class BoundingBox3D:
                 label = lut.labels[box.label_class]
                 c = (label.color[0], label.color[1], label.color[2])
             else:
-                c = (0.5, 0.5, 0.5)
+                if box.confidence == -1.0:
+                    c = (0., 1.0, 0.)  # GT: Green
+                elif box.confidence >= 0 and box.confidence <= 1.0:
+                    c = (1.0, 0., 0.)  # Prediction: red
+                else:
+                    c = (0.5, 0.5, 0.5)  # Grey
 
             colors[idx:idx +
                    nlines] = c  # copies c to each element in the range
