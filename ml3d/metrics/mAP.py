@@ -219,38 +219,44 @@ def mAP(pred,
                 gt_cnt[i, j] += len(filter_data(t, [c], [d])[1])
 
     detection = np.zeros((len(classes), len(difficulties), box_cnts[-1], 3))
-    fns = np.zeros((len(classes), len(difficulties), 1), dtype='int64')
+    false_negatives = np.zeros((len(classes), len(difficulties), 1), dtype='int64')
     for i in range(len(pred)):
-        d, f = precision_3d(pred=pred[i],
+        det, false_negative = precision_3d(pred=pred[i],
                             target=target[i],
                             classes=classes,
                             difficulties=difficulties,
                             min_overlap=min_overlap,
                             bev=bev,
                             similar_classes=similar_classes)
-        detection[:, :, box_cnts[i]:box_cnts[i + 1]] = d
-        fns += f
+        detection[:, :, box_cnts[i]:box_cnts[i + 1]] = det
+        false_negatives += false_negative
 
     mAP = np.empty((len(classes), len(difficulties), 1))
     for i in range(len(classes)):
         for j in range(len(difficulties)):
             det = detection[i, j, np.argsort(-detection[i, j, :, 0])]
 
-            #gt_cnt = np.sum(det[:,1]) + fns[i, j]
-            thresholds = sample_thresholds(det[np.where(det[:, 1] > 0)[0], 0],
-                                           gt_cnt[i, j], samples)
+            #gt_cnt = np.sum(det[:,1]) + false_negatives[i, j]
+            scores = det[np.where(det[:, 1] > 0)[0], 0]
+            thresholds = sample_thresholds(scores, gt_cnt[i, j], samples)
+            if len(thresholds) == 0:
+                # No elements met cutoff thresholds, skipping AP computation to avoid NaNs.
+                continue
 
             prec = np.zeros((len(thresholds),))
             for ti in range(len(thresholds))[::-1]:
                 d = det[np.where(det[:, 0] >= thresholds[ti])]
                 tp_acc = np.sum(d[:, 1])
                 fp_acc = np.sum(d[:, 2])
-                prec[ti] = tp_acc / (tp_acc + fp_acc)
+                if (tp_acc + fp_acc) > 0:
+                    prec[ti] = tp_acc / (tp_acc + fp_acc)
                 prec[ti] = np.max(prec[ti:], axis=-1)
 
-            if len(prec[::4]) < int(samples / 4 + 1):
-                mAP[i, j] = np.sum(prec) / len(prec) * 100
-            else:
-                mAP[i, j] = np.sum(prec[::4]) / int(samples / 4 + 1) * 100
+            quarter_samples = int(samples / 4 + 1)
+            if len(prec[::4]) < quarter_samples:
+                if len(prec) > 0:
+                    mAP[i, j] = np.sum(prec) / len(prec) * 100
+            elif quarter_samples > 0:
+                mAP[i, j] = np.sum(prec[::4]) / quarter_samples * 100
 
     return mAP

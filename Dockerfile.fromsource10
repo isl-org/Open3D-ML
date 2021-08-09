@@ -1,0 +1,91 @@
+FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+SHELL ["/bin/bash", "-c"]
+RUN nvcc --version
+
+# Set the timezone info because otherwise tzinfo blocks install 
+# flow and ignores the non-interactive frontend command 🤬🤬🤬
+RUN ln -snf /usr/share/zoneinfo/America/New_York /etc/localtime && echo "/usr/share/zoneinfo/America/New_York" > /etc/timezone
+
+# Core system packages
+RUN apt-get update --fix-missing
+RUN apt install -y software-properties-common wget curl gpg gcc git make
+
+# Install new version of CMake
+RUN apt purge --auto-remove cmake
+RUN wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+RUN apt-add-repository 'deb https://apt.kitware.com/ubuntu/ bionic main'
+RUN lsb_release -a
+RUN apt update
+RUN apt install -y cmake
+
+# # Install miniconda to /miniconda
+# RUN curl -LO http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+# RUN bash Miniconda3-latest-Linux-x86_64.sh -p /miniconda -b
+# RUN rm Miniconda3-latest-Linux-x86_64.sh
+# ENV PATH=/miniconda/bin:${PATH}
+# RUN conda update -y conda
+
+# Additional dev packages
+RUN apt update
+RUN apt install -y libssl-dev \
+libmodule-install-perl \
+libboost-all-dev \
+libgl1-mesa-dev \
+libglu1-mesa-dev \
+libopenblas-dev \
+xorg-dev \
+libsdl2-dev \
+libc++-7-dev \
+libc++abi-7-dev \
+python3-dev \
+ninja-build \
+libxi-dev \
+libtbb-dev \
+libosmesa6-dev \
+libudev-dev \
+autoconf \
+libtool
+
+RUN apt install -y python3-pip
+RUN update-alternatives --install /usr/bin/pip pip /usr/bin/pip3 1
+RUN pip install --upgrade pip
+RUN pip install Cython \
+addict \
+pillow>=8.2.0 \
+matplotlib>=3 \
+numpy>1.15 \
+pandas>=1.0 \
+pyyaml>=5.4.1 \
+scikit-learn>=0.21 \
+tqdm
+
+# Install env packages
+# RUN conda install python=3.7 \
+# pip \
+# yapf=0.30 \
+# pytest \
+# pillow>=8.2.0 \
+# matplotlib>=3 \
+# numpy>1.15 \
+# pandas>=1.0 \
+# pyyaml>=5.4.1 \
+# scikit-learn>=0.21 
+# RUN pip install addict tqdm
+
+RUN git clone --recursive --branch master  https://github.com/isl-org/Open3D.git
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+RUN python --version
+RUN pip install https://github.com/isl-org/open3d_downloads/releases/download/torch1.7.1/torch-1.7.1-cp36-cp36m-linux_x86_64.whl
+RUN python -c "import torch; print(torch.__version__)"
+RUN pip install yapf==0.30.0
+RUN mkdir /Open3D-Install
+RUN mkdir /Open3D/build
+WORKDIR /Open3D/build
+RUN cmake -DCMAKE_INSTALL_PREFIX=/Open3D-Install \
+      -DGLIBCXX_USE_CXX11_ABI=OFF \
+      ..
+RUN make -j`nproc` install-pip-package
+RUN python -c "import open3d as o3d"
+
+ENV OPEN3D_ML_ROOT /Open3D-ML
+WORKDIR /Open3D-ML

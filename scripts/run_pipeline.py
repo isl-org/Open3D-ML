@@ -56,6 +56,8 @@ def parse_args():
 
 import open3d.ml as _ml3d
 
+from open3d.ml.utils import convert_framework_name
+
 
 def main():
     cmd_line = ' '.join(sys.argv[:])
