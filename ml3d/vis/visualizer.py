@@ -995,7 +995,7 @@ class Visualizer:
 
         properties.add_fixed(em)
         properties.add_child(self._shader_panels)
-        self._panel.add_child(properties)
+        list_grid.add_child(properties)
 
         # Populate tree, etc.
         for name in self._objects.data_names:
