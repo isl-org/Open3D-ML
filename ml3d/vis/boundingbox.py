@@ -1,5 +1,6 @@
 import numpy as np
 import open3d as o3d
+import cv2
 
 
 class BoundingBox3D:
@@ -80,9 +81,8 @@ class BoundingBox3D:
         return s
 
     @staticmethod
-    def create_lines(boxes, lut=None):
-        """Creates and returns an open3d.geometry.LineSet that can be used to
-        render the boxes.
+    def get_lines(boxes, lut=None):
+        """Returns points, indices and colors for creating boxes.
 
         Args:
             boxes: the list of bounding boxes
@@ -153,9 +153,103 @@ class BoundingBox3D:
             colors[idx:idx +
                    nlines] = c  # copies c to each element in the range
 
+        return points, indices, colors
+
+    @staticmethod
+    def create_lines(boxes, lut=None):
+        """Creates and returns an open3d.geometry.LineSet that can be used to
+        render the boxes.
+
+        Args:
+            boxes: the list of bounding boxes
+            lut: a ml3d.vis.LabelLUT that is used to look up the color based on
+                the label_class argument of the BoundingBox3D constructor. If
+                not provided, a color of 50% grey will be used. (optional)
+        """
+        points, indices, colors = BoundingBox3D.get_lines(boxes, lut)
         lines = o3d.geometry.LineSet()
         lines.points = o3d.utility.Vector3dVector(points)
         lines.lines = o3d.utility.Vector2iVector(indices)
         lines.colors = o3d.utility.Vector3dVector(colors)
 
         return lines
+
+    @staticmethod
+    def project_to_img(boxes, img, lidar2img_rt=np.ones(4), lut=None):
+        """Returns image with projected 3D bboxes
+
+        Args:
+            boxes: the list of bounding boxes
+            img: an RGB image
+            lidar2img_rt: 4x4 transformation from lidar frame to image plane
+            lut: a ml3d.vis.LabelLUT that is used to look up the color based on
+                the label_class argument of the BoundingBox3D constructor. If
+                not provided, a color of 50% grey will be used. (optional)
+        """
+        points, indices, colors = BoundingBox3D.get_lines(boxes, lut)
+
+        pts_4d = np.concatenate(
+            [points.reshape(-1, 3),
+             np.ones((len(boxes) * 14, 1))], axis=-1)
+        pts_2d = pts_4d @ lidar2img_rt.T
+
+        pts_2d[:, 2] = np.clip(pts_2d[:, 2], a_min=1e-5, a_max=1e5)
+        pts_2d[:, 0] /= pts_2d[:, 2]
+        pts_2d[:, 1] /= pts_2d[:, 2]
+        imgfov_pts_2d = pts_2d[..., :2].reshape(len(boxes), 14, 2)
+        indices_2d = indices[..., :2].reshape(len(boxes), 17, 2)
+        colors_2d = colors[..., :3].reshape(len(boxes), 17, 3)
+
+        return BoundingBox3D.plot_rect3d_on_img(img,
+                                                len(boxes),
+                                                imgfov_pts_2d,
+                                                indices_2d,
+                                                colors_2d,
+                                                thickness=2)
+
+    @staticmethod
+    def plot_rect3d_on_img(
+        img,
+        num_rects,
+        rect_corners,
+        line_indices,
+        color=None,  #TODO: this should be a list of colors, len of line_indices
+        thickness=1):
+        """Plot the boundary lines of 3D rectangular on 2D images.
+
+        Args:
+            img (numpy.array): The numpy array of image.
+            num_rects (int): Number of 3D rectangulars.
+            rect_corners (numpy.array): Coordinates of the corners of 3D
+                rectangulars. Should be in the shape of [num_rect, 8, 2] or [num_rect, 14, 2] if counting arrows.
+            color (tuple[int]): The color to draw bboxes. Default: (1.0, 1.0, 1.0), i.e. white.
+            thickness (int, optional): The thickness of bboxes. Default: 1.
+        """
+        if color is None:
+            color = np.ones((line_indices.shape[0], line_indices.shape[1], 3))
+        for i in range(num_rects):
+            corners = rect_corners[i].astype(np.int)
+            # ignore boxes outside a certain threshold
+            interesting_corners_scale = 3.0
+            if min(corners[:, 0]
+                  ) < -interesting_corners_scale * img.shape[1] or max(
+                      corners[:, 0]
+                  ) > interesting_corners_scale * img.shape[1] or min(
+                      corners[:, 1]
+                  ) < -interesting_corners_scale * img.shape[0] or max(
+                      corners[:, 1]) > interesting_corners_scale * img.shape[0]:
+                continue
+            for j, (start, end) in enumerate(line_indices[i]):
+                c = tuple(color[i][j] * 255)  # TODO: not working
+                c = (int(c[0]), int(c[1]), int(c[2]))
+                if i != 0:
+                    pt1 = (corners[(start) % (14 * i),
+                                   0], corners[(start) % (14 * i), 1])
+                    pt2 = (corners[(end) % (14 * i),
+                                   0], corners[(end) % (14 * i), 1])
+                else:
+                    pt1 = (corners[start, 0], corners[start, 1])
+                    pt2 = (corners[end, 0], corners[end, 1])
+                cv2.line(img, pt1, pt2, c, thickness, cv2.LINE_AA)
+
+        return img.astype(np.uint8)
