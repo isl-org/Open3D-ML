@@ -149,7 +149,7 @@ class NuScenes(BaseDataset):
         return objects
 
     # @staticmethod
-    def read_imgs(self, cam_dict):
+    def read_cams(self, cam_dict):
         """Reads img data from the cam dict provided.
 
         Returns:
@@ -159,8 +159,27 @@ class NuScenes(BaseDataset):
 
         res_dict = dict()
         for cam in self.cam_names:
-            res_dict[cam] = np.array(
+            res_dict[cam] = dict()
+            res_dict[cam]['img'] = np.array(
                 o3d.io.read_image(cam_dict[cam]['data_path']))
+
+            # obtain lidar to cam transformation matrix
+            lidar2cam_r = np.linalg.inv(cam_dict[cam]['sensor2lidar_rotation'])
+            lidar2cam_t = cam_dict[cam][
+                'sensor2lidar_translation'] @ lidar2cam_r.T
+            lidar2cam_rt = np.eye(4)
+            lidar2cam_rt[:3, :3] = lidar2cam_r.T
+            lidar2cam_rt[3, :3] = -lidar2cam_t
+            intrinsic = cam_dict[cam]['cam_intrinsic']
+            viewpad = np.eye(4)
+            viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
+            # obtain lidar to image transformation matrix
+            lidar2img_rt = (viewpad @ lidar2cam_rt.T)
+
+            res_dict[cam]['lidar2cam_rt'] = lidar2cam_rt
+            res_dict[cam]['lidar2img_rt'] = lidar2img_rt
+            res_dict[cam]['cam_intrinsic'] = cam_dict[cam]['cam_intrinsic']
+
         return res_dict
 
     def get_split(self, split):
@@ -249,14 +268,14 @@ class NuSceneSplit():
 
         pc = self.dataset.read_lidar(lidar_path)
         label = self.dataset.read_label(info, calib)
-        cam_dict = self.dataset.read_imgs(info['cams'])
+        cam_dict = self.dataset.read_cams(info['cams'])
 
         data = {
             'point': pc,
             'feat': None,
             'calib': calib,
             'bounding_boxes': label,
-            'cam': cam_dict
+            'cams': cam_dict,
         }
 
         return data
