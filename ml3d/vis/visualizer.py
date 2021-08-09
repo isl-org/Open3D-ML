@@ -94,14 +94,6 @@ class Model:
             tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
         self.tclouds[name] = tcloud
 
-        tcam = dict()
-        if 'cam' in data:
-            for k, v in data['cam'].items():
-                img = self._convert_to_numpy(v)
-                tcam[k] = o3d.t.geometry.Image(
-                    Visualizer._make_tcloud_array(img))
-        self.tcams[name] = tcam
-
         # Add scalar attributes and vector3 attributes
         attrs = {}
         for k, v in data.items():
@@ -122,6 +114,20 @@ class Model:
 
         self._data[name] = attrs
         self._known_attrs[name] = known_attrs
+
+    def create_cams(self, name, cam_dict, key='img', update=False):
+        """Create images based on the data provided.
+
+        The data should include name and cams.
+        """
+        tcam = dict()
+        for k, v in cam_dict.items():
+            img = self._convert_to_numpy(v[key])
+            tcam[k] = o3d.t.geometry.Image(Visualizer._make_tcloud_array(img))
+        self.tcams[name] = tcam
+
+        if update:
+            self._data[name]['cams'] = cam_dict
 
     def _convert_to_numpy(self, ary):
         if isinstance(ary, list):
@@ -332,7 +338,15 @@ class DatasetModel(Model):
             self.bounding_box_data.append(
                 Model.BoundingBoxData(name, data['bounding_boxes']))
 
+            for _, val in data['cams'].items():
+                lidar2img_rt = val['lidar2img_rt']
+                bbox_data = data['bounding_boxes']
+                bbox_3d_img = BoundingBox3D.project_to_img(
+                    bbox_data, np.copy(val['img']), lidar2img_rt)
+                val['bbox_3d'] = bbox_3d_img
+
         self.create_point_cloud(data)
+        self.create_cams(data['name'], data['cams'], update=True)
         size = self._calc_pointcloud_size(self._data[name], self.tclouds[name],
                                           self.tcams[name])
         if size + self._current_memory_usage > self._memory_limit:
