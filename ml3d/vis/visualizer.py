@@ -374,7 +374,7 @@ class DatasetModel(Model):
         pcloud_size = 0
         for (attr, arr) in raw_data.items():
             if not isinstance(arr, dict):
-            pcloud_size += arr.size * 4
+                pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
         pcloud_size += pcloud.point["points"].num_elements() * 64
         # TODO: add memory for point cloud color and semantics
@@ -855,6 +855,15 @@ class Visualizer:
         v.add_fixed(0.25 * em)
         grid = gui.VGrid(2)
         v.add_child(grid)
+
+        # ... select image mode
+        self._img_mode = gui.Combobox()
+        for item in ["raw", "bbox_3d"]:
+            self._img_mode.add_item(item)
+        self._img_mode.selected_index = 0
+        self._img_mode.set_on_selection_changed(self._on_img_mode_changed)
+        grid.add_child(gui.Label("Image Mode"))
+        grid.add_child(self._img_mode)
 
         self._slider = gui.Slider(gui.Slider.INT)
         self._slider.set_limits(0, len(self._objects.data_names))
@@ -1462,6 +1471,21 @@ class Visualizer:
     def _on_prev(self):
         self._slider.int_value -= 1
         self._on_animation_slider_changed(self._slider.int_value)
+
+    def _on_img_mode_changed(self, name, idx):
+        if self._img_mode.selected_index == idx:
+            pass
+        if idx == 0:  # or name == 'raw'
+            for n in self._objects.data_names:
+                self._objects.create_cams(n,
+                                          self._objects._data[n]['cams'],
+                                          update=False)
+        elif idx == 1:  # or name == 'bbox_3d'
+            for n in self._objects.data_names:
+                self._objects.create_cams(n,
+                                          self._objects._data[n]['cams'],
+                                          key='bbox_3d',
+                                          update=False)
 
     def _on_bgcolor_changed(self, new_color):
         bg_color = [
