@@ -523,7 +523,7 @@ class ConcatBatcher(object):
         elif self.model == "SparseConvUnet":
             return {'data': SparseConvUnetBatch(batches), 'attr': {}}
 
-        elif self.model == "PointPillars" or self.model == "PointRCNN":
+        elif "PointPillars" in self.model  or self.model == "PointRCNN":
             batching_result = ObjectDetectBatch(batches)
             return batching_result
 
