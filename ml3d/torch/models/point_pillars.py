@@ -381,7 +381,9 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
-        ans = voxelize(points, self.voxel_size, self.points_range_min,
+        ans = voxelize(points,
+                       torch.LongTensor([0, points.shape[0]]).to(points.device),
+                       self.voxel_size, self.points_range_min,
                        self.points_range_max, self.max_num_points, max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.

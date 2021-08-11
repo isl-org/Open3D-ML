@@ -450,8 +450,11 @@ class PointPillarsVoxelization(tf.keras.layers.Layer):
 
         points = points_feats[:, :3]
 
-        ans = voxelize(points, self.voxel_size, self.points_range_min,
-                       self.points_range_max, self.max_num_points, max_voxels)
+        ans = voxelize(
+            points,
+            tf.convert_to_tensor([0, tf.shape(points)[0]], dtype=tf.int64),
+            self.voxel_size, self.points_range_min, self.points_range_max,
+            self.max_num_points, max_voxels)
 
         # prepend row with zeros which maps to index 0 which maps to void points.
         feats = tf.concat([tf.zeros_like(points_feats[0:1, :]), points_feats],
