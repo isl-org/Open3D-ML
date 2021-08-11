@@ -381,6 +381,8 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
+        num_voxels = ((self.points_range_max - self.points_range_min) /
+                      self.voxel_size).type(torch.int32)
         ans = voxelize(points,
                        torch.LongTensor([0, points.shape[0]]).to(points.device),
                        self.voxel_size, self.points_range_min,
@@ -399,6 +401,15 @@ class PointPillarsVoxelization(torch.nn.Module):
         out_coords = ans.voxel_coords[:, [2, 1, 0]].contiguous()
         out_num_points = ans.voxel_point_row_splits[
             1:] - ans.voxel_point_row_splits[:-1]
+
+        # Filter out pillars generated out of bounds of the pseudoimage.
+        in_bounds_y = out_coords[:, 1] < num_voxels[1]
+        in_bounds_x = out_coords[:, 2] < num_voxels[0]
+        in_bounds = torch.logical_and(in_bounds_x, in_bounds_y)
+
+        out_coords = out_coords[in_bounds]
+        out_voxels = out_voxels[in_bounds]
+        out_num_points = out_num_points[in_bounds]
 
         return out_voxels, out_coords, out_num_points
 
