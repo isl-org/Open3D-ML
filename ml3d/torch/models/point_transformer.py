@@ -191,9 +191,9 @@ class PointTransformer(BaseModel):
 
         Args:
             inputs: A dict object for inputs with following keys
-                point (torch.float32): Input pointcloud (N,3)
-                feat (torch.float32): Input features (N, 3)
-                row_splits (torch.int64): row splits for batches (b+1,)
+                point (tf.float32): Input pointcloud (N,3)
+                feat (tf.float32): Input features (N, 3)
+                row_splits (tf.int64): row splits for batches (b+1,)
 
         Returns:
             Returns the probability distribution.
@@ -373,7 +373,8 @@ class PointTransformer(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.SGD(self.parameters(), **cfg_pipeline.optimizer)
+        optimizer = torch.optim.SGD(self.parameters(),
+                                    **cfg_pipeline.optimizer)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer,
             milestones=[
