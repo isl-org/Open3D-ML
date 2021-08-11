@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.layers as layers
-import open3d.core as o3c
 
 from sklearn.neighbors import KDTree
 from open3d.ml.tf.ops import knn_search
@@ -16,7 +15,8 @@ tf.no_gradient("Open3DKnnSearch")
 
 
 class PointTransformer(BaseModel):
-    """Semantic Segmentation model.
+    """Semantic Segmentation model. Based on PointTransformer architecture
+    https://arxiv.org/pdf/2012.09164.pdf
 
     Uses Encoder-Decoder architecture with Transformer layers.
 
@@ -126,6 +126,19 @@ class PointTransformer(BaseModel):
                   share_planes=8,
                   stride=1,
                   nsample=16):
+        """Private method to create encoder.
+
+        Args:
+            block: Bottleneck block consisting transformer layers.
+            planes: list of feature dimension.
+            blocks: Number of `block` layers.
+            share_planes: Number of common planes for transformer.
+            stride: stride for pooling.
+            nsample: number of neighbour to sample.
+
+        Returns:
+            Returns encoder object.
+        """
         encoder_inputs = [
             layers.Input(shape=(3)),
             layers.Input(shape=(self.in_planes)),
@@ -153,7 +166,19 @@ class PointTransformer(BaseModel):
                   share_planes=8,
                   nsample=16,
                   is_head=False):
+        """Private method to create decoder.
 
+        Args:
+            block: Bottleneck block consisting transformer layers.
+            planes: list of feature dimension.
+            blocks: Number of `block` layers.
+            share_planes: Number of common planes for transformer.
+            nsample: number of neighbour to sample.
+            is_head: bool type for head layer.
+
+        Returns:
+            Returns decoder object.
+        """
         decoder = []
         decoder.append(
             TransitionUp(self.in_planes,
@@ -184,6 +209,17 @@ class PointTransformer(BaseModel):
         return decoder
 
     def call(self, inputs, training=False):
+        """Forward pass for the model.
+
+        Args:
+            inputs: A dict object for inputs with following keys
+                point (tf.float32): Input pointcloud (N,3)
+                feat (tf.float32): Input features (N, 3)
+                row_splits (tf.int64): row splits for batches (b+1,)
+
+        Returns:
+            Returns the probability distribution.
+        """
         point_0, feat_0, row_splits_0 = inputs['point'], inputs['feat'], inputs[
             'row_splits']  # (n, 3), (n, c), (b)
 
@@ -382,7 +418,7 @@ class PointTransformer(BaseModel):
     def get_loss(self, Loss, results, inputs):
         """Calculate the loss on output of the model.
 
-        Attributes:
+        Args:
             Loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
@@ -398,7 +434,8 @@ class PointTransformer(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = tf.keras.optimizers.Adam(learning_rate=cfg_pipeline.adam_lr)
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=cfg_pipeline.optimizer.lr)
 
         return optimizer
 
@@ -624,7 +661,7 @@ def queryandgroup(nsample,
                   use_xyz=True):
     """Find nearest neighbours and returns grouped features.
 
-    Attributes:
+    Args:
         nsample: Number of neighbours (k).
         points: Input pointcloud (n, 3).
         queries: Queries for Knn (m, 3).
@@ -664,47 +701,6 @@ def queryandgroup(nsample,
         return grouped_feat
 
 
-def knn_batch(points, queries, k, points_row_splits, queries_row_splits):
-    """K nearest neighbour with batch support.
-
-    Attributes:
-        points: Input pointcloud.
-        queries: Queries for Knn.
-        k: Number of neighbours.
-        points_row_splits: row_splits for batching points.
-        queries_row_splits: row_splits for batching queries.
-        return_distances: Whether to return distance with neighbours.
-
-    """
-    assert points_row_splits.shape[0] == queries_row_splits.shape[
-        0], "KNN(points and queries must have same batch size)"
-
-    # o3d.core knn
-    points = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(points))
-    queries = o3c.Tensor.from_dlpack(tf.experimental.dlpack.to_dlpack(queries))
-    idxs = []
-    dists = []
-
-    for i in range(0, points_row_splits.shape[0] - 1):
-        curr_points = points[points_row_splits[i]:points_row_splits[i + 1]]
-        nns = o3c.nns.NearestNeighborSearch(curr_points)
-        nns.knn_index()
-        idx, dist = nns.knn_search(
-            queries[queries_row_splits[i]:queries_row_splits[i + 1]], k)
-        if idx.shape[1] < k:
-            oversample = np.random.choice(np.arange(idx.shape[1]), k)
-            idx = idx[:, oversample]
-            dist = dist[:, oversample]
-        idx += points_row_splits[i]
-        idxs.append(tf.convert_to_tensor(idx.numpy()))
-        dists.append(tf.convert_to_tensor(dist.numpy()))
-
-    if return_distances:
-        return tf.concat(idxs, 0), tf.concat(dists, 0)
-    else:
-        return tf.concat(idxs, 0)
-
-
 def interpolation(points,
                   queries,
                   feat,
@@ -713,7 +709,7 @@ def interpolation(points,
                   k=3):
     """Interpolation of features with nearest neighbours.
 
-    Attributes:
+    Args:
         points: Input pointcloud (m, 3).
         queries: Queries for Knn (n, 3).
         feat: features (m, c).

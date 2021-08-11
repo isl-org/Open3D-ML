@@ -36,9 +36,10 @@ model:
       std: 0.01
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.02
-  momentum: 0.9
-  weight_decay: 0.0001
+  optimizer:
+    lr: 0.02
+    momentum: 0.9
+    weight_decay: 0.0001
   batch_size: 4
   learning_rate: 0.01
   main_log_dir: ./logs

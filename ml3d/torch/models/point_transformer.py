@@ -16,7 +16,8 @@ from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
 
 class PointTransformer(BaseModel):
-    """Semantic Segmentation model.
+    """Semantic Segmentation model. Based on PointTransformer architecture
+    https://arxiv.org/pdf/2012.09164.pdf
 
     Uses Encoder-Decoder architecture with Transformer layers.
 
@@ -126,6 +127,19 @@ class PointTransformer(BaseModel):
                   share_planes=8,
                   stride=1,
                   nsample=16):
+        """Private method to create encoder.
+
+        Args:
+            block: Bottleneck block consisting transformer layers.
+            planes: list of feature dimension.
+            blocks: Number of `block` layers.
+            share_planes: Number of common planes for transformer.
+            stride: stride for pooling.
+            nsample: number of neighbour to sample.
+
+        Returns:
+            Returns encoder object.
+        """
         layers = []
         layers.append(
             TransitionDown(self.in_planes, planes * block.expansion, stride,
@@ -146,6 +160,19 @@ class PointTransformer(BaseModel):
                   share_planes=8,
                   nsample=16,
                   is_head=False):
+        """Private method to create decoder.
+
+        Args:
+            block: Bottleneck block consisting transformer layers.
+            planes: list of feature dimension.
+            blocks: Number of `block` layers.
+            share_planes: Number of common planes for transformer.
+            nsample: number of neighbour to sample.
+            is_head: bool type for head layer.
+
+        Returns:
+            Returns decoder object.
+        """
         layers = []
         layers.append(
             TransitionUp(self.in_planes,
@@ -160,6 +187,17 @@ class PointTransformer(BaseModel):
         return nn.Sequential(*layers)
 
     def forward(self, batch):
+        """Forward pass for the model.
+
+        Args:
+            inputs: A dict object for inputs with following keys
+                point (torch.float32): Input pointcloud (N,3)
+                feat (torch.float32): Input features (N, 3)
+                row_splits (torch.int64): row splits for batches (b+1,)
+
+        Returns:
+            Returns the probability distribution.
+        """
         point_0, feat_0, row_splits_0 = batch.point, batch.feat, batch.row_splits  # (n, 3), (n, c), (b)
 
         feat_0 = point_0 if self.in_channels == 3 else torch.cat(
@@ -315,7 +353,7 @@ class PointTransformer(BaseModel):
     def get_loss(self, Loss, results, inputs, device):
         """Calculate the loss on output of the model.
 
-        Attributes:
+        Args:
             Loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
@@ -335,10 +373,7 @@ class PointTransformer(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.SGD(self.parameters(),
-                                    lr=cfg_pipeline.adam_lr,
-                                    momentum=cfg_pipeline.momentum,
-                                    weight_decay=cfg_pipeline.weight_decay)
+        optimizer = torch.optim.SGD(self.parameters(), **cfg_pipeline.optimizer)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer,
             milestones=[
@@ -547,7 +582,7 @@ def queryandgroup(nsample,
                   use_xyz=True):
     """Find nearest neighbours and returns grouped features.
 
-    Attributes:
+    Args:
         nsample: Number of neighbours (k).
         points: Input pointcloud (n, 3).
         queries: Queries for Knn (m, 3).
@@ -595,7 +630,7 @@ def knn_batch(points,
               return_distances=True):
     """K nearest neighbour with batch support.
 
-    Attributes:
+    Args:
         points: Input pointcloud.
         queries: Queries for Knn.
         k: Number of neighbours.
@@ -632,7 +667,7 @@ def interpolation(points,
                   k=3):
     """Interpolation of features with nearest neighbours.
 
-    Attributes:
+    Args:
         points: Input pointcloud (m, 3).
         queries: Queries for Knn (n, 3).
         feat: features (m, c).
