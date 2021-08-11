@@ -168,9 +168,8 @@ class RandLANet(BaseModel):
             num_points=self.cfg.num_points)
 
         label = label[selected_idxs]
-        if (feat is None):
-            feat = None
-        else:
+
+        if feat is not None:
             feat = feat[selected_idxs]
 
         t_normalize = cfg.get('t_normalize', {})

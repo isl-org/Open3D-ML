@@ -40,9 +40,10 @@ model:
       std: 0.05
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.001
+  optimizer:
+    lr: 0.001
+    betas: [0.9, 0.999]
   batch_size: 8
-  learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 512
   save_ckpt_freq: 5

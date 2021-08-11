@@ -3,6 +3,7 @@ import shutil
 import sys
 import tempfile
 import yaml
+from pathlib import Path
 from importlib import import_module
 from addict import Dict
 
@@ -73,6 +74,33 @@ class Config(object):
         print(self_as_dict)
         return yaml.dump(self_as_dict, *args, **kwargs)
         #return self_as_dict
+
+    def convert_to_tf_names(self, name):
+        """Convert keys compatible with tensorflow."""
+        cfg = self._cfg_dict
+        with open(
+                os.path.join(
+                    Path(__file__).parent, '../configs/torch_to_tf.yml')) as f:
+            mapping = yaml.safe_load(f)[name]
+
+        def convert_dict(cfg, mapping):
+            cfg_new = {}
+            for key in cfg:
+                if isinstance(cfg[key], dict):
+                    cfg_new[key] = convert_dict(cfg[key], mapping)
+                elif key in mapping:
+                    item = cfg[key]
+                    if isinstance(mapping[key], list):
+                        for k, v in zip(mapping[key], item):
+                            cfg_new[k] = v
+                    else:
+                        cfg_new[mapping[key]] = item
+                else:
+                    cfg_new[key] = cfg[key]
+            return cfg_new
+
+        cfg = convert_dict(cfg, mapping)
+        super(Config, self).__setattr__('_cfg_dict', ConfigDict(cfg))
 
     @staticmethod
     def merge_cfg_file(cfg, args, extra_dict):
