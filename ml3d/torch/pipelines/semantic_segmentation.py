@@ -14,6 +14,7 @@ from sklearn.metrics import confusion_matrix
 from os.path import exists, join, isfile, dirname, abspath
 
 from .base_pipeline import BasePipeline
+from .dataparallel import CustomDataParallel
 from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss
@@ -102,7 +103,8 @@ class SemanticSegmentation(BasePipeline):
             scheduler_gamma=0.95,
             momentum=0.98,
             main_log_dir='./logs/',
-            device='gpu',
+            device='cuda',
+            device_ids=[0],
             split='train',
             train_sum_dir='train_log',
             **kwargs):
@@ -122,6 +124,7 @@ class SemanticSegmentation(BasePipeline):
                          momentum=momentum,
                          main_log_dir=main_log_dir,
                          device=device,
+                         device_ids=device_ids,
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
@@ -308,7 +311,6 @@ class SemanticSegmentation(BasePipeline):
         dataset = self.dataset
 
         cfg = self.cfg
-        model.to(device)
 
         log.info("DEVICE : {}".format(device))
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -379,6 +381,10 @@ class SemanticSegmentation(BasePipeline):
 
         writer = SummaryWriter(self.tensorboard_dir)
         self.save_config(writer)
+
+        model = CustomDataParallel(model, device_ids=self.device_ids)
+        # model.to(device)
+
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")

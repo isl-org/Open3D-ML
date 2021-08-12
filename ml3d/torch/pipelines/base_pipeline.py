@@ -12,7 +12,12 @@ from ...utils import Config, make_dir
 class BasePipeline(ABC):
     """Base pipeline class."""
 
-    def __init__(self, model, dataset=None, device='gpu', **kwargs):
+    def __init__(self,
+                 model,
+                 dataset=None,
+                 device='cuda',
+                 device_ids=[0],
+                 **kwargs):
         """Initialize.
 
         Args:
@@ -42,9 +47,10 @@ class BasePipeline(ABC):
 
         if device == 'cpu' or not torch.cuda.is_available():
             self.device = torch.device('cpu')
+            self.device_ids = [-1]
         else:
-            self.device = torch.device('cuda' if len(device.split(':')) ==
-                                       1 else 'cuda:' + device.split(':')[1])
+            self.device = torch.device('cuda')
+            self.device_ids = device_ids
 
     @abstractmethod
     def run_inference(self, data):

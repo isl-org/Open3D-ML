@@ -28,8 +28,12 @@ def parse_args():
     parser.add_argument('--dataset_path', help='path to the dataset')
     parser.add_argument('--ckpt_path', help='path to the checkpoint')
     parser.add_argument('--device',
-                        help='device to run the pipeline',
-                        default='gpu')
+                        help='devices to run the pipeline',
+                        default='cuda')
+    parser.add_argument('--device_ids',
+                        nargs='+',
+                        help='cuda device list',
+                        default=['0'])
     parser.add_argument('--split', help='train or test', default='train')
     parser.add_argument('--mode', help='additional mode', default=None)
     parser.add_argument('--max_epochs', help='number of epochs', default=None)
@@ -62,7 +66,8 @@ def main():
     args, extra_dict = parse_args()
 
     framework = _ml3d.utils.convert_framework_name(args.framework)
-    args.device = _ml3d.utils.convert_device_name(args.device)
+    args.device, args.device_ids = _ml3d.utils.convert_device_name(
+        args.device, args.device_ids)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
     else:
@@ -107,6 +112,8 @@ def main():
             cfg_dict_pipeline["max_epochs"] = args.max_epochs
         if args.batch_size is not None:
             cfg_dict_pipeline["batch_size"] = args.batch_size
+        cfg_dict_pipeline["device"] = args.device
+        cfg_dict_pipeline["device_ids"] = args.device_ids
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
     else:
         if (args.pipeline and args.model and args.dataset) is None:

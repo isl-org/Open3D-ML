@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import torch
 import yaml
+import math
 from os import listdir
 from os.path import exists, join, isdir
 
@@ -433,6 +434,26 @@ class SparseConvUnetBatch:
         self.point = [pc.to(device) for pc in self.point]
         self.feat = [feat.to(device) for feat in self.feat]
         self.label = [label.to(device) for label in self.label]
+
+    @staticmethod
+    def scatter(batch, num_gpu):
+        batch_size = len(batch.batch_lengths)
+        assert num_gpu <= batch_size, "batch size must be greater than number of cuda devices"
+
+        new_batch_size = math.ceil(batch_size / num_gpu)
+        batches = [SparseConvUnetBatch([]) for _ in range(num_gpu)]
+        splits = [0]
+        for length in batch.batch_lengths:
+            splits.append(splits[-1] + length)
+        for i in range(num_gpu):
+            start = splits[new_batch_size * i]
+            end = splits[min(new_batch_size * (i + 1), len(splits) - 1)]
+            batches[i].point = batch.point[start:end]
+            batches[i].feat = batch.feat[start:end]
+            batches[i].label = batch.label[start:end]
+            batches[i].batch_lengths = batch.batch_lengths[start:end]
+
+        return batches
 
 
 class ObjectDetectBatch:
