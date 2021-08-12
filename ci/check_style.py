@@ -101,9 +101,11 @@ class PythonFormatter:
                     partial(self._check_style, style_config=self.style_config),
                     self.file_paths)
 
-        changed_files = [file_path for is_valid, file_path
-                         in zip(is_valid_files, self.file_paths)
-                         if not is_valid]
+        changed_files = [
+            file_path
+            for is_valid, file_path in zip(is_valid_files, self.file_paths)
+            if not is_valid
+        ]
         if do_apply_style:
             for file_path in changed_files:
                 self._apply_style(file_path, self.style_config)
@@ -155,7 +157,8 @@ class JupyterFormatter:
         return not changed
 
     def run(self, do_apply_style, no_parallel, verbose):
-        print(f"{'Applying' if do_apply_style else 'Checking'} Jupyter style...")
+        print(
+            f"{'Applying' if do_apply_style else 'Checking'} Jupyter style...")
 
         if verbose:
             print("To format:")
@@ -174,9 +177,11 @@ class JupyterFormatter:
                             style_config=self.style_config,
                             do_apply_style=False), self.file_paths)
 
-        changed_files = [file_path for is_valid, file_path
-                         in zip(is_valid_files, self.file_paths)
-                         if not is_valid]
+        changed_files = [
+            file_path
+            for is_valid, file_path in zip(is_valid_files, self.file_paths)
+            if not is_valid
+        ]
         if do_apply_style:
             for file_path in changed_files:
                 self._check_or_apply_style(file_path,
