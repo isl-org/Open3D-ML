@@ -177,6 +177,7 @@ class SemanticKITTI(BaseDataset):
             attr: The attributes that correspond to the outputs passed in results.
         """
         cfg = self.cfg
+        pred = results['predict_labels']
         name = attr['name']
         name_seq, name_points = name.split("_")
 
