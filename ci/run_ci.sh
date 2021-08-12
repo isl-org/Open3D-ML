@@ -5,7 +5,7 @@
 #
 TENSORFLOW_VER="2.4.1"
 TORCH_GLNX_VER="1.7.1+cpu"
-YAPF_VER="0.30.0"
+YAPF_VER="0.31.0"
 
 set -euo pipefail
 

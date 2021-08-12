@@ -1,41 +1,38 @@
-import subprocess
-import re
-import os
-import shutil
 import argparse
-from pathlib import Path
 import multiprocessing
-from functools import partial
-import time
+import os
 import sys
+import time
+from functools import partial
+from pathlib import Path
 
-# Yapf requires python 3.6+
-if not (sys.version_info.major == 3 and sys.version_info.minor >= 6):
+# Yapf requires Python 3.6.4+
+if sys.version_info < (3, 6, 4):
     raise RuntimeError(
-        "Requires Python 3.6+, currently using Python {}.{}.".format(
-            sys.version_info.major, sys.version_info.minor))
+        "Requires Python 3.6.4+, currently using Python {}.{}.{}.".format(
+            *sys.version_info))
 
 # Check and import yapf
 # > not found: throw exception
 # > version mismatch: throw exception
 try:
     import yapf
-except:
+except ImportError:
     raise ImportError(
-        "yapf not found. Install with `pip install yapf==0.30.0`.")
-if yapf.__version__ != "0.30.0":
+        "yapf not found. Install with `pip install yapf==0.31.0`.")
+if yapf.__version__ != "0.31.0":
     raise RuntimeError(
-        "yapf 0.30.0 required. Install with `pip install yapf==0.30.0`.")
-print("Using yapf version {}".format(yapf.__version__))
+        "yapf 0.31.0 required. Install with `pip install yapf==0.31.0`.")
+print(f"Using yapf version {yapf.__version__}")
 
 # Check and import nbformat
 # > not found: throw exception
 try:
     import nbformat
-except:
+except ImportError:
     raise ImportError(
         "nbformat not found. Install with `pip install nbformat`.")
-print("Using nbformat version {}".format(nbformat.__version__))
+print(f"Using nbformat version {nbformat.__version__}")
 
 PYTHON_FORMAT_DIRS = ["."]
 
@@ -64,9 +61,7 @@ def _glob_files(directories, extensions):
         for extension in extensions:
             extension_regex = "*." + extension
             file_paths.extend(directory.rglob(extension_regex))
-    file_paths = [str(file_path) for file_path in file_paths]
-    file_paths = sorted(list(set(file_paths)))
-    return file_paths
+    return sorted(set(str(file_path) for file_path in file_paths))
 
 
 class PythonFormatter:
@@ -89,15 +84,11 @@ class PythonFormatter:
                                                    in_place=True)
 
     def run(self, do_apply_style, no_parallel, verbose):
-        if do_apply_style:
-            print("Applying Python style...")
-        else:
-            print("Checking Python style...")
+        print(f"{'Applying' if do_apply_style else 'Checking'} Python style...")
 
         if verbose:
             print("To format:")
-            for file_path in self.file_paths:
-                print("> {}".format(file_path))
+            print("\n".join(f"> {file_path}" for file_path in self.file_paths))
 
         start_time = time.time()
         if no_parallel:
@@ -110,13 +101,13 @@ class PythonFormatter:
                     partial(self._check_style, style_config=self.style_config),
                     self.file_paths)
 
-        changed_files = []
-        for is_valid, file_path in zip(is_valid_files, self.file_paths):
-            if not is_valid:
-                changed_files.append(file_path)
-                if do_apply_style:
-                    self._apply_style(file_path, self.style_config)
-        print("Formatting takes {:.2f}s".format(time.time() - start_time))
+        changed_files = [file_path for is_valid, file_path
+                         in zip(is_valid_files, self.file_paths)
+                         if not is_valid]
+        if do_apply_style:
+            for file_path in changed_files:
+                self._apply_style(file_path, self.style_config)
+        print(f"Formatting takes {time.time() - start_time:.2f}s")
 
         return changed_files
 
@@ -135,7 +126,7 @@ class JupyterFormatter:
         are merged into one.
         """
         # Ref: https://gist.github.com/oskopek/496c0d96c79fb6a13692657b39d7c709
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             notebook = nbformat.read(f, as_version=nbformat.NO_CONVERT)
         nbformat.validate(notebook)
 
@@ -164,15 +155,11 @@ class JupyterFormatter:
         return not changed
 
     def run(self, do_apply_style, no_parallel, verbose):
-        if do_apply_style:
-            print("Applying Jupyter style...")
-        else:
-            print("Checking Jupyter style...")
+        print(f"{'Applying' if do_apply_style else 'Checking'} Jupyter style...")
 
         if verbose:
             print("To format:")
-            for file_path in self.file_paths:
-                print("> {}".format(file_path))
+            print("\n".join(f"> {file_path}" for file_path in self.file_paths))
 
         start_time = time.time()
         if no_parallel:
@@ -187,15 +174,15 @@ class JupyterFormatter:
                             style_config=self.style_config,
                             do_apply_style=False), self.file_paths)
 
-        changed_files = []
-        for is_valid, file_path in zip(is_valid_files, self.file_paths):
-            if not is_valid:
-                changed_files.append(file_path)
-                if do_apply_style:
-                    self._check_or_apply_style(file_path,
-                                               style_config=self.style_config,
-                                               do_apply_style=True)
-        print("Formatting takes {:.2f}s".format(time.time() - start_time))
+        changed_files = [file_path for is_valid, file_path
+                         in zip(is_valid_files, self.file_paths)
+                         if not is_valid]
+        if do_apply_style:
+            for file_path in changed_files:
+                self._check_or_apply_style(file_path,
+                                           style_config=self.style_config,
+                                           do_apply_style=True)
+        print(f"Formatting takes {time.time() - start_time:.2f}s")
 
         return changed_files
 
@@ -246,7 +233,7 @@ if __name__ == "__main__":
                               no_parallel=args.no_parallel,
                               verbose=args.verbose))
 
-    if len(changed_files) != 0:
+    if changed_files:
         if args.do_apply_style:
             print("Style applied to the following files:")
             print("\n".join(changed_files))
