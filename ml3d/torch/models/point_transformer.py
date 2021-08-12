@@ -373,8 +373,7 @@ class PointTransformer(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.SGD(self.parameters(),
-                                    **cfg_pipeline.optimizer)
+        optimizer = torch.optim.SGD(self.parameters(), **cfg_pipeline.optimizer)
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
             optimizer,
             milestones=[
