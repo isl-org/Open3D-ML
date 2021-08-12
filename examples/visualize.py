@@ -132,26 +132,25 @@ from open3d.ml.torch.models import RandLANet, KPFCNN
 def main():
     args = parse_args()
 
-    which = args.dataset_name
+    which = args.dataset_name.lower()
     path = args.dataset_path
 
-    if which == "kitti":
-        dataset = KITTI(path)
-    elif which == "semantickitti":
-        dataset = SemanticKITTI(path)
-    elif which == "paris":
-        dataset = ParisLille3D(path)
-    elif which == "toronto":
-        dataset = Toronto3D(path)
-    elif which == "semantic3d":
-        dataset = Semantic3D(path)
-    elif which == "s3dis":
-        dataset = S3DIS(path)
-    elif which == "custom":
-        dataset = None
-    else:
+    
+    funcs = {
+        "kitti": KITTI
+        "semantickitti": SemanticKITTI,
+        "paris": ParisLille3D,
+        "toronto": Toronto3D,
+        "semantic3d": Semantic3D,
+        "s3dis": S3DIS,
+        "custom": None,
+    }
+    try:
+        func = funcs[which]
+    except KeyError:
         print("[ERROR] '" + which + "' is not a valid dataset")
         print_usage_and_exit()
+    dataset = func(path) if func else func
 
     v = Visualizer()
     if dataset is None:  # custom
