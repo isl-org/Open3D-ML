@@ -1331,7 +1331,7 @@ class SimpleBlock(nn.Module):
                              deformable='deform' in block_name,
                              modulated=config.modulated)
 
-        # Other opperations
+        # Other operations
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
         self.leaky_relu = nn.LeakyReLU(config.get('l_relu', 0.1))
@@ -1798,7 +1798,7 @@ def kernel_point_optimization_debug(radius,
     kernel_points = kernel_points[:num_kernels * num_points, :].reshape(
         (num_kernels, num_points, -1))
 
-    # Optionnal fixing
+    # Optional fixing
     if fixed == 'center':
         kernel_points[:, 0, :] *= 0
     if fixed == 'verticals':
@@ -2164,7 +2164,7 @@ def p2p_fitting_regularizer(net):
             # Fitting loss
             ##############
 
-            # Get the distance to closest input point and normalize to be independant from layers
+            # Get the distance to closest input point and normalize to be independent from layers
             KP_min_d2 = m.min_d2 / (m.KP_extent**2)
 
             # Loss will be the square distance to closest input point. We use L1 because dist is already squared

@@ -82,7 +82,7 @@ def ball_query_gpu(radius, nsample, xyz, new_xyz):
     :param xyz: (B, N, 3) xyz coordinates of the features
     :param new_xyz: (B, npoint, 3) centers of the ball query
     :return:
-        idx: (B, npoint, nsample) tensor with the indicies of the features that form the query balls
+        idx: (B, npoint, nsample) tensor with the indices of the features that form the query balls
     """
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError

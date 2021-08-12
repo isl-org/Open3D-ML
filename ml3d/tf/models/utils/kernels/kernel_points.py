@@ -320,7 +320,7 @@ def kernel_point_optimization_debug(radius,
     kernel_points = kernel_points[:num_kernels * num_points, :].reshape(
         (num_kernels, num_points, -1))
 
-    # Optionnal fixing
+    # Optional fixing
     if fixed == 'center':
         kernel_points[:, 0, :] *= 0
     if fixed == 'verticals':

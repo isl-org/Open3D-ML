@@ -6,7 +6,7 @@ from ...utils import SAMPLER
 
 
 class SemSegSpatiallyRegularSampler(object):
-    """Spatially regularSampler sampler for semantic segmentation datsets."""
+    """Spatially regularSampler sampler for semantic segmentation datasets."""
 
     def __init__(self, dataset):
         self.dataset = dataset
