@@ -137,7 +137,7 @@ def main():
 
     
     funcs = {
-        "kitti": KITTI
+        "kitti": KITTI,
         "semantickitti": SemanticKITTI,
         "paris": ParisLille3D,
         "toronto": Toronto3D,
