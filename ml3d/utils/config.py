@@ -50,7 +50,7 @@ class Config(object):
         if cfg_dict is None:
             cfg_dict = dict()
         elif not isinstance(cfg_dict, dict):
-            raise TypeError('cfg_dict shoud be a dict, but'
+            raise TypeError('cfg_dict should be a dict, but'
                             f'got {type(cfg_dict)}')
 
         super(Config, self).__setattr__('_cfg_dict', ConfigDict(cfg_dict))

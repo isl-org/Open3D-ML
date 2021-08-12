@@ -52,7 +52,7 @@ id	raw_category	category	count	nyu40id	eigen13id	nyuClass	nyu40class	eigen13clas
 32	clothing	clothes	165	21	7	clothes	clothes	Objects					n02728440	apparel.n.01	clothes	38
 101	telephone	telephone	164	40	7	telephone	otherprop	Objects			telephone	4401088	n04401088	telephone.n.01	objects	39
 130	cup	cup	157	40	7	cup	otherprop	Objects	cup		cup or mug	3797390	n03797390	mug.n.04	objects	39
-27	refrigerator	refrigerator	154	24	6	refridgerator	refridgerator	Furniture					n04070727	refrigerator.n.01	appliances	37
+27	refrigerator	refrigerator	154	24	6	refrigerator	refrigerator	Furniture					n04070727	refrigerator.n.01	appliances	37
 44	end table	end table	147	7	10	table	table	Table	table	table	table	4379243	n04379243	table.n.02	table	5
 131	jacket	jacket	146	40	7	jacket	otherprop	Objects					n03589791	jacket.n.01	clothes	38
 55	shower curtain	shower curtain	144	28	7	shower curtain	shower curtain	Objects	curtain				n04209239	shower_curtain.n.01	curtain	12
@@ -73,7 +73,7 @@ id	raw_category	category	count	nyu40id	eigen13id	nyuClass	nyu40class	eigen13clas
 62	stove	stove	95	38	7	stove	otherstructure	Objects			stove	4330267	n04330267	stove.n.02	appliances	37
 105	light	light	93	38	7	light	otherstructure	Objects					n03665366	light.n.02	lighting	28
 1165	closet wall	closet wall	90	1	12	wall	wall	Wall					n04546855	wall.n.01	wall	1
-165	mini fridge	mini fridge	87	24	6	refridgerator	refridgerator	Furniture					n03273913	electric_refrigerator.n.01	appliances	37
+165	mini fridge	mini fridge	87	24	6	refrigerator	refrigerator	Furniture					n03273913	electric_refrigerator.n.01	appliances	37
 7	cabinets	cabinet	79	3	6	cabinet	cabinet	Furniture			cabinet	2933112	n02933112	cabinet.n.01	cabinet	7
 5	doors	door	76	8	12	door	door	Wall	door				n03221720	door.n.01	door	4
 76	fan	fan	75	40	7	fan	otherprop	Objects					n03320046	fan.n.01	misc	40
@@ -210,7 +210,7 @@ id	raw_category	category	count	nyu40id	eigen13id	nyuClass	nyu40class	eigen13clas
 1190	luggage	luggage	12	40	7	luggage	otherprop	Objects					n02774630	baggage.n.01	objects	39
 21	curtains	curtain	12	16	13	curtain	curtain	Window	curtain				n03151077	curtain.n.01	curtain	12
 312	headphones	headphones	12	40	7		otherprop	Objects					n03261776	earphone.n.01	objects	39
-233	crate	crate	12	39	6	crate	otherfurniture	Furniture					n03127925	crate.n.01	objects	39
+233	create	create	12	39	6	create	otherfurniture	Furniture					n03127925	create.n.01	objects	39
 286	candle	candle	12	40	7	candle	otherprop	Objects	lamp				n02948072	candle.n.01	objects	39
 264	projector	projector	12	40	7	projector	otherprop	Objects					n04009552	projector.n.02	objects	39
 110	clothes dryers	clothes dryer	12	39	6		otherfurniture	Furniture					n03251766	dryer.n.01	appliances	37
@@ -465,7 +465,7 @@ id	raw_category	category	count	nyu40id	eigen13id	nyuClass	nyu40class	eigen13clas
 1051	kinect	kinect	2	40	7	kinect	otherprop	Objects							objects	39
 566	crib	crib	2	39	6	crib	otherfurniture	Furniture							furniture	36
 1302	plastic storage bin	plastic storage bin	2	40	7	container	otherprop	Objects					n03094503	container.n.01	objects	39
-1062	cooler	cooler	2	24	6	refridgerator	refridgerator	Furniture					n03102654	cooler.n.01	appliances	37
+1062	cooler	cooler	2	24	6	refrigerator	refrigerator	Furniture					n03102654	cooler.n.01	appliances	37
 1303	kitchen apron	kitchen apron	2	21	7	clothes	clothes	Objects					n02728440	apparel.n.01	clothes	38
 1304	dishwashing soap bottle	dishwashing soap bottle	2	40	7	bottle	otherprop	Objects	bottle		bottle	2876657	n02876657	bottle.n.01	objects	39
 1305	xbox controller	xbox controller	2	40	7		otherprop	Objects							objects	39
