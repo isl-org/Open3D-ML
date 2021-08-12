@@ -1,19 +1,20 @@
 #!/usr/bin/env python
-import open3d.ml.torch as ml3d
-from open3d.ml.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
-                                Toronto3D, KITTI)
-from open3d.ml.vis import Visualizer, LabelLUT
-from open3d.ml.utils import get_module
-
 import argparse
-import math
-import numpy as np
 import os
-import random
-import sys
+from os.path import exists, join
+
+import numpy as np
+import open3d.ml.torch as ml3d
 import tensorflow as tf
-import torch
-from os.path import exists, join, isfile, dirname, abspath, split
+from open3d.ml.datasets import (
+    KITTI,
+    S3DIS,
+    ParisLille3D,
+    Semantic3D,
+    SemanticKITTI,
+    Toronto3D,
+)
+from open3d.ml.vis import LabelLUT, Visualizer
 
 
 def print_usage_and_exit():
@@ -125,8 +126,8 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
 # ------------------------------
 
+from open3d.ml.torch.models import KPFCNN, RandLANet
 from open3d.ml.torch.pipelines import SemanticSegmentation
-from open3d.ml.torch.models import RandLANet, KPFCNN
 
 
 def main():
@@ -135,22 +136,21 @@ def main():
     which = args.dataset_name.lower()
     path = args.dataset_path
 
-    
     funcs = {
         "kitti": KITTI,
-        "semantickitti": SemanticKITTI,
         "paris": ParisLille3D,
-        "toronto": Toronto3D,
-        "semantic3d": Semantic3D,
         "s3dis": S3DIS,
+        "semantic3d": Semantic3D,
+        "semantickitti": SemanticKITTI,
+        "toronto": Toronto3D,
         "custom": None,
     }
     try:
         func = funcs[which]
     except KeyError:
-        print("[ERROR] '" + which + "' is not a valid dataset")
+        print(f"[ERROR] '{which}' is not a valid dataset")
         print_usage_and_exit()
-    dataset = func(path) if func else func
+    dataset = func(path) if func else None
 
     v = Visualizer()
     if dataset is None:  # custom
@@ -171,7 +171,7 @@ def main():
         ckpt_path = "../dataset/checkpoints/vis_weights_{}.pth".format(
             'RandLANet')
         if not exists(ckpt_path):
-            cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
+            cmd = f"wget {randlanet_url} -O {ckpt_path}"
             os.system(cmd)
         model = RandLANet(ckpt_path=ckpt_path)
         pipeline_r = SemanticSegmentation(model)
@@ -179,7 +179,7 @@ def main():
 
         ckpt_path = "../dataset/checkpoints/vis_weights_{}.pth".format('KPFCNN')
         if not exists(ckpt_path):
-            cmd = "wget {} -O {}".format(kpconv_url, ckpt_path)
+            cmd = f"wget {kpconv_url} -O {ckpt_path}"
             os.system(cmd)
         model = KPFCNN(ckpt_path=ckpt_path, in_radius=10)
         pipeline_k = SemanticSegmentation(model)
