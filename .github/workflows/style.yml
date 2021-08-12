@@ -26,6 +26,7 @@ jobs:
           python -m pip install --upgrade yapf==0.31.0 nbformat pydocstyle==6.0.0
       - name: Run style check
         run: |
+          yapf --diff --recursive .
           python ci/check_style.py
       - name: Run docstring style check
         run: |
