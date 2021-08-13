@@ -399,8 +399,6 @@ class SemanticSegmentation(BasePipeline):
             model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
-                if hasattr(inputs['data'], 'to'):
-                    inputs['data'].to(device)
                 self.optimizer.zero_grad()
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
@@ -429,8 +427,6 @@ class SemanticSegmentation(BasePipeline):
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
-                    if hasattr(inputs['data'], 'to'):
-                        inputs['data'].to(device)
 
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(

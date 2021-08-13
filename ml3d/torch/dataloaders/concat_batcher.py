@@ -438,22 +438,18 @@ class SparseConvUnetBatch:
     @staticmethod
     def scatter(batch, num_gpu):
         batch_size = len(batch.batch_lengths)
-        assert num_gpu <= batch_size, "batch size must be greater than number of cuda devices"
 
         new_batch_size = math.ceil(batch_size / num_gpu)
         batches = [SparseConvUnetBatch([]) for _ in range(num_gpu)]
-        splits = [0]
-        for length in batch.batch_lengths:
-            splits.append(splits[-1] + length)
         for i in range(num_gpu):
-            start = splits[new_batch_size * i]
-            end = splits[min(new_batch_size * (i + 1), len(splits) - 1)]
+            start = new_batch_size * i
+            end = min(new_batch_size * (i + 1), batch_size)
             batches[i].point = batch.point[start:end]
             batches[i].feat = batch.feat[start:end]
             batches[i].label = batch.label[start:end]
             batches[i].batch_lengths = batch.batch_lengths[start:end]
 
-        return batches
+        return [b for b in batches if len(b.point)]  # filter empty batch
 
 
 class ObjectDetectBatch:
