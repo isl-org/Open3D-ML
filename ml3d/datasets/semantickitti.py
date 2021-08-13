@@ -213,7 +213,7 @@ class SemanticKITTI(BaseDataset):
 
             store_path = join(save_path, name_points + '.label')
             pred = pred + 1
-            pred = remap_lut[pred].astype(np.uint32)
+            pred = self.remap_lut[pred].astype(np.uint32)
             pred.tofile(store_path)
 
     def get_split_list(self, split):
