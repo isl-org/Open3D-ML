@@ -8,7 +8,8 @@ import argparse
 import pickle
 
 from tqdm import tqdm
-from open3d.ml.datasets import KITTI, utils
+from open3d.ml import datasets
+from open3d.ml.datasets import utils
 
 
 def parse_args():
@@ -22,6 +23,10 @@ def parse_args():
         help='Output path to store pickle (default to dataet_path)',
         default=None,
         required=False)
+    parser.add_argument('--dataset_type',
+                        help='Name of dataset class',
+                        default="KITTI",
+                        required=False)
 
     args = parser.parse_args()
 
@@ -35,12 +40,29 @@ def parse_args():
 
 
 if __name__ == '__main__':
+    """Collect bboxes
+
+    This script constructs a bbox dictionary for later data augmentation.
+
+    Args:
+        dataset_path (str): Directory to load dataset data.
+        out_path (str): Directory to save pickle file (infos).
+        dataset_type (str): Name of dataset object under `ml3d/datasets` to use to 
+                            load the test data split from the dataset folder. Uses 
+                            reflection to dynamically import this dataset object by name. 
+                            Default: KITTI
+
+    Example usage:
+
+    python scripts/collect_bboxes.py --dataset_path /path/to/data --dataset_type MyCustomDataset
+    """
     args = parse_args()
     out_path = args.out_path
     if out_path is None:
         out_path = args.dataset_path
 
-    dataset = KITTI(args.dataset_path)
+    classname = getattr(datasets, args.dataset_type)
+    dataset = classname(args.dataset_path)
     train = dataset.get_split('train')
 
     bboxes = []
