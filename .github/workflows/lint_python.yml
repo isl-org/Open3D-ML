@@ -13,10 +13,10 @@ jobs:
       - run: flake8 . --count --max-complexity=22 --select=C,E9,F63,F7 --show-source --statistics  # ,F82 TODO!
       - run: flake8 . --count --exit-zero --max-complexity=10 --max-line-length=88 --show-source --statistics
       - run: isort --check-only --profile google . || true
-      - run: pip install tensorflow -r requirements.txt -r requirements-torch.txt
+      - run: pip install open3d tensorflow -r requirements.txt -r requirements-torch.txt
       - run: pip install --editable .
-      - run: mkdir -p .mypy_cache
-      - run: mypy --ignore-missing-imports --install-types --non-interactive . || true
+      # cd workaround because Open3D-ML is not a valid Python package name
+      - run: cd ml3d ; mkdir -p .mypy_cache ; mypy --ignore-missing-imports --install-types --non-interactive . || true ; cd ..
       - run: pytest . || true
       - run: shopt -s globstar && pyupgrade --py36-plus **/*.py || true
       - run: safety check
