@@ -195,6 +195,7 @@ class PointPillars(BaseModel):
                                        target_bboxes,
                                        avg_factor=avg_factor)
         else:
+            loss_cls = loss_cls.sum()
             loss_bbox = bboxes.sum()
             loss_dir = dirs.sum()
 
