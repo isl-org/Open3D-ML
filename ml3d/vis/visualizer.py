@@ -930,8 +930,6 @@ class Visualizer:
                 self._img[cam] = gui.ImageWidget(o3d.t.geometry.Image())
                 cam_grid.add_child(self._img[cam])
 
-        self._panel.add_child(model)
-
         # Coloring
         properties = gui.CollapsableVert("Properties", 0, indented_margins)
 
@@ -1023,7 +1021,10 @@ class Visualizer:
 
         properties.add_fixed(em)
         properties.add_child(self._shader_panels)
-        list_grid.add_child(properties)
+        self._panel.add_child(properties)
+
+        # ... add model widget after property widget
+        self._panel.add_child(model)
 
         # Populate tree, etc.
         for name in self._objects.data_names:
