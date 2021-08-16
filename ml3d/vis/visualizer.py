@@ -753,12 +753,29 @@ class Visualizer:
         self._animation_delay_secs = 0.100
         self._consolidate_bounding_boxes = False
         self._dont_update_geometry = False
+        self._prev_img_mode = 0
 
     def _init_dataset(self, dataset, split, indices):
         self._objects = DatasetModel(dataset, split, indices)
+        self._modality = dict()
+        if 'lidar_path' in self._objects._dataset.infos[0]:
+            self._modality['use_lidar'] = True
+        if 'cams' in self._objects._dataset.infos[0]:
+            self._modality['use_camera'] = True
+            self._cam_names = list(
+                self._objects._dataset.infos[0]['cams'].keys())
 
     def _init_data(self, data):
         self._objects = DataModel(data)
+        self._modality = dict()
+        for _, val in self._objects._name2srcdata.items():
+            if isinstance(val, dict):
+                if 'points' in val or 'point' in val:
+                    self._modality['use_lidar'] = True
+                if 'cams' in val:
+                    self._modality['use_camera'] = True
+                    self._cam_names = list(
+                        self._objects._dataset.infos[0]['cams'].keys())
 
     def _init_user_interface(self, title, width, height):
         self.window = gui.Application.instance.create_window(
@@ -898,17 +915,15 @@ class Visualizer:
         h.add_stretch()
         v.add_child(h)
 
-        if 'modality' in self._objects._dataset.cfg.cfg_dict and self._objects._dataset.cfg.cfg_dict[
-                'modality']['use_camera']:
+        if 'use_camera' in self._modality and self._modality['use_camera']:
             w = gui.CollapsableVert("Cameras", 0, indented_margins)
-            cam_grid = gui.VGrid(self._objects._dataset.dataset.cam_cols, 0,
-                                 indented_margins)
-            # cam_grid.preferred_width = 60 * em
+            cam_grid = gui.VGrid(
+                2, 0, indented_margins)  # change no. of cam_grid columns here
 
             self._img = dict()
             w.add_child(cam_grid)
             v.add_child(w)
-            for cam in self._objects._dataset.dataset.cam_names:
+            for cam in self._cam_names:
                 self._img[cam] = gui.ImageWidget(o3d.t.geometry.Image())
                 cam_grid.add_child(self._img[cam])
 
@@ -1428,9 +1443,12 @@ class Visualizer:
         idx = int(new_value)
         for i in range(0, len(self._animation_frames)):
             self._3d.scene.show_geometry(self._animation_frames[i], (i == idx))
-        for cam in self._objects._dataset.dataset.cam_names:
+
+        if 'use_camera' in self._modality and self._modality['use_camera']:
+            for cam in self._cam_names:
             self._img[cam].update_image(
                 self._objects.tcams[self._animation_frames[idx]][cam])
+
         self._update_bounding_boxes(animation_frame=idx)
         self._3d.force_redraw()
         self._slider_current.text = self._animation_frames[idx]
@@ -1473,8 +1491,12 @@ class Visualizer:
         self._on_animation_slider_changed(self._slider.int_value)
 
     def _on_img_mode_changed(self, name, idx):
-        if self._img_mode.selected_index == idx:
-            pass
+        if idx == self._prev_img_mode:
+            return
+        if not 'use_camera' in self._modality or not self._modality[
+                'use_camera']:
+            return
+        self._prev_img_mode = idx
         if idx == 0:  # or name == 'raw'
             for n in self._objects.data_names:
                 self._objects.create_cams(n,
