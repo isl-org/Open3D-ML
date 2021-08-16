@@ -115,6 +115,7 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
+        self.cfg.convert_to_tf_names('pipeline')
 
     """
     Run the inference using the data passed.
@@ -133,6 +134,13 @@ class SemanticSegmentation(BasePipeline):
             results = model(inputs, training=False)
             if model.inference_end(results):
                 break
+
+        metric = SemSegMetric()
+        metric.update(
+            tf.convert_to_tensor(model.inference_result['predict_scores']),
+            tf.convert_to_tensor(data['label']))
+        log.info(f"Accuracy : {metric.acc()}")
+        log.info(f"IoU : {metric.iou()}")
 
         return model.inference_result
 
@@ -392,23 +400,27 @@ class SemanticSegmentation(BasePipeline):
     """
 
     def save_config(self, writer):
-
-        with writer.as_default():
-            with tf.name_scope("Description"):
-                tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)
-                tf.summary.text("Command line", self.cfg_tb['cmd_line'], step=0)
-            with tf.name_scope("Configuration"):
-                tf.summary.text('Dataset',
-                                code2md(self.cfg_tb['dataset'],
-                                        language='json'),
-                                step=0)
-                tf.summary.text('Model',
-                                code2md(self.cfg_tb['model'], language='json'),
-                                step=0)
-                tf.summary.text('Pipeline',
-                                code2md(self.cfg_tb['pipeline'],
-                                        language='json'),
-                                step=0)
+        """Save experiment configuration with tensorboard summary."""
+        if hasattr(self, 'cfg_tb'):
+            with writer.as_default():
+                with tf.name_scope("Description"):
+                    tf.summary.text("Open3D-ML", self.cfg_tb['readme'], step=0)
+                    tf.summary.text("Command line",
+                                    self.cfg_tb['cmd_line'],
+                                    step=0)
+                with tf.name_scope("Configuration"):
+                    tf.summary.text('Dataset',
+                                    code2md(self.cfg_tb['dataset'],
+                                            language='json'),
+                                    step=0)
+                    tf.summary.text('Model',
+                                    code2md(self.cfg_tb['model'],
+                                            language='json'),
+                                    step=0)
+                    tf.summary.text('Pipeline',
+                                    code2md(self.cfg_tb['pipeline'],
+                                            language='json'),
+                                    step=0)
 
 
 PIPELINE._register_module(SemanticSegmentation, "tf")

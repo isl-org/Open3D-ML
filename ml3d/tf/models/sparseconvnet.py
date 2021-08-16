@@ -230,8 +230,7 @@ class SparseConvUnet(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=cfg_pipeline.adam_lr)
+        optimizer = tf.keras.optimizers.Adam(**cfg_pipeline.optimizer)
 
         return optimizer
 
@@ -317,8 +316,11 @@ class InputLayer(tf.keras.layers.Layer):
         return np.repeat(np.arange(count.shape[0]), count).astype(np.int32)
 
     def call(self, features, in_positions):
-        v = voxelize(in_positions, self.voxel_size, tf.constant([0., 0., 0.]),
-                     tf.constant([40960., 40960., 40960.]))
+        v = voxelize(
+            in_positions,
+            tf.convert_to_tensor([0, in_positions.shape[0]], dtype=tf.int64),
+            self.voxel_size, tf.constant([0., 0., 0.]),
+            tf.constant([40960., 40960., 40960.]))
 
         # Contiguous repeating positions.
         in_positions = tf.gather(in_positions, v.voxel_point_indices)

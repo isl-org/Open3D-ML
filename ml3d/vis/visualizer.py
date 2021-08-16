@@ -1543,15 +1543,13 @@ class Visualizer:
             for i in range(self._prev_lower_val, self._lower_val.int_value):
                 name = self._objects.data_names[i]
                 self._name2treenode[name].checkbox.checked = False
-                item = [j for j, k in self._treeid2name.items() if name == k][0]
-                self._on_dataset_selection_changed(item)
+                self._3d.scene.show_geometry(name, False)
         if self._prev_upper_val > self._upper_val.int_value:
             for i in range(self._upper_val.int_value + 1,
                            self._prev_upper_val + 1):
                 name = self._objects.data_names[i]
                 self._name2treenode[name].checkbox.checked = False
-                item = [j for j, k in self._treeid2name.items() if name == k][0]
-                self._on_dataset_selection_changed(item)
+                self._3d.scene.show_geometry(name, False)
 
     def _check_bw_lims(self):
         for i in range(self._lower_val.int_value,
@@ -1560,6 +1558,8 @@ class Visualizer:
             self._name2treenode[name].checkbox.checked = True
             item = [j for j, k in self._treeid2name.items() if name == k][0]
             self._on_dataset_selection_changed(item)
+            self._3d.scene.show_geometry(name, True)
+        self._3d.force_redraw()
 
     def _on_datasource_changed(self, attr_name, idx):
         selected_names = self._get_selected_names()
