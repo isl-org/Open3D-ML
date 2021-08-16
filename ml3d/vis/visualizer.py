@@ -1617,13 +1617,12 @@ class Visualizer:
         else:
             return o3d.core.Tensor.from_numpy(np_array)
 
-    def visualize_dataset(
-            self,
+    def visualize_dataset(self,
             dataset,
             split,
             indices=None,
-            width=1920,  #1024,
-            height=1208):  #768):
+                          width=1920,
+                          height=1080):
         """Visualize a dataset.
 
         Example:
@@ -1655,8 +1654,8 @@ class Visualizer:
                   data,
                   lut=None,
                   bounding_boxes=None,
-                  width=1024,
-                  height=768):
+                  width=1920,
+                  height=1080):
         """Visualize a custom point cloud data.
 
         Example:
