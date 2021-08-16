@@ -78,14 +78,6 @@ class NuScenes(BaseDataset):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
 
-        if 'modality' in self.cfg.cfg_dict and self.cfg.cfg_dict['modality'][
-                'use_camera']:
-            self.cam_names = [
-                'CAM_FRONT_LEFT', 'CAM_FRONT', 'CAM_FRONT_RIGHT',
-                'CAM_BACK_LEFT', 'CAM_BACK', 'CAM_BACK_RIGHT'
-            ]
-            self.cam_cols = 3
-
     @staticmethod
     def get_label_to_names():
         """Returns a label to names dictonary object.
@@ -158,7 +150,7 @@ class NuScenes(BaseDataset):
         assert [Path(val['data_path']).exists() for _, val in cam_dict.items()]
 
         res_dict = dict()
-        for cam in self.cam_names:
+        for cam in cam_dict.keys():
             res_dict[cam] = dict()
             res_dict[cam]['img'] = np.array(
                 o3d.io.read_image(cam_dict[cam]['data_path']))
@@ -268,15 +260,16 @@ class NuSceneSplit():
 
         pc = self.dataset.read_lidar(lidar_path)
         label = self.dataset.read_label(info, calib)
-        cam_dict = self.dataset.read_cams(info['cams'])
 
         data = {
             'point': pc,
             'feat': None,
             'calib': calib,
             'bounding_boxes': label,
-            'cams': cam_dict,
         }
+
+        if 'cams' in info:
+            data['cams'] = self.dataset.read_cams(info['cams'])
 
         return data
 
