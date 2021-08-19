@@ -574,7 +574,7 @@ class PillarFeatureNet(nn.Module):
         for pfn in self.pfn_layers:
             features = pfn(features, num_points)
 
-        return features.squeeze()
+        return features.squeeze(dim=1)
 
 
 class PointPillarsScatter(nn.Module):
@@ -906,6 +906,10 @@ class Anchor3DHead(nn.Module):
                     -1, self.box_code_size)
 
                 if target_bboxes[i].shape[0] == 0:
+                    assigned_bboxes.append(torch.zeros(0, 7))
+                    target_idxs.append(torch.zeros((0,), dtype=torch.long))
+                    pos_idxs.append(torch.zeros((0,), dtype=torch.long))
+                    neg_idxs.append(torch.zeros((0,), dtype=torch.long))
                     continue
 
                 # compute a fast approximation of IoU
