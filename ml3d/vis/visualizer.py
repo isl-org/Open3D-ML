@@ -1264,7 +1264,7 @@ class Visualizer:
 
             self._3d.scene.remove_geometry(name)
             if len(boxes) > 0:
-                lines = BoundingBox3D.create_lines(boxes, lut)
+                lines = BoundingBox3D.create_lines(boxes, lut=None)
                 self._3d.scene.add_geometry(name, lines, mat)
 
                 if name not in self._name2treenode:
@@ -1279,7 +1279,7 @@ class Visualizer:
                     return
 
             for bbox_data in self._objects.bounding_box_data:
-                lines = BoundingBox3D.create_lines(bbox_data.boxes, lut)
+                lines = BoundingBox3D.create_lines(bbox_data.boxes, lut=None)
                 self._3d.scene.add_geometry(bbox_data.name, lines, mat)
 
             for bbox_data in self._objects.bounding_box_data:
