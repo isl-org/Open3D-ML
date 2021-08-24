@@ -340,6 +340,33 @@ class KPConvBatch:
 
         return self
 
+    @staticmethod
+    def scatter(batch, num_gpu):
+        batch_size = len(batch.points)
+
+        new_batch_size = math.ceil(batch_size / num_gpu)
+        batches = [KPConvBatch([]) for _ in range(num_gpu)]
+        for i in range(num_gpu):
+            start = new_batch_size * i
+            end = min(new_batch_size * (i + 1), batch_size)
+            batches[i].points = batch.points[start:end]
+            batches[i].neighbors = batch.neighbors[start:end]
+            batches[i].pools = batch.pools[start:end]
+            batches[i].upsamples = batch.upsamples[start:end]
+            batches[i].lengths = batch.lengths[start:
+                                               end]  # TODO : verify lengths
+
+        return [b for b in batches if len(b.points)]  # filter empty batch
+
+    def print(self):
+        print(self.points)
+        print(self.neighbors)
+        print(self.pools)
+        print(self.upsamples)
+        print(self.lengths)
+        print(self.features)
+        exit(0)
+
     def unstack_points(self, layer=None):
         """Unstack the points."""
         return self.unstack_elements('points', layer)
@@ -471,13 +498,13 @@ class ObjectDetectBatch:
         self.attr = []
 
         for batch in batches:
-            self.attr.append(batch['attr'])
             data = batch['data']
             attr = batch['attr']
             if 'test' not in attr['split'] and len(
                     data['bboxes']
             ) == 0:  # Skip training batch with no bounding box.
                 continue
+            self.attr.append(attr)
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(
                 torch.tensor(data['labels'], dtype=torch.int64) if 'labels' in
@@ -505,6 +532,23 @@ class ObjectDetectBatch:
                 self.labels[i] = self.labels[i].to(device)
             if self.bboxes[i] is not None:
                 self.bboxes[i] = self.bboxes[i].to(device)
+
+    @staticmethod
+    def scatter(batch, num_gpu):
+        batch_size = len(batch.point)
+
+        new_batch_size = math.ceil(batch_size / num_gpu)
+        batches = [ObjectDetectBatch([]) for _ in range(num_gpu)]
+        for i in range(num_gpu):
+            start = new_batch_size * i
+            end = min(new_batch_size * (i + 1), batch_size)
+            batches[i].point = batch.point[start:end]
+            batches[i].labels = batch.labels[start:end]
+            batches[i].bboxes = batch.bboxes[start:end]
+            batches[i].bbox_objs = batch.bbox_objs[start:end]
+            batches[i].attr = batch.attr[start:end]
+
+        return [b for b in batches if len(b.point)]  # filter empty batch
 
 
 class ConcatBatcher(object):

@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 
 from .base_pipeline import BasePipeline
+from .dataparallel import CustomDataParallel
 from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
@@ -171,7 +172,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         with torch.no_grad():
             for data in tqdm(valid_loader, desc='validation'):
-                data.to(device)
+                # data.to(device)
                 results = model(data)
                 loss = model.loss(results, data)
                 for l, v in loss.items():
@@ -280,6 +281,10 @@ class ObjectDetection(BasePipeline):
 
         writer = SummaryWriter(self.tensorboard_dir)
         self.save_config(writer)
+
+        # wrap model for multiple GPU
+        model = CustomDataParallel(model, device_ids=self.device_ids)
+
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         log.info("Started training")
@@ -291,7 +296,7 @@ class ObjectDetection(BasePipeline):
 
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
-                data.to(device)
+                # data.to(device)
                 results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
