@@ -28,6 +28,12 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
+
+class bcolors:  # See https://stackoverflow.com/questions/287871
+    WARNING = '\033[93m'
+    ENDC = '\033[0m'
+
+
 # ------------------------------------------------------------------------------------------
 #
 #           Functions

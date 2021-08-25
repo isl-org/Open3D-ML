@@ -21,6 +21,11 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
                                trans_crop_pc, create_3D_rotations)
 
 
+class bcolors:  # See https://stackoverflow.com/questions/287871
+    WARNING = '\033[93m'
+    ENDC = '\033[0m'
+
+
 class KPFCNN(BaseModel):
     """Class defining KPFCNN.
 
