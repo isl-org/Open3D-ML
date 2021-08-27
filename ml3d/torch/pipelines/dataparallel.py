@@ -22,7 +22,7 @@ class CustomDataParallel(DataParallel):
                 inputs[0].to(self.device_ids[0])
             return self.module(inputs[0], **kwargs)
 
-        inputs, kwargs = self.scatter(inputs, kwargs, self.device_ids)
+        inputs, kwargs = self.customscatter(inputs, kwargs, self.device_ids)
 
         self.module.cuda()
         replicas = self.replicate(self.module, self.device_ids[:len(inputs)])
@@ -30,7 +30,7 @@ class CustomDataParallel(DataParallel):
 
         return self.gather(outputs, self.output_device)
 
-    def scatter(self, inputs, kwargs, device_ids):
+    def customscatter(self, inputs, kwargs, device_ids):
         """Custom scatter method to override default method.
         Scatter batch dimension based on custom scatter implemented
         in custom batcher.
@@ -45,9 +45,12 @@ class CustomDataParallel(DataParallel):
             Each input is transfered to different device id.
         """
         if not hasattr(inputs[0], 'scatter'):
-            raise NotImplementedError(
-                f"Please implement scatter for {inputs[0]} for multi gpu execution."
-            )
+            try:
+                self.scatter(inputs, kwargs, device_ids)
+            except:
+                raise NotImplementedError(
+                    f"Please implement scatter for {inputs[0]} for multi gpu execution."
+                )
         inputs = inputs[0].scatter(inputs[0], len(device_ids))
         for i in range(len(inputs)):
             inputs[i].to(torch.device(device_ids[i]))
