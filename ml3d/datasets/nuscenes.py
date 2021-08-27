@@ -58,8 +58,8 @@ class NuScenes(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
-        self.num_classes = 10
         self.label_to_names = self.get_label_to_names()
+        self.num_classes = len(self.label_to_names)
 
         self.train_info = {}
         self.test_info = {}
@@ -86,17 +86,38 @@ class NuScenes(BaseDataset):
             values are the corresponding names.
         """
         label_to_names = {
-            0: 'ignore',
-            1: 'barrier',
-            2: 'bicycle',
-            3: 'bus',
-            4: 'car',
-            5: 'construction_vehicle',
-            6: 'motorcycle',
-            7: 'pedestrian',
-            8: 'traffic_cone',
-            9: 'trailer',
-            10: 'truck'
+            0: 'noise',
+            1: 'animal',
+            2: 'human.pedestrian.adult',
+            3: 'human.pedestrian.child',
+            4: 'human.pedestrian.construction_worker',
+            5: 'human.pedestrian.personal_mobility',
+            6: 'human.pedestrian.police_officer',
+            7: 'human.pedestrian.stroller',
+            8: 'human.pedestrian.wheelchair',
+            9: 'movable_object.barrier',
+            10: 'movable_object.debris',
+            11: 'movable_object.pushable_pullable',
+            12: 'movable_object.trafficcone',
+            13: 'static_object.bicycle_rack',
+            14: 'vehicle.bicycle',
+            15: 'vehicle.bus.bendy',
+            16: 'vehicle.bus.rigid',
+            17: 'vehicle.car',
+            18: 'vehicle.construction',
+            19: 'vehicle.emergency.ambulance',
+            20: 'vehicle.emergency.police',
+            21: 'vehicle.motorcycle',
+            22: 'vehicle.trailer',
+            23: 'vehicle.truck',
+            24: 'flat.driveable_surface',
+            25: 'flat.other',
+            26: 'flat.sidewalk',
+            27: 'flat.terrain',
+            28: 'static.manmade',
+            29: 'static.other',
+            30: 'static.vegetation',
+            31: 'vehicle.ego'
         }
         return label_to_names
 
@@ -112,7 +133,7 @@ class NuScenes(BaseDataset):
         return np.fromfile(path, dtype=np.float32).reshape(-1, 5)
 
     @staticmethod
-    def read_label(info, calib):
+    def read_bbox_3d(info, calib):
         """Reads labels of bound boxes.
 
         Returns:
@@ -138,6 +159,16 @@ class NuScenes(BaseDataset):
             objects[-1].yaw = ry
 
         return objects
+
+    @staticmethod
+    def read_label_3d(path):
+        """Reads lidarseg data from the path provided.
+        Returns:
+            A data object with lidarseg information.
+        """
+        assert Path(path).exists()
+
+        return np.fromfile(path, dtype=np.uint8)
 
     def get_split(self, split):
         """Returns a dataset split.
@@ -224,15 +255,17 @@ class NuSceneSplit():
         calib = {'world_cam': world_cam.T}
 
         pc = self.dataset.read_lidar(lidar_path)
-        label = self.dataset.read_label(info, calib)
+        bbox_3d = self.dataset.read_bbox_3d(info, calib)
 
         data = {
             'point': pc,
             'feat': None,
             'calib': calib,
-            'bounding_boxes': label,
+            'bounding_boxes': bbox_3d,
         }
 
+        if 'lidarseg_path' in info:
+            data['label'] = self.dataset.read_label_3d(info['lidarseg_path'])
         return data
 
     def get_attr(self, idx):
