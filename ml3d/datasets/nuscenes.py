@@ -163,6 +163,7 @@ class NuScenes(BaseDataset):
     @staticmethod
     def read_label_3d(path):
         """Reads lidarseg data from the path provided.
+        
         Returns:
             A data object with lidarseg information.
         """
