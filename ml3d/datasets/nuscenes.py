@@ -11,6 +11,8 @@ from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
 from .utils import BEVBox3D
 
+from nuscenes.utils.color_map import get_colormap
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
@@ -60,7 +62,18 @@ class NuScenes(BaseDataset):
         self.dataset_path = cfg.dataset_path
         self.label_to_names = self.get_label_to_names()
         self.num_classes = len(self.label_to_names)
-
+        # Initialize the colormap which maps from class names to RGB values.
+        self.color_map = get_colormap()
+        assert len(self.color_map) == self.num_classes
+        if isinstance(list(self.color_map.values())[0], tuple):
+            self.color_map = dict([
+                (key, list(val)) for key, val in self.color_map.items()
+            ])
+        # if colormap is 0-255, convert it to 0-1.0
+        if any([i > 1.0 for i in max(self.color_map.values())]):
+            self.color_map = dict([(key, [x / 255.0
+                                          for x in val])
+                                   for key, val in self.color_map.items()])
         self.train_info = {}
         self.test_info = {}
         self.val_info = {}
@@ -163,7 +176,7 @@ class NuScenes(BaseDataset):
     @staticmethod
     def read_label_3d(path):
         """Reads lidarseg data from the path provided.
-        
+
         Returns:
             A data object with lidarseg information.
         """
