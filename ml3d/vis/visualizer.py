@@ -1115,7 +1115,7 @@ class Visualizer:
             shape = [len(tcloud.point["points"].numpy())]
             scalar = np.zeros(shape, dtype='float32')
         tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(
-            scalar)
+            scalar.astype(np.float32))
 
         flag |= rendering.Scene.UPDATE_UV0_FLAG
 
