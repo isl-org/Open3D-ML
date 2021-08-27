@@ -1570,8 +1570,10 @@ class Visualizer:
         # Setup the labels
         lut = LabelLUT()
         for key, val in dataset.label_to_names.items():
-            key = str(key)
-            lut.add_label(key, val)
+            if isinstance(dataset.color_map, dict):
+                lut.add_label(str(key), val, color=dataset.color_map[val])
+            else:
+                lut.add_label(str(key), val)
         self.set_lut("labels", lut)
 
         self._consolidate_bounding_boxes = True
