@@ -1,0 +1,56 @@
+dataset:
+  name: NuScenes
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [2061156, 5385, 2156470, 9655, 139443, 8723, 9159, 8809, 12168,
+  9305106, 66861, 718641, 736239, 163126, 141351, 357463, 4247297, 38104219,
+  1514414, 2218, 59590, 427391, 4907511, 15841384, 316958899, 8559216, 70197461,
+  70289730, 178178063, 817150, 122581273, 337070621]
+  ignored_label_inds: []
+  #num_points: 40960
+  #test_area_idx: 3
+  test_result_folder: ./test
+  use_cache: False
+  #sampler:
+  #  name: 'SemSegRandomSampler'
+model:
+  name: RandLANet
+  batcher: DefaultBatcher
+  ckpt_path: # path/to/your/checkpoint
+  dim_feature: 8
+  dim_input: 3
+  dim_output:
+  - 16
+  - 64
+  - 128
+  - 256
+  - 512
+  grid_size: 0.04
+  ignored_label_inds: []
+  k_n: 16
+  num_classes: 32
+  num_layers: 5
+  num_points: 40960
+  sub_sampling_ratio:
+  - 4
+  - 4
+  - 4
+  - 4
+  - 2
+  t_normalize:
+    method: linear
+    normalize_points: False
+    feat_bias: 0
+    feat_scale: 1
+pipeline:
+  name: SemanticSegmentation
+  adam_lr: 0.01
+  batch_size: 2
+  learning_rate: 0.01
+  main_log_dir: ./logs
+  max_epoch: 100
+  save_ckpt_freq: 20
+  scheduler_gamma: 0.95
+  test_batch_size: 3
+  train_sum_dir: train_log
+  val_batch_size: 2
