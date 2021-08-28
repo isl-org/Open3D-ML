@@ -136,12 +136,12 @@ class NuScenesProcess():
             print(f"Saved val info at {join(out_path, 'infos_val.pkl')}")
 
     def obtain_sensor2top(self,
-                        sensor_token,
-                        l2e_t,
-                        l2e_r_mat,
-                        e2g_t,
-                        e2g_r_mat,
-                        sensor_type='lidar'):
+                          sensor_token,
+                          l2e_t,
+                          l2e_r_mat,
+                          e2g_t,
+                          e2g_r_mat,
+                          sensor_type='lidar'):
         """Obtain the info with RT matric from general sensor to Top LiDAR.
 
         Args:
@@ -162,7 +162,7 @@ class NuScenesProcess():
         nusc = self.nusc
         sd_rec = nusc.get('sample_data', sensor_token)
         cs_record = nusc.get('calibrated_sensor',
-                            sd_rec['calibrated_sensor_token'])
+                             sd_rec['calibrated_sensor_token'])
         pose_record = nusc.get('ego_pose', sd_rec['ego_pose_token'])
         data_path = str(nusc.get_sample_data_path(sd_rec['token']))
         if os.getcwd() in data_path:  # path from lyftdataset is absolute path
@@ -191,7 +191,7 @@ class NuScenesProcess():
         T = (l2e_t_s @ e2g_r_s_mat.T + e2g_t_s) @ (
             np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T)
         T -= e2g_t @ (np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T
-                    ) + l2e_t @ np.linalg.inv(l2e_r_mat).T
+                     ) + l2e_t @ np.linalg.inv(l2e_r_mat).T
         sweep['sensor2lidar_rotation'] = R.T  # points @ R.T + T
         sweep['sensor2lidar_translation'] = T
         return sweep
@@ -244,7 +244,7 @@ class NuScenesProcess():
                 cam_token = sample['data'][cam]
                 cam_path, _, cam_intrinsic = nusc.get_sample_data(cam_token)
                 cam_info = self.obtain_sensor2top(cam_token, l2e_t, l2e_r_mat,
-                                            e2g_t, e2g_r_mat, cam)
+                                                  e2g_t, e2g_r_mat, cam)
                 cam_info.update(cam_intrinsic=cam_intrinsic)
                 data['cams'].update({cam: cam_info})
 
