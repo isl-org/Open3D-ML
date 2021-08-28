@@ -208,13 +208,12 @@ class BoundingBox3D:
                                                 thickness=2)
 
     @staticmethod
-    def plot_rect3d_on_img(
-        img,
-        num_rects,
-        rect_corners,
-        line_indices,
-        color=None,  #TODO: this should be a list of colors, len of line_indices
-        thickness=1):
+    def plot_rect3d_on_img(img,
+                           num_rects,
+                           rect_corners,
+                           line_indices,
+                           color=None,
+                           thickness=1):
         """Plot the boundary lines of 3D rectangular on 2D images.
 
         Args:
