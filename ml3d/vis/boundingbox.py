@@ -221,6 +221,8 @@ class BoundingBox3D:
             num_rects (int): Number of 3D rectangulars.
             rect_corners (numpy.array): Coordinates of the corners of 3D
                 rectangulars. Should be in the shape of [num_rect, 8, 2] or [num_rect, 14, 2] if counting arrows.
+            line_indices (numpy.array): indicates connectivity of lines between rect_corners.
+                Should be in the shape of [num_rect, 12, 2] or [num_rect, 17, 2] if counting arrows.
             color (tuple[int]): The color to draw bboxes. Default: (1.0, 1.0, 1.0), i.e. white.
             thickness (int, optional): The thickness of bboxes. Default: 1.
         """
