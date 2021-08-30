@@ -11,8 +11,6 @@ from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
 from .utils import BEVBox3D
 
-from nuscenes.utils.color_map import get_colormap
-
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
@@ -63,7 +61,7 @@ class NuScenes(BaseDataset):
         self.label_to_names = self.get_label_to_names()
         self.num_classes = len(self.label_to_names)
         # Initialize the colormap which maps from class names to RGB values.
-        self.color_map = get_colormap()
+        self.color_map = self.get_colormap()
         assert len(self.color_map) == self.num_classes
         if isinstance(list(self.color_map.values())[0], tuple):
             self.color_map = dict([
@@ -89,6 +87,54 @@ class NuScenes(BaseDataset):
         if os.path.exists(join(info_path, 'infos_test.pkl')):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
+
+    @staticmethod
+    def get_colormap():
+        """Get the defined colormap.
+        source: https://github.com/nutonomy/nuscenes-devkit/blob/master/python-sdk/nuscenes/utils/color_map.py
+        
+        Returns:
+            A mapping from the class names to the respective RGB values.
+        """
+
+        classname_to_color = {  # RGB.
+            "noise": (0, 0, 0),  # Black.
+            "animal": (70, 130, 180),  # Steelblue
+            "human.pedestrian.adult": (0, 0, 230),  # Blue
+            "human.pedestrian.child": (135, 206, 235),  # Skyblue,
+            "human.pedestrian.construction_worker":
+                (100, 149, 237),  # Cornflowerblue
+            "human.pedestrian.personal_mobility":
+                (219, 112, 147),  # Palevioletred
+            "human.pedestrian.police_officer": (0, 0, 128),  # Navy,
+            "human.pedestrian.stroller": (240, 128, 128),  # Lightcoral
+            "human.pedestrian.wheelchair": (138, 43, 226),  # Blueviolet
+            "movable_object.barrier": (112, 128, 144),  # Slategrey
+            "movable_object.debris": (210, 105, 30),  # Chocolate
+            "movable_object.pushable_pullable": (105, 105, 105),  # Dimgrey
+            "movable_object.trafficcone": (47, 79, 79),  # Darkslategrey
+            "static_object.bicycle_rack": (188, 143, 143),  # Rosybrown
+            "vehicle.bicycle": (220, 20, 60),  # Crimson
+            "vehicle.bus.bendy": (255, 127, 80),  # Coral
+            "vehicle.bus.rigid": (255, 69, 0),  # Orangered
+            "vehicle.car": (255, 158, 0),  # Orange
+            "vehicle.construction": (233, 150, 70),  # Darksalmon
+            "vehicle.emergency.ambulance": (255, 83, 0),
+            "vehicle.emergency.police": (255, 215, 0),  # Gold
+            "vehicle.motorcycle": (255, 61, 99),  # Red
+            "vehicle.trailer": (255, 140, 0),  # Darkorange
+            "vehicle.truck": (255, 99, 71),  # Tomato
+            "flat.driveable_surface": (0, 207, 191),  # nuTonomy green
+            "flat.other": (175, 0, 75),
+            "flat.sidewalk": (75, 0, 75),
+            "flat.terrain": (112, 180, 60),
+            "static.manmade": (222, 184, 135),  # Burlywood
+            "static.other": (255, 228, 196),  # Bisque
+            "static.vegetation": (0, 175, 0),  # Green
+            "vehicle.ego": (255, 240, 245)
+        }
+
+        return classname_to_color
 
     @staticmethod
     def get_label_to_names():
