@@ -65,8 +65,8 @@ class PVCNN(BaseModel):
         self.classifier = nn.Sequential(*layers)
 
     def forward(self, inputs):
-        coords = inputs['point']
-        feat = inputs['feat']
+        coords = inputs['point'].to(self.device)
+        feat = inputs['feat'].to(self.device)
 
         # coords = inputs[:, :3, :]
         out_features_list = []
@@ -93,9 +93,9 @@ class PVCNN(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
-        # if attr['split'] in ['training', 'train']:
-        #     points, feat, labels = self.augmenter.augment(
-        #         points, feat, labels, self.cfg.get('augment', None))
+        if attr['split'] in ['training', 'train']:
+            points, feat, labels = self.augmenter.augment(
+                points, feat, labels, self.cfg.get('augment', None))
 
         points -= np.min(points, 0)
 
@@ -377,22 +377,27 @@ def avg_voxelize(feat, coords, r):
     coords = coords.to(torch.int64)
     batch_size = feat.shape[0]
     dim = feat.shape[1]
-    grid = torch.zeros((batch_size, dim, r, r, r))
+    grid = torch.zeros((batch_size, dim, r, r, r)).to(feat.device)
 
-    batch_id = torch.from_numpy(np.arange(batch_size).reshape(-1, 1))
+    batch_id = torch.from_numpy(np.arange(batch_size).reshape(-1, 1)).to(
+        feat.device)
     hash = batch_id * r * r * r + coords[:,
                                          0, :] * r * r + coords[:,
                                                                 1, :] * r + coords[:,
                                                                                    2, :]
-    hash = hash.reshape(-1,)
+    hash = hash.reshape(-1,).to(feat.device)
 
     for i in range(0, dim):
-        grid_ = torch.zeros(batch_size * r * r * r,).scatter_add_(
-            0, hash, feat[:, i, :].reshape(-1,)).reshape(batch_size, r, r, r)
+        grid_ = torch.zeros(batch_size * r * r * r,
+                            device=feat.device).scatter_add_(
+                                0, hash, feat[:, i, :].reshape(-1,)).reshape(
+                                    batch_size, r, r, r)
         grid[:, i] = grid_
-    count = torch.zeros(batch_size * r * r * r,).scatter_add_(
-        0, hash, torch.ones_like(feat[:, 0, :].reshape(-1,))).reshape(
-            batch_size, 1, r, r, r).clamp(min=1)
+    count = torch.zeros(batch_size * r * r * r,
+                        device=feat.device).scatter_add_(
+                            0, hash, torch.ones_like(feat[:, 0, :].reshape(
+                                -1,))).reshape(batch_size, 1, r, r,
+                                               r).clamp(min=1)
     grid = grid / count
 
     # hash = coords[:, 0] * r * r + coords[:, 1] * r + coords[:, 2]

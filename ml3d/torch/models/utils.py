@@ -4,7 +4,7 @@ import torch.nn as nn
 import open3d
 
 if open3d.core.cuda.device_count() > 0:
-    from open3d.ml.torch.ops import trilinear_devoxelize_forward, three_interpolate_for_backward
+    from open3d.ml.torch.ops import trilinear_devoxelize_forward, trilinear_devoxelize_backward
 
 
 class TrilinearDevoxelization(Function):
