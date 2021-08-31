@@ -96,7 +96,6 @@ class NuScenes(BaseDataset):
         Returns:
             A mapping from the class names to the respective RGB values.
         """
-
         classname_to_color = {  # RGB.
             "noise": (0, 0, 0),  # Black.
             "animal": (70, 130, 180),  # Steelblue
