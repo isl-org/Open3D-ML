@@ -333,16 +333,18 @@ class PointPillars(BaseModel):
 
         def batcher():
             count = len(dataset) if steps_per_epoch is None else steps_per_epoch
+            p1 = tf.zeros((0, 7), dtype=tf.float32)
+            p2 = tf.zeros((0,), dtype=tf.int32)
             for i in np.arange(0, count, batch_size):
                 batch = [dataset[i + bi]['data'] for bi in range(batch_size)]
                 points = tf.concat([b['point'] for b in batch], axis=0)
                 bboxes = tf.concat([
-                    b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32))
+                    b.get('bboxes', p1)
                     for b in batch
                 ],
                                    axis=0)
                 labels = tf.concat([
-                    b.get('labels', tf.zeros((0,), dtype=tf.int32))
+                    b.get('labels', p2)
                     for b in batch
                 ],
                                    axis=0)
@@ -355,7 +357,7 @@ class PointPillars(BaseModel):
                 ]
                 count_pts = tf.constant([len(b['point']) for b in batch])
                 count_lbs = tf.constant([
-                    len(b.get('labels', tf.zeros((0,), dtype=tf.int32)))
+                    len(b.get('labels', p2))
                     for b in batch
                 ])
                 yield (points, bboxes, labels, calib, count_pts, count_lbs)

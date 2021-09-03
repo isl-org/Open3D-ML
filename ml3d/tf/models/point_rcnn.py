@@ -426,12 +426,14 @@ class PointRCNN(BaseModel):
 
         def batcher():
             count = len(dataset) if steps_per_epoch is None else steps_per_epoch
+            p1 = tf.zeros((0, 7), dtype=tf.float32)
+            p2 = tf.zeros((0,), dtype=tf.int32)
             for i in np.arange(0, count, batch_size):
                 batch = [dataset[i + bi]['data'] for bi in range(batch_size)]
                 points = tf.stack([b['point'] for b in batch], axis=0)
 
                 bboxes = [
-                    b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32))
+                    b.get('bboxes', p1)
                     for b in batch
                 ]
                 max_gt = 0
@@ -444,7 +446,7 @@ class PointRCNN(BaseModel):
                 bboxes = tf.constant(pad_bboxes)
 
                 labels = [
-                    b.get('labels', tf.zeros((0,), dtype=tf.int32))
+                    b.get('labels', p2)
                     for b in batch
                 ]
                 max_lab = 0
