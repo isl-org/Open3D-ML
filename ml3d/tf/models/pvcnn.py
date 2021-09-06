@@ -1,12 +1,10 @@
 import numpy as np
-import torch
-import torch.nn as nn
+import tensorflow as tf
 import functools
 
 from .base_model import BaseModel
-from ...utils import MODEL
 from .utils import trilinear_devoxelize
-from ..modules.losses import filter_valid_label
+from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 
 
@@ -46,7 +44,7 @@ class PVCNN(BaseModel):
             with_se=False,
             width_multiplier=width_multiplier,
             voxel_resolution_multiplier=voxel_resolution_multiplier)
-        self.point_features = nn.ModuleList(layers)
+        self.point_features = layers
 
         layers, channels_cloud = create_mlp_components(
             in_channels=channels_point,
@@ -54,7 +52,7 @@ class PVCNN(BaseModel):
             classifier=False,
             dim=1,
             width_multiplier=width_multiplier)
-        self.cloud_features = nn.Sequential(*layers)
+        self.cloud_features = tf.keras.Sequential(layers=layers)
 
         layers, _ = create_mlp_components(
             in_channels=(concat_channels_point + channels_cloud),
@@ -62,23 +60,30 @@ class PVCNN(BaseModel):
             classifier=True,
             dim=2,
             width_multiplier=width_multiplier)
-        self.classifier = nn.Sequential(*layers)
+        self.classifier = tf.keras.Sequential(layers=layers)
 
-    def forward(self, inputs):
-        coords = inputs['point'].to(self.device)
-        feat = inputs['feat'].to(self.device)
+    def call(self, inputs, training=False):
+        coords = inputs['point']
+        feat = inputs['feat']
 
         # coords = inputs[:, :3, :]
         out_features_list = []
         for i in range(len(self.point_features)):
             feat, _ = self.point_features[i]((feat, coords))
             out_features_list.append(feat)
-        # feat: num_batches * 1024 * num_points -> num_batches * 1024 -> num_batches * 128
-        feat = self.cloud_features(feat.max(dim=-1, keepdim=False).values)
+        # feat: num_batches * num_points * 1024-> num_batches * 1024 -> num_batches * 128
+
+        feat = self.cloud_features(tf.reduce_max(feat, axis=1, keepdims=False))
+
         out_features_list.append(
-            feat.unsqueeze(-1).repeat([1, 1, coords.size(-1)]))
-        out = self.classifier(torch.cat(out_features_list, dim=1))
-        return out.transpose(1, 2)
+            tf.transpose(tf.repeat(tf.expand_dims(feat, -1),
+                                   coords.shape[1],
+                                   axis=-1),
+                         perm=[0, 2, 1]))
+
+        out = self.classifier(tf.concat(out_features_list, axis=-1))
+
+        return out
 
     def preprocess(self, data, attr):
         points = np.array(data['point'], dtype=np.float32)
@@ -116,8 +121,8 @@ class PVCNN(BaseModel):
             points.shape[0],
             self.cfg.num_points,
             replace=(points.shape[0] < self.cfg.num_points))
-        points = points[choices].transpose()
-        feat = feat[choices].transpose()
+        points = points[choices]
+        feat = feat[choices]
         labels = labels[choices]
 
         data = {}
@@ -127,12 +132,23 @@ class PVCNN(BaseModel):
 
         return data
 
-    def transform(self, data, attr):
-        data['point'] = torch.from_numpy(data['point'])
-        data['feat'] = torch.from_numpy(data['feat'])
-        data['label'] = torch.from_numpy(data['label'])
+    def transform(self, points, feat, labels):
+        return {'point': points, 'feat': feat, 'label': labels}
 
-        return data
+    def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
+
+        def gen():
+            iters = dataset.num_pc
+
+            for idx in range(iters):
+                data, attr = dataset.read_data(idx)
+                yield data['point'], data['feat'], data['label']
+
+        gen_func = gen
+        gen_types = (tf.float32, tf.float32, tf.int32)
+        gen_shapes = ([None, 3], [None, 9], [None])
+
+        return gen_func, gen_types, gen_shapes
 
     def update_probs(self, inputs, results, test_probs, test_labels):
         result = results.reshape(-1, self.cfg.num_classes)
@@ -166,7 +182,7 @@ class PVCNN(BaseModel):
 
         return {'predict_labels': pred_l, 'predict_scores': probs}
 
-    def get_loss(self, Loss, results, inputs, device):
+    def get_loss(self, Loss, results, inputs):
         """Calculate the loss on output of the model.
 
         Attributes:
@@ -179,36 +195,42 @@ class PVCNN(BaseModel):
             Returns loss, labels and scores.
         """
         cfg = self.cfg
-        labels = inputs['data']['label'].reshape(-1,)
-        results = results.reshape(-1, results.shape[-1])
+        labels = tf.reshape(inputs['label'], -1)
+        results = tf.reshape(results, (-1, results.shape[-1]))
 
-        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
-                                            cfg.ignored_label_inds, device)
-
+        scores, labels = Loss.filter_valid_label(results, labels)
         loss = Loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(),
-                                     **cfg_pipeline.optimizer)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer, cfg_pipeline.scheduler_gamma)
+        optimizer = tf.keras.optimizers.Adam(
+            learning_rate=cfg_pipeline['learning_rate'])
 
-        return optimizer, scheduler
+        return optimizer
 
 
-MODEL._register_module(PVCNN, 'torch')
+MODEL._register_module(PVCNN, 'tf')
 
 
-class SE3d(nn.Module):
+class SE3d(tf.keras.layers.Layer):
 
     def __init__(self, channel, reduction=8):
         super().__init__()
-        self.fc = nn.Sequential(
-            nn.Linear(channel, channel // reduction, bias=False),
-            nn.ReLU(inplace=True),
-            nn.Linear(channel // reduction, channel, bias=False), nn.Sigmoid())
+        fc = tf.keras.Sequential()
+        fc.add(
+            tf.keras.layers.Dense(channel // reduction,
+                                  use_bias=False,
+                                  input_shape=(channel,)))
+        fc.add(tf.keras.layers.ReLU())
+        fc.add(tf.keras.layers.Dense(channel, use_bias=False))
+        fc.add(tf.keras.layers.Sigmoid())
+
+        self.fc = fc
+        # self.fc = nn.Sequential(
+        #     nn.Linear(channel, channel // reduction, bias=False),
+        #     nn.ReLU(inplace=True),
+        #     nn.Linear(channel // reduction, channel, bias=False), nn.Sigmoid())
 
     def forward(self, inputs):
         return inputs * self.fc(inputs.mean(-1).mean(-1).mean(-1)).view(
@@ -216,8 +238,14 @@ class SE3d(nn.Module):
 
 
 def _linear_bn_relu(in_channels, out_channels):
-    return nn.Sequential(nn.Linear(in_channels, out_channels),
-                         nn.BatchNorm1d(out_channels), nn.ReLU(True))
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.Dense(out_channels, input_shape=(in_channels,)))
+    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.ReLU())
+
+    return model
+    # return nn.Sequential(nn.Linear(in_channels, out_channels),
+    #                      nn.BatchNorm1d(out_channels), nn.ReLU(True))
 
 
 def create_mlp_components(in_channels,
@@ -235,25 +263,26 @@ def create_mlp_components(in_channels,
         out_channels = [out_channels]
     if len(out_channels) == 0 or (len(out_channels) == 1 and
                                   out_channels[0] is None):
-        return nn.Sequential(), in_channels, in_channels
+        return tf.keras.Sequential(), in_channels, in_channels
 
     layers = []
     for oc in out_channels[:-1]:
         if oc < 1:
-            layers.append(nn.Dropout(oc))
+            layers.append(tf.keras.layers.Dropout(rate=oc))
         else:
             oc = int(r * oc)
             layers.append(block(in_channels, oc))
             in_channels = oc
     if dim == 1:
         if classifier:
-            layers.append(nn.Linear(in_channels, out_channels[-1]))
+            layers.append(tf.keras.layers.Dense(out_channels[-1]))
         else:
             layers.append(
                 _linear_bn_relu(in_channels, int(r * out_channels[-1])))
     else:
         if classifier:
-            layers.append(nn.Conv1d(in_channels, out_channels[-1], 1))
+            layers.append(
+                tf.keras.layers.Conv1D(filters=out_channels[-1], kernel_size=1))
         else:
             layers.append(SharedMLP(in_channels, int(r * out_channels[-1])))
     return layers, out_channels[-1] if classifier else int(r * out_channels[-1])
@@ -287,16 +316,16 @@ def create_pointnet_components(blocks,
     return layers, in_channels, concat_channels
 
 
-class SharedMLP(nn.Module):
+class SharedMLP(tf.keras.layers.Layer):
 
     def __init__(self, in_channels, out_channels, dim=1):
         super().__init__()
         if dim == 1:
-            conv = nn.Conv1d
-            bn = nn.BatchNorm1d
+            conv = tf.keras.layers.Conv1D
+            bn = tf.keras.layers.BatchNormalization
         elif dim == 2:
-            conv = nn.Conv2d
-            bn = nn.BatchNorm2d
+            conv = tf.keras.layers.Conv2D
+            bn = tf.keras.layers.BatchNormalization
         else:
             raise ValueError
         if not isinstance(out_channels, (list, tuple)):
@@ -304,21 +333,21 @@ class SharedMLP(nn.Module):
         layers = []
         for oc in out_channels:
             layers.extend([
-                conv(in_channels, oc, 1),
-                bn(oc),
-                nn.ReLU(True),
+                conv(filters=oc, kernel_size=1),
+                bn(),
+                tf.keras.layers.ReLU(),
             ])
             in_channels = oc
-        self.layers = nn.Sequential(*layers)
+        self.layers = tf.keras.Sequential(layers=layers)
 
-    def forward(self, inputs):
+    def call(self, inputs, training):
         if isinstance(inputs, (list, tuple)):
             return (self.layers(inputs[0]), *inputs[1:])
         else:
             return self.layers(inputs)
 
 
-class PVConv(nn.Module):
+class PVConv(tf.keras.layers.Layer):
 
     def __init__(self,
                  in_channels,
@@ -338,72 +367,64 @@ class PVConv(nn.Module):
                                          normalize=normalize,
                                          eps=eps)
         voxel_layers = [
-            nn.Conv3d(in_channels,
-                      out_channels,
-                      kernel_size,
-                      stride=1,
-                      padding=kernel_size // 2),
-            nn.BatchNorm3d(out_channels, eps=1e-4),
-            nn.LeakyReLU(0.1, True),
-            nn.Conv3d(out_channels,
-                      out_channels,
-                      kernel_size,
-                      stride=1,
-                      padding=kernel_size // 2),
-            nn.BatchNorm3d(out_channels, eps=1e-4),
-            nn.LeakyReLU(0.1, True),
+            tf.keras.layers.Conv3D(filters=out_channels,
+                                   kernel_size=kernel_size,
+                                   strides=1,
+                                   padding="same"),  # kernel_size // 2
+            tf.keras.layers.BatchNormalization(epsilon=1e-4),
+            tf.keras.layers.LeakyReLU(0.1),
+            tf.keras.layers.Conv3D(filters=out_channels,
+                                   kernel_size=kernel_size,
+                                   strides=1,
+                                   padding="same"),
+            tf.keras.layers.BatchNormalization(epsilon=1e-4),
+            tf.keras.layers.LeakyReLU(0.1),
         ]
         if with_se:
             voxel_layers.append(SE3d(out_channels))
-        self.voxel_layers = nn.Sequential(*voxel_layers)
+
+        self.voxel_layers = tf.keras.Sequential(layers=voxel_layers)
         self.point_features = SharedMLP(in_channels, out_channels)
 
-    def forward(self, inputs):
+    def call(self, inputs, training=True):
         features, coords = inputs
         voxel_features, voxel_coords = self.voxelization(features, coords)
         voxel_features = self.voxel_layers(voxel_features)
         voxel_features = trilinear_devoxelize(voxel_features, voxel_coords,
-                                              self.resolution, self.training)
-        fused_features = voxel_features + self.point_features(features)
+                                              self.resolution, training)
+
+        point_features = self.point_features(features)
+        fused_features = voxel_features + point_features
+
         return fused_features, coords
+
+
+# def trilinear_devoxelize(feat, coords, r, training):
+#     return tf.random.uniform((feat.shape[0], coords.shape[1], feat.shape[-1]))
 
 
 def avg_voxelize(feat, coords, r):
     """
-    coords (B, 3, N)
-    feat (B, C, N)
-    return (B, C, r, r, r)
+    coords (B, N, 3)
+    feat (B, N, C)
+    return (B, r, r, r, C)
     """
-    coords = coords.to(torch.int64)
-    batch_size = feat.shape[0]
-    dim = feat.shape[1]
-    grid = torch.zeros((batch_size, dim, r, r, r)).to(feat.device)
 
-    batch_id = torch.from_numpy(np.arange(batch_size).reshape(-1, 1)).to(
-        feat.device)
-    hash = batch_id * r * r * r + coords[:,
-                                         0, :] * r * r + coords[:,
-                                                                1, :] * r + coords[:,
-                                                                                   2, :]
-    hash = hash.reshape(-1,).to(feat.device)
+    shape = tf.constant([feat.shape[0], r, r, r, feat.shape[2]])
+    batch_id = tf.repeat(tf.range(0, feat.shape[0]), feat.shape[1])
+    batch_id = tf.reshape(batch_id, (-1, 1))
+    coords = tf.reshape(coords, (-1, 3))
+    coords = tf.concat([batch_id, coords], 1)
+    feat = tf.reshape(feat, (-1, shape[-1]))
 
-    for i in range(0, dim):
-        grid_ = torch.zeros(batch_size * r * r * r,
-                            device=feat.device).scatter_add_(
-                                0, hash, feat[:, i, :].reshape(-1,)).reshape(
-                                    batch_size, r, r, r)
-        grid[:, i] = grid_
-    count = torch.zeros(batch_size * r * r * r,
-                        device=feat.device).scatter_add_(
-                            0, hash, torch.ones_like(feat[:, 0, :].reshape(
-                                -1,))).reshape(batch_size, 1, r, r,
-                                               r).clamp(min=1)
-    grid = grid / count
+    grid = tf.scatter_nd(coords, feat, shape)
 
-    return grid
+    count = tf.scatter_nd(coords, tf.ones(feat.shape), shape)
+
+    return grid / count
 
 
-class Voxelization(nn.Module):
+class Voxelization(tf.keras.layers.Layer):
 
     def __init__(self, resolution, normalize=True, eps=0):
         super().__init__()
@@ -411,17 +432,23 @@ class Voxelization(nn.Module):
         self.normalize = normalize
         self.eps = eps
 
-    def forward(self, features, coords):
-        coords = coords.detach()
-        norm_coords = coords - coords.mean(2, keepdim=True)
+    def call(self, features, coords):
+        coords = tf.stop_gradient(coords)
+        norm_coords = coords - tf.reduce_mean(coords, axis=1, keepdims=True)
+
         if self.normalize:
-            norm_coords = norm_coords / (norm_coords.norm(
-                dim=1, keepdim=True).max(dim=2, keepdim=True).values * 2.0 +
-                                         self.eps) + 0.5
+            # TODO : change to fro norm
+            norm_coords = norm_coords / (
+                tf.reduce_max(tf.norm(norm_coords, axis=2, keepdims=True),
+                              axis=1,
+                              keepdims=True) * 2.0 + self.eps) + 0.5
+            # norm_coords = norm_coords / (norm_coords.norm(
+            #     dim=1, keepdim=True).max(dim=2, keepdim=True).values * 2.0 +
+            #                              self.eps) + 0.5
         else:
             norm_coords = (norm_coords + 1) / 2.0
-        norm_coords = torch.clamp(norm_coords * self.r, 0, self.r - 1)
-        vox_coords = torch.round(norm_coords).to(torch.int32)
+        norm_coords = tf.clip_by_value(norm_coords * self.r, 0, self.r - 1)
+        vox_coords = tf.cast(tf.round(norm_coords), tf.int32)
 
         return avg_voxelize(features, vox_coords, self.r), norm_coords
 
@@ -429,17 +456,3 @@ class Voxelization(nn.Module):
         return 'resolution={}{}'.format(
             self.r,
             ', normalized eps = {}'.format(self.eps) if self.normalize else '')
-
-
-if __name__ == '__main__':
-    # vox = Voxelization(10)
-    # feat = torch.rand(1, 10, 3)
-    # coords = torch.rand(1, 10, 3) * 100
-
-    # res = vox(feat, coords)
-    # print(vox)
-    feat = torch.Tensor([[1., 2, 3], [3, 4., 5], [4, 6, 7]])
-    coords = torch.IntTensor([[0, 1, 1], [0, 1, 1], [2, 1, 0]])
-    res = avg_voxelize(feat, coords, 3)
-    print(res)
-    res.backward()
