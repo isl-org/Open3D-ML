@@ -3,7 +3,7 @@ import tensorflow as tf
 import functools
 
 from .base_model import BaseModel
-from .utils import trilinear_devoxelize
+from .util import trilinear_devoxelize
 from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 
@@ -420,6 +420,7 @@ def avg_voxelize(feat, coords, r):
     grid = tf.scatter_nd(coords, feat, shape)
 
     count = tf.scatter_nd(coords, tf.ones(feat.shape), shape)
+    count = tf.where(count == 0, 1, count)
 
     return grid / count
 

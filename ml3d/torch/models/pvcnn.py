@@ -398,6 +398,7 @@ def avg_voxelize(feat, coords, r):
                             0, hash, torch.ones_like(feat[:, 0, :].reshape(
                                 -1,))).reshape(batch_size, 1, r, r,
                                                r).clamp(min=1)
+    count[count == 0] = 1
     grid = grid / count
 
     return grid
