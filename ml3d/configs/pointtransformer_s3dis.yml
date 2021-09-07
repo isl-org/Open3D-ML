@@ -34,6 +34,9 @@ model:
       trans_range_ratio: 0.05
     ChromaticJitter:
       std: 0.01
+    HueSaturationTranslation:
+      hue_max: 0.5
+      saturation_max: 0.2
 pipeline:
   name: SemanticSegmentation
   optimizer:
