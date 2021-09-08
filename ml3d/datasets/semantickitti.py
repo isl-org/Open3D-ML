@@ -185,6 +185,8 @@ class SemanticKITTI(BaseDataset):
         save_path = join(test_path, name_seq, 'predictions')
         make_dir(save_path)
         test_file_name = name_points
+        #add follwing line to resolve the error
+        pred = results['predict_labels']
         for ign in cfg.ignored_label_inds:
             pred[pred >= ign] += 1
 
