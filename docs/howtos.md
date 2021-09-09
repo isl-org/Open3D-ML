@@ -4,7 +4,7 @@ This page is an effort to give short examples for common tasks and will be
 extended over time.
 
 ## Visualize network predictions
-Users can inspect the prediction results using the visualizer. Run `python examples/vis_pred.py` to see an example.
+Users can inspect the prediction results using the visualizer. Run `python examples/vis_pred.py` to see an example (torch and tf version is available).
 
 First, initialize a `Visualizer` and set up `LabelLUT` as label names to visualize. Here we would like to visualize points from `SemanticKITTI`. The labels can be obtained by `get_label_to_names()`
 ```python
