@@ -373,14 +373,11 @@ class PointTransformer(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.SGD(self.parameters(), **cfg_pipeline.optimizer)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer,
-            milestones=[
-                int(cfg_pipeline.max_epoch * 0.6),
-                int(cfg_pipeline.max_epoch * 0.8)
-            ],
-            gamma=0.1)
+        optimizer = torch.optim.Adam(self.parameters(),
+                                     **cfg_pipeline.optimizer)
+
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer, cfg_pipeline.scheduler_gamma)
 
         return optimizer, scheduler
 
