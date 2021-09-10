@@ -158,7 +158,8 @@ class SemsegAugmentation(Augmentation):
         all_methods = [
             'recenter', 'normalize', 'rotate', 'scale', 'noise',
             'RandomDropout', 'RandomHorizontalFlip', 'ChromaticAutoContrast',
-            'ChromaticTranslation', 'ChromaticJitter'
+            'ChromaticTranslation', 'ChromaticJitter',
+            'HueSaturationTranslation'
         ]
         for method in cfg:
             if method not in all_methods:
