@@ -917,10 +917,20 @@ class Anchor3DHead(nn.Module):
                     -1, self.box_code_size)
 
                 if target_bboxes[i].shape[0] == 0:
-                    assigned_bboxes.append(torch.zeros(0, 7))
-                    target_idxs.append(torch.zeros((0,), dtype=torch.long))
-                    pos_idxs.append(torch.zeros((0,), dtype=torch.long))
-                    neg_idxs.append(torch.zeros((0,), dtype=torch.long))
+                    assigned_bboxes.append(
+                        torch.zeros((0, 7), device=pred_bboxes.device))
+                    target_idxs.append(
+                        torch.zeros((0,),
+                                    dtype=torch.long,
+                                    device=pred_bboxes.device))
+                    pos_idxs.append(
+                        torch.zeros((0,),
+                                    dtype=torch.long,
+                                    device=pred_bboxes.device))
+                    neg_idxs.append(
+                        torch.zeros((0,),
+                                    dtype=torch.long,
+                                    device=pred_bboxes.device))
                     continue
 
                 # compute a fast approximation of IoU
