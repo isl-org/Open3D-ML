@@ -607,11 +607,9 @@ def queryandgroup(nsample,
     n, m, c = points.shape[0], queries.shape[0], feat.shape[1]
     grouped_xyz = points[idx.view(-1).long(), :].view(m, nsample,
                                                       3)  # (m, nsample, 3)
-    #grouped_xyz = grouping(xyz, idx) # (m, nsample, 3)
     grouped_xyz -= queries.unsqueeze(1)  # (m, nsample, 3)
     grouped_feat = feat[idx.view(-1).long(), :].view(m, nsample,
                                                      c)  # (m, nsample, c)
-    #grouped_feat = grouping(feat, idx) # (m, nsample, c)
 
     if use_xyz:
         return torch.cat((grouped_xyz, grouped_feat), -1)  # (m, nsample, 3+c)
@@ -683,8 +681,6 @@ def interpolation(points,
                           points_row_splits=points_row_splits,
                           queries_row_splits=queries_row_splits,
                           return_distances=True)  # (n, 3), (n, 3)
-
-    # TODO : pad idx if num_points < nsample
 
     idx, dist = idx.reshape(-1, 3), dist.reshape(-1, 3)
 
