@@ -435,7 +435,7 @@ class PointTransformer(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
         optimizer = tf.keras.optimizers.Adam(
-            learning_rate=cfg_pipeline.optimizer.lr)
+            learning_rate=cfg_pipeline.optimizer.learning_rate)
 
         return optimizer
 
@@ -471,7 +471,7 @@ class Transformer(layers.Layer):
                                        epsilon=1e-5), layers.ReLU(),
              layers.Dense(out_planes // share_planes)))
 
-        self.softmax = layers.Softmax(axis=-1)
+        self.softmax = layers.Softmax(axis=1)
 
     def call(self, pxo, training):
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
