@@ -69,11 +69,12 @@ class PVCNN(BaseModel):
         # coords = inputs[:, :3, :]
         out_features_list = []
         for i in range(len(self.point_features)):
-            feat, _ = self.point_features[i]((feat, coords))
+            feat, _ = self.point_features[i]((feat, coords), training=training)
             out_features_list.append(feat)
         # feat: num_batches * num_points * 1024-> num_batches * 1024 -> num_batches * 128
 
-        feat = self.cloud_features(tf.reduce_max(feat, axis=1, keepdims=False))
+        feat = self.cloud_features(tf.reduce_max(feat, axis=1, keepdims=False),
+                                   training=training)
 
         out_features_list.append(
             tf.transpose(tf.repeat(tf.expand_dims(feat, -1),
@@ -81,7 +82,8 @@ class PVCNN(BaseModel):
                                    axis=-1),
                          perm=[0, 2, 1]))
 
-        out = self.classifier(tf.concat(out_features_list, axis=-1))
+        out = self.classifier(tf.concat(out_features_list, axis=-1),
+                              training=training)
 
         return out
 
@@ -149,15 +151,6 @@ class PVCNN(BaseModel):
         gen_shapes = ([None, 3], [None, 9], [None])
 
         return gen_func, gen_types, gen_shapes
-
-    def update_probs(self, inputs, results, test_probs, test_labels):
-        result = results.reshape(-1, self.cfg.num_classes)
-        probs = torch.nn.functional.softmax(result, dim=-1).cpu().data.numpy()
-        labels = np.argmax(probs, 1)
-
-        self.trans_point_sampler(patchwise=False)
-
-        return probs, labels
 
     def inference_begin(self, data):
         data = self.preprocess(data, {'split': 'test'})
@@ -342,9 +335,9 @@ class SharedMLP(tf.keras.layers.Layer):
 
     def call(self, inputs, training):
         if isinstance(inputs, (list, tuple)):
-            return (self.layers(inputs[0]), *inputs[1:])
+            return (self.layers(inputs[0], training=training), *inputs[1:])
         else:
-            return self.layers(inputs)
+            return self.layers(inputs, training=training)
 
 
 class PVConv(tf.keras.layers.Layer):
@@ -386,14 +379,16 @@ class PVConv(tf.keras.layers.Layer):
         self.voxel_layers = tf.keras.Sequential(layers=voxel_layers)
         self.point_features = SharedMLP(in_channels, out_channels)
 
-    def call(self, inputs, training=True):
+    def call(self, inputs, training):
         features, coords = inputs
-        voxel_features, voxel_coords = self.voxelization(features, coords)
-        voxel_features = self.voxel_layers(voxel_features)
+        voxel_features, voxel_coords = self.voxelization(features,
+                                                         coords,
+                                                         training=training)
+        voxel_features = self.voxel_layers(voxel_features, training=training)
         voxel_features = trilinear_devoxelize(voxel_features, voxel_coords,
                                               self.resolution, training)
 
-        point_features = self.point_features(features)
+        point_features = self.point_features(features, training=training)
         fused_features = voxel_features + point_features
 
         return fused_features, coords
@@ -433,19 +428,15 @@ class Voxelization(tf.keras.layers.Layer):
         self.normalize = normalize
         self.eps = eps
 
-    def call(self, features, coords):
+    def call(self, features, coords, training):
         coords = tf.stop_gradient(coords)
         norm_coords = coords - tf.reduce_mean(coords, axis=1, keepdims=True)
 
         if self.normalize:
-            # TODO : change to fro norm
             norm_coords = norm_coords / (
                 tf.reduce_max(tf.norm(norm_coords, axis=2, keepdims=True),
                               axis=1,
                               keepdims=True) * 2.0 + self.eps) + 0.5
-            # norm_coords = norm_coords / (norm_coords.norm(
-            #     dim=1, keepdim=True).max(dim=2, keepdim=True).values * 2.0 +
-            #                              self.eps) + 0.5
         else:
             norm_coords = (norm_coords + 1) / 2.0
         norm_coords = tf.clip_by_value(norm_coords * self.r, 0, self.r - 1)
