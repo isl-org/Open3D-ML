@@ -10,6 +10,7 @@ from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
 
 from open3d.ml.contrib import subsample_batch
+from open3d.ml.torch.layers import FixedRadiusSearch
 
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
