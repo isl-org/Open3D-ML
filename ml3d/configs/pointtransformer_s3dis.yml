@@ -40,14 +40,15 @@ model:
 pipeline:
   name: SemanticSegmentation
   optimizer:
-    lr: 0.005
+    lr: 0.02
+    momentum: 0.9
     weight_decay: 0.0001
   batch_size: 3
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 512
   save_ckpt_freq: 5
-  scheduler_gamma: 1
+  scheduler_gamma: 0.99
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 3
