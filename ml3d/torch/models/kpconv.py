@@ -2,7 +2,6 @@ import time
 import math
 import torch
 import torch.nn as nn
-import open3d.core as o3c
 
 from tqdm import tqdm
 from torch.nn.parameter import Parameter
@@ -11,6 +10,7 @@ from sklearn.neighbors import KDTree
 
 from open3d.ml.contrib import subsample_batch
 from open3d.ml.torch.layers import FixedRadiusSearch
+from open3d.ml.torch.ops import ragged_to_dense
 
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
