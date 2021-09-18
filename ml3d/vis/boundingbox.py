@@ -1,6 +1,6 @@
 import numpy as np
 import open3d as o3d
-import cv2
+from PIL import Image, ImageDraw
 
 
 class BoundingBox3D:
@@ -205,7 +205,7 @@ class BoundingBox3D:
                                                 imgfov_pts_2d,
                                                 indices_2d,
                                                 colors_2d,
-                                                thickness=2)
+                                                thickness=3)
 
     @staticmethod
     def plot_rect3d_on_img(img,
@@ -226,6 +226,9 @@ class BoundingBox3D:
             color (tuple[int]): The color to draw bboxes. Default: (1.0, 1.0, 1.0), i.e. white.
             thickness (int, optional): The thickness of bboxes. Default: 1.
         """
+        img_pil = Image.fromarray(img)
+        draw = ImageDraw.Draw(img_pil)
+
         if color is None:
             color = np.ones((line_indices.shape[0], line_indices.shape[1], 3))
         for i in range(num_rects):
@@ -251,6 +254,5 @@ class BoundingBox3D:
                 else:
                     pt1 = (corners[start, 0], corners[start, 1])
                     pt2 = (corners[end, 0], corners[end, 1])
-                cv2.line(img, pt1, pt2, c, thickness, cv2.LINE_AA)
-
-        return img.astype(np.uint8)
+                draw.line([pt1, pt2], fill=c, width=thickness)
+        return np.array(img_pil).astype(np.uint8)
