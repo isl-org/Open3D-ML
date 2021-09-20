@@ -233,7 +233,7 @@ class SE3d(tf.keras.layers.Layer):
 def _linear_bn_relu(in_channels, out_channels):
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Dense(out_channels, input_shape=(in_channels,)))
-    model.add(tf.keras.layers.BatchNormalization())
+    model.add(tf.keras.layers.BatchNormalization(momentum=0.9, epsilon=1e-5))
     model.add(tf.keras.layers.ReLU())
 
     return model
@@ -327,7 +327,7 @@ class SharedMLP(tf.keras.layers.Layer):
         for oc in out_channels:
             layers.extend([
                 conv(filters=oc, kernel_size=1),
-                bn(),
+                bn(momentum=0.9, epsilon=1e-5),
                 tf.keras.layers.ReLU(),
             ])
             in_channels = oc
@@ -364,13 +364,13 @@ class PVConv(tf.keras.layers.Layer):
                                    kernel_size=kernel_size,
                                    strides=1,
                                    padding="same"),  # kernel_size // 2
-            tf.keras.layers.BatchNormalization(epsilon=1e-4),
+            tf.keras.layers.BatchNormalization(momentum=0.9, epsilon=1e-4),
             tf.keras.layers.LeakyReLU(0.1),
             tf.keras.layers.Conv3D(filters=out_channels,
                                    kernel_size=kernel_size,
                                    strides=1,
                                    padding="same"),
-            tf.keras.layers.BatchNormalization(epsilon=1e-4),
+            tf.keras.layers.BatchNormalization(momentum=0.9, epsilon=1e-4),
             tf.keras.layers.LeakyReLU(0.1),
         ]
         if with_se:
