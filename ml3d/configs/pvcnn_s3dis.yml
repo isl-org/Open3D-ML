@@ -17,7 +17,7 @@ model:
   num_points: 40960
   extra_feature_channels: 6
   width_multiplier: 1
-  voxel_resolution_multiplier: 1
+  voxel_resolution_multiplier: 2
   ignored_label_inds: [-1]
   augment: None
 pipeline:
@@ -26,11 +26,11 @@ pipeline:
     lr: 0.001
     weight_decay: 0.00001
     betas: [0.9, 0.999]
-  batch_size: 2
+  batch_size: 4
   main_log_dir: ./logs
-  max_epoch: 512
+  max_epoch: 256
   save_ckpt_freq: 5
   scheduler_gamma: 0.99
   test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 2
+  val_batch_size: 4
