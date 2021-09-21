@@ -206,7 +206,7 @@ class Toronto3DSplit(BaseDatasetSplit):
 
         data = o3d.t.io.read_point_cloud(pc_path).point
 
-        points = data["points"].numpy() - self.UTM_OFFSET
+        points = data["positions"].numpy() - self.UTM_OFFSET
         points = np.float32(points)
 
         feat = data["colors"].numpy().astype(np.float32)
