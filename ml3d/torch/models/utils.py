@@ -21,7 +21,7 @@ class TrilinearDevoxelization(Function):
             FloatTensor[B, C, N]
         """
         B, C = features.shape[:2]
-        features = features.contiguous().view(B, C, -1)
+        features = features.contiguous()
         coords = coords.contiguous()
         outs, inds, wgts = trilinear_devoxelize_forward(resolution, is_training,
                                                         coords, features)
