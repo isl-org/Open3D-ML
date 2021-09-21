@@ -86,7 +86,7 @@ class Model:
             # TensorList can be inplace.
             xyz = pts[:, [0, 1, 2]]
             tcloud.point["positions"] = Visualizer._make_tcloud_array(xyz,
-                                                                   copy=True)
+                                                                      copy=True)
         else:
             tcloud.point["positions"] = Visualizer._make_tcloud_array(pts)
         self.tclouds[name] = tcloud
