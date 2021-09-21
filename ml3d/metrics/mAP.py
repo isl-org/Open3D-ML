@@ -231,7 +231,11 @@ def mAP(pred,
         detection[:, :, box_cnts[i]:box_cnts[i + 1]] = d
         fns += f
 
-    mAP = np.empty((len(classes), len(difficulties), 1))
+    mAP = np.zeros((len(classes), len(difficulties), 1))
+    if samples <= 0:
+        # No samples to compute mAP against, so all results are zero.
+        return mAP
+
     for i in range(len(classes)):
         for j in range(len(difficulties)):
             det = detection[i, j, np.argsort(-detection[i, j, :, 0])]
@@ -239,13 +243,17 @@ def mAP(pred,
             #gt_cnt = np.sum(det[:,1]) + fns[i, j]
             thresholds = sample_thresholds(det[np.where(det[:, 1] > 0)[0], 0],
                                            gt_cnt[i, j], samples)
+            if len(thresholds) == 0:
+                # No predictions met cutoff thresholds, skipping AP computation to avoid NaNs.
+                continue
 
             prec = np.zeros((len(thresholds),))
             for ti in range(len(thresholds))[::-1]:
                 d = det[np.where(det[:, 0] >= thresholds[ti])]
                 tp_acc = np.sum(d[:, 1])
                 fp_acc = np.sum(d[:, 2])
-                prec[ti] = tp_acc / (tp_acc + fp_acc)
+                if (tp_acc + fp_acc) > 0:
+                    prec[ti] = tp_acc / (tp_acc + fp_acc)
                 prec[ti] = np.max(prec[ti:], axis=-1)
 
             if len(prec[::4]) < int(samples / 4 + 1):
