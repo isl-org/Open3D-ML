@@ -3,8 +3,7 @@ name: Style check
 on:
   workflow_dispatch:
   push:
-    branches:
-      - master
+    branches: [master, dev]
   pull_request:
     types: [opened, reopened, synchronize]
 

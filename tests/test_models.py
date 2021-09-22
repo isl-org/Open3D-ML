@@ -52,9 +52,16 @@ def test_randlanet_torch():
         'features': torch.from_numpy(np.array([inputs['features']])),
         'labels': torch.from_numpy(np.array([inputs['labels']]))
     }
+    net.eval()
     out = net(inputs).detach().numpy()
 
     assert out.shape == (1, 5000, 10)
+
+    # TODO: issue with Gather
+    # ov_net = ml3d.models.OpenVINOModel(net)
+    # ov_out = ov_net(inputs).detach().numpy()
+    # assert ov_out.shape == out.shape
+    # assert np.max(np.abs(ov_out - out)) < 2e-4
 
 
 def test_randlanet_tf():
@@ -86,9 +93,14 @@ def test_randlanet_tf():
     for i in range(18):  # num_layers * 4 + 2
         inputs[i] = tf.expand_dims(inputs[i], 0)
 
-    out = net(inputs).numpy()
+    out = net(inputs, training=False).numpy()
 
     assert out.shape == (1, 5000, 10)
+
+    ov_net = ml3d.models.OpenVINOModel(net)
+    ov_out = ov_net(inputs)
+    assert ov_out.shape == out.shape
+    assert np.max(np.abs(ov_out - out)) < 1e-6
 
 
 def test_kpconv_torch():
@@ -115,13 +127,22 @@ def test_kpconv_torch():
     data = net.preprocess(data, attr)
     inputs = {'data': net.transform(data, attr), 'attr': attr}
     inputs = batcher.collate_fn([inputs])
+
+    net.eval()
     out = net(inputs['data']).detach().numpy()
 
     assert out.shape[1] == 5
 
+    ov_net = ml3d.models.OpenVINOModel(net)
+    ov_out = ov_net(inputs['data']).detach().numpy()
+    assert ov_out.shape == out.shape
+    assert np.max(np.abs(ov_out - out)) < 1e-7
+
 
 def test_kpconv_tf():
     import open3d.ml.tf as ml3d
+
+    np.random.seed(32)
 
     net = ml3d.models.KPFCNN(lbl_values=[0, 1, 2, 3, 4, 5],
                              num_classes=4,
@@ -158,6 +179,11 @@ def test_kpconv_tf():
 
     assert out.shape == (1000, 5)
 
+    ov_net = ml3d.models.OpenVINOModel(net)
+    ov_out = ov_net(inputs)
+    assert ov_out.shape == out.shape
+    assert np.max(np.abs(ov_out - out)) < 1e-5
+
 
 def test_pointpillars_torch():
     import open3d.ml.torch as ml3d
@@ -183,6 +209,13 @@ def test_pointpillars_torch():
         results = net(data)
         boxes = net.inference_end(results, data)
         assert type(boxes) == list
+
+    ov_net = ml3d.models.OpenVINOModel(net)
+    ov_results = ov_net(data)
+
+    for out, ref in zip(ov_results, results):
+        assert out.shape == ref.shape
+        assert torch.max(torch.abs(out - ref)) < 1e-5
 
 
 def test_pointpillars_tf():
