@@ -1,4 +1,5 @@
 import math
+import sys
 import numpy as np
 import threading
 import open3d as o3d
@@ -294,7 +295,10 @@ class DatasetModel(Model):
                 self._attr_rename["feat"] = "colors"
                 self._attr_rename["feature"] = "colors"
         else:
-            print("[ERROR] Dataset split has no data")
+            print(
+                "[ERROR] Dataset split has no data. Please check that you are pointing to the correct directory for the dataset."
+            )
+            sys.exit(-1)
 
     def is_loaded(self, name):
         """Check if the data is loaded."""
