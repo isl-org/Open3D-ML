@@ -70,16 +70,21 @@ class FurthestPointSamplingV2(Function):
     def forward(ctx, xyz, row_splits, new_row_splits):
         """Forward pass.
 
-        Attributes:
+        Args:
             ctx: Context.
-            xyz: Input pointcloud (N, 3).
-            row_splits: splits to define batch.
-            new_row_splits: splits for output batch lengths.
+            xyz (torch.float32): Input pointcloud (N, 3).
+            row_splits (torch,int64): splits to define batch (b + 1,)
+            new_row_splits (torch.int64): splits for output batch lengths (b + 1,)
+
+        Returns:
+            Returns indices of sampled points with shape (new_row_splits[-1], ).
         """
         if not open3d.core.cuda.device_count() > 0:
             raise NotImplementedError
 
-        assert xyz.is_contiguous()
+        if not xyz.is_contiguous():
+            raise ValueError(
+                "FurthestPointSampling : coordinates are not contiguous.")
 
         idx = []
         for i in range(0, row_splits.shape[0] - 1):

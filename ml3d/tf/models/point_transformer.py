@@ -55,62 +55,27 @@ class PointTransformer(BaseModel):
         fpn_planes, fpnhead_planes, share_planes = 128, 64, 8
         stride, nsample = [1, 4, 4, 4, 4], [8, 16, 16, 16, 16]
         block = Bottleneck
-        self.enc1 = self._make_enc(block,
-                                   planes[0],
-                                   blocks[0],
-                                   share_planes,
-                                   stride=stride[0],
-                                   nsample=nsample[0])  # N/1
-        self.enc2 = self._make_enc(block,
-                                   planes[1],
-                                   blocks[1],
-                                   share_planes,
-                                   stride=stride[1],
-                                   nsample=nsample[1])  # N/4
-        self.enc3 = self._make_enc(block,
-                                   planes[2],
-                                   blocks[2],
-                                   share_planes,
-                                   stride=stride[2],
-                                   nsample=nsample[2])  # N/16
-        self.enc4 = self._make_enc(block,
-                                   planes[3],
-                                   blocks[3],
-                                   share_planes,
-                                   stride=stride[3],
-                                   nsample=nsample[3])  # N/64
-        self.enc5 = self._make_enc(block,
-                                   planes[4],
-                                   blocks[4],
-                                   share_planes,
-                                   stride=stride[4],
-                                   nsample=nsample[4])  # N/256
-        self.dec5 = self._make_dec(block,
-                                   planes[4],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[4],
-                                   is_head=True)  # transform p5
-        self.dec4 = self._make_dec(block,
-                                   planes[3],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[3])  # fusion p5 and p4
-        self.dec3 = self._make_dec(block,
-                                   planes[2],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[2])  # fusion p4 and p3
-        self.dec2 = self._make_dec(block,
-                                   planes[1],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[1])  # fusion p3 and p2
-        self.dec1 = self._make_dec(block,
-                                   planes[0],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[0])  # fusion p2 and p1
+
+        self.encoders = []
+        for i in range(5):
+            self.encoders.append(
+                self._make_enc(
+                    block,
+                    planes[i],
+                    blocks[i],
+                    share_planes,
+                    stride=stride[i],
+                    nsample=nsample[i]))  # N/1, N/4, N/16, N/64, N/256
+
+        self.decoders = []
+        for i in range(4, -1, -1):
+            self.decoders.append(
+                self._make_dec(block,
+                               planes[i],
+                               2,
+                               share_planes,
+                               nsample=nsample[i],
+                               is_head=True if i == 4 else False))
 
         self.cls = tf.keras.models.Sequential(
             (layers.InputLayer(input_shape=(planes[0],)),
@@ -197,11 +162,17 @@ class PointTransformer(BaseModel):
                 layers.Input(shape=(planes * block.expansion)),
                 layers.Input(shape=(0,), dtype=tf.int64)
             ]
-        for _ in range(1, blocks):
-            x = block(self.in_planes,
-                      self.in_planes,
-                      share_planes,
-                      nsample=nsample)(decoder_inputs)
+        for i in range(1, blocks):
+            if i == 1:
+                x = block(self.in_planes,
+                          self.in_planes,
+                          share_planes,
+                          nsample=nsample)(decoder_inputs)
+            else:
+                x = block(self.in_planes,
+                          self.in_planes,
+                          share_planes,
+                          nsample=nsample)(x)
 
         decoder.append(
             tf.keras.Model(inputs=decoder_inputs, outputs=x, name="decoder"))
@@ -216,69 +187,71 @@ class PointTransformer(BaseModel):
                 point (tf.float32): Input pointcloud (N,3)
                 feat (tf.float32): Input features (N, 3)
                 row_splits (tf.int64): row splits for batches (b+1,)
+            training: training mode of model.
 
         Returns:
             Returns the probability distribution.
+
         """
-        point_0, feat_0, row_splits_0 = inputs['point'], inputs['feat'], inputs[
-            'row_splits']  # (n, 3), (n, c), (b)
+        points = [inputs['point']]  # (n, 3)
+        feats = [inputs['feat']]  # (n, c)
+        row_splits = [inputs['row_splits']]  # (b)
 
-        feat_0 = point_0 if self.in_channels == 3 else tf.concat(
-            (point_0, feat_0), 1)  # maybe use feat for in_channels == 3
-        point_1, feat_1, row_splits_1 = self.enc1(
-            [point_0, feat_0, row_splits_0], training=training)
-        point_2, feat_2, row_splits_2 = self.enc2(
-            [point_1, feat_1, row_splits_1], training=training)
-        point_3, feat_3, row_splits_3 = self.enc3(
-            [point_2, feat_2, row_splits_2], training=training)
-        point_4, feat_4, row_splits_4 = self.enc4(
-            [point_3, feat_3, row_splits_3], training=training)
-        point_5, feat_5, row_splits_5 = self.enc5(
-            [point_4, feat_4, row_splits_4], training=training)
+        feats[0] = points[0] if self.in_channels == 3 else tf.concat(
+            (points[0], feats[0]), 1)
 
-        feat_5 = self.dec5[1]([
-            point_5, self.dec5[0]([point_5, feat_5, row_splits_5],
-                                  training=training), row_splits_5
-        ],
-                              training=training)[1]
-        feat_4 = self.dec4[1]([
-            point_4, self.dec4[0]([point_4, feat_4, row_splits_4],
-                                  [point_5, feat_5, row_splits_5],
-                                  training=training), row_splits_4
-        ],
-                              training=training)[1]
-        feat_3 = self.dec3[1]([
-            point_3, self.dec3[0]([point_3, feat_3, row_splits_3],
-                                  [point_4, feat_4, row_splits_4],
-                                  training=training), row_splits_3
-        ],
-                              training=training)[1]
-        feat_2 = self.dec2[1]([
-            point_2, self.dec2[0]([point_2, feat_2, row_splits_2],
-                                  [point_3, feat_3, row_splits_3],
-                                  training=training), row_splits_2
-        ],
-                              training=training)[1]
-        feat_1 = self.dec1[1]([
-            point_1, self.dec1[0]([point_1, feat_1, row_splits_1],
-                                  [point_2, feat_2, row_splits_2],
-                                  training=training), row_splits_1
-        ],
-                              training=training)[1]
-        feat = self.cls(feat_1, training=training)
+        for i in range(5):
+            p, f, r = self.encoders[i]([points[i], feats[i], row_splits[i]],
+                                       training=training)
+            points.append(p)
+            feats.append(f)
+            row_splits.append(r)
+
+        for i in range(4, -1, -1):
+            if i == 4:
+                feats[i + 1] = self.decoders[4 - i][1]([
+                    points[i + 1], self.decoders[4 - i][0](
+                        [points[i + 1], feats[i + 1], row_splits[i + 1]],
+                        training=training), row_splits[i + 1]
+                ],
+                                                       training=training)[1]
+            else:
+                feats[i + 1] = self.decoders[4 - i][1]([
+                    points[i + 1], self.decoders[4 - i][0](
+                        [points[i + 1], feats[i + 1], row_splits[i + 1]],
+                        [points[i + 2], feats[i + 2], row_splits[i + 2]],
+                        training=training), row_splits[i + 1]
+                ],
+                                                       training=training)[1]
+
+        feat = self.cls(feats[1], training=training)
 
         return feat
 
     def preprocess(self, data, attr):
+        """Data preprocessing function.
+
+        This function is called before training to preprocess the data from a
+        dataset. It consists of subsampling pointcloud with voxelization,
+        augmentation and normalizing the features.
+
+        Args:
+            data: A sample from the dataset.
+            attr: The corresponding attributes.
+
+        Returns:
+            Returns the preprocessed data
+
+        """
         cfg = self.cfg
         points = np.array(data['point'], dtype=np.float32)
 
-        if 'label' not in data or data['label'] is None:
+        if data.get('label') is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
             labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
-        if 'feat' not in data or data['feat'] is None:
+        if data.get('feat') is None:
             feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
@@ -341,6 +314,22 @@ class PointTransformer(BaseModel):
         return data
 
     def transform(self, point, feat, label, splits):
+        """Transform function for the point cloud and features.
+
+        This function is called after preprocess method by dataset generator.
+        It consists of mapping data to dict.
+
+        Args:
+            point: Input pointcloud.
+            feat: Input features.
+            label: Input labels.
+            splits: row_splits defining batches.
+
+        Returns:
+            Returns dictionary data with keys
+            (point, feat, label, row_splits).
+
+        """
         return {
             'point': point,
             'feat': feat,
@@ -415,11 +404,11 @@ class PointTransformer(BaseModel):
 
         return True
 
-    def get_loss(self, Loss, results, inputs):
+    def get_loss(self, sem_seg_loss, results, inputs):
         """Calculate the loss on output of the model.
 
         Args:
-            Loss: Object of type `SemSegLoss`.
+            sem_seg_loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
             device: device(cpu or cuda).
@@ -428,8 +417,8 @@ class PointTransformer(BaseModel):
             Returns loss, labels and scores.
         """
         labels = inputs['label']
-        scores, labels = Loss.filter_valid_label(results, labels)
-        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        scores, labels = sem_seg_loss.filter_valid_label(results, labels)
+        loss = sem_seg_loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
 
@@ -444,8 +433,17 @@ MODEL._register_module(PointTransformer, 'tf')
 
 
 class Transformer(layers.Layer):
+    """Transformer layer of the model, uses self attention."""
 
     def __init__(self, in_planes, out_planes, share_planes=8, nsample=16):
+        """Constructor for Transformer Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            out_planes (int): Number of output planes.
+            share_planes (int): Number of shared planes.
+            nsample (int): Number of neighbours.
+        """
         super().__init__()
         self.mid_planes = mid_planes = out_planes // 1
         self.out_planes = out_planes
@@ -474,6 +472,15 @@ class Transformer(layers.Layer):
         self.softmax = layers.Softmax(axis=1)
 
     def call(self, pxo, training):
+        """Forward call for Transformer.
+
+        Args:
+            pxo: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+            training: training mode of model.
+        Returns:
+            Transformer features.
+        """
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
         feat_q, feat_k, feat_v = self.linear_q(feat), self.linear_k(
             feat), self.linear_v(feat)  # (n, c)
@@ -519,8 +526,21 @@ class Transformer(layers.Layer):
 
 
 class TransitionDown(layers.Layer):
+    """TransitionDown layer for PointTransformer.
+
+    Subsamples points and increase receptive field.
+    """
 
     def __init__(self, in_planes, out_planes, stride=1, nsample=16):
+        """Constructor for TransitionDown Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            out_planes (int): Number of output planes.
+            stride (int): subsampling factor.
+            nsample (int): Number of neighbours.
+
+        """
         super().__init__()
         self.stride, self.nsample = stride, nsample
         if stride != 1:
@@ -542,6 +562,16 @@ class TransitionDown(layers.Layer):
         return np.array(new_row_splits, dtype=np.int64)
 
     def call(self, pxo, training):
+        """Forward call for TransitionDown
+
+        Args:
+            pxo: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+            training: training mode of model.
+        Returns:
+            List of point, feat, row_splits.
+
+        """
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
         if self.stride != 1:
             new_row_splits = tf.numpy_function(self.compute_new_row_splits,
@@ -572,8 +602,19 @@ class TransitionDown(layers.Layer):
 
 
 class TransitionUp(layers.Layer):
+    """Decoder layer for PointTransformer.
+
+    Interpolate points based on corresponding encoder layer.
+    """
 
     def __init__(self, in_planes, out_planes=None):
+        """Constructor for TransitionUp Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            out_planes (int): Number of output planes.
+
+        """
         super().__init__()
         if out_planes is None:
             self.linear1 = tf.keras.models.Sequential(
@@ -597,6 +638,18 @@ class TransitionUp(layers.Layer):
                                            epsilon=1e-5), layers.ReLU()))
 
     def call(self, pxo1, pxo2=None, training=False):
+        """Forward call for TransitionUp
+
+        Args:
+            pxo1: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+            pxo2: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+            training: training mode of model.
+        Returns:
+            Interpolated features.
+
+        """
         if pxo2 is None:
             _, feat, row_splits = pxo1  # (n, 3), (n, c), (b)
             feat_tmp = []
@@ -625,9 +678,22 @@ class TransitionUp(layers.Layer):
 
 
 class Bottleneck(layers.Layer):
+    """Bottleneck layer for PointTransformer.
+
+    Block of layers using Transformer layer as building block.
+    """
     expansion = 1
 
     def __init__(self, in_planes, planes, share_planes=8, nsample=16):
+        """Constructor for Bottleneck Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            planes (int): Number of output planes.
+            share_planes (int): Number of shared planes.
+            nsample (int): Number of neighbours.
+
+        """
         super(Bottleneck, self).__init__()
         self.linear1 = layers.Dense(planes, use_bias=False)
         self.bn1 = layers.BatchNormalization(momentum=0.9, epsilon=1e-5)
@@ -638,6 +704,16 @@ class Bottleneck(layers.Layer):
         self.relu = layers.ReLU()
 
     def call(self, pxo, training):
+        """Forward call for Bottleneck
+
+        Args:
+            pxo: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+            training: training mode of model.
+        Returns:
+            List of point, feat, row_splits.
+
+        """
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
         identity = feat
         feat = self.relu(self.bn1(self.linear1(feat), training=training))
@@ -673,6 +749,7 @@ def queryandgroup(nsample,
 
     Returns:
         Returns grouped features (m, nsample, c) or (m, nsample, 3+c).
+
     """
     if queries is None:
         queries = points
@@ -719,6 +796,7 @@ def interpolation(points,
 
     Returns:
         Returns interpolated features (n, c).
+
     """
     ans = knn_search(points,
                      queries,
@@ -729,9 +807,9 @@ def interpolation(points,
     idx = tf.cast(tf.reshape(ans.neighbors_index, (-1, k)), tf.int64)
     dist = tf.reshape(ans.neighbors_distance, (-1, k))
 
-    dist_recip = 1.0 / (dist + 1e-8)  # (n, 3)
+    dist_recip = 1.0 / (dist + 1e-8)  # (n, k)
     norm = tf.reduce_sum(dist_recip, 1, keepdims=True)
-    weight = dist_recip / norm  # (n, 3)
+    weight = dist_recip / norm  # (n, k)
 
     new_feat = tf.zeros((queries.shape[0], feat.shape[1]))
 

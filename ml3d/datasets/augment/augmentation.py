@@ -265,7 +265,7 @@ class SemsegAugmentation(Augmentation):
         return feats
 
     @staticmethod
-    def __rgb_to_hsv(rgb):
+    def _rgb_to_hsv(rgb):
         """Converts RGB to HSV.
 
         Translated from source of colorsys.rgb_to_hsv
@@ -303,7 +303,7 @@ class SemsegAugmentation(Augmentation):
         return hsv
 
     @staticmethod
-    def __hsv_to_rgb(hsv):
+    def _hsv_to_rgb(hsv):
         """Converts HSV to RGB.
 
         Translated from source of colorsys.hsv_to_rgb
@@ -340,19 +340,19 @@ class SemsegAugmentation(Augmentation):
 
         Args:
             feat: Features.
-            cfg: configuration dict.
+            cfg: config dict with keys('hue_max', and 'saturation_max').
 
         """
         hue_max = cfg.get('hue_max', 0.5)
         saturation_max = cfg.get('saturation_max', 0.2)
 
         # Assume feat[:, :3] is rgb
-        hsv = SemsegAugmentation.__rgb_to_hsv(feat[:, :3])
+        hsv = SemsegAugmentation._rgb_to_hsv(feat[:, :3])
         hue_val = (np.random.rand() - 0.5) * 2 * hue_max
         sat_ratio = 1 + (np.random.rand() - 0.5) * 2 * saturation_max
         hsv[..., 0] = np.remainder(hue_val + hsv[..., 0] + 1, 1)
         hsv[..., 1] = np.clip(sat_ratio * hsv[..., 1], 0, 1)
-        feat[:, :3] = np.clip(SemsegAugmentation.__hsv_to_rgb(hsv), 0, 255)
+        feat[:, :3] = np.clip(SemsegAugmentation._hsv_to_rgb(hsv), 0, 255)
 
         return feat
 

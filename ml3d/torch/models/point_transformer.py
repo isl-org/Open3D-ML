@@ -59,62 +59,28 @@ class PointTransformer(BaseModel):
         fpn_planes, fpnhead_planes, share_planes = 128, 64, 8
         stride, nsample = [1, 4, 4, 4, 4], [8, 16, 16, 16, 16]
         block = Bottleneck
-        self.enc1 = self._make_enc(block,
-                                   planes[0],
-                                   blocks[0],
-                                   share_planes,
-                                   stride=stride[0],
-                                   nsample=nsample[0])  # N/1
-        self.enc2 = self._make_enc(block,
-                                   planes[1],
-                                   blocks[1],
-                                   share_planes,
-                                   stride=stride[1],
-                                   nsample=nsample[1])  # N/4
-        self.enc3 = self._make_enc(block,
-                                   planes[2],
-                                   blocks[2],
-                                   share_planes,
-                                   stride=stride[2],
-                                   nsample=nsample[2])  # N/16
-        self.enc4 = self._make_enc(block,
-                                   planes[3],
-                                   blocks[3],
-                                   share_planes,
-                                   stride=stride[3],
-                                   nsample=nsample[3])  # N/64
-        self.enc5 = self._make_enc(block,
-                                   planes[4],
-                                   blocks[4],
-                                   share_planes,
-                                   stride=stride[4],
-                                   nsample=nsample[4])  # N/256
-        self.dec5 = self._make_dec(block,
-                                   planes[4],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[4],
-                                   is_head=True)  # transform p5
-        self.dec4 = self._make_dec(block,
-                                   planes[3],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[3])  # fusion p5 and p4
-        self.dec3 = self._make_dec(block,
-                                   planes[2],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[2])  # fusion p4 and p3
-        self.dec2 = self._make_dec(block,
-                                   planes[1],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[1])  # fusion p3 and p2
-        self.dec1 = self._make_dec(block,
-                                   planes[0],
-                                   2,
-                                   share_planes,
-                                   nsample=nsample[0])  # fusion p2 and p1
+
+        self.encoders = nn.ModuleList()
+        for i in range(5):
+            self.encoders.append(
+                self._make_enc(
+                    block,
+                    planes[i],
+                    blocks[i],
+                    share_planes,
+                    stride=stride[i],
+                    nsample=nsample[i]))  # N/1, N/4, N/16, N/64, N/256
+
+        self.decoders = nn.ModuleList()
+        for i in range(4, -1, -1):
+            self.decoders.append(
+                self._make_dec(block,
+                               planes[i],
+                               2,
+                               share_planes,
+                               nsample=nsample[i],
+                               is_head=True if i == 4 else False))
+
         self.cls = nn.Sequential(nn.Linear(planes[0], planes[0]),
                                  nn.BatchNorm1d(planes[0]),
                                  nn.ReLU(inplace=True),
@@ -198,53 +164,60 @@ class PointTransformer(BaseModel):
         Returns:
             Returns the probability distribution.
         """
-        point_0, feat_0, row_splits_0 = batch.point, batch.feat, batch.row_splits  # (n, 3), (n, c), (b)
+        points = [batch.point]  # (n, 3)
+        feats = [batch.feat]  # (n, c)
+        row_splits = [batch.row_splits]  # (b)
 
-        feat_0 = point_0 if self.in_channels == 3 else torch.cat(
-            (point_0, feat_0), 1)  # maybe use feat for in_channels == 3
-        point_1, feat_1, row_splits_1 = self.enc1(
-            [point_0, feat_0, row_splits_0])
-        point_2, feat_2, row_splits_2 = self.enc2(
-            [point_1, feat_1, row_splits_1])
-        point_3, feat_3, row_splits_3 = self.enc3(
-            [point_2, feat_2, row_splits_2])
-        point_4, feat_4, row_splits_4 = self.enc4(
-            [point_3, feat_3, row_splits_3])
-        point_5, feat_5, row_splits_5 = self.enc5(
-            [point_4, feat_4, row_splits_4])
+        feats[0] = points[0] if self.in_channels == 3 else torch.cat(
+            (points[0], feats[0]), 1)
 
-        feat_5 = self.dec5[1:]([
-            point_5, self.dec5[0]([point_5, feat_5, row_splits_5]), row_splits_5
-        ])[1]
-        feat_4 = self.dec4[1:]([
-            point_4, self.dec4[0]([point_4, feat_4, row_splits_4],
-                                  [point_5, feat_5, row_splits_5]), row_splits_4
-        ])[1]
-        feat_3 = self.dec3[1:]([
-            point_3, self.dec3[0]([point_3, feat_3, row_splits_3],
-                                  [point_4, feat_4, row_splits_4]), row_splits_3
-        ])[1]
-        feat_2 = self.dec2[1:]([
-            point_2, self.dec2[0]([point_2, feat_2, row_splits_2],
-                                  [point_3, feat_3, row_splits_3]), row_splits_2
-        ])[1]
-        feat_1 = self.dec1[1:]([
-            point_1, self.dec1[0]([point_1, feat_1, row_splits_1],
-                                  [point_2, feat_2, row_splits_2]), row_splits_1
-        ])[1]
-        feat = self.cls(feat_1)
+        for i in range(5):
+            p, f, r = self.encoders[i]([points[i], feats[i], row_splits[i]])
+            points.append(p)
+            feats.append(f)
+            row_splits.append(r)
+
+        for i in range(4, -1, -1):
+            if i == 4:
+                feats[i + 1] = self.decoders[4 - i][1:]([
+                    points[i + 1], self.decoders[4 - i][0](
+                        [points[i + 1], feats[i + 1], row_splits[i + 1]]),
+                    row_splits[i + 1]
+                ])[1]
+            else:
+                feats[i + 1] = self.decoders[4 - i][1:]([
+                    points[i + 1], self.decoders[4 - i][0](
+                        [points[i + 1], feats[i + 1], row_splits[i + 1]],
+                        [points[i + 2], feats[i + 2], row_splits[i + 2]]),
+                    row_splits[i + 1]
+                ])[1]
+
+        feat = self.cls(feats[1])
         return feat
 
     def preprocess(self, data, attr):
+        """Data preprocessing function.
+
+        This function is called before training to preprocess the data from a
+        dataset. It consists of subsampling pointcloud with voxelization.
+
+        Args:
+            data: A sample from the dataset.
+            attr: The corresponding attributes.
+
+        Returns:
+            Returns the preprocessed data
+
+        """
         cfg = self.cfg
         points = np.array(data['point'], dtype=np.float32)
 
-        if 'label' not in data or data['label'] is None:
+        if data.get('label') is None:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
         else:
             labels = np.array(data['label'], dtype=np.int32).reshape((-1,))
 
-        if 'feat' not in data or data['feat'] is None:
+        if data.get('feat') is None:
             feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
@@ -284,6 +257,20 @@ class PointTransformer(BaseModel):
         return data
 
     def transform(self, data, attr):
+        """Transform function for the point cloud and features.
+
+        This function is called after preprocess method. It consists
+        of calling augmentation and normalizing the pointcloud.
+
+        Args:
+            data: A sample from the dataset.
+            attr: The corresponding attributes.
+
+        Returns:
+            Returns dictionary data with keys
+            (point, feat, label).
+
+        """
         cfg = self.cfg
         points = data['point']
         feat = data['feat']
@@ -350,11 +337,11 @@ class PointTransformer(BaseModel):
 
         return {'predict_labels': pred_l, 'predict_scores': probs}
 
-    def get_loss(self, Loss, results, inputs, device):
+    def get_loss(self, sem_seg_loss, results, inputs, device):
         """Calculate the loss on output of the model.
 
         Args:
-            Loss: Object of type `SemSegLoss`.
+            sem_seg_loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
             device: device(cpu or cuda).
@@ -368,7 +355,7 @@ class PointTransformer(BaseModel):
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
 
-        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        loss = sem_seg_loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
 
@@ -389,8 +376,18 @@ MODEL._register_module(PointTransformer, 'torch')
 
 
 class Transformer(nn.Module):
+    """Transformer layer of the model, uses self attention."""
 
     def __init__(self, in_planes, out_planes, share_planes=8, nsample=16):
+        """Constructor for Transformer Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            out_planes (int): Number of output planes.
+            share_planes (int): Number of shared planes.
+            nsample (int): Number of neighbours.
+
+        """
         super().__init__()
         self.mid_planes = mid_planes = out_planes // 1
         self.out_planes = out_planes
@@ -417,7 +414,16 @@ class Transformer(nn.Module):
         )
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, pxo) -> torch.Tensor:
+    def forward(self, pxo):
+        """Forward call for Transformer.
+
+        Args:
+            pxo: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+        Returns:
+            Transformer features.
+
+        """
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
         feat_q, feat_k, feat_v = self.linear_q(feat), self.linear_k(
             feat), self.linear_v(feat)  # (n, c)
@@ -457,13 +463,26 @@ class Transformer(nn.Module):
         s = self.share_planes
         feat = ((feat_v + point_r).view(n, nsample, s, c // s) *
                 w.unsqueeze(2)).sum(1).view(n, c)
-        #x = pointops.aggregation(x_v, w)
+
         return feat
 
 
 class TransitionDown(nn.Module):
+    """TransitionDown layer for PointTransformer.
+
+    Subsamples points and increase receptive field.
+    """
 
     def __init__(self, in_planes, out_planes, stride=1, nsample=16):
+        """Constructor for TransitionDown Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            out_planes (int): Number of output planes.
+            stride (int): subsampling factor.
+            nsample (int): Number of neighbours.
+
+        """
         super().__init__()
         self.stride, self.nsample = stride, nsample
         if stride != 1:
@@ -475,7 +494,16 @@ class TransitionDown(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, pxo):
-        point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
+        """Forward call for TransitionDown
+
+        Args:
+            pxo: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+        Returns:
+            List of point, feat, row_splits.
+
+        """
+        point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
         if self.stride != 1:
             new_row_splits = [0]
             count = 0
@@ -508,8 +536,19 @@ class TransitionDown(nn.Module):
 
 
 class TransitionUp(nn.Module):
+    """Decoder layer for PointTransformer.
+
+    Interpolate points based on corresponding encoder layer.
+    """
 
     def __init__(self, in_planes, out_planes=None):
+        """Constructor for TransitionUp Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            out_planes (int): Number of output planes.
+
+        """
         super().__init__()
         if out_planes is None:
             self.linear1 = nn.Sequential(nn.Linear(2 * in_planes, in_planes),
@@ -526,6 +565,17 @@ class TransitionUp(nn.Module):
                                          nn.ReLU(inplace=True))
 
     def forward(self, pxo1, pxo2=None):
+        """Forward call for TransitionUp
+
+        Args:
+            pxo1: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+            pxo2: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+        Returns:
+            Interpolated features.
+
+        """
         if pxo2 is None:
             _, feat, row_splits = pxo1  # (n, 3), (n, c), (b)
             feat_tmp = []
@@ -549,9 +599,22 @@ class TransitionUp(nn.Module):
 
 
 class Bottleneck(nn.Module):
+    """Bottleneck layer for PointTransformer.
+
+    Block of layers using Transformer layer as building block.
+    """
     expansion = 1
 
     def __init__(self, in_planes, planes, share_planes=8, nsample=16):
+        """Constructor for Bottleneck Layer.
+
+        Args:
+            in_planes (int): Number of input planes.
+            planes (int): Number of output planes.
+            share_planes (int): Number of shared planes.
+            nsample (int): Number of neighbours.
+
+        """
         super(Bottleneck, self).__init__()
         self.linear1 = nn.Linear(in_planes, planes, bias=False)
         self.bn1 = nn.BatchNorm1d(planes)
@@ -562,6 +625,15 @@ class Bottleneck(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, pxo):
+        """Forward call for Bottleneck
+
+        Args:
+            pxo: [point, feat, row_splits] with shapes
+                (n, 3), (n, c) and (b+1,)
+        Returns:
+            List of point, feat, row_splits.
+
+        """
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
         identity = feat
         feat = self.relu(self.bn1(self.linear1(feat)))
@@ -594,9 +666,11 @@ def queryandgroup(nsample,
 
     Returns:
         Returns grouped features (m, nsample, c) or (m, nsample, 3+c).
+
     """
-    assert points.is_contiguous() and queries.is_contiguous(
-    ) and feat.is_contiguous()
+    if not (points.is_contiguous and queries.is_contiguous() and
+            feat.is_contiguous()):
+        raise ValueError("queryandgroup (points/queries/feat not contiguous)")
     if queries is None:
         queries = points
     if idx is None:
@@ -637,8 +711,8 @@ def knn_batch(points,
         return_distances: Whether to return distance with neighbours.
 
     """
-    assert points_row_splits.shape[0] == queries_row_splits.shape[
-        0], "KNN(points and queries must have same batch size)"
+    if points_row_splits.shape[0] != queries_row_splits.shape[0]:
+        raise ValueError("KNN(points and queries must have same batch size)")
 
     points = points.cpu()
     queries = queries.cpu()
@@ -676,20 +750,21 @@ def interpolation(points,
     Returns:
         Returns interpolated features (n, c).
     """
-    assert points.is_contiguous() and queries.is_contiguous(
-    ) and feat.is_contiguous()
+    if not (points.is_contiguous and queries.is_contiguous() and
+            feat.is_contiguous()):
+        raise ValueError("Interpolation (points/queries/feat not contiguous)")
     idx, dist = knn_batch(points,
                           queries,
                           k=k,
                           points_row_splits=points_row_splits,
                           queries_row_splits=queries_row_splits,
-                          return_distances=True)  # (n, 3), (n, 3)
+                          return_distances=True)  # (n, k), (n, k)
 
-    idx, dist = idx.reshape(-1, 3), dist.reshape(-1, 3)
+    idx, dist = idx.reshape(-1, k), dist.reshape(-1, k)
 
-    dist_recip = 1.0 / (dist + 1e-8)  # (n, 3)
+    dist_recip = 1.0 / (dist + 1e-8)  # (n, k)
     norm = torch.sum(dist_recip, dim=1, keepdim=True)
-    weight = dist_recip / norm  # (n, 3)
+    weight = dist_recip / norm  # (n, k)
 
     new_feat = torch.FloatTensor(queries.shape[0],
                                  feat.shape[1]).zero_().to(feat.device)
