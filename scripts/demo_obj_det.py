@@ -6,6 +6,7 @@ from open3d.ml.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
 from open3d.ml.datasets import KITTI
 
 import argparse
+from tqdm import tqdm
 
 
 def parse_args():
@@ -98,6 +99,30 @@ def main(args):
     }],
                   lut,
                   bounding_boxes=boxes)
+
+    # run inference on a multiple examples
+    vis = Visualizer()
+    lut = LabelLUT()
+    for val in sorted(dataset.label_to_names.keys()):
+        lut.add_label(val, val)
+
+    boxes = []
+    data_list = []
+    for idx in tqdm(range(100)):
+        data = test_split[idx]['data']
+
+        result = pipeline.run_inference(data)[0]
+
+        boxes = data['bbox_objs']
+        boxes.extend(result)
+
+        data_list.append({
+            "name": 'KITTI' + '_' + str(idx),
+            'points': data['point'],
+            'bounding_boxes': boxes
+        })
+
+    vis.visualize(data_list, lut, bounding_boxes=None)
 
 
 if __name__ == '__main__':
