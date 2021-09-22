@@ -1573,6 +1573,8 @@ class Visualizer:
                         box_data.append(data)
                         current_group = []
             self._objects.bounding_box_data = box_data
+        else:
+            self._consolidate_bounding_boxes = True
 
         self._visualize("Open3D", width, height)
 
