@@ -3,7 +3,7 @@ import open3d.ml as _ml3d
 import math
 
 from open3d.ml.vis import Visualizer, BoundingBox3D, LabelLUT, BEVBox3D
-from open3d.ml.datasets import KITTI
+from open3d.ml import datasets
 
 import argparse
 from tqdm import tqdm
@@ -14,7 +14,11 @@ def parse_args():
         description='Demo for inference of object detection')
     parser.add_argument('framework',
                         help='deep learning framework: tf or torch')
-    parser.add_argument('--path_kitti', help='path to KITTI', required=True)
+    parser.add_argument('--dataset_type',
+                        help='Name of dataset class',
+                        default="KITTI",
+                        required=False)
+    parser.add_argument('--dataset_path', help='path to dataset', required=True)
     parser.add_argument('--path_ckpt_pointpillars',
                         help='path to PointPillars checkpoint')
     parser.add_argument('--device',
@@ -61,14 +65,17 @@ def main(args):
             except RuntimeError as e:
                 print(e)
 
+    classname = getattr(datasets, args.dataset_type)
+    dataset = classname(args.dataset_path)
+
     ObjectDetection = _ml3d.utils.get_module("pipeline", "ObjectDetection",
                                              framework)
     PointPillars = _ml3d.utils.get_module("model", "PointPillars", framework)
-    cfg = _ml3d.utils.Config.load_from_file(
-        "ml3d/configs/pointpillars_kitti.yml")
+    cfg = _ml3d.utils.Config.load_from_file("ml3d/configs/pointpillars_" +
+                                            args.dataset_type.lower() + ".yml")
 
     model = PointPillars(device=args.device, **cfg.model)
-    dataset = KITTI(args.path_kitti)
+
     pipeline = ObjectDetection(model, dataset, device=args.device)
 
     # load the parameters.
@@ -79,7 +86,6 @@ def main(args):
                             transform=None,
                             use_cache=False,
                             shuffle=False)
-    data = test_split[5]['data']
 
     # run inference on a single example.
     data = test_split[5]['data']
@@ -99,7 +105,7 @@ def main(args):
     #     lut.add_label(key, val)
 
     vis.visualize([{
-        "name": "KITTI",
+        "name": args.dataset_type,
         'points': data['point']
     }],
                   lut,
@@ -122,7 +128,7 @@ def main(args):
         boxes.extend(result)
 
         data_list.append({
-            "name": 'KITTI' + '_' + str(idx),
+            "name": args.dataset_type + '_' + str(idx),
             'points': data['point'],
             'bounding_boxes': boxes
         })
