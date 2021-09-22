@@ -82,6 +82,7 @@ def main(args):
     data = test_split[5]['data']
 
     # run inference on a single example.
+    data = test_split[5]['data']
     result = pipeline.run_inference(data)[0]
 
     boxes = data['bbox_objs']
@@ -92,6 +93,10 @@ def main(args):
     lut = LabelLUT()
     for val in sorted(dataset.label_to_names.keys()):
         lut.add_label(val, val)
+
+    # Uncommenting this assigns bbox color according to lut
+    # for key, val in sorted(dataset.label_to_names.items()):
+    #     lut.add_label(key, val)
 
     vis.visualize([{
         "name": "KITTI",
