@@ -1,15 +1,9 @@
-import numpy as np
-import os, sys, glob, pickle
-from pathlib import Path
-from os.path import join, exists, dirname, abspath
-from os import makedirs
-import random
+from os.path import join
 import argparse
 import pickle
-
-from tqdm import tqdm
-from open3d.ml import datasets
 from open3d.ml.datasets import utils
+from open3d.ml import datasets
+import multiprocessing
 
 
 def parse_args():
@@ -27,6 +21,11 @@ def parse_args():
                         help='Name of dataset class',
                         default="KITTI",
                         required=False)
+    parser.add_argument('--num_cpus',
+                        help='Name of dataset class',
+                        type=int,
+                        default=multiprocessing.cpu_count(),
+                        required=False)
 
     args = parser.parse_args()
 
@@ -37,6 +36,19 @@ def parse_args():
               format(k))
 
     return args
+
+
+def process_boxes(i):
+    data = train.get_data(i)
+    bbox = data['bounding_boxes']
+    flat_bbox = [box.to_xyzwhlr() for box in bbox]
+    indices = utils.operations.points_in_box(data['point'], flat_bbox)
+    bboxes = []
+    for i, box in enumerate(bbox):
+        pts = data['point'][indices[:, i]]
+        box.points_inside_box = pts
+        bboxes.append(box)
+    return bboxes
 
 
 if __name__ == '__main__':
@@ -51,6 +63,8 @@ if __name__ == '__main__':
                             load the test data split from the dataset folder. Uses 
                             reflection to dynamically import this dataset object by name. 
                             Default: KITTI
+        num_cpus (int): Number of threads to use.
+                        Default: All CPU cores.
 
     Example usage:
 
@@ -60,22 +74,14 @@ if __name__ == '__main__':
     out_path = args.out_path
     if out_path is None:
         out_path = args.dataset_path
-
     classname = getattr(datasets, args.dataset_type)
     dataset = classname(args.dataset_path)
     train = dataset.get_split('train')
 
-    bboxes = []
-    for i in tqdm(range(len(train))):
-        data = train.get_data(i)
-        bbox = data['bounding_boxes']
-        flat_bbox = [box.to_xyzwhlr() for box in bbox]
-
-        indices = utils.operations.points_in_box(data['point'], flat_bbox)
-        for i, box in enumerate(bbox):
-            pts = data['point'][indices[:, i]]
-            box.points_inside_box = pts
-            bboxes.append(box)
-
-    file = open(join(out_path, 'bboxes.pkl'), 'wb')
-    pickle.dump(bboxes, file)
+    print("Found", len(train), "traning samples")
+    print("This may take a few minutes...")
+    with multiprocessing.Pool(args.num_cpus) as p:
+        bboxes = p.map(process_boxes, range(len(train)))
+        bboxes = [e for l in bboxes for e in l]
+        file = open(join(out_path, 'bboxes.pkl'), 'wb')
+        pickle.dump(bboxes, file)
