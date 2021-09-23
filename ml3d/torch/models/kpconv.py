@@ -2008,16 +2008,16 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
 
     Returns:
         neighbors indices
+
     """
-    q_splits = np.zeros((len(q_batches) + 1,), np.int32)
-    s_splits = np.zeros((len(s_batches) + 1,), np.int32)
-    q_splits[1:] = np.cumsum(q_batches)
-    s_splits[1:] = np.cumsum(s_batches)
+    q_splits = torch.zeros((len(q_batches) + 1,), dtype=torch.int64)
+    s_splits = torch.zeros((len(s_batches) + 1,), dtype=torch.int64)
+    q_splits[1:] = torch.cumsum(torch.LongTensor(q_batches), dim=0)
+    s_splits[1:] = torch.cumsum(torch.LongTensor(s_batches), dim=0)
 
     nns = FixedRadiusSearch()
     result = nns(torch.from_numpy(supports), torch.from_numpy(queries), radius,
-                 torch.from_numpy(s_splits).to(torch.int64),
-                 torch.from_numpy(q_splits).to(torch.int64))
+                 s_splits, q_splits)
 
     idx = result.neighbors_index.reshape(-1, 1)
     splits = result.neighbors_row_splits
