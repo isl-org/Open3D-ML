@@ -304,9 +304,9 @@ class PointPillars(BaseModel):
         inference_result = []
         for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
                                                      scores_b, labels_b):
-            bboxes = _bboxes.cpu().numpy()
-            scores = _scores.cpu().numpy()
-            labels = _labels.cpu().numpy()
+            bboxes = _bboxes.cpu().detach().numpy()
+            scores = _scores.cpu().detach().numpy()
+            labels = _labels.cpu().detach().numpy()
             inference_result.append([])
 
             world_cam, cam_img = None, None

@@ -80,7 +80,7 @@ class BoundingBox3D:
         return s
 
     @staticmethod
-    def create_lines(boxes, lut=None):
+    def create_lines(boxes, lut=None, out="lineset"):
         """Creates and returns an open3d.geometry.LineSet that can be used to
         render the boxes.
 
@@ -89,6 +89,9 @@ class BoundingBox3D:
             lut: a ml3d.vis.LabelLUT that is used to look up the color based on
                 the label_class argument of the BoundingBox3D constructor. If
                 not provided, a color of 50% grey will be used. (optional)
+            out (str): Output format. Can be "lineset" (default) for the
+                Open3D lineset or "dict" for a dictionary of lineset properties
+                ("vertex_positions", "line_indices", and "line_colors").
         """
         nverts = 14
         nlines = 17
@@ -148,9 +151,16 @@ class BoundingBox3D:
             colors[idx:idx +
                    nlines] = c  # copies c to each element in the range
 
-        lines = o3d.geometry.LineSet()
-        lines.points = o3d.utility.Vector3dVector(points)
-        lines.lines = o3d.utility.Vector2iVector(indices)
-        lines.colors = o3d.utility.Vector3dVector(colors)
+        if out == "lineset":
+            lines = o3d.geometry.LineSet()
+            lines.points = o3d.utility.Vector3dVector(points)
+            lines.lines = o3d.utility.Vector2iVector(indices)
+            lines.colors = o3d.utility.Vector3dVector(colors)
+        elif out == "dict":
+            lines = {
+                "vertex_positions": points,
+                "line_indices": indices,
+                "line_colors": colors
+            }
 
         return lines

@@ -26,9 +26,12 @@ class LabelLUT:
               [0.5, 0.5, 0.5], [0.625, 0.625, 0.625], [0.75, 0.75, 0.75],
               [0.875, 0.875, 0.875]]
 
-    def __init__(self):
+    def __init__(self, label_to_names=None):
         self._next_color = 0
         self.labels = {}
+        if label_to_names is not None:
+            for val in sorted(label_to_names.keys()):
+                self.add_label(label_to_names[val], val)
 
     def add_label(self, name, value, color=None):
         """Adds a label to the table.
