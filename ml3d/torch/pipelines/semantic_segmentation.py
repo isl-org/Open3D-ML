@@ -383,7 +383,6 @@ class SemanticSegmentation(BasePipeline):
         self.save_config(writer)
 
         model = CustomDataParallel(model, device_ids=self.device_ids)
-        # model.to(device)
 
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
 

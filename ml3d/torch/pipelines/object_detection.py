@@ -172,7 +172,7 @@ class ObjectDetection(BasePipeline):
         gt = []
         with torch.no_grad():
             for data in tqdm(valid_loader, desc='validation'):
-                # data.to(device)
+                data.to(device)
                 results = model(data)
                 loss = model.get_loss(results, data)
                 for l, v in loss.items():
