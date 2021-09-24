@@ -183,7 +183,7 @@ class PointRCNN(BaseModel):
 
         return optimizer, scheduler
 
-    def loss(self, results, inputs):
+    def get_loss(self, results, inputs):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
         else:

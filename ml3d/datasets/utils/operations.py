@@ -4,7 +4,7 @@ import copy
 import math
 from scipy.spatial import ConvexHull
 
-from ...metrics import iou_bev
+from open3d.ml.contrib import iou_bev_cpu as iou_bev
 
 
 def create_3D_rotations(axis, angle):

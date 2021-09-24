@@ -138,7 +138,7 @@ class PointPillars(BaseModel):
         optimizer = torch.optim.AdamW(self.parameters(), **cfg)
         return optimizer, None
 
-    def loss(self, results, inputs):
+    def get_loss(self, results, inputs):
         scores, bboxes, dirs = results
         gt_labels = inputs.labels
         gt_bboxes = inputs.bboxes

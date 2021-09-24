@@ -174,7 +174,7 @@ class ObjectDetection(BasePipeline):
             for data in tqdm(valid_loader, desc='validation'):
                 # data.to(device)
                 results = model(data)
-                loss = model.loss(results, data)
+                loss = model.get_loss(results, data)
                 for l, v in loss.items():
                     if not l in self.valid_losses:
                         self.valid_losses[l] = []
@@ -296,9 +296,9 @@ class ObjectDetection(BasePipeline):
 
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
-                # data.to(device)
+                data.to(device)
                 results = model(data)
-                loss = model.loss(results, data)
+                loss = model.get_loss(results, data)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()

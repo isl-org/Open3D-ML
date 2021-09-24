@@ -46,7 +46,7 @@ class CustomDataParallel(DataParallel):
         """
         if not hasattr(inputs[0], 'scatter'):
             try:
-                self.scatter(inputs, kwargs, device_ids)
+                return self.scatter(inputs, kwargs, device_ids)
             except:
                 raise NotImplementedError(
                     f"Please implement scatter for {inputs[0]} for multi gpu execution."

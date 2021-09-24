@@ -340,33 +340,6 @@ class KPConvBatch:
 
         return self
 
-    @staticmethod
-    def scatter(batch, num_gpu):
-        batch_size = len(batch.points)
-
-        new_batch_size = math.ceil(batch_size / num_gpu)
-        batches = [KPConvBatch([]) for _ in range(num_gpu)]
-        for i in range(num_gpu):
-            start = new_batch_size * i
-            end = min(new_batch_size * (i + 1), batch_size)
-            batches[i].points = batch.points[start:end]
-            batches[i].neighbors = batch.neighbors[start:end]
-            batches[i].pools = batch.pools[start:end]
-            batches[i].upsamples = batch.upsamples[start:end]
-            batches[i].lengths = batch.lengths[start:
-                                               end]  # TODO : verify lengths
-
-        return [b for b in batches if len(b.points)]  # filter empty batch
-
-    def print(self):
-        print(self.points)
-        print(self.neighbors)
-        print(self.pools)
-        print(self.upsamples)
-        print(self.lengths)
-        print(self.features)
-        exit(0)
-
     def unstack_points(self, layer=None):
         """Unstack the points."""
         return self.unstack_elements('points', layer)
