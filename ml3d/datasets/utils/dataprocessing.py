@@ -4,7 +4,6 @@ import open3d.core as o3c
 
 from os.path import exists, join, isfile, dirname, abspath, split
 from open3d.ml.contrib import subsample
-from open3d.ml.contrib import knn_search
 
 from .operations import *
 
@@ -90,18 +89,18 @@ class DataProcessing:
         """KNN search.
 
         Args:
-            support_pts: points you have, B*N1*3
-            query_pts: points you want to know the neighbour index, B*N2*3
+            support_pts: points you have, N1*3
+            query_pts: points you want to know the neighbour index, N2*3
             k: Number of neighbours in knn search
 
         Returns:
-            neighbor_idx: neighboring points indexes, B*N2*k
+            neighbor_idx: neighboring points indexes, N2*k
         """
-        neighbor_idx = knn_search(o3c.Tensor.from_numpy(query_pts),
-                                  o3c.Tensor.from_numpy(support_pts),
-                                  k).numpy()
+        nns = o3c.nns.NearestNeighborSearch(o3c.Tensor.from_numpy(support_pts))
+        nns.knn_index()
+        idx, dist = nns.knn_search(o3c.Tensor.from_numpy(query_pts), k)
 
-        return neighbor_idx.astype(np.int32)
+        return idx.numpy().astype(np.int32)
 
     @staticmethod
     def data_aug(xyz, color, labels, idx, num_out):
