@@ -11,6 +11,22 @@ from ...datasets.augment import SemsegAugmentation
 
 
 class PVCNN(BaseModel):
+    """Semantic Segmentation model. Based on Point Voxel Convolutions.
+    https://arxiv.org/abs/1907.03739
+
+    Uses PointNet architecture with separate Point and Voxel processing.
+
+    Attributes:
+        name: Name of model.
+          Default to "PVCNN".
+        num_classes: Number of classes.
+        num_points: Number of points to sample per pointcloud.
+        extra_feature_channels: Number of extra features.
+          Default to 6 (RGB + Coordinate norms).
+        batcher: Batching method for dataloader.
+        augment: dictionary for augmentation.
+    """
+
     blocks = ((64, 1, 32), (64, 2, 16), (128, 1, 16), (1024, 1, None))
 
     def __init__(self,
@@ -65,6 +81,17 @@ class PVCNN(BaseModel):
         self.classifier = nn.Sequential(*layers)
 
     def forward(self, inputs):
+        """Forward pass for the model.
+
+        Args:
+            inputs: A dict object for inputs with following keys
+                point (torch.float32): Input pointcloud (B, N,3)
+                feat (torch.float32): Input features (B, N, 9)
+
+        Returns:
+            Returns the probability distribution.
+
+        """
         coords = inputs['point'].to(self.device)
         feat = inputs['feat'].to(self.device)
 
@@ -81,6 +108,20 @@ class PVCNN(BaseModel):
         return out.transpose(1, 2)
 
     def preprocess(self, data, attr):
+        """Data preprocessing function.
+
+        This function is called before training to preprocess the data from a
+        dataset. It consists of subsampling and normalizing the pointcloud and
+        creating new features.
+
+        Args:
+            data: A sample from the dataset.
+            attr: The corresponding attributes.
+
+        Returns:
+            Returns the preprocessed data
+
+        """
         points = np.array(data['point'], dtype=np.float32)
 
         if 'label' not in data or data['label'] is None:
@@ -128,6 +169,20 @@ class PVCNN(BaseModel):
         return data
 
     def transform(self, data, attr):
+        """Transform function for the point cloud and features.
+
+        This function is called after preprocess method. It consists
+        of converting numpy arrays to torch Tensors.
+
+        Args:
+            data: A sample from the dataset.
+            attr: The corresponding attributes.
+
+        Returns:
+            Returns dictionary data with keys
+            (point, feat, label).
+
+        """
         data['point'] = torch.from_numpy(data['point'])
         data['feat'] = torch.from_numpy(data['feat'])
         data['label'] = torch.from_numpy(data['label'])
@@ -166,7 +221,7 @@ class PVCNN(BaseModel):
 
         return {'predict_labels': pred_l, 'predict_scores': probs}
 
-    def get_loss(self, Loss, results, inputs, device):
+    def get_loss(self, sem_seg_loss, results, inputs, device):
         """Calculate the loss on output of the model.
 
         Attributes:
@@ -185,7 +240,7 @@ class PVCNN(BaseModel):
         scores, labels = filter_valid_label(results, labels, cfg.num_classes,
                                             cfg.ignored_label_inds, device)
 
-        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        loss = sem_seg_loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
 
@@ -202,8 +257,18 @@ MODEL._register_module(PVCNN, 'torch')
 
 
 class SE3d(nn.Module):
+    """Extra Sequential Dense layers to be used to increase
+    model complexity.
+    """
 
     def __init__(self, channel, reduction=8):
+        """Constructor for SE3d module.
+
+        Args:
+            channel: Number of channels in the input layer.
+            reduction: Factor of channels in second layer.
+
+        """
         super().__init__()
         self.fc = nn.Sequential(
             nn.Linear(channel, channel // reduction, bias=False),
@@ -211,11 +276,21 @@ class SE3d(nn.Module):
             nn.Linear(channel // reduction, channel, bias=False), nn.Sigmoid())
 
     def forward(self, inputs):
+        """Forward call for SE3d
+
+        Args:
+            inputs: Input features.
+
+        Returns:
+            Transformed features.
+
+        """
         return inputs * self.fc(inputs.mean(-1).mean(-1).mean(-1)).view(
             inputs.shape[0], inputs.shape[1], 1, 1, 1)
 
 
 def _linear_bn_relu(in_channels, out_channels):
+    """Layer combining Linear, BatchNorm and ReLU Block."""
     return nn.Sequential(nn.Linear(in_channels, out_channels),
                          nn.BatchNorm1d(out_channels), nn.ReLU(True))
 
@@ -225,6 +300,20 @@ def create_mlp_components(in_channels,
                           classifier=False,
                           dim=2,
                           width_multiplier=1):
+    """Creates multiple layered components. For each output channel,
+    it creates Dense layers with Dropout.
+
+    Args:
+        in_channels: Number of input channels.
+        out_channels: Number of output channels.
+        classifier: Whether the layer is classifier(appears at the end).
+        dim: Dimension
+        width_multiplier: factor by which neurons expands in intermediate layers.
+
+    Returns:
+        A List of layers.
+
+    """
     r = width_multiplier
 
     if dim == 1:
@@ -266,6 +355,22 @@ def create_pointnet_components(blocks,
                                eps=0,
                                width_multiplier=1,
                                voxel_resolution_multiplier=1):
+    """Creates pointnet components. For each output channel,
+    it comprises of PVConv or SharedMLP layers.
+
+    Args:
+        blocks: list of (out_channels, num_blocks, voxel_resolution).
+        in_channels: Number of input channels.
+        with_se: Whether to use extra dense layers in each block.
+        normalize: Whether to normalize pointcloud before voxelization.
+        eps: Epsilon for voxelization.
+        width_multiplier: factor by which neurons expands in intermediate layers.
+        voxel_resolution_multiplier: Factor by which voxel resolution expands.
+
+    Returns:
+        A List of layers, input_channels, and concat_channels
+
+    """
     r, vr = width_multiplier, voxel_resolution_multiplier
 
     layers, concat_channels = [], 0
@@ -288,8 +393,17 @@ def create_pointnet_components(blocks,
 
 
 class SharedMLP(nn.Module):
+    """SharedMLP Module, comprising Conv2d, BatchNorm and ReLU blocks."""
 
     def __init__(self, in_channels, out_channels, dim=1):
+        """Constructor for SharedMLP Block.
+
+        Args:
+            in_channels: Number of input channels.
+            out_channels: Number of output channels.
+            dim: Input dimension
+
+        """
         super().__init__()
         if dim == 1:
             conv = nn.Conv1d
@@ -312,6 +426,15 @@ class SharedMLP(nn.Module):
         self.layers = nn.Sequential(*layers)
 
     def forward(self, inputs):
+        """Forward pass for SharedMLP
+
+        Args:
+            inputs: features or a list of features.
+
+        Returns:
+            Transforms first features in a list.
+
+        """
         if isinstance(inputs, (list, tuple)):
             return (self.layers(inputs[0]), *inputs[1:])
         else:
@@ -319,6 +442,9 @@ class SharedMLP(nn.Module):
 
 
 class PVConv(nn.Module):
+    """Point Voxel Convolution module. Consisting of 3D Convolutions
+    for voxelized pointcloud, and SharedMLP blocks for point features.
+    """
 
     def __init__(self,
                  in_channels,
@@ -328,6 +454,18 @@ class PVConv(nn.Module):
                  with_se=False,
                  normalize=True,
                  eps=0):
+        """Constructor for PVConv module.
+
+        Args:
+            in_channels: Number of input channels.
+            out_channels: Number of output channels.
+            kernel_size: kernel size for Conv3D.
+            resolution: Resolution of the voxel grid.
+            with_se: Whether to use extra dense layers in each block.
+            normalize: Whether to normalize pointcloud before voxelization.
+            eps: Epsilon for voxelization.
+
+        """
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -359,6 +497,16 @@ class PVConv(nn.Module):
         self.point_features = SharedMLP(in_channels, out_channels)
 
     def forward(self, inputs):
+        """Forward pass for PVConv.
+
+        Args:
+            inputs: tuple of features and coordinates.
+
+        Returns:
+            Fused features consists of point features and
+            voxel_features.
+
+        """
         features, coords = inputs
         voxel_features, voxel_coords = self.voxelization(features, coords)
         voxel_features = self.voxel_layers(voxel_features)
@@ -369,10 +517,17 @@ class PVConv(nn.Module):
 
 
 def avg_voxelize(feat, coords, r):
-    """
-    coords (B, 3, N)
-    feat (B, C, N)
-    return (B, C, r, r, r)
+    """Voxelize points and returns a voxel_grid with
+    mean of features lying in same voxel.
+
+    Args:
+        feat: Input features (B, 3, N).
+        coords: Input coordinates (B, C, N).
+        r (int): Resolution of voxel grid.
+
+    Returns:
+        voxel grid (B, C, r, r, r)
+
     """
     coords = coords.to(torch.int64)
     batch_size = feat.shape[0]
@@ -405,14 +560,36 @@ def avg_voxelize(feat, coords, r):
 
 
 class Voxelization(nn.Module):
+    """Voxelization module. Normalize the coordinates and
+    returns voxel_grid with mean of features lying in same
+    voxel.
+    """
 
     def __init__(self, resolution, normalize=True, eps=0):
+        """Constructor of Voxelization module.
+
+        Args:
+            resolution (int): Resolution of the voxel grid.
+            normalize (bool): Whether to normalize coordinates.
+            eps (float): Small epsilon to avoid nan.
+
+        """
         super().__init__()
         self.r = int(resolution)
         self.normalize = normalize
         self.eps = eps
 
     def forward(self, features, coords):
+        """Forward pass for Voxelization.
+
+        Args:
+            features: Input features.
+            coords: Input coordinates.
+
+        Returns:
+            Voxel grid of features (B, C, r, r, r)
+
+        """
         coords = coords.detach()
         norm_coords = coords - coords.mean(2, keepdim=True)
         if self.normalize:
@@ -427,20 +604,7 @@ class Voxelization(nn.Module):
         return avg_voxelize(features, vox_coords, self.r), norm_coords
 
     def extra_repr(self):
+        """Extra representation of module."""
         return 'resolution={}{}'.format(
             self.r,
             ', normalized eps = {}'.format(self.eps) if self.normalize else '')
-
-
-if __name__ == '__main__':
-    # vox = Voxelization(10)
-    # feat = torch.rand(1, 10, 3)
-    # coords = torch.rand(1, 10, 3) * 100
-
-    # res = vox(feat, coords)
-    # print(vox)
-    feat = torch.Tensor([[1., 2, 3], [3, 4., 5], [4, 6, 7]])
-    coords = torch.IntTensor([[0, 1, 1], [0, 1, 1], [2, 1, 0]])
-    res = avg_voxelize(feat, coords, 3)
-    print(res)
-    res.backward()

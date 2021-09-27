@@ -9,6 +9,23 @@ from ...datasets.augment import SemsegAugmentation
 
 
 class PVCNN(BaseModel):
+    """Semantic Segmentation model. Based on Point Voxel Convolutions.
+    https://arxiv.org/abs/1907.03739
+
+    Uses PointNet architecture with separate Point and Voxel processing.
+
+    Attributes:
+        name: Name of model.
+          Default to "PVCNN".
+        num_classes: Number of classes.
+        num_points: Number of points to sample per pointcloud.
+        extra_feature_channels: Number of extra features.
+          Default to 6 (RGB + Coordinate norms).
+        batcher: Batching method for dataloader.
+        augment: dictionary for augmentation.
+
+    """
+
     blocks = ((64, 1, 32), (64, 2, 16), (128, 1, 16), (1024, 1, None))
 
     def __init__(self,
@@ -63,6 +80,18 @@ class PVCNN(BaseModel):
         self.classifier = tf.keras.Sequential(layers=layers)
 
     def call(self, inputs, training=False):
+        """Forward pass for the model.
+
+        Args:
+            inputs: A dict object for inputs with following keys
+            point (tf.float32): Input pointcloud (B, N,3)
+            feat (tf.float32): Input features (B, N, 9)
+            training (bool): Whether model is in training phase.
+
+        Returns:
+            Returns the probability distribution.
+
+        """
         coords = inputs['point']
         feat = inputs['feat']
 
@@ -88,6 +117,20 @@ class PVCNN(BaseModel):
         return out
 
     def preprocess(self, data, attr):
+        """Data preprocessing function.
+
+        This function is called before training to preprocess the data from a
+        dataset. It consists of subsampling and normalizing the pointcloud and
+        creating new features.
+
+        Args:
+            data: A sample from the dataset.
+            attr: The corresponding attributes.
+
+        Returns:
+            Returns the preprocessed data
+
+        """
         points = np.array(data['point'], dtype=np.float32)
 
         if 'label' not in data or data['label'] is None:
@@ -135,6 +178,21 @@ class PVCNN(BaseModel):
         return data
 
     def transform(self, points, feat, labels):
+        """Transform function for the point cloud and features.
+
+        This function is called after preprocess method by dataset generator.
+        It consists of mapping data to dict.
+
+        Args:
+            points: Input pointcloud.
+            feat: Input features.
+            labels: Input labels.
+
+        Returns:
+            Returns dictionary data with keys
+            (point, feat, label).
+
+        """
         return {'point': points, 'feat': feat, 'label': labels}
 
     def get_batch_gen(self, dataset, steps_per_epoch=None, batch_size=1):
@@ -175,7 +233,7 @@ class PVCNN(BaseModel):
 
         return {'predict_labels': pred_l, 'predict_scores': probs}
 
-    def get_loss(self, Loss, results, inputs):
+    def get_loss(self, sem_seg_loss, results, inputs):
         """Calculate the loss on output of the model.
 
         Attributes:
@@ -191,8 +249,8 @@ class PVCNN(BaseModel):
         labels = tf.reshape(inputs['label'], -1)
         results = tf.reshape(results, (-1, results.shape[-1]))
 
-        scores, labels = Loss.filter_valid_label(results, labels)
-        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
+        scores, labels = sem_seg_loss.filter_valid_label(results, labels)
+        loss = sem_seg_loss.weighted_CrossEntropyLoss(scores, labels)
 
         return loss, labels, scores
 
@@ -207,8 +265,18 @@ MODEL._register_module(PVCNN, 'tf')
 
 
 class SE3d(tf.keras.layers.Layer):
+    """Extra Sequential Dense layers to be used to increase
+    model complexity.
+    """
 
     def __init__(self, channel, reduction=8):
+        """Constructor for SE3d module.
+
+        Args:
+            channel: Number of channels in the input layer.
+            reduction: Factor of channels in second layer.
+
+        """
         super().__init__()
         fc = tf.keras.Sequential()
         fc.add(
@@ -220,25 +288,30 @@ class SE3d(tf.keras.layers.Layer):
         fc.add(tf.keras.layers.Sigmoid())
 
         self.fc = fc
-        # self.fc = nn.Sequential(
-        #     nn.Linear(channel, channel // reduction, bias=False),
-        #     nn.ReLU(inplace=True),
-        #     nn.Linear(channel // reduction, channel, bias=False), nn.Sigmoid())
 
-    def forward(self, inputs):
+    def call(self, inputs, training):
+        """Forward call for SE3d
+
+        Args:
+            inputs: Input features.
+            training (bool): Whether model is in training phase.
+
+        Returns:
+            Transformed features.
+
+        """
         return inputs * self.fc(inputs.mean(-1).mean(-1).mean(-1)).view(
             inputs.shape[0], inputs.shape[1], 1, 1, 1)
 
 
 def _linear_bn_relu(in_channels, out_channels):
+    """Layer combining Linear, BatchNorm and ReLU Block."""
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Dense(out_channels, input_shape=(in_channels,)))
     model.add(tf.keras.layers.BatchNormalization(momentum=0.9, epsilon=1e-5))
     model.add(tf.keras.layers.ReLU())
 
     return model
-    # return nn.Sequential(nn.Linear(in_channels, out_channels),
-    #                      nn.BatchNorm1d(out_channels), nn.ReLU(True))
 
 
 def create_mlp_components(in_channels,
@@ -246,6 +319,20 @@ def create_mlp_components(in_channels,
                           classifier=False,
                           dim=2,
                           width_multiplier=1):
+    """Creates multiple layered components. For each output channel,
+    it creates Dense layers with Dropout.
+
+    Args:
+        in_channels: Number of input channels.
+        out_channels: Number of output channels.
+        classifier: Whether the layer is classifier(appears at the end).
+        dim: Dimension
+        width_multiplier: factor by which neurons expands in intermediate layers.
+
+    Returns:
+        A List of layers.
+
+    """
     r = width_multiplier
 
     if dim == 1:
@@ -288,6 +375,22 @@ def create_pointnet_components(blocks,
                                eps=0,
                                width_multiplier=1,
                                voxel_resolution_multiplier=1):
+    """Creates pointnet components. For each output channel,
+    it comprises of PVConv or SharedMLP layers.
+
+    Args:
+        blocks: list of (out_channels, num_blocks, voxel_resolution).
+        in_channels: Number of input channels.
+        with_se: Whether to use extra dense layers in each block.
+        normalize: Whether to normalize pointcloud before voxelization.
+        eps: Epsilon for voxelization.
+        width_multiplier: factor by which neurons expands in intermediate layers.
+        voxel_resolution_multiplier: Factor by which voxel resolution expands.
+
+    Returns:
+        A List of layers, input_channels, and concat_channels
+
+    """
     r, vr = width_multiplier, voxel_resolution_multiplier
 
     layers, concat_channels = [], 0
@@ -310,8 +413,17 @@ def create_pointnet_components(blocks,
 
 
 class SharedMLP(tf.keras.layers.Layer):
+    """SharedMLP Module, comprising Conv2d, BatchNorm and ReLU blocks."""
 
     def __init__(self, in_channels, out_channels, dim=1):
+        """Constructor for SharedMLP Block.
+
+        Args:
+            in_channels: Number of input channels.
+            out_channels: Number of output channels.
+            dim: Input dimension
+
+        """
         super().__init__()
         if dim == 1:
             conv = tf.keras.layers.Conv1D
@@ -334,6 +446,16 @@ class SharedMLP(tf.keras.layers.Layer):
         self.layers = tf.keras.Sequential(layers=layers)
 
     def call(self, inputs, training):
+        """Forward pass for SharedMLP
+
+        Args:
+            inputs: features or a list of features.
+            training (bool): Whether model is in training phase.
+
+        Returns:
+            Transforms first features in a list.
+
+        """
         if isinstance(inputs, (list, tuple)):
             return (self.layers(inputs[0], training=training), *inputs[1:])
         else:
@@ -341,6 +463,9 @@ class SharedMLP(tf.keras.layers.Layer):
 
 
 class PVConv(tf.keras.layers.Layer):
+    """Point Voxel Convolution module. Consisting of 3D Convolutions
+    for voxelized pointcloud, and SharedMLP blocks for point features.
+    """
 
     def __init__(self,
                  in_channels,
@@ -350,6 +475,18 @@ class PVConv(tf.keras.layers.Layer):
                  with_se=False,
                  normalize=True,
                  eps=0):
+        """Constructor for PVConv module.
+
+        Args:
+            in_channels: Number of input channels.
+            out_channels: Number of output channels.
+            kernel_size: kernel size for Conv3D.
+            resolution: Resolution of the voxel grid.
+            with_se: Whether to use extra dense layers in each block.
+            normalize: Whether to normalize pointcloud before voxelization.
+            eps: Epsilon for voxelization.
+
+        """
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -380,6 +517,17 @@ class PVConv(tf.keras.layers.Layer):
         self.point_features = SharedMLP(in_channels, out_channels)
 
     def call(self, inputs, training):
+        """Forward pass for PVConv.
+
+        Args:
+            inputs: tuple of features and coordinates.
+            training (bool): Whether model is in training phase.
+
+        Returns:
+            Fused features consists of point features and
+            voxel_features.
+
+        """
         features, coords = inputs
         voxel_features, voxel_coords = self.voxelization(features,
                                                          coords,
@@ -394,17 +542,19 @@ class PVConv(tf.keras.layers.Layer):
         return fused_features, coords
 
 
-# def trilinear_devoxelize(feat, coords, r, training):
-#     return tf.random.uniform((feat.shape[0], coords.shape[1], feat.shape[-1]))
-
-
 def avg_voxelize(feat, coords, r):
-    """
-    coords (B, N, 3)
-    feat (B, N, C)
-    return (B, r, r, r, C)
-    """
+    """Voxelize points and returns a voxel_grid with
+    mean of features lying in same voxel.
 
+    Args:
+        feat: Input features (B, N, 3).
+        coords: Input coordinates (B, N, C).
+        r (int): Resolution of voxel grid.
+
+    Returns:
+        voxel grid (B, r, r, r, C)
+
+    """
     shape = tf.constant([feat.shape[0], r, r, r, feat.shape[2]])
     batch_id = tf.repeat(tf.range(0, feat.shape[0]), feat.shape[1])
     batch_id = tf.reshape(batch_id, (-1, 1))
@@ -421,14 +571,37 @@ def avg_voxelize(feat, coords, r):
 
 
 class Voxelization(tf.keras.layers.Layer):
+    """Voxelization module. Normalize the coordinates and
+    returns voxel_grid with mean of features lying in same
+    voxel.
+    """
 
     def __init__(self, resolution, normalize=True, eps=0):
+        """Constructor of Voxelization module.
+
+        Args:
+            resolution (int): Resolution of the voxel grid.
+            normalize (bool): Whether to normalize coordinates.
+            eps (float): Small epsilon to avoid nan.
+
+        """
         super().__init__()
         self.r = int(resolution)
         self.normalize = normalize
         self.eps = eps
 
     def call(self, features, coords, training):
+        """Forward pass for Voxelization.
+
+        Args:
+            features: Input features.
+            coords: Input coordinates.
+            training (bool): Whether model is in training phase.
+
+        Returns:
+            Voxel grid of features (B, C, r, r, r)
+
+        """
         coords = tf.stop_gradient(coords)
         norm_coords = coords - tf.reduce_mean(coords, axis=1, keepdims=True)
 
@@ -445,6 +618,7 @@ class Voxelization(tf.keras.layers.Layer):
         return avg_voxelize(features, vox_coords, self.r), norm_coords
 
     def extra_repr(self):
+        """Extra representation of module."""
         return 'resolution={}{}'.format(
             self.r,
             ', normalized eps = {}'.format(self.eps) if self.normalize else '')
