@@ -478,6 +478,7 @@ class Transformer(layers.Layer):
             pxo: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
             training: training mode of model.
+
         Returns:
             Transformer features.
         """
@@ -568,6 +569,7 @@ class TransitionDown(layers.Layer):
             pxo: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
             training: training mode of model.
+
         Returns:
             List of point, feat, row_splits.
 
@@ -646,6 +648,7 @@ class TransitionUp(layers.Layer):
             pxo2: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
             training: training mode of model.
+
         Returns:
             Interpolated features.
 
@@ -710,6 +713,7 @@ class Bottleneck(layers.Layer):
             pxo: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
             training: training mode of model.
+
         Returns:
             List of point, feat, row_splits.
 

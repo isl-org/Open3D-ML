@@ -420,6 +420,7 @@ class Transformer(nn.Module):
         Args:
             pxo: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
+
         Returns:
             Transformer features.
 
@@ -499,6 +500,7 @@ class TransitionDown(nn.Module):
         Args:
             pxo: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
+
         Returns:
             List of point, feat, row_splits.
 
@@ -572,6 +574,7 @@ class TransitionUp(nn.Module):
                 (n, 3), (n, c) and (b+1,)
             pxo2: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
+
         Returns:
             Interpolated features.
 
@@ -630,6 +633,7 @@ class Bottleneck(nn.Module):
         Args:
             pxo: [point, feat, row_splits] with shapes
                 (n, 3), (n, c) and (b+1,)
+
         Returns:
             List of point, feat, row_splits.
 
