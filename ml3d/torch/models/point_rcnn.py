@@ -99,7 +99,7 @@ class PointRCNN(BaseModel):
         assert mode == "RPN" or mode == "RCNN"
         self.mode = mode
 
-        self.augmenter = ObjdetAugmentation(self.cfg.augment)
+        self.augmenter = ObjdetAugmentation(self.cfg.augment, seed=self.rng)
         self.npoints = npoints
         self.classes = classes
         self.name2lbl = {n: i for i, n in enumerate(classes)}
@@ -208,8 +208,17 @@ class PointRCNN(BaseModel):
         return filtered
 
     def preprocess(self, data, attr):
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            rng = np.random.default_rng(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+        else:
+            rng = self.rng
+
         if attr['split'] in ['train', 'training']:
-            data = self.augmenter.augment(data, attr)
+            data = self.augmenter.augment(data, attr, seed=rng)
 
         data['bounding_boxes'] = self.filter_objects(data['bounding_boxes'])
 
@@ -301,27 +310,36 @@ class PointRCNN(BaseModel):
         points = data['point']
 
         if attr['split'] not in ['test', 'testing']:  #, 'val', 'validation']:
+            # If num_workers > 0, use new RNG with unique seed for each thread.
+            # Else, use default RNG.
+            if torch.utils.data.get_worker_info():
+                rng = np.random.default_rng(
+                    torch.utils.data.get_worker_info().seed +
+                    torch.utils.data.get_worker_info().id)
+            else:
+                rng = self.rng
+
             if self.npoints < len(points):
                 pts_depth = points[:, 2]
                 pts_near_flag = pts_depth < 40.0
                 far_idxs_choice = np.where(pts_near_flag == 0)[0]
                 near_idxs = np.where(pts_near_flag == 1)[0]
-                near_idxs_choice = np.random.choice(near_idxs,
-                                                    self.npoints -
-                                                    len(far_idxs_choice),
-                                                    replace=False)
+                near_idxs_choice = rng.choice(near_idxs,
+                                              self.npoints -
+                                              len(far_idxs_choice),
+                                              replace=False)
 
                 choice = np.concatenate((near_idxs_choice, far_idxs_choice), axis=0) \
                     if len(far_idxs_choice) > 0 else near_idxs_choice
-                np.random.shuffle(choice)
+                rng.shuffle(choice)
             else:
                 choice = np.arange(0, len(points), dtype=np.int32)
                 if self.npoints > len(points):
-                    extra_choice = np.random.choice(choice,
-                                                    self.npoints - len(points),
-                                                    replace=False)
+                    extra_choice = rng.choice(choice,
+                                              self.npoints - len(points),
+                                              replace=False)
                     choice = np.concatenate((choice, extra_choice), axis=0)
-                np.random.shuffle(choice)
+                rng.shuffle(choice)
 
             points = points[choice, :]
 

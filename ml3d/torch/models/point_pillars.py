@@ -38,7 +38,8 @@ from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
-from ...datasets.utils import ObjdetAugmentation, BEVBox3D
+from ...datasets.utils import BEVBox3D
+from ...datasets.augment import ObjdetAugmentation
 from ...datasets.utils.operations import filter_by_min_points
 
 
@@ -83,6 +84,7 @@ class PointPillars(BaseModel):
         self.name2lbl = {n: i for i, n in enumerate(classes)}
         self.lbl2name = {i: n for i, n in enumerate(classes)}
 
+        self.augmenter = ObjdetAugmentation(self.cfg.augment, seed=self.rng)
         self.voxel_layer = PointPillarsVoxelization(
             point_cloud_range=point_cloud_range, **voxelize)
         self.voxel_encoder = PillarFeatureNet(
@@ -205,6 +207,15 @@ class PointPillars(BaseModel):
         }
 
     def preprocess(self, data, attr):
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            rng = np.random.default_rng(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+        else:
+            rng = self.rng
+
         points = np.array(data['point'][:, 0:4], dtype=np.float32)
 
         min_val = np.array(self.point_cloud_range[:3])
@@ -219,7 +230,7 @@ class PointPillars(BaseModel):
 
         #Augment data
         if attr['split'] not in ['test', 'testing', 'val', 'validation']:
-            data = self.augment_data(data, attr)
+            data = self.augmenter.augment(data, attr, seed=rng)
 
         new_data = {'point': data['point'], 'calib': data['calib']}
 
@@ -240,48 +251,6 @@ class PointPillars(BaseModel):
             new_data['full_point'] = points
 
         return new_data
-
-    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
-        db_boxes = pickle.load(open(pickle_path, 'rb'))
-
-        if min_points_dict is not None:
-            db_boxes = filter_by_min_points(db_boxes, min_points_dict)
-
-        db_boxes_dict = {}
-        for key in sample_dict.keys():
-            db_boxes_dict[key] = []
-
-        for db_box in db_boxes:
-            if db_box.label_class in sample_dict.keys():
-                db_boxes_dict[db_box.label_class].append(db_box)
-
-        self.db_boxes_dict = db_boxes_dict
-
-    def augment_data(self, data, attr):
-        cfg = self.cfg.augment
-
-        if 'ObjectSample' in cfg.keys():
-            if not hasattr(self, 'db_boxes_dict'):
-                data_path = attr['path']
-                # remove tail of path to get root data path
-                for _ in range(3):
-                    data_path = os.path.split(data_path)[0]
-                pickle_path = os.path.join(data_path, 'bboxes.pkl')
-                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
-
-            data = ObjdetAugmentation.ObjectSample(
-                data,
-                db_boxes_dict=self.db_boxes_dict,
-                sample_dict=cfg['ObjectSample']['sample_dict'])
-
-        if cfg.get('ObjectRangeFilter', False):
-            data = ObjdetAugmentation.ObjectRangeFilter(
-                data, self.cfg.point_cloud_range)
-
-        if cfg.get('PointShuffle', False):
-            data = ObjdetAugmentation.PointShuffle(data)
-
-        return data
 
     def transform(self, data, attr):
         t_data = {'point': data['point'], 'calib': data['calib']}

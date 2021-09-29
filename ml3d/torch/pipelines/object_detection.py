@@ -233,6 +233,7 @@ class ObjectDetection(BasePipeline):
 
     def run_train(self):
         """Run training with train data split."""
+        torch.manual_seed(self.rng.integers(100))
         model = self.model
         device = self.device
         dataset = self.dataset

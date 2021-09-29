@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import numpy as np
-import random
 import time
 from tqdm import tqdm
 
@@ -222,7 +221,7 @@ class RandLANet(BaseModel):
         self.inference_data = self.preprocess(data, attr)
         self.inference_proj_inds = self.inference_data['proj_inds']
         num_points = self.inference_data['search_tree'].data.shape[0]
-        self.possibility = np.random.rand(num_points) * 1e-3
+        self.possibility = self.rng.random(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
         self.pbar = tqdm(total=self.possibility.shape[0])

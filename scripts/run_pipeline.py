@@ -1,3 +1,4 @@
+import numpy as np
 import argparse
 import copy
 import os
@@ -36,6 +37,7 @@ def parse_args():
     parser.add_argument('--batch_size', help='batch size', default=None)
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
+    parser.add_argument('--seed', help='random seed', default=0)
 
     args, unknown = parser.parse_known_args()
 
@@ -63,6 +65,7 @@ def main():
 
     framework = _ml3d.utils.convert_framework_name(args.framework)
     args.device = _ml3d.utils.convert_device_name(args.device)
+    rng = np.random.default_rng(args.seed)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
     else:
@@ -96,6 +99,10 @@ def main():
         cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
                         _ml3d.utils.Config.merge_cfg_file(cfg, args, extra_dict)
 
+        cfg_dict_dataset['seed'] = rng
+        cfg_dict_model['seed'] = rng
+        cfg_dict_pipeline['seed'] = rng
+
         dataset = Dataset(cfg_dict_dataset.pop('dataset_path', None),
                           **cfg_dict_dataset)
 
@@ -120,6 +127,10 @@ def main():
 
         cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
                         _ml3d.utils.Config.merge_module_cfg_file(args, extra_dict)
+
+        cfg_dict_dataset['seed'] = rng
+        cfg_dict_model['seed'] = rng
+        cfg_dict_pipeline['seed'] = rng
 
         dataset = Dataset(**cfg_dict_dataset)
         model = Model(**cfg_dict_model, mode=args.mode)

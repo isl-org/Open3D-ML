@@ -3,7 +3,6 @@ import pandas as pd
 import os, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath, isdir
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging

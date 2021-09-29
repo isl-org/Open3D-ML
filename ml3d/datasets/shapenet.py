@@ -3,7 +3,6 @@ from os.path import exists, join
 from pathlib import Path
 import logging
 import json
-from random import shuffle
 
 import numpy as np
 
@@ -115,9 +114,9 @@ class ShapeNet(BaseDataset):
                     self.test_files.append((item, fn[0], fn[1]))
                 else:
                     self.val_files.append((item, fn[0], fn[1]))
-        shuffle(self.train_files)
-        shuffle(self.test_files)
-        shuffle(self.val_files)
+        self.rng.shuffle(self.train_files)
+        self.rng.shuffle(self.test_files)
+        self.rng.shuffle(self.val_files)
 
     @staticmethod
     def get_label_to_names(task="classification"):
