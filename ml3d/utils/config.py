@@ -193,7 +193,7 @@ class Config(object):
         return b
 
     def merge_from_dict(self, new_dict):
-        """Merge a new into cfg_dict.
+        """Merge a new dict into cfg_dict.
 
         Args:
             new_dict (dict): a dict of configs.
