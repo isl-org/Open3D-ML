@@ -20,14 +20,12 @@
 #***************************************************************************************/
 
 import torch
-import pickle
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.modules.utils import _pair
 
 from functools import partial
 import numpy as np
-import os
 
 from open3d.ml.torch.ops import voxelize, ragged_to_dense
 
@@ -40,7 +38,6 @@ from ..modules.losses.smooth_L1 import SmoothL1Loss
 from ..modules.losses.cross_entropy import CrossEntropyLoss
 from ...datasets.utils import BEVBox3D
 from ...datasets.augment import ObjdetAugmentation
-from ...datasets.utils.operations import filter_by_min_points
 
 
 class PointPillars(BaseModel):

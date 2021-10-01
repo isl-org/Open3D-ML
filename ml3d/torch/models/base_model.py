@@ -24,7 +24,7 @@ class BaseModel(ABC, torch.nn.Module):
 
         self.trans_point_sampler = SemSegRandomSampler.get_point_sampler()
         self.cfg = Config(kwargs)
-        self.rng = np.random.default_rng(kwargs['seed'])
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
     @abstractmethod
     def get_loss(self, Loss, results, inputs, device):
