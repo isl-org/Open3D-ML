@@ -65,9 +65,9 @@ def get_from_name(module_name, registry, framework):
     """Build a module from config dict.
 
     Args:
-        cfg (dict): Config dict. It should at least contain the key "type".
-        registry (:obj:`Registry`): The registry to search the type from.
-        default_args (dict, optional): Default initialization arguments.
+        module_name (string): Name of the module.
+        registry: Object of type Registry.
+        framework (string): Framework, one of 'tf' or 'torch'
 
     Returns:
         object: The constructed object.
