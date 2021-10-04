@@ -6,14 +6,6 @@ PIPELINE = Registry('pipeline')
 SAMPLER = Registry('sampler')
 
 
-def build(cfg, registry, args=None):
-    return build_from_cfg(cfg, registry, args)
-
-
-def build_network(cfg):
-    return build(cfg, NETWORK)
-
-
 def convert_device_name(framework):
     """Convert device to either cpu or cuda."""
     gpu_names = ["gpu", "cuda"]
