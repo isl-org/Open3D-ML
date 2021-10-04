@@ -55,7 +55,7 @@ class BaseDataset(ABC):
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
-        self.rng = np.random.default_rng(kwargs['seed'])
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
     @staticmethod
     @abstractmethod
