@@ -1,10 +1,6 @@
-from os.path import exists, join
-from os import makedirs
-from sklearn.metrics import confusion_matrix
 import tensorflow as tf
 import numpy as np
-import time
-import random
+
 from tqdm import tqdm
 from sklearn.neighbors import KDTree
 
@@ -144,7 +140,6 @@ class RandLANet(BaseModel):
 
     def forward_att_pooling(self, feature_set, name):
         # feature_set: BxNxKxd
-        batch_size = feature_set.shape[0]
         num_points = feature_set.shape[1]
         num_neigh = feature_set.shape[2]
         d = feature_set.shape[3]
@@ -166,7 +161,6 @@ class RandLANet(BaseModel):
         return f_agg
 
     def forward_relative_pos_encoding(self, xyz, neigh_idx):
-        B, N, K = neigh_idx.shape
         neighbor_xyz = self.forward_gather_neighbour(xyz, neigh_idx)
 
         xyz_tile = tf.tile(tf.expand_dims(xyz, axis=2),
@@ -468,9 +462,6 @@ class RandLANet(BaseModel):
 
     def transform(self, pc, feat, label):
         cfg = self.cfg
-
-        pc = pc
-        feat = feat
 
         input_points = []
         input_neighbors = []

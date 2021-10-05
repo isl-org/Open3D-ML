@@ -1,9 +1,5 @@
-from abc import abstractmethod
 from tqdm import tqdm
-import torch
-from torch.multiprocessing import Pool
 from torch.utils.data import Dataset
-from collections import namedtuple
 
 from ...utils import Cache, get_hash
 

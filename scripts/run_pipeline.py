@@ -1,12 +1,9 @@
 import argparse
-import copy
-import os
 import sys
-import os.path as osp
-from pathlib import Path
 import yaml
-import time
 import pprint
+
+from pathlib import Path
 
 
 def parse_args():
