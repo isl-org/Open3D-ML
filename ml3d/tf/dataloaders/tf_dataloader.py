@@ -44,7 +44,7 @@ class TFDataloader():
          * Checks if preprocess is available. If yes, then uses the preprocessed data.
          * Checks if cache is used. If not, then uses data from the cache.
 
-        **Args:**
+        Args:
             dataset: The 3DML dataset object. You can use the base dataset,
                 sample datasets, or a custom dataset.
             model: 3DML model object.

@@ -2,6 +2,7 @@ import tensorflow as tf
 
 
 class FocalLoss(tf.Module):
+    """Focal Loss."""
 
     def __init__(self, gamma=2.0, alpha=0.25, loss_weight=1.0):
         """`Focal Loss <https://arxiv.org/abs/1708.02002>`_

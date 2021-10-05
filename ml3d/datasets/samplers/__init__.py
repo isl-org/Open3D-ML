@@ -1,3 +1,5 @@
+"""Point Samplers."""
+
 from .semseg_random import SemSegRandomSampler
 from .semseg_spatially_regular import SemSegSpatiallyRegularSampler
 

@@ -17,6 +17,7 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
 
 
 class RandLANet(BaseModel):
+    """Semantic Segmentation model"""
 
     def __init__(
             self,
