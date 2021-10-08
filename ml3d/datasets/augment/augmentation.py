@@ -5,6 +5,7 @@ import warnings
 from ..utils.operations import *
 from ..utils.transforms import in_range_bev
 
+
 class Augmentation():
     """Class consisting common augmentation methods for different pipelines."""
 
