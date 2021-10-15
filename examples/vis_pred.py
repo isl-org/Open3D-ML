@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import open3d.ml.torch as ml3d # just switch to open3d.ml.tf for tf usage
+import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
 import argparse
 import math
 import numpy as np
@@ -74,6 +74,7 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
     return vis_points
 
+
 def get_torch_ckpts():
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
@@ -103,7 +104,8 @@ def get_tf_ckpts():
         os.system(cmd)
         cmd = "unzip -j -o {} -d {}".format(ckpt_path_zip, ckpt_path_dir)
         os.system(cmd)
-    ckpt_path_r = example_dir + "/vis_weights_{}/{}_{}".format('RandLANet', 'randlanet', 'semantickitti')
+    ckpt_path_r = example_dir + "/vis_weights_{}/{}_{}".format(
+        'RandLANet', 'randlanet', 'semantickitti')
 
     ckpt_path_dir = example_dir + "/vis_weights_{}".format('KPFCNN')
     if not exists(ckpt_path_dir):
@@ -130,9 +132,9 @@ def main():
     v.set_lut("pred", lut)
 
     # load pretrained weights depending on used ml framework (torch or tf)
-    if("open3d.ml.torch" in sys.modules): # torch is used
+    if ("open3d.ml.torch" in sys.modules):  # torch is used
         ckpt_path_r, ckpt_path_k = get_torch_ckpts()
-    else: # tf is used
+    else:  # tf is used
         ckpt_path_r, ckpt_path_k = get_tf_ckpts()
 
     model = ml3d.models.RandLANet(ckpt_path=ckpt_path_r)
