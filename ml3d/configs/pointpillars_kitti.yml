@@ -106,8 +106,8 @@ pipeline:
 
   # Open3D for Tensorboard summary (3D data)
   summary:
-    # Record summary in these stages
-    record_for: [train, valid, test]
+    # Record summary in these stages (from train, valid, test)
+    record_for: [train]
     # Subsample point cloud if n_pts exceeds this value. Empty => save all
     # points in the summary.
     max_pts:
