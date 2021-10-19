@@ -81,8 +81,7 @@ class BoundingBox3D:
 
     @staticmethod
     def create_lines(boxes, lut=None, out="lineset"):
-        """Creates and returns an open3d.geometry.LineSet that can be used to
-        render the boxes.
+        """Creates a LineSet that can be used to render the boxes.
 
         Args:
             boxes: the list of bounding boxes
@@ -90,8 +89,13 @@ class BoundingBox3D:
                 the label_class argument of the BoundingBox3D constructor. If
                 not provided, a color of 50% grey will be used. (optional)
             out (str): Output format. Can be "lineset" (default) for the
-                Open3D lineset or "dict" for a dictionary of lineset properties
-                ("vertex_positions", "line_indices", and "line_colors").
+                Open3D lineset or "dict" for a dictionary of lineset properties.
+
+        Returns:
+            open3d.geometry.LineSet if out == "lineset", or
+                Dictionary of lineset properties ("vertex_positions",
+                "line_indices", "line_colors", "bbox_labels",
+                "bbox_confidences") if out == "dict".
         """
         nverts = 14
         nlines = 17
@@ -99,8 +103,7 @@ class BoundingBox3D:
         indices = np.zeros((nlines * len(boxes), 2), dtype="int32")
         colors = np.zeros((nlines * len(boxes), 3), dtype="float32")
 
-        for i in range(0, len(boxes)):
-            box = boxes[i]
+        for i, box in enumerate(boxes):
             pidx = nverts * i
             x = 0.5 * box.size[0] * box.left
             y = 0.5 * box.size[1] * box.up
@@ -126,8 +129,7 @@ class BoundingBox3D:
             points[pidx + 13] = arrow_mid - head_length * box.left
 
         # It is faster to break the indices and colors into their own loop.
-        for i in range(0, len(boxes)):
-            box = boxes[i]
+        for i, box in enumerate(boxes):
             pidx = nverts * i
             idx = nlines * i
             indices[idx:idx +
@@ -160,7 +162,9 @@ class BoundingBox3D:
             lines = {
                 "vertex_positions": points,
                 "line_indices": indices,
-                "line_colors": colors
+                "line_colors": colors,
+                "bbox_labels": tuple(b.label_class for b in boxes),
+                "bbox_confidences": tuple(b.confidence for b in boxes)
             }
 
         return lines
