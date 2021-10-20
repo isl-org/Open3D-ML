@@ -103,17 +103,8 @@ pipeline:
     Person_sitting: Pedestrian
   }
   difficulties: [0, 1, 2]
-
-  # Open3D for Tensorboard summary (3D data)
   summary:
-    # Record summary in these stages (from train, valid, test)
-    record_for: [train]
-    # Subsample point cloud if n_pts exceeds this value. Empty => save all
-    # points in the summary.
+    record_for: []
     max_pts:
-    # Only write input point cloud in the first epoch. In other epochs, use
-    # reference to the first step. Do not use if each epoch has a different
-    # order of minibatches.
     use_reference: false
-    # Write at most this many samples in each batch
     max_outputs: 1

@@ -177,8 +177,6 @@ class ObjectDetection(BasePipeline):
 
         self.valid_losses = {}
 
-        return  # TODO: Remove
-
         pred = []
         gt = []
         with torch.no_grad():
@@ -349,7 +347,8 @@ class ObjectDetection(BasePipeline):
 
     def get_3d_summary(self, infer_bboxes_batch, inputs_batch, epoch):
         """
-        Create visualization for network inputs and outputs.
+        Create visualization for input point cloud and network output bounding
+        boxes.
 
         Args:
             infer_bboxes_batch (Sequence[Sequence[BoundingBox3D]): Batch of
@@ -403,11 +402,11 @@ class ObjectDetection(BasePipeline):
                     input_pcd if self._first_step == epoch or not use_reference
                     else self._first_step
             },
-            'ground_truth': {
+            'objdet_ground_truth': {
                 "bboxes": gt_bboxes,
                 'label_to_names': label_to_names
             },
-            'prediction': {
+            'objdet_prediction': {
                 "bboxes": infer_bboxes,
                 'label_to_names': label_to_names
             },

@@ -1,14 +1,8 @@
 batch_size: 2
 val_batch_size: 1
 test_batch_size: 1
-max_epoch: 100
-learning_rate: 0.01
-lr_decays: 0.95
-deform_lr_factor: 0.1
+max_epoch: 200
 save_ckpt_freq: 5
-adam_lr: 0.01
-scheduler_gamma: 0.95
-momentum: 0.98
 main_log_dir: ./logs
 train_sum_dir: train_log
 device: gpu

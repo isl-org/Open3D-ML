@@ -6,7 +6,7 @@ dataset:
   ignored_label_inds:
   - 0
   num_classes: 8
-  num_points: 65536
+  num_points: 1024  # 65536
   test_files:
   - L002.ply
   test_result_folder: ./test
@@ -72,3 +72,8 @@ pipeline:
   val_batch_size: 2
   test_continue: false
   test_compute_metric: true
+  summary:
+    record_for: [train, valid, test]
+    max_pts:
+    use_reference: false
+    max_outputs: 1

@@ -381,9 +381,9 @@ class PointRCNN(BaseModel):
             labels = labels[fltr]
             scores = scores[fltr]
 
-            bboxes = bboxes.cpu().numpy()
-            scores = scores.cpu().numpy()
-            labels = labels.cpu().numpy()
+            bboxes = bboxes.cpu().detach().numpy()
+            scores = scores.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
             inference_result.append([])
 
             world_cam, cam_img = None, None
