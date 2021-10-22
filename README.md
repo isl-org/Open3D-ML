@@ -377,7 +377,7 @@ The following is a list of datasets for which we provide dataset reader classes.
 * KITTI ([project-page](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d))
 * Lyft ([project-page](https://self-driving.lyft.com/level5/data/))
 * nuScenes ([project-page](https://www.nuscenes.org/))
-* Waymo ([project-page](https://waymo.com/open/data/))
+* Waymo ([project-page](https://waymo.com/open/))
 * ScanNet([project-page](http://www.scan-net.org/))
 
 
