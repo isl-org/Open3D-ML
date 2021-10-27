@@ -14,14 +14,14 @@ train_sum_dir: train_log
 device: gpu
 # Open3D for Tensorboard summary (3D data)
 summary:
-# Record summary in these stages (from train, valid, test)
-record_for: []
-# Subsample point cloud if n_pts exceeds this value. Empty => save all
-# points in the summary.
-max_pts:
-# Only write input point cloud in the first epoch. In other epochs, use
-# reference to the first step. Do not use if each epoch has a different
-# order of minibatches.
-use_reference: false
-# Write at most this many samples in each batch
-max_outputs: 1
+  # Record summary in these stages (from train, valid, test)
+  record_for: []
+  # Subsample point cloud if n_pts exceeds this value. Empty => save all
+  # points in the summary.
+  max_pts:
+  # Only write input point cloud in the first epoch. In other epochs, use
+  # reference to the first step. Do not use if each epoch has a different
+  # order of minibatches. Do not use for RandLaNet or KPConv.
+  use_reference: false
+  # Write at most this many samples in each batch
+  max_outputs: 1

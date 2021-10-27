@@ -73,7 +73,7 @@ pipeline:
   test_continue: false
   test_compute_metric: true
   summary:
-    record_for: [train, valid, test]
+    record_for: []
     max_pts:
     use_reference: false
     max_outputs: 1

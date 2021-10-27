@@ -119,7 +119,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Run the inference using the data passed.
-    
+
     """
 
     def run_inference(self, data):
@@ -146,7 +146,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Run the test using the data passed.
-    
+
     """
 
     def run_test(self):
@@ -188,7 +188,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Run the training on the self model.
-    
+
     """
 
     def run_train(self):
@@ -297,6 +297,9 @@ class SemanticSegmentation(BasePipeline):
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
 
+                    # inputs['point'], inputs['label'], inputs['batch_lengths'] concatenated for all except
+                    # randlanet (same size point clouds)
+
                 if len(predict_scores.shape) < 2:
                     continue
 
@@ -312,7 +315,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Save logs from the training and send results to TensorBoard.
-    
+
     """
 
     def save_logs(self, writer, epoch):
@@ -355,7 +358,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
-    
+
     """
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
@@ -387,7 +390,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Save a checkpoint at the passed epoch.
-    
+
     """
 
     def save_ckpt(self, epoch):
@@ -396,7 +399,7 @@ class SemanticSegmentation(BasePipeline):
 
     """
     Save experiment configuration with TensorBoard summary.
-    
+
     """
 
     def save_config(self, writer):
