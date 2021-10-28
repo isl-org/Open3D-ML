@@ -1,19 +1,20 @@
-import numpy as np
 import logging
-import sys
-
-from tqdm import tqdm
 from datetime import datetime
-from os.path import exists, join, isfile, dirname, abspath
+from os.path import join
 from pathlib import Path
 
+import numpy as np
+from tqdm import tqdm
 import tensorflow as tf
 
+from open3d.visualization.tensorboard_plugin import summary as summary3d
 from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
+
+import ipdb
 
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
@@ -29,47 +30,53 @@ class SemanticSegmentation(BasePipeline):
     stages: Pre-processing, loading dataset, testing, and inference or training.
 
     **Example:**
-        This example loads the Semantic Segmentation and performs a training using the SemanticKITTI dataset.
+        This example loads the Semantic Segmentation and performs a training
+        using the SemanticKITTI dataset.
+
+        .. code::
 
             import tensorflow as tf
-
             from .base_pipeline import BasePipeline
 
             Mydataset = TFDataloader(dataset=tf.dataset.get_split('training')
-            MyModel = SemanticSegmentation(self,model,dataset=Mydataset, name='SemanticSegmentation',
-            name='SemanticSegmentation',
-            batch_size=4,
-            val_batch_size=4,
-            test_batch_size=3,
-            max_epoch=100,
-            learning_rate=1e-2,
-            lr_decays=0.95,
-            save_ckpt_freq=20,
-            adam_lr=1e-2,
-            scheduler_gamma=0.95,
-            momentum=0.98,
-            main_log_dir='./logs/',
-            device='gpu',
-            split='train',
-            train_sum_dir='train_log')
+            MyModel = SemanticSegmentation(self,model,dataset=Mydataset,
+                name='SemanticSegmentation',
+                batch_size=4,
+                val_batch_size=4,
+                test_batch_size=3,
+                max_epoch=100,
+                learning_rate=1e-2,
+                lr_decays=0.95,
+                save_ckpt_freq=20,
+                adam_lr=1e-2,
+                scheduler_gamma=0.95,
+                momentum=0.98,
+                main_log_dir='./logs/',
+                device='gpu',
+                split='train',
+                train_sum_dir='train_log')
 
     **Args:**
-            dataset: The 3D ML dataset class. You can use the base dataset, sample datasets , or a custom dataset.
+            dataset: The 3D ML dataset class. You can use the base dataset,
+                sample datasets, or a custom dataset.
             model: The model to be used for building the pipeline.
             name: The name of the current training.
             batch_size: The batch size to be used for training.
             val_batch_size: The batch size to be used for validation.
             test_batch_size: The batch size to be used for testing.
             max_epoch: The maximum size of the epoch to be used for training.
-            leanring_rate: The hyperparameter that controls the weights during training. Also, known as step size.
+            leanring_rate: The hyperparameter that controls the weights during
+                training. Also, known as step size.
             lr_decays: The learning rate decay for the training.
-            save_ckpt_freq: The frequency in which the checkpoint should be saved.
+            save_ckpt_freq: The frequency in which the checkpoint should be
+                saved.
             adam_lr: The leanring rate to be applied for Adam optimization.
             scheduler_gamma: The decaying factor associated with the scheduler.
             momentum: The momentum that accelerates the training rate schedule.
             main_log_dir: The directory where logs are stored.
             device: The device to be used for training.
-            split: The dataset split to be used. In this example, we have used "train".
+            split: The dataset split to be used. In this example, we have used
+                "train".
             train_sum_dir: The directory where the trainig summary is stored.
 
     **Returns:**
@@ -115,15 +122,11 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
+        self.summary = {}
         self.cfg.convert_to_tf_names('pipeline')
 
-    """
-    Run the inference using the data passed.
-
-    """
-
     def run_inference(self, data):
-        cfg = self.cfg
+        """ Run the inference using the data passed.  """
         model = self.model
         log.info("running inference")
 
@@ -144,12 +147,8 @@ class SemanticSegmentation(BasePipeline):
 
         return model.inference_result
 
-    """
-    Run the test using the data passed.
-
-    """
-
     def run_test(self):
+        """ Run the test using the data passed. """
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
@@ -161,6 +160,7 @@ class SemanticSegmentation(BasePipeline):
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
 
+        record_summary = cfg.get('summary').get('record_for', [])
         log.info("Started testing")
 
         metric = SemSegMetric()
@@ -173,10 +173,11 @@ class SemanticSegmentation(BasePipeline):
             results = self.run_inference(data)
             scores, labels = Loss.filter_valid_label(results['predict_scores'],
                                                      data['label'])
-
             metric.update(scores, labels)
-
             dataset.save_test_result(results, attr)
+            # Save only for the first batch
+            if 'test' in record_summary and 'test' not in self.summary:
+                self.summary['test'] = self.get_3d_summary(results, data, 0)
 
         accs = metric.acc()
         ious = metric.iou()
@@ -186,12 +187,8 @@ class SemanticSegmentation(BasePipeline):
         log.info("Overall Accuracy : {:.3f}".format(accs[-1]))
         log.info("Overall IOU : {:.3f}".format(ious[-1]))
 
-    """
-    Run the training on the self model.
-
-    """
-
     def run_train(self):
+        """ Run the training on the self model.  """
         model = self.model
         dataset = self.dataset
 
@@ -232,6 +229,7 @@ class SemanticSegmentation(BasePipeline):
         writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
+        record_summary = cfg.get('summary').get('record_for', [])
         self.optimizer = model.get_optimizer(cfg)
 
         is_resume = model.cfg.get('is_resume', True)
@@ -245,8 +243,7 @@ class SemanticSegmentation(BasePipeline):
             self.losses = []
             step = 0
 
-            for idx, inputs in enumerate(
-                    tqdm(train_loader, total=len_train, desc='training')):
+            for inputs in tqdm(train_loader, total=len_train, desc='training'):
                 with tf.GradientTape(persistent=True) as tape:
                     results = model(inputs, training=True)
 
@@ -282,30 +279,36 @@ class SemanticSegmentation(BasePipeline):
                         zip(scaled_grads, scaled_params))
 
                 self.metric_train.update(predict_scores, gt_labels)
-
                 self.losses.append(loss.numpy())
+
+                if 'train' in record_summary and step == 0:
+                    self.summary['train'] = self.get_3d_summary(
+                        results, inputs, epoch)
                 step = step + 1
 
             # --------------------- validation
             self.valid_losses = []
             step = 0
 
-            for idx, inputs in enumerate(
-                    tqdm(valid_loader, total=len_val, desc='validation')):
+            for inputs in tqdm(valid_loader, total=len_val, desc='validation'):
                 with tf.GradientTape() as tape:
                     results = model(inputs, training=False)
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs)
 
-                    # inputs['point'], inputs['label'], inputs['batch_lengths'] concatenated for all except
-                    # randlanet (same size point clouds)
+                    # inputs['point'], inputs['label'], inputs['batch_lengths']
+                    # concatenated for all except randlanet (same size point
+                    # clouds)
 
                 if len(predict_scores.shape) < 2:
                     continue
 
                 self.metric_val.update(predict_scores, gt_labels)
-
                 self.valid_losses.append(loss.numpy())
+
+                if 'valid' in record_summary and step == 0:
+                    self.summary['valid'] = self.get_3d_summary(
+                        results, inputs, epoch)
                 step = step + 1
 
             self.save_logs(writer, epoch)
@@ -313,12 +316,76 @@ class SemanticSegmentation(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
-    """
-    Save logs from the training and send results to TensorBoard.
+    def get_3d_summary(self, results, input_data, epoch):
+        """
+        Create visualization for network inputs and outputs.
 
-    """
+        Args:
+            results (Tensor(B, N, C)): Prediction scores for all classes.
+            input_batch: Network inputs. Batch of pointclouds and labels as a
+                Dict with the fields:
+                'xyz': [(5,) Tensor(B,N,3)] : points
+                'labels': (B, N) (optional): labels
+            epoch (int): step
+
+        Returns:
+            [Dict] visualizations of inputs and outputs suitable to save as an
+                Open3D for TensorBoard summary.
+        """
+        if not hasattr(self, "_first_step"):
+            self._first_step = epoch
+        label_to_names = self.dataset.get_label_to_names()
+        if not hasattr(self.dataset, "name_to_labels"):
+            self.dataset.name_to_labels = {
+                name: label
+                for label, name in self.dataset.get_label_to_names().items()
+            }
+        cfg = self.cfg.get('summary')
+        max_pts = cfg.get('max_pts')
+        if max_pts is None:
+            max_pts = np.iinfo(np.int32).max
+        use_reference = cfg.get('use_reference', False)
+        max_outputs = cfg.get('max_outputs', 1)
+        input_pcd = []
+        gt_labels = []
+        predict_labels = []
+
+        # ipdb.set_trace()
+
+        def to_sum_fmt(tensor, dtype=np.int32):
+            return np.atleast_3d(tensor.numpy().astype(dtype))
+
+        if self._first_step == epoch or not use_reference:
+            pointcloud = input_data[0]  # 0 => input to first layer # TODO
+            # TF doesn't support indexing with int Tensors
+            pcd_step = int(
+                np.ceil(pointcloud.shape[1] /
+                        min(max_pts, pointcloud.shape[1])))
+            input_pcd = to_sum_fmt(pointcloud[:max_outputs, ::pcd_step, :3],
+                                   np.float32)
+            gtl = input_data[-1]  # TODO
+            gt_labels = to_sum_fmt(gtl[:max_outputs, ::pcd_step])
+            # TODO
+            predict_labels = to_sum_fmt(
+                tf.argmax(results[:max_outputs, ::pcd_step, :], 2))
+
+        def get_reference_or(data_tensor):
+            if self._first_step == epoch or not use_reference:
+                return data_tensor
+            return self._first_step
+
+        summary_dict = {
+            'semantic_segmentation': {
+                "vertex_positions": get_reference_or(input_pcd),
+                "vertex_gt_labels": get_reference_or(gt_labels),
+                "vertex_predict_labels": predict_labels,
+                'label_to_names': label_to_names
+            }
+        }
+        return summary_dict
 
     def save_logs(self, writer, epoch):
+        """ Save logs from the training and send results to TensorBoard.  """
 
         train_accs = self.metric_train.acc()
         val_accs = self.metric_val.acc()
@@ -356,12 +423,20 @@ class SemanticSegmentation(BasePipeline):
             for key, val in iou_dicts[-1].items():
                 tf.summary.scalar("{}/ Overall".format(key), val, epoch)
 
-    """
-    Load a checkpoint. You must pass the checkpoint and indicate if you want to resume.
-
-    """
+            for stage in self.summary:
+                for key, summary_dict in self.summary[stage].items():
+                    label_to_names = summary_dict.pop('label_to_names', None)
+                    summary3d.add_3d('/'.join((stage, key)),
+                                     summary_dict,
+                                     epoch,
+                                     max_outputs=None,
+                                     label_to_names=label_to_names,
+                                     logdir=self.tensorboard_dir)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
+        """ Load a checkpoint. You must pass the checkpoint and indicate if you want
+        to resume.
+        """
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
 
@@ -388,19 +463,10 @@ class SemanticSegmentation(BasePipeline):
             else:
                 log.info("Initializing from scratch.")
 
-    """
-    Save a checkpoint at the passed epoch.
-
-    """
-
     def save_ckpt(self, epoch):
+        """Save a checkpoint at the passed epoch. """
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format(save_path))
-
-    """
-    Save experiment configuration with TensorBoard summary.
-
-    """
 
     def save_config(self, writer):
         """Save experiment configuration with tensorboard summary."""

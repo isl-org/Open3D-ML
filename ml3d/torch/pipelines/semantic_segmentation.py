@@ -125,6 +125,7 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
+        self.summary = {}
 
     def run_inference(self, data):
         """Run inference on given data.
@@ -223,9 +224,8 @@ class SemanticSegmentation(BasePipeline):
         self.test_labels = []
         self.ori_test_probs = []
         self.ori_test_labels = []
-        self.summary = {'test': {}}
 
-        record_summary = 'test' in cfg.get('summary').get('record_for', [])
+        record_summary = cfg.get('summary').get('record_for', [])
         log.info("Started testing")
 
         with torch.no_grad():
@@ -243,9 +243,9 @@ class SemanticSegmentation(BasePipeline):
                     attr = self.dataset_split.get_attr(test_sampler.cloud_id)
                     dataset.save_test_result(inference_result, attr)
                     # Save only for the first batch
-                    if record_summary and 'test' not in self.summary:
+                    if 'test' in record_summary and 'test' not in self.summary:
                         self.summary['test'] = self.get_3d_summary(
-                            results, inputs, 0)
+                            results, inputs['data'], 0)
 
         log.info("Finshed testing")
 
@@ -389,7 +389,6 @@ class SemanticSegmentation(BasePipeline):
             self.metric_val.reset()
             self.losses = []
             model.trans_point_sampler = train_sampler.get_point_sampler()
-            self.summary = {'train': {}, 'valid': {}}
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 if hasattr(inputs['data'], 'to'):
@@ -414,7 +413,7 @@ class SemanticSegmentation(BasePipeline):
                 # Save only for the first pcd in batch
                 if 'train' in record_summary and step == 0:
                     self.summary['train'] = self.get_3d_summary(
-                        results, inputs, epoch)
+                        results, inputs['data'], epoch)
 
             self.scheduler.step()
 
@@ -450,7 +449,7 @@ class SemanticSegmentation(BasePipeline):
                     # Save only for the first batch
                     if 'valid' in record_summary and step == 0:
                         self.summary['valid'] = self.get_3d_summary(
-                            results, inputs, epoch)
+                            results, inputs['data'], epoch)
 
             self.save_logs(writer, epoch)
 
@@ -470,30 +469,24 @@ class SemanticSegmentation(BasePipeline):
             batcher = None
         return batcher
 
-    def get_3d_summary(self, results, inputs, epoch):
+    def get_3d_summary(self, results, input_data, epoch):
         """
         Create visualization for network inputs and outputs.
 
         Args:
-            results (Tensor(B, N, C)): Prediction scores for all classes.
-            inputs_batch: Batch of pointclouds and labels as a Dict with the
-                fields:
-                {
-                'data' : { 'xyz': [(5,) Tensor(B,N,3)],
-                    'labels': (B, N) }
-                'attr' : {'idx': tensor (1,), 'name' : List pcd_name,
-                    'path': List [file_paths],
-                    'split': List ['train'|'test'|'valid']
-                    }
-                }
-
+            results (Tensor(B, N, C)): Prediction scores for all classes
+            (network output).
+            inputs_batch: Network inputs. Batch of pointclouds and labels as a
+                Dict with the fields:
+                'xyz': [(5,) Tensor(B,N,3)] : points
+                'labels': (B, N) (optional): labels
             epoch (int): step
 
         Returns:
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
-        # ipdb.set_trace()
+        ipdb.set_trace()
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         label_to_names = self.dataset.get_label_to_names()
@@ -505,30 +498,30 @@ class SemanticSegmentation(BasePipeline):
         cfg = self.cfg.get('summary')
         max_pts = cfg.get('max_pts')
         if max_pts is None:
-            max_pts = np.iinfo(np.int32).max
+            max_pts = torch.torch.iinfo(torch.int32).max
         use_reference = cfg.get('use_reference', False)
         max_outputs = cfg.get('max_outputs', 1)
         input_pcd = []
         gt_labels = []
         predict_labels = []
 
-        def to_sum_fmt(tensor, dtype=np.int32):
-            return tensor.cpu().detach().numpy().astype(dtype)
+        def to_sum_fmt(tensor, dtype=torch.int32):
+            return torch.atleast_3d(tensor.cpu().detach().type(dtype))
 
         if self._first_step == epoch or not use_reference:
-            pointcloud = inputs['data']['xyz'][0]  # 0 => input to first layer
-            pcd_subsample = np.linspace(0,
-                                        pointcloud.shape[1] - 1,
-                                        num=min(max_pts, pointcloud.shape[1]),
-                                        dtype=int)
+            pointcloud = input_data['xyz'][0]  # 0 => input to first layer
+            pcd_subsample = torch.linspace(0,
+                                           pointcloud.shape[1] - 1,
+                                           steps=min(max_pts,
+                                                     pointcloud.shape[1]),
+                                           dtype=torch.int)
             input_pcd = to_sum_fmt(pointcloud[:max_outputs, pcd_subsample, :3],
-                                   np.float32)
-            gtl = inputs['data']['labels']
-            gt_labels = np.atleast_3d(
-                to_sum_fmt(gtl[:max_outputs, pcd_subsample]))
-            predict_labels = np.atleast_3d(
-                to_sum_fmt(
-                    torch.argmax(results[:max_outputs, pcd_subsample, :], 2)))
+                                   torch.float32)
+            if 'labels' in input_data:
+                gtl = input_data['labels']
+                gt_labels = to_sum_fmt(gtl[:max_outputs, pcd_subsample])
+            predict_labels = to_sum_fmt(
+                torch.argmax(results[:max_outputs, pcd_subsample, :], 2))
 
         def get_reference_or(data_tensor):
             if self._first_step == epoch or not use_reference:
