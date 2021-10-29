@@ -4,7 +4,7 @@ from tensorflow.python.framework import ops
 import open3d
 
 if open3d.core.cuda.device_count() > 0:
-    import open3d.ml.tf.ops as ml_ops
+    from open3d.ml.tf.ops import furthest_point_sampling, three_nn, three_interpolate, three_interpolate_grad, ball_query
 
 
 def furthest_point_sample(xyz, npoint):
@@ -18,7 +18,7 @@ def furthest_point_sample(xyz, npoint):
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
-    output = ml_ops.furthest_point_sampling(xyz, npoint)
+    output = furthest_point_sampling(xyz, npoint)
     return output
 
 
@@ -37,7 +37,7 @@ def three_nn_gpu(query_pts, data_pts):
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
-    dist2, idx = ml_ops.three_nn(query_pts, data_pts)
+    dist2, idx = three_nn(query_pts, data_pts)
     return tf.sqrt(dist2), idx
 
 
@@ -56,7 +56,7 @@ def three_interpolate_gpu(features, idx, weight):
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
-    output = ml_ops.three_interpolate(features, idx, weight)
+    output = three_interpolate(features, idx, weight)
     return output
 
 
@@ -71,7 +71,7 @@ def _tree_interpolate_gradient(op, grad_out):
 
     m = features.shape[2]
 
-    grad_features = ml_ops.three_interpolate_grad(grad_out, idx, weight, m)
+    grad_features = three_interpolate_grad(grad_out, idx, weight, m)
     return grad_features, None, None
 
 
@@ -82,12 +82,12 @@ def ball_query_gpu(radius, nsample, xyz, new_xyz):
     :param xyz: (B, N, 3) xyz coordinates of the features
     :param new_xyz: (B, npoint, 3) centers of the ball query
     :return:
-        idx: (B, npoint, nsample) tensor with the indicies of the features that form the query balls
+        idx: (B, npoint, nsample) tensor with the indices of the features that form the query balls
     """
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
 
-    idx = ml_ops.ball_query(xyz, new_xyz, radius, nsample)
+    idx = ball_query(xyz, new_xyz, radius, nsample)
     return idx
 
 

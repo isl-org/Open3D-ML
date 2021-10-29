@@ -330,7 +330,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou', is_aligned=False, eps=1e-6):
         Tensor: shape (m, n) if ``is_aligned `` is False else shape (m,)
     """
     assert mode in ['iou', 'iof', 'giou'], f'Unsupported mode {mode}'
-    # Either the boxes are empty or the length of boxes's last dimenstion is 4
+    # Either the boxes are empty or the length of boxes's last dimension is 4
     assert (bboxes1.shape[-1] == 4 or bboxes1.shape[-1] == 0)
     assert (bboxes2.shape[-1] == 4 or bboxes2.shape[-1] == 0)
 
