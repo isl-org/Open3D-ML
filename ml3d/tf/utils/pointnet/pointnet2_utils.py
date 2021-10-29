@@ -25,6 +25,33 @@ def furthest_point_sample(xyz, npoint):
 ops.NoGradient('Open3DFurthestPointSampling')
 
 
+def furthest_point_sample_v2(xyz, row_splits, new_row_splits):
+    """Furthest Point Sampling with variable length batch support.
+
+    Args:
+        xyz (tf.float32): Input pointcloud (N, 3).
+        row_splits (tf.int64): splits to define batch (b + 1,)
+        new_row_splits (tf.int64): splits for output batch lengths (b + 1,)
+
+    Returns:
+        Returns indices of sampled points with shape (new_row_splits[-1], ).
+    """
+    if not open3d.core.cuda.device_count() > 0:
+        raise NotImplementedError
+
+    idx = []
+    for i in range(tf.shape(row_splits)[0] - 1):
+        npoint = new_row_splits[i + 1] - new_row_splits[i]
+        start_i = row_splits[i]
+        end_i = row_splits[i + 1]
+        out = ml_ops.furthest_point_sampling(
+            tf.expand_dims(xyz[start_i:end_i], 0), npoint) + row_splits[i]
+
+        idx.append(out[0])
+
+    return tf.concat(idx, 0)
+
+
 def three_nn_gpu(query_pts, data_pts):
     """Find the three nearest neighbors of query_pts in data_pts.
 
