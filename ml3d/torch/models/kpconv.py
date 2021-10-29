@@ -2,7 +2,6 @@ import time
 import math
 import torch
 import torch.nn as nn
-import open3d.core as o3c
 
 from tqdm import tqdm
 from torch.nn.parameter import Parameter
@@ -10,7 +9,8 @@ from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
 
 from open3d.ml.contrib import subsample_batch
-from open3d.ml.contrib import radius_search
+from open3d.ml.torch.layers import FixedRadiusSearch
+from open3d.ml.torch.ops import ragged_to_dense
 
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
@@ -19,6 +19,11 @@ from ...utils import MODEL
 
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
                                trans_crop_pc, create_3D_rotations)
+
+
+class bcolors:  # See https://stackoverflow.com/questions/287871
+    WARNING = '\033[93m'
+    ENDC = '\033[0m'
 
 
 class KPFCNN(BaseModel):
@@ -1331,7 +1336,7 @@ class SimpleBlock(nn.Module):
                              deformable='deform' in block_name,
                              modulated=config.modulated)
 
-        # Other opperations
+        # Other operations
         self.batch_norm = BatchNormBlock(out_dim // 2, self.use_bn,
                                          self.bn_momentum)
         self.leaky_relu = nn.LeakyReLU(config.get('l_relu', 0.1))
@@ -1798,7 +1803,7 @@ def kernel_point_optimization_debug(radius,
     kernel_points = kernel_points[:num_kernels * num_points, :].reshape(
         (num_kernels, num_points, -1))
 
-    # Optionnal fixing
+    # Optional fixing
     if fixed == 'center':
         kernel_points[:, 0, :] *= 0
     if fixed == 'verticals':
@@ -2008,17 +2013,27 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
 
     Returns:
         neighbors indices
+
     """
-    ret = radius_search(
-        o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
-        o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
-        o3c.Tensor.from_numpy(np.array(s_batches, dtype=np.int32)),
-        radius).numpy()
+    q_splits = torch.zeros((len(q_batches) + 1,), dtype=torch.int64)
+    s_splits = torch.zeros((len(s_batches) + 1,), dtype=torch.int64)
+    q_splits[1:] = torch.cumsum(torch.LongTensor(q_batches), dim=0)
+    s_splits[1:] = torch.cumsum(torch.LongTensor(s_batches), dim=0)
 
-    num_points = supports.shape[0]
-    corret_ret = np.where(ret == -1, num_points, ret)
+    nns = FixedRadiusSearch()
+    result = nns(torch.from_numpy(supports), torch.from_numpy(queries), radius,
+                 s_splits, q_splits)
 
-    return corret_ret
+    idx = result.neighbors_index.reshape(-1, 1)
+    splits = result.neighbors_row_splits
+
+    max_nbrs = torch.max(splits[1:] - splits[:-1]).item()
+
+    dense_idx = ragged_to_dense(
+        idx, splits, max_nbrs,
+        torch.Tensor([supports.shape[0]]).to(torch.int32)).squeeze(2)
+
+    return dense_idx.numpy()
 
 
 def batch_grid_subsampling(points,
@@ -2164,7 +2179,7 @@ def p2p_fitting_regularizer(net):
             # Fitting loss
             ##############
 
-            # Get the distance to closest input point and normalize to be independant from layers
+            # Get the distance to closest input point and normalize to be independent from layers
             KP_min_d2 = m.min_d2 / (m.KP_extent**2)
 
             # Loss will be the square distance to closest input point. We use L1 because dist is already squared

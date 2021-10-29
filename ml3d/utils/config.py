@@ -4,6 +4,7 @@ import sys
 import tempfile
 import yaml
 from pathlib import Path
+from collections import abc
 from importlib import import_module
 from addict import Dict
 
@@ -51,7 +52,7 @@ class Config(object):
         if cfg_dict is None:
             cfg_dict = dict()
         elif not isinstance(cfg_dict, dict):
-            raise TypeError('cfg_dict shoud be a dict, but'
+            raise TypeError('cfg_dict should be a dict, but'
                             f'got {type(cfg_dict)}')
 
         super(Config, self).__setattr__('_cfg_dict', ConfigDict(cfg_dict))
@@ -220,7 +221,7 @@ class Config(object):
         return b
 
     def merge_from_dict(self, new_dict):
-        """Merge a new into cfg_dict.
+        """Merge a new dict into cfg_dict.
 
         Args:
             new_dict (dict): a dict of configs.

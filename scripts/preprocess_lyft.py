@@ -31,11 +31,8 @@ def parse_args():
 
     args = parser.parse_args()
 
-    dict_args = vars(args)
-    for k in dict_args:
-        v = dict_args[k]
-        print("{}: {}".format(k, v) if v is not None else "{} not given".
-              format(k))
+    for k, v in vars(args).items():
+        print(f"{k}: {v}" if v is not None else f"{k} not given")
 
     return args
 
@@ -53,7 +50,7 @@ class LyftProcess():
 
     def __init__(self, dataset_path, out_path, version='v1.01-train'):
 
-        assert version in ['v1.01-train', 'v1.01-test', 'sample']
+        assert version in ('v1.01-train', 'v1.01-test', 'sample')
         self.is_test = 'test' in version
         self.out_path = out_path
 
@@ -104,7 +101,7 @@ class LyftProcess():
 
     @staticmethod
     def get_mapping():
-        mapping = {
+        return {
             'bicycle': 'bicycle',
             'bus': 'bus',
             'car': 'car',
@@ -115,7 +112,6 @@ class LyftProcess():
             'truck': 'truck',
             'animal': 'animal'
         }
-        return mapping
 
     def convert(self):
         train_info, val_info = self.process_scenes()
@@ -205,11 +201,7 @@ class LyftProcess():
                                    sample_rec['data']['LIDAR_TOP'])
 
             lidar_path, boxes, _ = lyft.get_sample_data(sample_data['token'])
-            lidar_path = str(lidar_path)
-
-            if not os.path.exists(lidar_path):
-                continue
-            else:
+            if os.path.exists(str(lidar_path)):
                 available_scenes.append(scene)
 
         return available_scenes
@@ -217,8 +209,6 @@ class LyftProcess():
 
 if __name__ == '__main__':
     args = parse_args()
-    out_path = args.out_path
-    if out_path is None:
-        args.out_path = args.dataset_path
+    args.out_path = args.out_path or args.dataset_path
     converter = LyftProcess(args.dataset_path, args.out_path, args.version)
     converter.convert()

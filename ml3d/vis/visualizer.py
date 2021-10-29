@@ -1,4 +1,5 @@
 import math
+import sys
 import numpy as np
 import threading
 import open3d as o3d
@@ -33,9 +34,9 @@ class Model:
 
     def __init__(self):
         # Note: the tpointcloud cannot store the actual data arrays, because
-        # the tpointcloud requires specific names for some arrays (e.g. "points",
-        # "colors"). So the tpointcloud exists for rendering and initially only
-        # contains the "points" array.
+        # the tpointcloud requires specific names for some arrays (e.g.
+        # "positions", "colors"). So the tpointcloud exists for rendering and
+        # initially only contains the "positions" array.
         self.tclouds = {}  # name -> tpointcloud
         self.data_names = []  # the order data will be displayed / animated
         self.bounding_box_data = []  # [BoundingBoxData]
@@ -85,10 +86,10 @@ class Model:
             # because the resulting arrays won't be contiguous. However,
             # TensorList can be inplace.
             xyz = pts[:, [0, 1, 2]]
-            tcloud.point["points"] = Visualizer._make_tcloud_array(xyz,
-                                                                   copy=True)
+            tcloud.point["positions"] = Visualizer._make_tcloud_array(xyz,
+                                                                      copy=True)
         else:
-            tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
+            tcloud.point["positions"] = Visualizer._make_tcloud_array(pts)
         self.tclouds[name] = tcloud
 
         # Add scalar attributes and vector3 attributes
@@ -200,7 +201,7 @@ class Model:
             tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
-            pts = tcloud.point["points"].numpy()
+            pts = tcloud.point["positions"].numpy()
             min_val = (pts[:, 0].min(), pts[:, 1].min(), pts[:, 2].min())
             max_val = (pts[:, 0].max(), pts[:, 1].max(), pts[:, 2].max())
             return [min_val, max_val]
@@ -294,7 +295,10 @@ class DatasetModel(Model):
                 self._attr_rename["feat"] = "colors"
                 self._attr_rename["feature"] = "colors"
         else:
-            print("[ERROR] Dataset split has no data")
+            print(
+                "[ERROR] Dataset split has no data. Please check that you are pointing to the correct directory for the dataset."
+            )
+            sys.exit(-1)
 
     def is_loaded(self, name):
         """Check if the data is loaded."""
@@ -349,7 +353,7 @@ class DatasetModel(Model):
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
-        pcloud_size += pcloud.point["points"].num_elements() * 64
+        pcloud_size += pcloud.point["positions"].num_elements() * 64
         return pcloud_size
 
     def unload(self, name):
@@ -1113,7 +1117,7 @@ class Visualizer:
                 channel = max(0, self._colormap_channel.selected_index)
                 scalar = attr[:, channel]
         else:
-            shape = [len(tcloud.point["points"].numpy())]
+            shape = [len(tcloud.point["positions"].numpy())]
             scalar = np.zeros(shape, dtype='float32')
         tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(
             scalar)
