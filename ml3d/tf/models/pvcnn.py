@@ -1,11 +1,25 @@
 import numpy as np
 import tensorflow as tf
 import functools
+import open3d
 
+from tensorflow.python.framework import ops
 from .base_model import BaseModel
-from .util import trilinear_devoxelize
 from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
+
+if open3d.core.cuda.device_count() > 0:
+    import open3d.ml.tf.ops as ml_ops
+
+
+def trilinear_devoxelize(features, coords, resolution, is_training=True):
+    if not open3d.core.cuda.device_count() > 0:
+        raise NotImplementedError
+
+    outs, inds, wgts = ml_ops.trilinear_devoxelize(
+        tf.transpose(coords, perm=[0, 2, 1]),
+        tf.transpose(features, perm=[0, 4, 1, 2, 3]), resolution, is_training)
+    return tf.transpose(outs, perm=[0, 2, 1])
 
 
 class PVCNN(BaseModel):
