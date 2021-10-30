@@ -245,7 +245,7 @@ class SemanticSegmentation(BasePipeline):
                     # Save only for the first batch
                     if 'test' in record_summary and 'test' not in self.summary:
                         self.summary['test'] = self.get_3d_summary(
-                            results, inputs['data'], 0)
+                            results, inputs['data'], 0, save_gt=False)
 
         log.info("Finshed testing")
 
@@ -429,14 +429,6 @@ class SemanticSegmentation(BasePipeline):
                         inputs['data'].to(device)
 
                     results = model(inputs['data'])
-                    # gt_labels, predict_scores are always concatenated
-                    # inputs['data'].point:
-                    # model.batcher: empty or DefaultBatcher => fixed size point
-                    # clouds
-                    # KPConvBatcher: concatenated for KPConv, ...
-                    # SparseConvUNetBatcher list[point] for SparseConvUNet
-                    # PointTransformerbatcher rowsplits
-
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
 
@@ -469,23 +461,34 @@ class SemanticSegmentation(BasePipeline):
             batcher = None
         return batcher
 
-    def get_3d_summary(self, results, input_data, epoch):
+    def get_3d_summary(self, results, input_data, epoch, save_gt=True):
         """
         Create visualization for network inputs and outputs.
 
         Args:
-            results (Tensor(B, N, C)): Prediction scores for all classes
-            (network output).
-            inputs_batch: Network inputs. Batch of pointclouds and labels as a
-                Dict with the fields:
-                'xyz': [(5,) Tensor(B,N,3)] : points
-                'labels': (B, N) (optional): labels
+            results: Model output (see below).
+            input_data: Model input (see below).
             epoch (int): step
+            save_gt (bool): Save ground truth (for 'train' or 'valid' stages).
+
+        RandLaNet:
+            results (Tensor(B, N, C)): Prediction scores for all classes
+            inputs_batch: Batch of pointclouds and labels as a Dict with keys:
+                'xyz': First element is Tensor(B,N,3) points
+                'labels': (B, N) (optional) labels
 
         Returns:
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
+        # gt_labels, predict_scores are always concatenated
+        # inputs['data'].point:
+        # model.batcher: empty or DefaultBatcher => fixed size point
+        # clouds
+        # KPConvBatcher: concatenated for KPConv, ...
+        # SparseConvUNetBatcher list[point] for SparseConvUNet
+        # PointTransformerbatcher rowsplits
+
         ipdb.set_trace()
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
@@ -505,23 +508,57 @@ class SemanticSegmentation(BasePipeline):
         gt_labels = []
         predict_labels = []
 
-        def to_sum_fmt(tensor, dtype=torch.int32):
-            return torch.atleast_3d(tensor.cpu().detach().type(dtype))
+        ipdb.set_trace()
 
-        if self._first_step == epoch or not use_reference:
+        def to_sum_fmt(tensor, add_dims=(0, 0), dtype=torch.int32):
+            sten = tensor.cpu().detach().type(dtype)
+            new_shape = (1,) * add_dims[0] + sten.shape + (1,) * add_dims[1]
+            return sten.reshape(new_shape)
+
+        # Variable size point clouds
+        # if self.model.cfg['name'] in ('PointTransformers',):
+        #     # row_splits
+        if self.model.cfg['name'] in ('SparseConvUnet',):
+            blen = input_data.batch_lengths
+            max_outputs = min(max_outputs, len(blen))
+            start_idx = np.hstack(((0,), np.cumsum(blen)))
+            for k in range(max_outputs):
+                pcd_step = int(np.ceil(blen[k] / min(max_pts, blen[k])))
+                res_pcd = results[start_idx[k]:start_idx[k + 1]:pcd_step, :]
+                predict_labels.append(
+                    to_sum_fmt(torch.argmax(res_pcd, 1), (0, 1)))
+                if self._first_step != epoch and use_reference:
+                    continue
+                pointcloud = input_data.point[
+                    start_idx[k]:start_idx[k + 1]:pcd_step]
+                input_pcd.append(
+                    to_sum_fmt(pointcloud[:, :3], (0, 0), np.float32))
+                if getattr(input_data, 'label', None) is not None:
+                    gtl = input_data.label[start_idx[k]:start_idx[k +
+                                                                  1]:pcd_step]
+                    gt_labels.append(to_sum_fmt(gtl, (0, 1)))
+        # elif self.model.cfg['name'] in ('KPConv',):
+        # Fixed size point clouds
+        # elif self.model.cfg['name'] in ('PVCNN',):  # Tuple input
+        # PVCNN: labels are in the input_data['label']
+        elif self.model.cfg['name'] in ('RandLANet',):  # Tuple input
             pointcloud = input_data['xyz'][0]  # 0 => input to first layer
-            pcd_subsample = torch.linspace(0,
-                                           pointcloud.shape[1] - 1,
-                                           steps=min(max_pts,
-                                                     pointcloud.shape[1]),
-                                           dtype=torch.int)
-            input_pcd = to_sum_fmt(pointcloud[:max_outputs, pcd_subsample, :3],
-                                   torch.float32)
-            if 'labels' in input_data:
-                gtl = input_data['labels']
-                gt_labels = to_sum_fmt(gtl[:max_outputs, pcd_subsample])
+            pcd_step = int(
+                np.ceil(pointcloud.shape[1] /
+                        min(max_pts, pointcloud.shape[1])))
             predict_labels = to_sum_fmt(
-                torch.argmax(results[:max_outputs, pcd_subsample, :], 2))
+                torch.argmax(results[:max_outputs, ::pcd_step, :], 2), (0, 1))
+            if self._first_step == epoch or not use_reference:
+                input_pcd = to_sum_fmt(pointcloud[:max_outputs, ::pcd_step, :3],
+                                       (0, 0), torch.float32)
+                if 'labels' in input_data:
+                    gtl = input_data['labels']
+                    gt_labels = to_sum_fmt(gtl[:max_outputs, ::pcd_step],
+                                           (0, 1))
+        else:
+            raise NotImplementedError(
+                "Saving 3D summary for the model "
+                f"{self.model.cfg['name']} is not implemented.")
 
         def get_reference_or(data_tensor):
             if self._first_step == epoch or not use_reference:
