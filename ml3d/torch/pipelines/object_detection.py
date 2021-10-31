@@ -17,7 +17,6 @@ from open3d.visualization.tensorboard_plugin import summary
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
 from ...datasets.utils import BEVBox3D
-from ...vis import BoundingBox3D, LabelLUT
 
 from ...metrics.mAP import mAP
 
@@ -127,9 +126,13 @@ class ObjectDetection(BasePipeline):
                 results = self.run_inference(data)
                 pred.extend(results)
                 dataset.save_test_result(results, data.attr)
-                if record_summary and 'test' not in self.summary:  # Save only for the first batch
+                # Save only for the first batch
+                if record_summary and 'test' not in self.summary:
                     boxes = model.inference_end(results, data)
-                    self.summary['test'] = self.get_3d_summary(boxes, data, 0)
+                    self.summary['test'] = self.get_3d_summary(boxes,
+                                                               data,
+                                                               0,
+                                                               save_gt=False)
 
     def run_valid(self, epoch=0):
         """Run validation with validation data split, computes mean average
@@ -193,9 +196,8 @@ class ObjectDetection(BasePipeline):
                 boxes = model.inference_end(results, data)
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
-                if record_summary and len(
-                        self.summary['valid']
-                ) == 0:  # Save only for the first batch
+                # Save only for the first batch
+                if record_summary and 'valid' not in self.summary:
                     self.summary['valid'] = self.get_3d_summary(
                         boxes, data, epoch)
 
@@ -304,7 +306,6 @@ class ObjectDetection(BasePipeline):
             model.train()
 
             self.losses = {}
-            self.summary = {'train': {}, 'valid': {}}
 
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
@@ -312,11 +313,6 @@ class ObjectDetection(BasePipeline):
                 results = model(data)
                 loss = model.loss(results, data)
                 loss_sum = sum(loss.values())
-                # Record visualization for the last iteration
-                if record_summary and process_bar.n == process_bar.total - 1:
-                    boxes = model.inference_end(results, data)
-                    self.summary['train'] = self.get_3d_summary(
-                        boxes, data, epoch)
 
                 self.optimizer.zero_grad()
                 loss_sum.backward()
@@ -324,6 +320,12 @@ class ObjectDetection(BasePipeline):
                     torch.nn.utils.clip_grad_value_(model.parameters(),
                                                     model.cfg.grad_clip_norm)
                 self.optimizer.step()
+
+                # Record visualization for the last iteration
+                if record_summary and process_bar.n == process_bar.total - 1:
+                    boxes = model.inference_end(results, data)
+                    self.summary['train'] = self.get_3d_summary(
+                        boxes, data, epoch)
                 desc = "training - "
                 for l, v in loss.items():
                     if l not in self.losses:
@@ -345,17 +347,22 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
-    def get_3d_summary(self, infer_bboxes_batch, inputs_batch, epoch):
+    def get_3d_summary(self,
+                       infer_bboxes_batch,
+                       inputs_batch,
+                       epoch,
+                       save_gt=True):
         """
         Create visualization for input point cloud and network output bounding
         boxes.
 
         Args:
             infer_bboxes_batch (Sequence[Sequence[BoundingBox3D]): Batch of
-                predicted bounding boxes.
+                predicted bounding boxes from inference_end()
             inputs_batch (Sequence[Sequence[bbox_objs: Object3D, point:
                 array(N,3)]]): Batch of ground truth boxes and pointclouds.
             epoch (int): step
+            save_gt (bool): Save ground truth (for 'train' or 'valid' stages).
 
         Returns:
             [Dict] visualizations of inputs and outputs suitable to save as an
@@ -373,12 +380,12 @@ class ObjectDetection(BasePipeline):
         if max_pts is None:
             max_pts = np.iinfo(np.int32).max
         use_reference = cfg.get('use_reference', False)
-        max_outputs = cfg.get('max_outputs', 1)
+        max_outputs = min(cfg.get('max_outputs', 1), len(inputs_batch.point))
         input_pcd = []
-        label_to_names = None
+        inputs_batch_gt_bboxes = (inputs_batch.bbox_objs[:max_outputs]
+                                  if save_gt else ([],) * max_outputs)
         for infer_bboxes, gt_bboxes, pointcloud in zip(
-                infer_bboxes_batch[:max_outputs],
-                inputs_batch.bbox_objs[:max_outputs],
+                infer_bboxes_batch[:max_outputs], inputs_batch_gt_bboxes,
                 inputs_batch.point[:max_outputs]):
             for bboxes in (gt_bboxes, infer_bboxes):
                 for bb in bboxes:  # LUT needs label_class to be int, not str
@@ -387,30 +394,29 @@ class ObjectDetection(BasePipeline):
                             bb.label_class]
 
             if self._first_step == epoch or not use_reference:
-                pcd_subsample = np.linspace(0,
-                                            pointcloud.shape[0] - 1,
-                                            num=min(max_pts,
-                                                    pointcloud.shape[0]),
-                                            dtype=int)
-                pcd = pointcloud[pcd_subsample, :3].cpu().detach().numpy()
+                pcd_step = int(
+                    np.ceil(pointcloud.shape[0] /
+                            min(max_pts, pointcloud.shape[0])))
+                pcd = pointcloud[::pcd_step, :3].cpu().detach()
                 input_pcd.append(pcd)
-                label_to_names = self.dataset.get_label_to_names()
 
-        return {
+        summary3d = {
             'input_pointcloud': {
                 "vertex_positions":
                     input_pcd if self._first_step == epoch or not use_reference
                     else self._first_step
             },
-            'objdet_ground_truth': {
-                "bboxes": gt_bboxes,
-                'label_to_names': label_to_names
-            },
             'objdet_prediction': {
-                "bboxes": infer_bboxes,
-                'label_to_names': label_to_names
-            },
+                "bboxes": infer_bboxes_batch[:max_outputs],
+                'label_to_names': self.dataset.get_label_to_names()
+            }
         }
+        if save_gt:
+            summary3d['objdet_ground_truth'] = {
+                "bboxes": inputs_batch.bbox_objs[:max_outputs],
+                'label_to_names': self.dataset.get_label_to_names()
+            }
+        return summary3d
 
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():
@@ -423,7 +429,7 @@ class ObjectDetection(BasePipeline):
                 writer.add_3d('/'.join((stage, key)),
                               summary_dict,
                               epoch,
-                              max_outputs=None,
+                              max_outputs=0,
                               label_to_names=label_to_names)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):

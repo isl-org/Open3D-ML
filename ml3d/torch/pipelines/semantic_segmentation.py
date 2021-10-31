@@ -125,7 +125,6 @@ class SemanticSegmentation(BasePipeline):
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
-        self.summary = {}
 
     def run_inference(self, data):
         """Run inference on given data.
@@ -477,6 +476,15 @@ class SemanticSegmentation(BasePipeline):
                 'xyz': First element is Tensor(B,N,3) points
                 'labels': (B, N) (optional) labels
 
+        SparseConvUNet:
+            results (Tensor(SN, C)): Prediction scores for all classes. SN is
+                total points in the batch.
+            input_batch (Dict): Batch of pointclouds and labels. Keys should be:
+                'point' [Tensor(SN,3), float]: Concatenated points.
+                'batch_lengths' [Tensor(B,), int]: Number of points in each
+                    point cloud of the batch.
+                'label' [Tensor(SN,) (optional)]: Concatenated labels.
+
         Returns:
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
@@ -493,11 +501,6 @@ class SemanticSegmentation(BasePipeline):
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         label_to_names = self.dataset.get_label_to_names()
-        if not hasattr(self.dataset, "name_to_labels"):
-            self.dataset.name_to_labels = {
-                name: label
-                for label, name in self.dataset.get_label_to_names().items()
-            }
         cfg = self.cfg.get('summary')
         max_pts = cfg.get('max_pts')
         if max_pts is None:
@@ -618,7 +621,7 @@ class SemanticSegmentation(BasePipeline):
                 writer.add_3d('/'.join((stage, key)),
                               summary_dict,
                               epoch,
-                              max_outputs=None,
+                              max_outputs=0,
                               label_to_names=label_to_names)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):

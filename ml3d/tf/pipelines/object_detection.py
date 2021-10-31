@@ -1,13 +1,12 @@
-import tensorflow as tf
 import logging
+import re
+from datetime import datetime
+from os.path import join
+from pathlib import Path
+
 import numpy as np
 from tqdm import tqdm
-import re
-
-from datetime import datetime
-
-from os.path import exists, join
-from pathlib import Path
+import tensorflow as tf
 
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
@@ -90,14 +89,28 @@ class ObjectDetection(BasePipeline):
         self.test_ious = []
 
         pred = []
+        record_summary = 'test' in cfg.get('summary').get('record_for', [])
         process_bar = tqdm(test_loader, total=len_test, desc='testing')
         for data in process_bar:
             results = self.run_inference(data)
             pred.append(results[0])
+            # Save only for the first batch
+            if record_summary and 'test' not in self.summary:
+                self.summary['test'] = self.get_3d_summary(results,
+                                                           data,
+                                                           0,
+                                                           save_gt=False)
 
-        #dataset.save_test_result(pred, attr)
+        # dataset.save_test_result(pred, attr)
 
-    def run_valid(self):
+    def run_valid(self, epoch=0):
+        """Run validation with validation data split, computes mean average
+        precision and the loss of the prediction results.
+
+        Args:
+            epoch (int): step for TensorBoard summary. Defaults to 0 if
+                unspecified.
+        """
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
@@ -118,6 +131,7 @@ class ObjectDetection(BasePipeline):
         valid_loader, len_valid = valid_split.get_loader(cfg.val_batch_size,
                                                          transform=False)
 
+        record_summary = 'valid' in cfg.get('summary').get('record_for', [])
         log.info("Started validation")
 
         self.valid_losses = {}
@@ -130,7 +144,7 @@ class ObjectDetection(BasePipeline):
             results = model(data, training=False)
             loss = model.loss(results, data, training=False)
             for l, v in loss.items():
-                if not l in self.valid_losses:
+                if l not in self.valid_losses:
                     self.valid_losses[l] = []
                 self.valid_losses[l].append(v.numpy())
 
@@ -142,6 +156,9 @@ class ObjectDetection(BasePipeline):
                                               bi]["data"]["bbox_objs"])
                 for bi in range(cfg.val_batch_size)
             ])
+            # Save only for the first batch
+            if record_summary and 'valid' not in self.summary:
+                self.summary['valid'] = self.get_3d_summary(boxes, data, epoch)
 
         sum_loss = 0
         desc = "validation - "
@@ -190,6 +207,7 @@ class ObjectDetection(BasePipeline):
         self.valid_losses["mAP 3D"] = np.mean(ap[:, -1])
 
     def run_train(self):
+        """Run training with train data split."""
         model = self.model
         dataset = self.dataset
 
@@ -225,6 +243,7 @@ class ObjectDetection(BasePipeline):
         writer = tf.summary.create_file_writer(self.tensorboard_dir)
         self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
+        record_summary = 'train' in cfg.get('summary').get('record_for', [])
 
         log.info("Started training")
         for epoch in range(start_ep, cfg.max_epoch + 1):
@@ -249,9 +268,15 @@ class ObjectDetection(BasePipeline):
                 self.optimizer.apply_gradients(
                     zip(grads, model.trainable_weights))
 
+                # Record visualization for the last iteration
+                if record_summary and process_bar.n == process_bar.total - 1:
+                    boxes = model.inference_end(results, data)
+                    self.summary['train'] = self.get_3d_summary(
+                        boxes, data, epoch)
+
                 desc = "training - "
                 for l, v in loss.items():
-                    if not l in self.losses:
+                    if l not in self.losses:
                         self.losses[l] = []
                     self.losses[l].append(v.numpy())
                     desc += " %s: %.03f" % (l, v.numpy())
@@ -267,6 +292,77 @@ class ObjectDetection(BasePipeline):
             if epoch % cfg.save_ckpt_freq == 0:
                 self.save_ckpt(epoch)
 
+    def get_3d_summary(self,
+                       infer_bboxes_batch,
+                       inputs_batch,
+                       epoch,
+                       save_gt=True):
+        """
+        Create visualization for input point cloud and network output bounding
+        boxes.
+
+        Args:
+            infer_bboxes_batch (Sequence[Sequence[BoundingBox3D]): Batch of
+                predicted bounding boxes from inference_end()
+            inputs_batch (Sequence[Sequence[bbox_objs: Object3D, point:
+                array(N,3)]]): Batch of ground truth boxes and pointclouds.
+            epoch (int): step
+            save_gt (bool): Save ground truth (for 'train' or 'valid' stages).
+
+        Returns:
+            [Dict] visualizations of inputs and outputs suitable to save as an
+                Open3D for TensorBoard summary.
+        """
+        if not hasattr(self, "_first_step"):
+            self._first_step = epoch
+        if not hasattr(self.dataset, "name_to_labels"):
+            self.dataset.name_to_labels = {
+                name: label
+                for label, name in self.dataset.get_label_to_names().items()
+            }
+        cfg = self.cfg.get('summary')
+        max_pts = cfg.get('max_pts')
+        if max_pts is None:
+            max_pts = np.iinfo(np.int32).max
+        use_reference = cfg.get('use_reference', False)
+        max_outputs = min(cfg.get('max_outputs', 1), len(inputs_batch.point))
+        input_pcd = []
+        inputs_batch_gt_bboxes = (inputs_batch.bbox_objs[:max_outputs]
+                                  if save_gt else ([],) * max_outputs)
+        for infer_bboxes, gt_bboxes, pointcloud in zip(
+                infer_bboxes_batch[:max_outputs], inputs_batch_gt_bboxes,
+                inputs_batch.point[:max_outputs]):
+            for bboxes in (gt_bboxes, infer_bboxes):
+                for bb in bboxes:  # LUT needs label_class to be int, not str
+                    if not isinstance(bb.label_class, int):
+                        bb.label_class = self.dataset.name_to_labels[
+                            bb.label_class]
+
+            if self._first_step == epoch or not use_reference:
+                pcd_step = int(
+                    np.ceil(pointcloud.shape[0] /
+                            min(max_pts, pointcloud.shape[0])))
+                pcd = pointcloud[::pcd_step, :3]
+                input_pcd.append(pcd)
+
+        summary3d = {
+            'input_pointcloud': {
+                "vertex_positions":
+                    input_pcd if self._first_step == epoch or not use_reference
+                    else self._first_step
+            },
+            'objdet_prediction': {
+                "bboxes": infer_bboxes_batch[:max_outputs],
+                'label_to_names': self.dataset.get_label_to_names()
+            }
+        }
+        if save_gt:
+            summary3d['objdet_ground_truth'] = {
+                "bboxes": inputs_batch.bbox_objs[:max_outputs],
+                'label_to_names': self.dataset.get_label_to_names()
+            }
+        return summary3d
+
     def save_logs(self, writer, epoch):
         with writer.as_default():
             for key, val in self.losses.items():
@@ -274,6 +370,15 @@ class ObjectDetection(BasePipeline):
 
             for key, val in self.valid_losses.items():
                 tf.summary.scalar("valid/" + key, np.mean(val), epoch)
+            for stage in self.summary.keys():
+                for key, summary_dict in self.summary[stage].items():
+                    label_to_names = summary_dict.pop('label_to_names', None)
+                    writer.add_3d('/'.join((stage, key)),
+                                  summary_dict,
+                                  epoch,
+                                  max_outputs=0,
+                                  label_to_names=label_to_names,
+                                  logdir=self.tensorboard_dir)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')

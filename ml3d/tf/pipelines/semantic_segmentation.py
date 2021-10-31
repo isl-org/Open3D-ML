@@ -351,11 +351,6 @@ class SemanticSegmentation(BasePipeline):
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         label_to_names = self.dataset.get_label_to_names()
-        if not hasattr(self.dataset, "name_to_labels"):
-            self.dataset.name_to_labels = {
-                name: label
-                for label, name in self.dataset.get_label_to_names().items()
-            }
         cfg = self.cfg.get('summary')
         max_pts = cfg.get('max_pts')
         if max_pts is None:
@@ -399,7 +394,6 @@ class SemanticSegmentation(BasePipeline):
         # Tuple input, same size point clouds
         elif self.model.cfg['name'] in ('RandLANet',):
             pointcloud = input_data[0]  # 0 => input to first layer
-            # TF doesn't support indexing with int Tensors
             pcd_step = int(
                 np.ceil(pointcloud.shape[1] /
                         min(max_pts, pointcloud.shape[1])))
@@ -477,7 +471,7 @@ class SemanticSegmentation(BasePipeline):
                     summary3d.add_3d('/'.join((stage, key)),
                                      summary_dict,
                                      epoch,
-                                     max_outputs=None,
+                                     max_outputs=0,
                                      label_to_names=label_to_names,
                                      logdir=self.tensorboard_dir)
 
