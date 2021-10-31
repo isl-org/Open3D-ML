@@ -129,6 +129,7 @@ class SemanticSegmentation(BasePipeline):
 
         Args:
             data: A raw data.
+
         Returns:
             Returns the inference results.
         """
@@ -180,8 +181,7 @@ class SemanticSegmentation(BasePipeline):
         return inference_result
 
     def run_test(self):
-        """Run the test using the data passed.
-        """
+        """Run the test using the data passed."""
         model = self.model
         dataset = self.dataset
         device = self.device
@@ -247,8 +247,7 @@ class SemanticSegmentation(BasePipeline):
         log.info("Finished testing")
 
     def update_tests(self, sampler, inputs, results):
-        """Update tests using sampler, inputs, and results.
-        """
+        """Update tests using sampler, inputs, and results."""
         split = sampler.split
         end_threshold = 0.5
         if self.curr_cloud_id != sampler.cloud_id:
@@ -294,8 +293,7 @@ class SemanticSegmentation(BasePipeline):
             self.complete_infer = True
 
     def run_train(self):
-        """Run the training on the self model.
-        """
+        """Run the training on the self model."""
         model = self.model
         device = self.device
         model.device = device
@@ -446,8 +444,7 @@ class SemanticSegmentation(BasePipeline):
                 self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
-        """Get the batcher to be used based on the device and split.
-        """
+        """Get the batcher to be used based on the device and split."""
         batcher_name = getattr(self.model.cfg, 'batcher')
 
         if batcher_name == 'DefaultBatcher':
@@ -580,8 +577,7 @@ class SemanticSegmentation(BasePipeline):
         return summary_dict
 
     def save_logs(self, writer, epoch):
-        """Save logs from the training and send results to TensorBoard.
-        """
+        """Save logs from the training and send results to TensorBoard."""
         train_accs = self.metric_train.acc()
         val_accs = self.metric_val.acc()
 
@@ -626,7 +622,9 @@ class SemanticSegmentation(BasePipeline):
                               label_to_names=label_to_names)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
-        """Load a checkpoint. You must pass the checkpoint and indicate if you want to resume."""
+        """Load a checkpoint. You must pass the checkpoint and indicate if you
+        want to resume.
+        """
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(train_ckpt_dir)
 
@@ -652,8 +650,7 @@ class SemanticSegmentation(BasePipeline):
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
     def save_ckpt(self, epoch):
-        """Save a checkpoint at the passed epoch.
-        """
+        """Save a checkpoint at the passed epoch."""
         path_ckpt = join(self.cfg.logs_dir, 'checkpoint')
         make_dir(path_ckpt)
         torch.save(

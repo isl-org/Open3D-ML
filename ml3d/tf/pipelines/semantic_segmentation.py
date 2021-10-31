@@ -124,7 +124,7 @@ class SemanticSegmentation(BasePipeline):
         self.cfg.convert_to_tf_names('pipeline')
 
     def run_inference(self, data):
-        """ Run the inference using the data passed.  """
+        """Run the inference using the data passed."""
         model = self.model
         log.info("running inference")
 
@@ -146,7 +146,7 @@ class SemanticSegmentation(BasePipeline):
         return model.inference_result
 
     def run_test(self):
-        """ Run the test using the data passed. """
+        """Run the test using the data passed."""
         model = self.model
         dataset = self.dataset
         cfg = self.cfg
@@ -189,7 +189,7 @@ class SemanticSegmentation(BasePipeline):
         log.info("Overall IOU : {:.3f}".format(ious[-1]))
 
     def run_train(self):
-        """ Run the training on the self model.  """
+        """Run the training on the self model."""
         model = self.model
         dataset = self.dataset
 
@@ -438,8 +438,7 @@ class SemanticSegmentation(BasePipeline):
         return summary_dict
 
     def save_logs(self, writer, epoch):
-        """ Save logs from the training and send results to TensorBoard.  """
-
+        """Save logs from the training and send results to TensorBoard."""
         train_accs = self.metric_train.acc()
         val_accs = self.metric_val.acc()
 
@@ -487,7 +486,7 @@ class SemanticSegmentation(BasePipeline):
                                      logdir=self.tensorboard_dir)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
-        """ Load a checkpoint. You must pass the checkpoint and indicate if you want
+        """Load a checkpoint. You must pass the checkpoint and indicate if you want
         to resume.
         """
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
@@ -517,7 +516,7 @@ class SemanticSegmentation(BasePipeline):
                 log.info("Initializing from scratch.")
 
     def save_ckpt(self, epoch):
-        """Save a checkpoint at the passed epoch. """
+        """Save a checkpoint at the passed epoch."""
         save_path = self.manager.save()
         log.info("Saved checkpoint at: {}".format(save_path))
 
