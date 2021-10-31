@@ -14,8 +14,6 @@ from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
 
-import ipdb
-
 logging.setLogRecordFactory(LogRecord)
 logging.basicConfig(
     level=logging.INFO,
@@ -361,8 +359,6 @@ class SemanticSegmentation(BasePipeline):
         gt_labels = []
         predict_labels = []
 
-        ipdb.set_trace()
-
         def to_sum_fmt(tensor, add_dims=(0, 0), dtype=np.int32):
             np_tensor = tensor.numpy().astype(dtype)
             new_shape = (1,) * add_dims[0] + np_tensor.shape + (
@@ -370,12 +366,18 @@ class SemanticSegmentation(BasePipeline):
             return np_tensor.reshape(new_shape)
 
         # Dict input, variable size point clouds
-        if self.model.cfg['name'] in ('SparseConvUnet',):
-            blen = input_data['batch_lengths']
-            max_outputs = min(max_outputs, len(blen))
-            start_idx = np.hstack(((0,), np.cumsum(blen)))
+        if self.model.cfg['name'] in ('SparseConvUnet', ' PointTransformer'):
+            if self.model.cfg['name'] == 'SparseConvUnet':
+                row_splits = np.hstack(
+                    ((0,), np.cumsum(input_data.batch_lengths)))
+            else:
+                row_splits = input_data.row_splits
+            max_outputs = min(max_outputs, len(row_splits) - 1)
+            start_idx = np.hstack(
+                ((0,), np.cumsum(input_data['batch_lengths'])))
             for k in range(max_outputs):
-                pcd_step = int(np.ceil(blen[k] / min(max_pts, blen[k])))
+                blen_k = row_splits[k + 1] - row_splits[k]
+                pcd_step = int(np.ceil(blen_k / min(max_pts, blen_k)))
                 res_pcd = results[start_idx[k]:start_idx[k + 1]:pcd_step, :]
                 predict_labels.append(to_sum_fmt(tf.argmax(res_pcd, 1), (0, 1)))
                 if self._first_step != epoch and use_reference:
@@ -390,10 +392,12 @@ class SemanticSegmentation(BasePipeline):
                     gt_labels.append(to_sum_fmt(gtl, (0, 1)))
 
         # Fixed size point clouds
-        # elif self.model.cfg['name'] in ('PVCNN'):  # Tuple input
         # Tuple input, same size point clouds
-        elif self.model.cfg['name'] in ('RandLANet',):
-            pointcloud = input_data[0]  # 0 => input to first layer
+        elif self.model.cfg['name'] in ('RandLANet', 'PVCNN'):
+            if self.model.cfg['name'] == 'RandLANet':
+                pointcloud = input_data[0]  # 0 => input to first layer
+            elif self.model.cfg['name'] == 'PVCNN':
+                pointcloud = input_data['point']
             pcd_step = int(
                 np.ceil(pointcloud.shape[1] /
                         min(max_pts, pointcloud.shape[1])))
@@ -403,7 +407,14 @@ class SemanticSegmentation(BasePipeline):
                 input_pcd = to_sum_fmt(pointcloud[:max_outputs, ::pcd_step, :3],
                                        (0, 0), np.float32)
                 if save_gt:
-                    gtl = input_data[-1]
+                    if self.model.cfg['name'] == 'RandLANet':
+                        gtl = input_data[-1]
+                        if 'int' not in repr(gtl.dtype).lower():
+                            raise TypeError(
+                                "Labels should be Int types. Received "
+                                f"{gtl.dtype}")
+                    elif self.model.cfg['name'] == 'PVCNN':
+                        gtl = input_data['label']
                     gt_labels = to_sum_fmt(gtl[:max_outputs, ::pcd_step],
                                            (0, 1))
         else:

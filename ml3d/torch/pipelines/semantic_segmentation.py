@@ -26,8 +26,6 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-import ipdb
-
 
 class SemanticSegmentation(BasePipeline):
     """This class allows you to perform semantic segmentation for both training
@@ -497,7 +495,6 @@ class SemanticSegmentation(BasePipeline):
         # SparseConvUNetBatcher list[point] for SparseConvUNet
         # PointTransformerbatcher rowsplits
 
-        ipdb.set_trace()
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         label_to_names = self.dataset.get_label_to_names()
@@ -511,41 +508,42 @@ class SemanticSegmentation(BasePipeline):
         gt_labels = []
         predict_labels = []
 
-        ipdb.set_trace()
-
         def to_sum_fmt(tensor, add_dims=(0, 0), dtype=torch.int32):
             sten = tensor.cpu().detach().type(dtype)
             new_shape = (1,) * add_dims[0] + sten.shape + (1,) * add_dims[1]
             return sten.reshape(new_shape)
 
         # Variable size point clouds
-        # if self.model.cfg['name'] in ('PointTransformers',):
-        #     # row_splits
-        if self.model.cfg['name'] in ('SparseConvUnet',):
-            blen = input_data.batch_lengths
-            max_outputs = min(max_outputs, len(blen))
-            start_idx = np.hstack(((0,), np.cumsum(blen)))
+        if self.model.cfg['name'] in ('SparseConvUnet', ' PointTransformer'):
+            if self.model.cfg['name'] == 'SparseConvUnet':
+                row_splits = np.hstack(
+                    ((0,), np.cumsum(input_data.batch_lengths)))
+            else:
+                row_splits = input_data.row_splits
+            max_outputs = min(max_outputs, len(row_splits) - 1)
             for k in range(max_outputs):
-                pcd_step = int(np.ceil(blen[k] / min(max_pts, blen[k])))
-                res_pcd = results[start_idx[k]:start_idx[k + 1]:pcd_step, :]
+                blen_k = row_splits[k + 1] - row_splits[k]
+                pcd_step = int(np.ceil(blen_k / min(max_pts, blen_k)))
+                res_pcd = results[row_splits[k]:row_splits[k + 1]:pcd_step, :]
                 predict_labels.append(
                     to_sum_fmt(torch.argmax(res_pcd, 1), (0, 1)))
                 if self._first_step != epoch and use_reference:
                     continue
                 pointcloud = input_data.point[
-                    start_idx[k]:start_idx[k + 1]:pcd_step]
+                    row_splits[k]:row_splits[k + 1]:pcd_step]
                 input_pcd.append(
                     to_sum_fmt(pointcloud[:, :3], (0, 0), np.float32))
                 if getattr(input_data, 'label', None) is not None:
-                    gtl = input_data.label[start_idx[k]:start_idx[k +
-                                                                  1]:pcd_step]
+                    gtl = input_data.label[row_splits[k]:row_splits[k +
+                                                                    1]:pcd_step]
                     gt_labels.append(to_sum_fmt(gtl, (0, 1)))
         # elif self.model.cfg['name'] in ('KPConv',):
         # Fixed size point clouds
-        # elif self.model.cfg['name'] in ('PVCNN',):  # Tuple input
-        # PVCNN: labels are in the input_data['label']
-        elif self.model.cfg['name'] in ('RandLANet',):  # Tuple input
-            pointcloud = input_data['xyz'][0]  # 0 => input to first layer
+        elif self.model.cfg['name'] in ('RandLANet', 'PVCNN'):  # Tuple input
+            if self.model.cfg['name'] == 'RandLANet':
+                pointcloud = input_data['xyz'][0]  # 0 => input to first layer
+            elif self.model.cfg['name'] == 'PVCNN':
+                pointcloud = input_data['point']
             pcd_step = int(
                 np.ceil(pointcloud.shape[1] /
                         min(max_pts, pointcloud.shape[1])))
@@ -554,8 +552,11 @@ class SemanticSegmentation(BasePipeline):
             if self._first_step == epoch or not use_reference:
                 input_pcd = to_sum_fmt(pointcloud[:max_outputs, ::pcd_step, :3],
                                        (0, 0), torch.float32)
-                if 'labels' in input_data:
-                    gtl = input_data['labels']
+                if save_gt:
+                    gtl = input_data.get('label',
+                                         input_data.get('labels', None))
+                    if gtl is None:
+                        raise ValueError("input_data does not have label(s).")
                     gt_labels = to_sum_fmt(gtl[:max_outputs, ::pcd_step],
                                            (0, 1))
         else:
