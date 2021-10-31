@@ -292,7 +292,7 @@ class ObjectDetection(BasePipeline):
             self.cfg.train_sum_dir,
             model.__class__.__name__ + '_' + dataset_name + '_torch')
         runid = get_runid(tensorboard_dir)
-        self.tensorboard_dir = join(self.cfg.train_sum_dir,
+        self.tensorboard_dir = join(cfg.train_sum_dir,
                                     runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
@@ -340,7 +340,8 @@ class ObjectDetection(BasePipeline):
                 self.scheduler.step()
 
             # --------------------- validation
-            self.run_valid(epoch)
+            if (epoch % cfg.get("validation_freq", 1)) == 0:
+                self.run_valid()
 
             self.save_logs(writer, epoch)
 
@@ -421,8 +422,9 @@ class ObjectDetection(BasePipeline):
     def save_logs(self, writer, epoch):
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
-        for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+        if (epoch % self.cfg.get("validation_freq", 1)) == 0:
+            for key, val in self.valid_losses.items():
+                writer.add_scalar("valid/" + key, np.mean(val), epoch)
         for stage in self.summary.keys():
             for key, summary_dict in self.summary[stage].items():
                 label_to_names = summary_dict.pop('label_to_names', None)

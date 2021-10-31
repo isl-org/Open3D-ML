@@ -246,7 +246,7 @@ class SemanticSegmentation(BasePipeline):
                         self.summary['test'] = self.get_3d_summary(
                             results, inputs['data'], 0, save_gt=False)
 
-        log.info("Finshed testing")
+        log.info("Finished testing")
 
     def update_tests(self, sampler, inputs, results):
         """Update tests using sampler, inputs, and results.

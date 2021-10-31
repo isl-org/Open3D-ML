@@ -195,6 +195,7 @@ class PointPillars(BaseModel):
                                        target_bboxes,
                                        avg_factor=avg_factor)
         else:
+            loss_cls = loss_cls.sum()
             loss_bbox = bboxes.sum()
             loss_dir = dirs.sum()
 
@@ -381,6 +382,8 @@ class PointPillarsVoxelization(torch.nn.Module):
 
         points = points_feats[:, :3]
 
+        num_voxels = ((self.points_range_max - self.points_range_min) /
+                      self.voxel_size).type(torch.int32)
         ans = voxelize(points,
                        torch.LongTensor([0, points.shape[0]]).to(points.device),
                        self.voxel_size, self.points_range_min,
@@ -399,6 +402,15 @@ class PointPillarsVoxelization(torch.nn.Module):
         out_coords = ans.voxel_coords[:, [2, 1, 0]].contiguous()
         out_num_points = ans.voxel_point_row_splits[
             1:] - ans.voxel_point_row_splits[:-1]
+
+        # Filter out pillars generated out of bounds of the pseudoimage.
+        in_bounds_y = out_coords[:, 1] < num_voxels[1]
+        in_bounds_x = out_coords[:, 2] < num_voxels[0]
+        in_bounds = torch.logical_and(in_bounds_x, in_bounds_y)
+
+        out_coords = out_coords[in_bounds]
+        out_voxels = out_voxels[in_bounds]
+        out_num_points = out_num_points[in_bounds]
 
         return out_voxels, out_coords, out_num_points
 
@@ -573,7 +585,7 @@ class PillarFeatureNet(nn.Module):
         for pfn in self.pfn_layers:
             features = pfn(features, num_points)
 
-        return features.squeeze()
+        return features.squeeze(dim=1)
 
 
 class PointPillarsScatter(nn.Module):
@@ -905,6 +917,20 @@ class Anchor3DHead(nn.Module):
                     -1, self.box_code_size)
 
                 if target_bboxes[i].shape[0] == 0:
+                    assigned_bboxes.append(
+                        torch.zeros((0, 7), device=pred_bboxes.device))
+                    target_idxs.append(
+                        torch.zeros((0,),
+                                    dtype=torch.long,
+                                    device=pred_bboxes.device))
+                    pos_idxs.append(
+                        torch.zeros((0,),
+                                    dtype=torch.long,
+                                    device=pred_bboxes.device))
+                    neg_idxs.append(
+                        torch.zeros((0,),
+                                    dtype=torch.long,
+                                    device=pred_bboxes.device))
                     continue
 
                 # compute a fast approximation of IoU

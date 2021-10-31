@@ -121,7 +121,7 @@ class ShapeNet(BaseDataset):
 
     @staticmethod
     def get_label_to_names(task="classification"):
-        """Returns a label to names dictonary object depending on the task. The
+        """Returns a label to names dictionary object depending on the task. The
         valid values for task for classification and segmentation.
 
         Returns:
@@ -234,7 +234,7 @@ class ShapeNet(BaseDataset):
 
 
 class ShapeNetSplit:
-    """The class gets data and atributes based on the split and
+    """The class gets data and attributes based on the split and
     classification.
     """
 
