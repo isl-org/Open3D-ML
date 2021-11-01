@@ -52,3 +52,8 @@ pipeline:
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 3
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

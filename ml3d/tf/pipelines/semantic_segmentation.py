@@ -366,29 +366,27 @@ class SemanticSegmentation(BasePipeline):
             return np_tensor.reshape(new_shape)
 
         # Dict input, variable size point clouds
-        if self.model.cfg['name'] in ('SparseConvUnet', ' PointTransformer'):
+        if self.model.cfg['name'] in ('SparseConvUnet', 'PointTransformer'):
             if self.model.cfg['name'] == 'SparseConvUnet':
                 row_splits = np.hstack(
-                    ((0,), np.cumsum(input_data.batch_lengths)))
+                    ((0,), np.cumsum(input_data['batch_lengths'])))
             else:
-                row_splits = input_data.row_splits
+                row_splits = input_data['row_splits']
             max_outputs = min(max_outputs, len(row_splits) - 1)
-            start_idx = np.hstack(
-                ((0,), np.cumsum(input_data['batch_lengths'])))
             for k in range(max_outputs):
                 blen_k = row_splits[k + 1] - row_splits[k]
                 pcd_step = int(np.ceil(blen_k / min(max_pts, blen_k)))
-                res_pcd = results[start_idx[k]:start_idx[k + 1]:pcd_step, :]
+                res_pcd = results[row_splits[k]:row_splits[k + 1]:pcd_step, :]
                 predict_labels.append(to_sum_fmt(tf.argmax(res_pcd, 1), (0, 1)))
                 if self._first_step != epoch and use_reference:
                     continue
                 pointcloud = input_data['point'][
-                    start_idx[k]:start_idx[k + 1]:pcd_step]
+                    row_splits[k]:row_splits[k + 1]:pcd_step]
                 input_pcd.append(
                     to_sum_fmt(pointcloud[:, :3], (0, 0), np.float32))
                 if save_gt:
                     gtl = input_data['label'][
-                        start_idx[k]:start_idx[k + 1]:pcd_step]
+                        row_splits[k]:row_splits[k + 1]:pcd_step]
                     gt_labels.append(to_sum_fmt(gtl, (0, 1)))
 
         # Fixed size point clouds
@@ -402,7 +400,7 @@ class SemanticSegmentation(BasePipeline):
                 np.ceil(pointcloud.shape[1] /
                         min(max_pts, pointcloud.shape[1])))
             predict_labels = to_sum_fmt(
-                tf.argmax(results[:max_outputs, ::pcd_step, :], (0, 1)))
+                tf.argmax(results[:max_outputs, ::pcd_step, :]), (0, 1))
             if self._first_step == epoch or not use_reference:
                 input_pcd = to_sum_fmt(pointcloud[:max_outputs, ::pcd_step, :3],
                                        (0, 0), np.float32)
