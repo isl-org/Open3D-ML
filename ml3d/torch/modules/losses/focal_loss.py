@@ -30,7 +30,9 @@ class FocalLoss(nn.Module):
 
     def forward(self, pred, target, weight=None, avg_factor=None):
         pred_sigmoid = pred.sigmoid()
-        target = one_hot(target, int(pred.shape[-1]))
+        if len(pred.shape) > 1:
+            target = one_hot(target, int(pred.shape[-1]))
+
         target = target.type_as(pred)
 
         pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
