@@ -175,7 +175,8 @@ class SemanticSegmentation(BasePipeline):
             dataset.save_test_result(results, attr)
             # Save only for the first batch
             if 'test' in record_summary and 'test' not in self.summary:
-                self.summary['test'] = self.get_3d_summary(results,
+                self.summary['test'] = self.get_3d_summary(tf.convert_to_tensor(
+                    results['predict_scores']),
                                                            data,
                                                            0,
                                                            save_gt=False)
@@ -371,7 +372,10 @@ class SemanticSegmentation(BasePipeline):
                 row_splits = np.hstack(
                     ((0,), np.cumsum(input_data['batch_lengths'])))
             else:
-                row_splits = input_data['row_splits']
+                if 'row_splits' in input_data:
+                    row_splits = input_data['row_splits']
+                else:
+                    row_splits = [0, input_data['point'].shape[0]]
             max_outputs = min(max_outputs, len(row_splits) - 1)
             for k in range(max_outputs):
                 blen_k = row_splits[k + 1] - row_splits[k]
@@ -382,6 +386,7 @@ class SemanticSegmentation(BasePipeline):
                     continue
                 pointcloud = input_data['point'][
                     row_splits[k]:row_splits[k + 1]:pcd_step]
+                pointcloud = tf.convert_to_tensor(pointcloud)
                 input_pcd.append(
                     to_sum_fmt(pointcloud[:, :3], (0, 0), np.float32))
                 if save_gt:
@@ -393,14 +398,20 @@ class SemanticSegmentation(BasePipeline):
         # Tuple input, same size point clouds
         elif self.model.cfg['name'] in ('RandLANet', 'PVCNN'):
             if self.model.cfg['name'] == 'RandLANet':
-                pointcloud = input_data[0]  # 0 => input to first layer
+                if save_gt:
+                    pointcloud = input_data[0]  # 0 => input to first layer
+                else:
+                    # Structured data during inference
+                    pointcloud = tf.expand_dims(
+                        tf.convert_to_tensor(input_data['point']), 0)
+                    results = tf.expand_dims(results, 0)
             elif self.model.cfg['name'] == 'PVCNN':
                 pointcloud = input_data['point']
             pcd_step = int(
                 np.ceil(pointcloud.shape[1] /
                         min(max_pts, pointcloud.shape[1])))
             predict_labels = to_sum_fmt(
-                tf.argmax(results[:max_outputs, ::pcd_step, :]), (0, 1))
+                tf.argmax(results[:max_outputs, ::pcd_step, :], -1), (0, 1))
             if self._first_step == epoch or not use_reference:
                 input_pcd = to_sum_fmt(pointcloud[:max_outputs, ::pcd_step, :3],
                                        (0, 0), np.float32)
