@@ -91,8 +91,7 @@ class Scannet(BaseDataset):
                 self.test_scenes.append(join(self.dataset_path, scene))
 
         self.semantic_ids = [
-            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
-            39
+            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39
         ]
 
     def get_label_to_names(self):
