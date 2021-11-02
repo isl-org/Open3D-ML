@@ -128,7 +128,7 @@ class ObjectDetection(BasePipeline):
                 dataset.save_test_result(results, data.attr)
                 # Save only for the first batch
                 if record_summary and 'test' not in self.summary:
-                    boxes = model.inference_end(results, data)
+                    boxes = results  # inference_end already executed in run_inference
                     self.summary['test'] = self.get_3d_summary(boxes,
                                                                data,
                                                                0,

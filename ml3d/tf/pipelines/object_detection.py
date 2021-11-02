@@ -350,7 +350,7 @@ class ObjectDetection(BasePipeline):
                 for bbox, label in zip(
                         bboxes[box_start_idx:box_start_idx + boxblen],
                         labels[box_start_idx:box_start_idx + boxblen]):
-                    dim = bbox[[3, 5, 4]]
+                    dim = tf.gather(bbox, [3, 5, 4])
                     pos = bbox[:3] + [0, 0, dim[1] / 2]
                     yaw = bbox[-1]
                     gt_bboxes[bidx].append(
