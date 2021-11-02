@@ -369,6 +369,8 @@ class ObjectDetection(BasePipeline):
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
+        if self.model.cfg['name'] == 'PointRCNN' and self.model.mode == 'RPN':
+            return {}  # Not supported for PointRCNN-RPN
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         if not hasattr(self.dataset, "name_to_labels"):

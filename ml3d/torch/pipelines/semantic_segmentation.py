@@ -498,7 +498,7 @@ class SemanticSegmentation(BasePipeline):
         cfg = self.cfg.get('summary')
         max_pts = cfg.get('max_pts')
         if max_pts is None:
-            max_pts = torch.torch.iinfo(torch.int32).max
+            max_pts = np.iinfo(np.int32).max
         use_reference = cfg.get('use_reference', False)
         max_outputs = cfg.get('max_outputs', 1)
         input_pcd = []

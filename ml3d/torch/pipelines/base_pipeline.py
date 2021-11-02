@@ -46,6 +46,7 @@ class BasePipeline(ABC):
             self.device = torch.device('cuda' if len(device.split(':')) ==
                                        1 else 'cuda:' + device.split(':')[1])
         self.summary = {}
+        self.cfg.setdefault('summary', {})
 
     @abstractmethod
     def run_inference(self, data):

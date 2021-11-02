@@ -11,7 +11,7 @@ import tensorflow as tf
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
-from ...datasets.utils import BEVBox3D
+from ...datasets.utils import BEVBox3D, DataProcessing
 
 from ...metrics.mAP import mAP
 
@@ -304,8 +304,12 @@ class ObjectDetection(BasePipeline):
         Args:
             infer_bboxes_batch (Sequence[Sequence[BoundingBox3D]): Batch of
                 predicted bounding boxes from inference_end()
-            inputs_batch (Sequence[Sequence[bbox_objs: Object3D, point:
-                array(N,3)]]): Batch of ground truth boxes and pointclouds.
+            inputs_batch: Batch of ground truth boxes and pointclouds.
+                PointPillars: (Tuple (points(N, 4), bboxes(Nb, 7), labels(Nb),
+                    calib(B, 2, 4, 4), points_batch_lengths(B,),
+                    bboxes_batch_lengths(B,)))
+                PointRCNN: (Tuple (points(B, N, 3), bboxes(B, Nb, 7), labels(B,
+                    Nb), calib(B, 2, 4, 4)))
             epoch (int): step
             save_gt (bool): Save ground truth (for 'train' or 'valid' stages).
 
@@ -325,25 +329,62 @@ class ObjectDetection(BasePipeline):
         if max_pts is None:
             max_pts = np.iinfo(np.int32).max
         use_reference = cfg.get('use_reference', False)
-        max_outputs = min(cfg.get('max_outputs', 1), len(inputs_batch.point))
         input_pcd = []
-        inputs_batch_gt_bboxes = (inputs_batch.bbox_objs[:max_outputs]
-                                  if save_gt else ([],) * max_outputs)
-        for infer_bboxes, gt_bboxes, pointcloud in zip(
-                infer_bboxes_batch[:max_outputs], inputs_batch_gt_bboxes,
-                inputs_batch.point[:max_outputs]):
-            for bboxes in (gt_bboxes, infer_bboxes):
-                for bb in bboxes:  # LUT needs label_class to be int, not str
-                    if not isinstance(bb.label_class, int):
-                        bb.label_class = self.dataset.name_to_labels[
-                            bb.label_class]
+        gt_bboxes = []
+        if self.model.cfg['name'] == 'PointPillars':
+            max_outputs = min(cfg.get('max_outputs', 1), len(inputs_batch[4]))
+            (pointclouds, bboxes, labels, calib, points_batch_lengths,
+             bboxes_batch_lengths) = inputs_batch
+            gt_bboxes = [[] for _ in range(max_outputs)]
+            pt_start_idx, box_start_idx = 0, 0
+            for bidx in range(max_outputs):
+                if self._first_step == epoch or not use_reference:
+                    ptblen = points_batch_lengths[bidx]
+                    pcd_step = int(np.ceil(ptblen / min(max_pts, ptblen)))
+                    pcd = pointclouds[pt_start_idx:pt_start_idx +
+                                      ptblen:pcd_step, :3]
+                    input_pcd.append(pcd)
+                    pt_start_idx += ptblen
+                world_cam, cam_img = calib[bidx].numpy()
+                boxblen = points_batch_lengths[bidx]
+                for bbox, label in zip(
+                        bboxes[box_start_idx:box_start_idx + boxblen],
+                        labels[box_start_idx:box_start_idx + boxblen]):
+                    dim = bbox[[3, 5, 4]]
+                    pos = bbox[:3] + [0, 0, dim[1] / 2]
+                    yaw = bbox[-1]
+                    gt_bboxes[bidx].append(
+                        BEVBox3D(pos, dim, yaw, label, world_cam, cam_img))
 
-            if self._first_step == epoch or not use_reference:
-                pcd_step = int(
-                    np.ceil(pointcloud.shape[0] /
-                            min(max_pts, pointcloud.shape[0])))
-                pcd = pointcloud[::pcd_step, :3]
-                input_pcd.append(pcd)
+        elif self.model.cfg['name'] == 'PointRCNN':
+            if self.model.mode == 'RPN':  # Not supported for RPN
+                return {}
+            pointclouds, bboxes, labels, calib = inputs_batch
+            max_outputs = min(cfg.get('max_outputs', 1), pointclouds.shape[0])
+            gt_bboxes = [[] for _ in range(max_outputs)]
+            pcd_step = int(
+                np.ceil(pointclouds.shape[1] /
+                        min(max_pts, pointclouds.shape[1])))
+            for bidx in range(max_outputs):
+                if self._first_step == epoch or not use_reference:
+                    pcd = pointclouds[bidx, ::pcd_step, :3]
+                    input_pcd.append(pcd)
+                world_cam, cam_img = calib[bidx].numpy()
+                for bbox, label in zip(bboxes[bidx], labels[bidx]):
+                    pos = bbox[:3]
+                    dim = bbox[[4, 3, 5]]
+                    # transform into world space
+                    pos = DataProcessing.cam2world(pos.reshape((1, -1)),
+                                                   world_cam).flatten()
+                    pos = pos + [0, 0, dim[1] / 2]
+                    yaw = bbox[-1]
+                    gt_bboxes[bidx].append(
+                        BEVBox3D(pos, dim, yaw, label[0], 1, world_cam,
+                                 cam_img))
+            else:
+                raise NotImplementedError(
+                    f"Saving 3D summary for the model {self.model.cfg['name']}"
+                    " is not implemented.")
 
         summary3d = {
             'input_pointcloud': {
@@ -358,7 +399,7 @@ class ObjectDetection(BasePipeline):
         }
         if save_gt:
             summary3d['objdet_ground_truth'] = {
-                "bboxes": inputs_batch.bbox_objs[:max_outputs],
+                "bboxes": gt_bboxes,
                 'label_to_names': self.dataset.get_label_to_names()
             }
         return summary3d

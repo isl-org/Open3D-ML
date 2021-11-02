@@ -39,6 +39,7 @@ class BasePipeline(ABC):
             model.__class__.__name__ + '_' + dataset_name + '_tf')
         make_dir(self.cfg.logs_dir)
         self.summary = {}
+        self.cfg.setdefault('summary', {})
 
     @abstractmethod
     def run_inference(self, data):
