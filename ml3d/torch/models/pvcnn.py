@@ -18,14 +18,18 @@ class TrilinearDevoxelization(Function):
 
     @staticmethod
     def forward(ctx, features, coords, resolution, is_training=True):
-        """
-        :param ctx:
-        :param coords: the coordinates of points, FloatTensor[B, 3, N]
-        :param features: FloatTensor[B, C, R, R, R]
-        :param resolution: int, the voxel resolution
-        :param is_training: bool, training mode
-        :return:
-            FloatTensor[B, C, N]
+        """Forward pass for the Op.
+
+        Args:
+            ctx: torch Autograd context.
+            coords: the coordinates of points, FloatTensor[B, 3, N]
+            features: FloatTensor[B, C, R, R, R]
+            resolution: int, the voxel resolution.
+            is_training: bool, training mode.
+        
+        Returns:
+            torch.FloatTensor: devoxelized features (B, C, N)
+
         """
         B, C = features.shape[:2]
         features = features.contiguous()
@@ -39,11 +43,15 @@ class TrilinearDevoxelization(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        """
-        :param ctx:
-        :param grad_output: gradient of outputs, FloatTensor[B, C, N]
-        :return:
-            gradient of inputs, FloatTensor[B, C, R, R, R]
+        """Backward pass for the Op.
+
+        Args:
+            ctx: torch Autograd context
+            grad_output: gradient of outputs, FloatTensor[B, C, N]
+
+        Returns:
+            torch.FloatTensor: gradient of inputs (B, C, R, R, R)
+
         """
         inds, wgts = ctx.saved_tensors
         grad_inputs = trilinear_devoxelize_backward(grad_output.contiguous(),
@@ -134,13 +142,12 @@ class PVCNN(BaseModel):
                 feat (torch.float32): Input features (B, N, 9)
 
         Returns:
-            Returns the probability distribution.
+            torch.float32 : probability distribution (B, N, C).
 
         """
         coords = inputs['point'].to(self.device)
         feat = inputs['feat'].to(self.device)
 
-        # coords = inputs[:, :3, :]
         out_features_list = []
         for i in range(len(self.point_features)):
             feat, _ = self.point_features[i]((feat, coords))
@@ -167,6 +174,16 @@ class PVCNN(BaseModel):
             Returns the preprocessed data
 
         """
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            seedseq = np.random.SeedSequence(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+            rng = np.random.default_rng(seedseq.spawn(1)[0])
+        else:
+            rng = self.rng
+
         points = np.array(data['point'], dtype=np.float32)
 
         if 'label' not in data or data['label'] is None:
@@ -185,7 +202,7 @@ class PVCNN(BaseModel):
 
         points -= np.min(points, 0)
 
-        feat = feat / 255.0
+        feat = feat / 255.0  # Normalize to [0, 1]
 
         max_points_x = np.max(points[:, 0])
         max_points_y = np.max(points[:, 1])
@@ -198,10 +215,9 @@ class PVCNN(BaseModel):
 
         feat = np.concatenate([x, y, z, feat, norm_x, norm_y, norm_z], axis=-1)
 
-        choices = np.random.choice(
-            points.shape[0],
-            self.cfg.num_points,
-            replace=(points.shape[0] < self.cfg.num_points))
+        choices = rng.choice(points.shape[0],
+                             self.cfg.num_points,
+                             replace=(points.shape[0] < self.cfg.num_points))
         points = points[choices].transpose()
         feat = feat[choices].transpose()
         labels = labels[choices]
@@ -270,7 +286,7 @@ class PVCNN(BaseModel):
         """Calculate the loss on output of the model.
 
         Attributes:
-            Loss: Object of type `SemSegLoss`.
+            sem_seg_loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
             device: device(cpu or cuda).

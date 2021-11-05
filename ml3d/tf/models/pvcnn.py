@@ -14,7 +14,9 @@ if open3d.core.cuda.device_count() > 0:
 
 def trilinear_devoxelize(features, coords, resolution, is_training=True):
     if not open3d.core.cuda.device_count() > 0:
-        raise NotImplementedError
+        raise NotImplementedError(
+            "Op 'trilinear_devoxelize` not implemented on CPU. Please use a CUDA enabled machine."
+        )
 
     outs, inds, wgts = ml_ops.trilinear_devoxelize(
         tf.transpose(coords, perm=[0, 2, 1]),
@@ -103,13 +105,12 @@ class PVCNN(BaseModel):
             training (bool): Whether model is in training phase.
 
         Returns:
-            Returns the probability distribution.
+            tf.float32 : probability distribution (B, N, C).
 
         """
         coords = inputs['point']
         feat = inputs['feat']
 
-        # coords = inputs[:, :3, :]
         out_features_list = []
         for i in range(len(self.point_features)):
             feat, _ = self.point_features[i]((feat, coords), training=training)
@@ -163,7 +164,7 @@ class PVCNN(BaseModel):
 
         points -= np.min(points, 0)
 
-        feat = feat / 255.0
+        feat = feat / 255.0  # Normalize to [0, 1]
 
         max_points_x = np.max(points[:, 0])
         max_points_y = np.max(points[:, 1])
