@@ -1,4 +1,4 @@
-"""Data processing utilities."""
+"""Utilities for processing data, such as normalization and cropping."""
 
 from .dataprocessing import DataProcessing
 from .transforms import trans_normalize, trans_augment, trans_crop_pc, ObjdetAugmentation

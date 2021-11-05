@@ -13,7 +13,12 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
 
 
 class RandLANet(BaseModel):
-    """Semantic Segmentation model"""
+    """Class defining RandLANet, a Semantic Segmentation model.
+    Based on the architecture
+    https://arxiv.org/abs/1911.11236#
+
+    Reference Implementation - https://github.com/QingyongHu/RandLA-Net
+    """
 
     def __init__(
             self,

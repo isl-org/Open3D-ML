@@ -66,7 +66,7 @@ def get_from_name(module_name, registry, framework):
 
     Args:
         module_name (string): Name of the module.
-        registry: Object of type Registry.
+        registry: The registry to search the type from.
         framework (string): Framework, one of 'tf' or 'torch'
 
     Returns:
