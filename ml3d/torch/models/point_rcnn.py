@@ -211,9 +211,10 @@ class PointRCNN(BaseModel):
         # If num_workers > 0, use new RNG with unique seed for each thread.
         # Else, use default RNG.
         if torch.utils.data.get_worker_info():
-            rng = np.random.default_rng(
+            seedseq = np.random.SeedSequence(
                 torch.utils.data.get_worker_info().seed +
                 torch.utils.data.get_worker_info().id)
+            rng = np.random.default_rng(seedseq.spawn(1)[0])
         else:
             rng = self.rng
 
@@ -313,9 +314,10 @@ class PointRCNN(BaseModel):
             # If num_workers > 0, use new RNG with unique seed for each thread.
             # Else, use default RNG.
             if torch.utils.data.get_worker_info():
-                rng = np.random.default_rng(
+                seedseq = np.random.SeedSequence(
                     torch.utils.data.get_worker_info().seed +
                     torch.utils.data.get_worker_info().id)
+                rng = np.random.default_rng(seedseq.spawn(1)[0])
             else:
                 rng = self.rng
 

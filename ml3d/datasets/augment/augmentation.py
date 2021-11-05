@@ -85,7 +85,7 @@ class Augmentation():
             theta = self.rng.random() * 2 * np.pi
             phi = (self.rng.random() - 0.5) * np.pi
 
-            # Create the first vector in carthesian coordinates
+            # Create the first vector in cartesian coordinates
             u = np.array([
                 np.cos(theta) * np.cos(phi),
                 np.sin(theta) * np.cos(phi),

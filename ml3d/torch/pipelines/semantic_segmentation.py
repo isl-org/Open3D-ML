@@ -302,7 +302,8 @@ class SemanticSegmentation(BasePipeline):
     """
 
     def run_train(self):
-        torch.manual_seed(self.rng.integers(100))
+        torch.manual_seed(
+            self.rng.integers(100000))  # Random reproducible seed for torch
         model = self.model
         device = self.device
         model.device = device
