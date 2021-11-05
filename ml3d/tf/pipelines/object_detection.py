@@ -370,21 +370,22 @@ class ObjectDetection(BasePipeline):
                     pcd = pointclouds[bidx, ::pcd_step, :3]
                     input_pcd.append(pcd)
                 world_cam, cam_img = calib[bidx].numpy()
+                bboxes = bboxes.numpy()
+                labels = labels.numpy()
                 for bbox, label in zip(bboxes[bidx], labels[bidx]):
                     pos = bbox[:3]
-                    dim = bbox[[4, 3, 5]]
+                    dim = tf.gather(bbox, [4, 3, 5])
                     # transform into world space
                     pos = DataProcessing.cam2world(pos.reshape((1, -1)),
                                                    world_cam).flatten()
                     pos = pos + [0, 0, dim[1] / 2]
                     yaw = bbox[-1]
                     gt_bboxes[bidx].append(
-                        BEVBox3D(pos, dim, yaw, label[0], 1, world_cam,
-                                 cam_img))
-            else:
-                raise NotImplementedError(
-                    f"Saving 3D summary for the model {self.model.cfg['name']}"
-                    " is not implemented.")
+                        BEVBox3D(pos, dim, yaw, label, 1, world_cam, cam_img))
+        else:
+            raise NotImplementedError(
+                f"Saving 3D summary for the model {self.model.cfg['name']}"
+                " is not implemented.")
 
         summary3d = {
             'input_pointcloud': {
