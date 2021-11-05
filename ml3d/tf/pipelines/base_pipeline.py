@@ -31,6 +31,7 @@ class BasePipeline(ABC):
 
         self.model = model
         self.dataset = dataset
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
         make_dir(self.cfg.main_log_dir)
         dataset_name = dataset.name if dataset is not None else ''
