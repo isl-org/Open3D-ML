@@ -1,13 +1,8 @@
 #!/usr/bin/env python
 import open3d.ml.torch as ml3d
-import argparse
-import math
 import numpy as np
 import os
-import random
-import sys
-import torch
-from os.path import exists, join, isfile, dirname, abspath, split
+from os.path import exists, join
 
 example_dir = os.path.dirname(os.path.realpath(__file__))
 

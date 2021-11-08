@@ -2,6 +2,7 @@ import tensorflow as tf
 
 
 class CrossEntropyLoss(tf.Module):
+    """CrossEntropyLoss."""
 
     def __init__(self, loss_weight=1.0):
         """CrossEntropyLoss.

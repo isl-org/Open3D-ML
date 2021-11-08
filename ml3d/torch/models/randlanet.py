@@ -21,9 +21,11 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
-    """Class defining RandLANet.
+    """Class defining RandLANet, a Semantic Segmentation model.
+    Based on the architecture
+    https://arxiv.org/abs/1911.11236#
 
-    A model for Semantic Segmentation.
+    Reference Implementation - https://github.com/QingyongHu/RandLA-Net
     """
 
     def __init__(

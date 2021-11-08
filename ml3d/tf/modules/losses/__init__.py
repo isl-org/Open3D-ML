@@ -1,3 +1,5 @@
+"""Loss modules"""
+
 from .semseg_loss import SemSegLoss
 from .cross_entropy import CrossEntropyLoss
 from .focal_loss import FocalLoss
