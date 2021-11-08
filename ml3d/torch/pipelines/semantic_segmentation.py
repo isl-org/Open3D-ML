@@ -511,7 +511,27 @@ class SemanticSegmentation(BasePipeline):
             return sten.reshape(new_shape)
 
         # Variable size point clouds
-        if self.model.cfg['name'] in ('SparseConvUnet', 'PointTransformer'):
+        if self.model.cfg['name'] in ('KPFCNN', 'KPConv'):
+            batch_lengths = input_data.lengths[0].detach().numpy()
+            row_splits = np.hstack(((0,), np.cumsum(batch_lengths)))
+            max_outputs = min(max_outputs, len(row_splits) - 1)
+            for k in range(max_outputs):
+                blen_k = row_splits[k + 1] - row_splits[k]
+                pcd_step = int(np.ceil(blen_k / min(max_pts, blen_k)))
+                res_pcd = results[row_splits[k]:row_splits[k + 1]:pcd_step, :]
+                predict_labels.append(
+                    to_sum_fmt(torch.argmax(res_pcd, 1), (0, 1)))
+                if self._first_step != epoch and use_reference:
+                    continue
+                pointcloud = input_data.points[0][
+                    row_splits[k]:row_splits[k + 1]:pcd_step]
+                input_pcd.append(
+                    to_sum_fmt(pointcloud[:, :3], (0, 0), torch.float32))
+                if torch.any(input_data.labels != 0):
+                    gtl = input_data.labels[row_splits[k]:row_splits[k + 1]]
+                    gt_labels.append(to_sum_fmt(gtl, (0, 1)))
+
+        elif self.model.cfg['name'] in ('SparseConvUnet', 'PointTransformer'):
             if self.model.cfg['name'] == 'SparseConvUnet':
                 row_splits = np.hstack(
                     ((0,), np.cumsum(input_data.batch_lengths)))
