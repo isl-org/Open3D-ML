@@ -318,7 +318,8 @@ class ObjectDetection(BasePipeline):
                 self.scheduler.step()
 
             # --------------------- validation
-            self.run_valid()
+            if (epoch % cfg.get("validation_freq", 1)) == 0:
+                self.run_valid()
 
             self.save_logs(writer, epoch)
 
@@ -329,8 +330,9 @@ class ObjectDetection(BasePipeline):
         for key, val in self.losses.items():
             writer.add_scalar("train/" + key, np.mean(val), epoch)
 
-        for key, val in self.valid_losses.items():
-            writer.add_scalar("valid/" + key, np.mean(val), epoch)
+        if (epoch % cfg.get("validation_freq", 1)) == 0:
+            for key, val in self.valid_losses.items():
+                writer.add_scalar("valid/" + key, np.mean(val), epoch)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')

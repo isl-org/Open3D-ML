@@ -28,6 +28,12 @@ from matplotlib import cm
 from os import makedirs
 from os.path import join, exists
 
+
+class bcolors:  # See https://stackoverflow.com/questions/287871
+    WARNING = '\033[93m'
+    ENDC = '\033[0m'
+
+
 # ------------------------------------------------------------------------------------------
 #
 #           Functions
@@ -320,7 +326,7 @@ def kernel_point_optimization_debug(radius,
     kernel_points = kernel_points[:num_kernels * num_points, :].reshape(
         (num_kernels, num_points, -1))
 
-    # Optionnal fixing
+    # Optional fixing
     if fixed == 'center':
         kernel_points[:, 0, :] *= 0
     if fixed == 'verticals':

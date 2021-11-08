@@ -244,7 +244,7 @@ class PointRCNN(BaseModel):
         """Generates labels for RPN network.
 
         Classifies each point as foreground/background based on points inside bbox.
-        We don't train on ambigious points which are just outside bounding boxes(calculated
+        We don't train on ambiguous points which are just outside bounding boxes(calculated
         by `extended_boxes`).
         Also computes regression labels for bounding box proposals(in bounding box frame).
 
