@@ -387,7 +387,7 @@ def create_pointnet_components(blocks,
                                in_channels,
                                with_se=False,
                                normalize=True,
-                               eps=0,
+                               eps=1e-6,
                                width_multiplier=1,
                                voxel_resolution_multiplier=1):
     """Creates pointnet components. For each output channel,
@@ -489,7 +489,7 @@ class PVConv(tf.keras.layers.Layer):
                  resolution,
                  with_se=False,
                  normalize=True,
-                 eps=0):
+                 eps=1e-6):
         """Constructor for PVConv module.
 
         Args:
@@ -591,7 +591,7 @@ class Voxelization(tf.keras.layers.Layer):
     voxel.
     """
 
-    def __init__(self, resolution, normalize=True, eps=0):
+    def __init__(self, resolution, normalize=True, eps=1e-6):
         """Constructor of Voxelization module.
 
         Args:
