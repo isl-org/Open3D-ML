@@ -1,7 +1,5 @@
 import tensorflow as tf
 import numpy as np
-from os.path import exists, join, isfile, dirname, abspath, split
-from pathlib import Path
 
 from .utils.kernels.kernel_points import load_kernels as create_kernel_points
 
