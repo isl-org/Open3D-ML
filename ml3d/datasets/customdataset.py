@@ -2,7 +2,6 @@ import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -177,13 +176,13 @@ class Custom3D(BaseDataset):
              'all'.
         """
         if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
+            self.rng.shuffle(self.test_files)
             return self.test_files
         elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
+            self.rng.shuffle(self.val_files)
             return self.val_files
         elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
+            self.rng.shuffle(self.train_files)
             return self.train_files
         elif split in ['all']:
             files = self.val_files + self.train_files + self.test_files
