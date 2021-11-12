@@ -4,7 +4,6 @@ from pathlib import Path
 from glob import glob
 import joblib
 import logging
-import random
 
 from .base_dataset import BaseDataset
 from ..utils import DATASET
@@ -85,7 +84,7 @@ class MatterportObjects(BaseDataset):
         # Ensures that the training and validation regions
         # of the dataset are not uniform distinct regions of index,
         # while still being deterministic
-        random.Random(0).shuffle(self.all_files)
+        self.rng.shuffle(self.all_files)
         self.train_files = []
         self.val_files = []
 

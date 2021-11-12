@@ -80,23 +80,26 @@ class BoundingBox3D:
         return s
 
     @staticmethod
-    def create_lines(boxes, lut=None, out="lineset"):
+    def create_lines(boxes, lut=None, out_format="lineset"):
         """Creates a LineSet that can be used to render the boxes.
 
         Args:
-            boxes: the list of bounding boxes
-            lut: a ml3d.vis.LabelLUT that is used to look up the color based on
+            boxes: The list of bounding boxes.
+            lut: An ml3d.vis.LabelLUT that is used to look up the color based on
                 the label_class argument of the BoundingBox3D constructor. If
                 not provided, a color of 50% grey will be used. (optional)
-            out (str): Output format. Can be "lineset" (default) for the
+            out_format (str): Output format. Can be "lineset" (default) for the
                 Open3D lineset or "dict" for a dictionary of lineset properties.
 
         Returns:
-            open3d.geometry.LineSet if out == "lineset", or
-                Dictionary of lineset properties ("vertex_positions",
-                "line_indices", "line_colors", "bbox_labels",
-                "bbox_confidences") if out == "dict".
+            For out_format == "lineset": open3d.geometry.LineSet
+            For out_format == "dict": Dictionary of lineset properties
+                ("vertex_positions", "line_indices", "line_colors", "bbox_labels",
+                "bbox_confidences").
         """
+        if out_format not in ('lineset', 'dict'):
+            raise ValueError("Please specify an output_format of 'lineset' "
+                             "(default) or 'dict'.")
         nverts = 14
         nlines = 17
         points = np.zeros((nverts * len(boxes), 3), dtype="float32")
@@ -153,12 +156,12 @@ class BoundingBox3D:
             colors[idx:idx +
                    nlines] = c  # copies c to each element in the range
 
-        if out == "lineset":
+        if out_format == "lineset":
             lines = o3d.geometry.LineSet()
             lines.points = o3d.utility.Vector3dVector(points)
             lines.lines = o3d.utility.Vector2iVector(indices)
             lines.colors = o3d.utility.Vector3dVector(colors)
-        elif out == "dict":
+        elif out_format == "dict":
             lines = {
                 "vertex_positions": points,
                 "line_indices": indices,

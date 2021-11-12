@@ -343,10 +343,6 @@ class SemanticSegmentation(BasePipeline):
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
-        # inputs['point'], inputs['label'], inputs['batch_lengths']
-        # concatenated for all except randlanet (same size point
-        # clouds)
-
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         label_to_names = self.dataset.get_label_to_names()
@@ -366,8 +362,20 @@ class SemanticSegmentation(BasePipeline):
                 1,) * add_dims[1]
             return np_tensor.reshape(new_shape)
 
+        # Variable size point clouds
+        if self.model.cfg['name'] in ('KPFCNN', 'KPConv'):
+            org_inputs = self.model.organise_inputs(input_data)
+            predict_labels.append(to_sum_fmt(tf.argmax(results, 1), (0, 1)))
+            if self._first_step == epoch or not use_reference:
+                pointcloud = org_inputs['points'][0]
+                input_pcd.append(
+                    to_sum_fmt(pointcloud[:, :3], (0, 0), np.float32))
+                if save_gt:
+                    gtl = org_inputs['point_labels']
+                    gt_labels.append(to_sum_fmt(gtl, (0, 1)))
+
         # Dict input, variable size point clouds
-        if self.model.cfg['name'] in ('SparseConvUnet', 'PointTransformer'):
+        elif self.model.cfg['name'] in ('SparseConvUnet', 'PointTransformer'):
             if self.model.cfg['name'] == 'SparseConvUnet':
                 row_splits = np.hstack(
                     ((0,), np.cumsum(input_data['batch_lengths'])))

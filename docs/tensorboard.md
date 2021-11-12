@@ -259,7 +259,7 @@ visualized in TensorBoard.
 alt="Tensorboard semantic segmentation example"
 style="width:100%;display:block;margin:auto">
 <source src="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_semseg.webm" type="video/webm">
-<a href="/home/ssheorey/Documents/Open3D/Code/Open3D-ML/docs/images/tensorboard_semseg.webm">Playing the video is not supported. Download the video instead.</a>
+<a href="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_semseg.webm">Download the video.</a>
 </video>
 
 
@@ -272,7 +272,7 @@ batch index and viewpoint of different runs can also be synchronized.
 alt="Tensorboard object detection example"
 style="width:100%;display:block;margin:auto">
 <source src="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_objdet.webm" type="video/webm">
-<a href="/home/ssheorey/Documents/Open3D/Code/Open3D-ML/docs/images/tensorboard_objdet.webm">Playing the video is not supported. Download the video instead.</a>
+<a href="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_objdet.webm">Download the video.</a>
 </video>
 
 

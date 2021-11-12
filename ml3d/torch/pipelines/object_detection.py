@@ -198,8 +198,10 @@ class ObjectDetection(BasePipeline):
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
                 # Save only for the first batch
                 if record_summary and 'valid' not in self.summary:
-                    self.summary['valid'] = self.get_3d_summary(
-                        boxes, data, epoch)
+                    self.summary['valid'] = self.get_3d_summary(boxes,
+                                                                data,
+                                                                epoch,
+                                                                results=results)
 
         sum_loss = 0
         desc = "validation - "
@@ -250,6 +252,8 @@ class ObjectDetection(BasePipeline):
 
     def run_train(self):
         """Run training with train data split."""
+        torch.manual_seed(self.rng.integers(np.iinfo(
+            np.int32).max))  # Random reproducible seed for torch
         model = self.model
         device = self.device
         dataset = self.dataset
@@ -324,8 +328,10 @@ class ObjectDetection(BasePipeline):
                 # Record visualization for the last iteration
                 if record_summary and process_bar.n == process_bar.total - 1:
                     boxes = model.inference_end(results, data)
-                    self.summary['train'] = self.get_3d_summary(
-                        boxes, data, epoch)
+                    self.summary['train'] = self.get_3d_summary(boxes,
+                                                                data,
+                                                                epoch,
+                                                                results=results)
                 desc = "training - "
                 for l, v in loss.items():
                     if l not in self.losses:
@@ -352,6 +358,7 @@ class ObjectDetection(BasePipeline):
                        infer_bboxes_batch,
                        inputs_batch,
                        epoch,
+                       results=None,
                        save_gt=True):
         """
         Create visualization for input point cloud and network output bounding
@@ -363,14 +370,14 @@ class ObjectDetection(BasePipeline):
             inputs_batch (Sequence[Sequence[bbox_objs: Object3D, point:
                 array(N,3)]]): Batch of ground truth boxes and pointclouds.
             epoch (int): step
+            results (torch.FloatTensor): Model output (only required for RPN
+                stage of PointRCNN).
             save_gt (bool): Save ground truth (for 'train' or 'valid' stages).
 
         Returns:
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
-        if self.model.cfg['name'] == 'PointRCNN' and self.model.mode == 'RPN':
-            return {}  # Not supported for PointRCNN-RPN
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         if not hasattr(self.dataset, "name_to_labels"):
@@ -385,6 +392,33 @@ class ObjectDetection(BasePipeline):
         use_reference = cfg.get('use_reference', False)
         max_outputs = min(cfg.get('max_outputs', 1), len(inputs_batch.point))
         input_pcd = []
+
+        if self.model.cfg['name'] == 'PointRCNN' and self.model.mode == 'RPN':
+            for pointcloud in inputs_batch.point[:max_outputs]:
+                if self._first_step == epoch or not use_reference:
+                    pcd_step = int(
+                        np.ceil(pointcloud.shape[0] /
+                                min(max_pts, pointcloud.shape[0])))
+                    pcd = pointcloud[::pcd_step, :3].cpu().detach()
+                    input_pcd.append(pcd)
+            rpn_scores_norm = torch.sigmoid(results['cls'])
+            seg_mask = (rpn_scores_norm > self.model.score_thres).float()
+            cls_score = [ten.cpu().detach() for ten in seg_mask]
+            summary3d = {
+                'input_pointcloud': {
+                    "vertex_positions":
+                        input_pcd if self._first_step == epoch or
+                        not use_reference else self._first_step,
+                    "vertex_predict_labels":
+                        cls_score,
+                    "label_to_names": {
+                        0: "background",
+                        1: "foreground"
+                    }
+                }
+            }
+            return summary3d
+
         inputs_batch_gt_bboxes = (inputs_batch.bbox_objs[:max_outputs]
                                   if save_gt else ([],) * max_outputs)
         for infer_bboxes, gt_bboxes, pointcloud in zip(

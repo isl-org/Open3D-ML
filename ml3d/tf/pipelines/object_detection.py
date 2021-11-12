@@ -158,7 +158,10 @@ class ObjectDetection(BasePipeline):
             ])
             # Save only for the first batch
             if record_summary and 'valid' not in self.summary:
-                self.summary['valid'] = self.get_3d_summary(boxes, data, epoch)
+                self.summary['valid'] = self.get_3d_summary(boxes,
+                                                            data,
+                                                            epoch,
+                                                            results=results)
 
         sum_loss = 0
         desc = "validation - "
@@ -271,8 +274,10 @@ class ObjectDetection(BasePipeline):
                 # Record visualization for the last iteration
                 if record_summary and process_bar.n == process_bar.total - 1:
                     boxes = model.inference_end(results, data)
-                    self.summary['train'] = self.get_3d_summary(
-                        boxes, data, epoch)
+                    self.summary['train'] = self.get_3d_summary(boxes,
+                                                                data,
+                                                                epoch,
+                                                                results=results)
 
                 desc = "training - "
                 for l, v in loss.items():
@@ -296,6 +301,7 @@ class ObjectDetection(BasePipeline):
                        infer_bboxes_batch,
                        inputs_batch,
                        epoch,
+                       results=None,
                        save_gt=True):
         """
         Create visualization for input point cloud and network output bounding
@@ -311,6 +317,8 @@ class ObjectDetection(BasePipeline):
                 PointRCNN: (Tuple (points(B, N, 3), bboxes(B, Nb, 7), labels(B,
                     Nb), calib(B, 2, 4, 4)))
             epoch (int): step
+            results (tf.FloatTensor): Model output (only required for RPN
+                stage of PointRCNN)
             save_gt (bool): Save ground truth (for 'train' or 'valid' stages).
 
         Returns:
@@ -357,14 +365,36 @@ class ObjectDetection(BasePipeline):
                         BEVBox3D(pos, dim, yaw, label, world_cam, cam_img))
 
         elif self.model.cfg['name'] == 'PointRCNN':
-            if self.model.mode == 'RPN':  # Not supported for RPN
-                return {}
             pointclouds, bboxes, labels, calib = inputs_batch
             max_outputs = min(cfg.get('max_outputs', 1), pointclouds.shape[0])
             gt_bboxes = [[] for _ in range(max_outputs)]
             pcd_step = int(
                 np.ceil(pointclouds.shape[1] /
                         min(max_pts, pointclouds.shape[1])))
+            if self.model.mode == 'RPN':
+                for bidx in range(max_outputs):
+                    if self._first_step == epoch or not use_reference:
+                        pcd = pointclouds[bidx, ::pcd_step, :3]
+                        input_pcd.append(pcd)
+                rpn_scores_norm = tf.sigmoid(results['cls'])
+                seg_mask = tf.cast((rpn_scores_norm > self.model.score_thres),
+                                   tf.float32)
+                cls_score = [tf.stop_gradient(ten) for ten in seg_mask]
+                summary3d = {
+                    'input_pointcloud': {
+                        "vertex_positions":
+                            input_pcd if self._first_step == epoch or
+                            not use_reference else self._first_step,
+                        "vertex_predict_labels":
+                            cls_score,
+                        "label_to_names": {
+                            0: "background",
+                            1: "foreground"
+                        }
+                    }
+                }
+                return summary3d
+
             for bidx in range(max_outputs):
                 if self._first_step == epoch or not use_reference:
                     pcd = pointclouds[bidx, ::pcd_step, :3]

@@ -67,7 +67,8 @@ model:
 
   augment:
     PointShuffle: True
-    ObjectRangeFilter: True
+    ObjectRangeFilter:
+      point_cloud_range: [0, -39.68, -3, 69.12, 39.68, 1]
     ObjectSample:
       min_points_dict:
         Car: 5

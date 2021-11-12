@@ -55,7 +55,7 @@ class SparseConvUnet(BaseModel):
                                              **kwargs)
         cfg = self.cfg
         self.device = device
-        self.augmenter = SemsegAugmentation(cfg.augment)
+        self.augmenter = SemsegAugmentation(cfg.augment, seed=self.rng)
         self.multiplier = cfg.multiplier
         self.input_layer = InputLayer()
         self.sub_sparse_conv = SubmanifoldSparseConv(in_channels=in_channels,
@@ -93,6 +93,16 @@ class SparseConvUnet(BaseModel):
         return output
 
     def preprocess(self, data, attr):
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            seedseq = np.random.SeedSequence(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+            rng = np.random.default_rng(seedseq.spawn(1)[0])
+        else:
+            rng = self.rng
+
         points = np.array(data['point'], dtype=np.float32)
 
         if 'label' not in data or data['label'] is None:
@@ -110,17 +120,19 @@ class SparseConvUnet(BaseModel):
         points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
 
         if attr['split'] in ['training', 'train']:
-            points, feat, labels = self.augmenter.augment(
-                points, feat, labels, self.cfg.get('augment', None))
-
+            points, feat, labels = self.augmenter.augment(points,
+                                                          feat,
+                                                          labels,
+                                                          self.cfg.get(
+                                                              'augment', None),
+                                                          seed=rng)
         m = points.min(0)
         M = points.max(0)
 
         # Randomly place pointcloud in 4096 size grid.
         grid_size = self.cfg.grid_size
-        offset = -m + np.clip(
-            grid_size - M + m - 0.001, 0, None) * np.random.rand(3) + np.clip(
-                grid_size - M + m + 0.001, None, 0) * np.random.rand(3)
+        offset = -m + np.clip(grid_size - M + m - 0.001, 0, None) * rng.random(
+            3) + np.clip(grid_size - M + m + 0.001, None, 0) * rng.random(3)
 
         points += offset
         idxs = (points.min(1) >= 0) * (points.max(1) < 4096)

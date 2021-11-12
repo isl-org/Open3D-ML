@@ -1,6 +1,5 @@
 """Wrapper functions for TensorFlow layers."""
 
-import numpy as np
 import tensorflow as tf
 
 

@@ -94,7 +94,8 @@ class PointRCNN(BaseModel):
         rois, _ = self.rpn.proposal_layer(rpn_scores_raw,
                                           reg_score,
                                           backbone_xyz,
-                                          training=training)  # (B, M, 7)
+                                          training=self.mode == "RPN" and
+                                          training)  # (B, M, 7)
         rois = tf.stop_gradient(rois)
 
         output = {"rois": rois, "cls": cls_score, "reg": reg_score}
