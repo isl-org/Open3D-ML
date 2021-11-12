@@ -8,6 +8,7 @@ import numpy as np
 from tqdm import tqdm
 import tensorflow as tf
 
+from open3d.visualization.tensorboard_plugin import summary as summary3d
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
 from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
@@ -362,7 +363,7 @@ class ObjectDetection(BasePipeline):
                     pos = bbox[:3] + [0, 0, dim[1] / 2]
                     yaw = bbox[-1]
                     gt_bboxes[bidx].append(
-                        BEVBox3D(pos, dim, yaw, label, world_cam, cam_img))
+                        BEVBox3D(pos, dim, yaw, label, 1, world_cam, cam_img))
 
         elif self.model.cfg['name'] == 'PointRCNN':
             pointclouds, bboxes, labels, calib = inputs_batch
@@ -445,12 +446,12 @@ class ObjectDetection(BasePipeline):
             for stage in self.summary.keys():
                 for key, summary_dict in self.summary[stage].items():
                     label_to_names = summary_dict.pop('label_to_names', None)
-                    writer.add_3d('/'.join((stage, key)),
-                                  summary_dict,
-                                  epoch,
-                                  max_outputs=0,
-                                  label_to_names=label_to_names,
-                                  logdir=self.tensorboard_dir)
+                    summary3d.add_3d('/'.join((stage, key)),
+                                     summary_dict,
+                                     epoch,
+                                     max_outputs=0,
+                                     label_to_names=label_to_names,
+                                     logdir=self.tensorboard_dir)
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
