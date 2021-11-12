@@ -2,7 +2,6 @@ import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging

@@ -87,7 +87,8 @@ model:
 
   augment:
     PointShuffle: True
-    ObjectRangeFilter: True
+    ObjectRangeFilter:
+      point_cloud_range: [-80, -80, -5, 80, 80, 3.0]
 
 
 pipeline:

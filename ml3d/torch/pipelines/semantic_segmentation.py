@@ -293,7 +293,8 @@ class SemanticSegmentation(BasePipeline):
             self.complete_infer = True
 
     def run_train(self):
-        """Run the training on the self model."""
+        torch.manual_seed(self.rng.integers(np.iinfo(
+            np.int32).max))  # Random reproducible seed for torch
         model = self.model
         device = self.device
         model.device = device
@@ -484,13 +485,6 @@ class SemanticSegmentation(BasePipeline):
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
-        # gt_labels, predict_scores are always concatenated
-        # inputs['data'].point:
-        # model.batcher: empty or DefaultBatcher => fixed size point
-        # clouds
-        # KPConvBatcher: concatenated for KPConv, ...
-        # SparseConvUNetBatcher list[point] for SparseConvUNet
-        # PointTransformerbatcher rowsplits
 
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
@@ -560,7 +554,6 @@ class SemanticSegmentation(BasePipeline):
                         gtl = input_data.label[
                             row_splits[k]:row_splits[k + 1]:pcd_step]
                     gt_labels.append(to_sum_fmt(gtl, (0, 1)))
-        # elif self.model.cfg['name'] in ('KPConv',):
         # Fixed size point clouds
         elif self.model.cfg['name'] in ('RandLANet', 'PVCNN'):  # Tuple input
             if self.model.cfg['name'] == 'RandLANet':

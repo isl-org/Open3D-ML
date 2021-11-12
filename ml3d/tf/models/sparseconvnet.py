@@ -120,8 +120,8 @@ class SparseConvUnet(BaseModel):
         # Randomly place pointcloud in 4096 size grid.
         grid_size = self.cfg.grid_size
         offset = -m + np.clip(
-            grid_size - M + m - 0.001, 0, None) * np.random.rand(3) + np.clip(
-                grid_size - M + m + 0.001, None, 0) * np.random.rand(3)
+            grid_size - M + m - 0.001, 0, None) * self.rng.random(3) + np.clip(
+                grid_size - M + m + 0.001, None, 0) * self.rng.random(3)
 
         points += offset
         idxs = (points.min(1) >= 0) * (points.max(1) < 4096)

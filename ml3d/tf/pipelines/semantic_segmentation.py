@@ -343,10 +343,6 @@ class SemanticSegmentation(BasePipeline):
             [Dict] visualizations of inputs and outputs suitable to save as an
                 Open3D for TensorBoard summary.
         """
-        # inputs['point'], inputs['label'], inputs['batch_lengths']
-        # concatenated for all except randlanet (same size point
-        # clouds)
-
         if not hasattr(self, "_first_step"):
             self._first_step = epoch
         label_to_names = self.dataset.get_label_to_names()
