@@ -1145,7 +1145,7 @@ class Visualizer:
 
     def _get_material(self):
         self._update_gradient()
-        material = rendering.Material()
+        material = rendering.MaterialRecord()
         if self._shader.selected_text == self.SOLID_NAME:
             material.shader = "unlitSolidColor"
             c = self._color.color_value
@@ -1173,7 +1173,7 @@ class Visualizer:
         else:
             lut = None
 
-        mat = rendering.Material()
+        mat = rendering.MaterialRecord()
         mat.shader = "unlitLine"
         mat.line_width = 2 * self.window.scaling
 
