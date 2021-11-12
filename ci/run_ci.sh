@@ -27,7 +27,7 @@ git clone --recursive --branch master https://github.com/isl-org/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -U tensorflow-cpu==$TENSORFLOW_VER
-python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.org/whl/lts/1.8/torch_lts.html
 python -m pip install -U pytest=="$PYTEST_VER" \
     pytest-randomly=="$PYTEST_RANDOMLY_VER"
 python -m pip install -U yapf=="$YAPF_VER"
