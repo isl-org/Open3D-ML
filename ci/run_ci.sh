@@ -3,8 +3,8 @@
 # The following environment variables are required:
 # - NPROC
 #
-TENSORFLOW_VER="2.5.0"
-TORCH_GLNX_VER="1.8.1+cpu"
+TENSORFLOW_VER="2.5.2"
+TORCH_GLNX_VER="1.8.2+cpu"
 YAPF_VER="0.30.0"
 PYTEST_VER="6.0.1"
 PYTEST_RANDOMLY_VER="3.8.0"
