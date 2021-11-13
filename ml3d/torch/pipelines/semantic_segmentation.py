@@ -558,7 +558,7 @@ class SemanticSegmentation(BasePipeline):
             if self.model.cfg['name'] == 'RandLANet':
                 pointcloud = input_data['xyz'][0]  # 0 => input to first layer
             elif self.model.cfg['name'] == 'PVCNN':
-                pointcloud = input_data['point']
+                pointcloud = input_data['point'].transpose(1, 2)
             pcd_step = int(
                 np.ceil(pointcloud.shape[1] /
                         min(max_pts, pointcloud.shape[1])))

@@ -22,7 +22,7 @@ class FocalLoss(tf.Module):
 
         pred_sigmoid = tf.math.sigmoid(pred)
 
-        if len(pred.shape) > 1 and int(pred.shape[-1]) > 1:
+        if len(pred.shape) > 1:
             target = tf.one_hot(target, int(pred.shape[-1]))
         target = tf.cast(target, pred.dtype)
 
