@@ -114,7 +114,7 @@ def main():
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
     else:
         if (args.pipeline and args.model and args.dataset) is None:
-            raise ValueError("please specify pipeline, model, and dataset " +
+            raise ValueError("Please specify pipeline, model, and dataset " +
                              "if no cfg_file given")
 
         Pipeline = _ml3d.utils.get_module("pipeline", args.pipeline, framework)

@@ -53,6 +53,7 @@ class Scannet(BaseDataset):
             'garbagebin'
         ]
         self.cat2label = {cat: self.classes.index(cat) for cat in self.classes}
+        self.cat2label['ignored'] = -1
         self.label2cat = {self.cat2label[t]: t for t in self.cat2label}
         self.cat_ids = np.array(
             [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
