@@ -14,16 +14,11 @@ from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
 from ..utils import latest_torch_ckpt
-from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
+from ...utils import make_dir, PIPELINE, get_runid, code2md
 from ...datasets.utils import BEVBox3D
 
 from ...metrics.mAP import mAP
 
-logging.setLogRecordFactory(LogRecord)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

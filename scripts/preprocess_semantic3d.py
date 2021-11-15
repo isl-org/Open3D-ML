@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import pandas as pd
 import os, sys, glob, pickle
@@ -145,5 +146,11 @@ def preprocess(args):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     preprocess(args)

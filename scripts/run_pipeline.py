@@ -1,5 +1,6 @@
 import argparse
 import copy
+import logging
 import os
 import sys
 import os.path as osp
@@ -142,4 +143,10 @@ def main():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     main()

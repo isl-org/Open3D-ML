@@ -5,10 +5,6 @@ import logging
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET, get_module
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

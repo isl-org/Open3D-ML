@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+import logging
 import os
 from os.path import exists, join
 
@@ -194,4 +195,10 @@ def main():
 
 
 if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     main()

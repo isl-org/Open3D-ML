@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import open3d.ml as _ml3d
 import math
@@ -101,5 +102,11 @@ def main(args):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     main(args)

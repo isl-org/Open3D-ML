@@ -5,6 +5,7 @@ except ImportError:
         'Please run "pip install waymo-open-dataset-tf-2-1-0==1.2.0" '
         'to install the official devkit first.')
 
+import logging
 import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
@@ -449,6 +450,12 @@ class Waymo2KITTI():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     out_path = args.out_path
     if out_path is None:

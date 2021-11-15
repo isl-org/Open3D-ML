@@ -1,3 +1,4 @@
+import logging
 import subprocess
 import re
 import os
@@ -201,6 +202,12 @@ class JupyterFormatter:
 
 
 if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--do_apply_style",
