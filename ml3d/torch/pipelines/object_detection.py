@@ -417,6 +417,9 @@ class ObjectDetection(BasePipeline):
                     }
                 }
             }
+            if save_gt:
+                log.warning("Saving ground truth not supported for PointRCNN "
+                            "in RPN mode")
             return summary3d
 
         inputs_batch_gt_bboxes = (inputs_batch.bbox_objs[:max_outputs]

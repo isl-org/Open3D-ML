@@ -82,7 +82,7 @@ class PointRCNN(BaseModel):
 
     def call(self, inputs, training=True):
         cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
-            inputs[0], training=self.mode == "RPN" and training)
+            inputs[0], training=(self.mode == "RPN" and training))
 
         if self.mode != "RPN":
             cls_score = tf.stop_gradient(cls_score)
@@ -351,7 +351,6 @@ class PointRCNN(BaseModel):
                 pos = pos + [0, 0, dim[1] / 2]
                 yaw = bbox[-1]
 
-                name = self.lbl2name.get(label[0], "ignore")
                 inference_result[-1].append(
                     BEVBox3D(pos, dim, yaw, label[0], score, world_cam,
                              cam_img))
