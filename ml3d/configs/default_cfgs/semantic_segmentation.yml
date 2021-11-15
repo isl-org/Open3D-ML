@@ -23,5 +23,5 @@ summary:
   # reference to the first step. Do not use if each epoch has a different
   # order of minibatches. Do not use for RandLaNet or KPConv.
   use_reference: false
-  # Write at most this many samples in each batch
+  # Write at most this many initial samples from each batch
   max_outputs: 1

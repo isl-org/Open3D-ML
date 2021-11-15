@@ -190,7 +190,7 @@ class SemanticSegmentation(BasePipeline):
         log.info("Overall IOU : {:.3f}".format(ious[-1]))
 
     def run_train(self):
-        """Run the training on the self model."""
+        """Run model training."""
         model = self.model
         dataset = self.dataset
 
@@ -380,10 +380,8 @@ class SemanticSegmentation(BasePipeline):
                 row_splits = np.hstack(
                     ((0,), np.cumsum(input_data['batch_lengths'])))
             else:
-                if 'row_splits' in input_data:
-                    row_splits = input_data['row_splits']
-                else:
-                    row_splits = [0, input_data['point'].shape[0]]
+                row_splits = input_data.get('row_splits',
+                                            [0, input_data['point'].shape[0]])
             max_outputs = min(max_outputs, len(row_splits) - 1)
             for k in range(max_outputs):
                 blen_k = row_splits[k + 1] - row_splits[k]
@@ -408,8 +406,7 @@ class SemanticSegmentation(BasePipeline):
             if self.model.cfg['name'] == 'RandLANet':
                 if save_gt:
                     pointcloud = input_data[0]  # 0 => input to first layer
-                else:
-                    # Structured data during inference
+                else:  # Structured data during inference
                     pointcloud = tf.expand_dims(
                         tf.convert_to_tensor(input_data['point']), 0)
                     results = tf.expand_dims(results, 0)
