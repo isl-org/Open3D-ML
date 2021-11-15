@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 import os, pickle
 from os.path import join
@@ -232,6 +233,12 @@ class SunRGBDProcess():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     out_path = args.out_path
     if out_path is None:

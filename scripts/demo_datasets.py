@@ -1,3 +1,4 @@
+import logging
 from open3d.ml.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
                                 Toronto3D)
 import argparse
@@ -72,5 +73,11 @@ def demo_dataset(args):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     demo_dataset(args)

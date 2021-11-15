@@ -1,3 +1,4 @@
+import logging
 from os.path import join
 import argparse
 import pickle
@@ -70,6 +71,12 @@ if __name__ == '__main__':
 
     python scripts/collect_bboxes.py --dataset_path /path/to/data --dataset_type MyCustomDataset
     """
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     out_path = args.out_path
     if out_path is None:

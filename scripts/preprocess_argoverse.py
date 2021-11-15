@@ -3,6 +3,7 @@ try:
 except ImportError:
     raise ImportError('Please clone and install agroverse-api.')
 
+import logging
 import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
@@ -120,6 +121,12 @@ class ArgoverseProcess():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     out_path = args.out_path
     if out_path is None:

@@ -6,10 +6,6 @@ import numpy as np
 
 from ..utils import Config, get_module
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

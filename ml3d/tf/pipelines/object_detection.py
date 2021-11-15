@@ -11,16 +11,11 @@ import tensorflow as tf
 from open3d.visualization.tensorboard_plugin import summary as summary3d
 from .base_pipeline import BasePipeline
 from ..dataloaders import TFDataloader
-from ...utils import make_dir, PIPELINE, LogRecord, get_runid, code2md
+from ...utils import make_dir, PIPELINE, get_runid, code2md
 from ...datasets.utils import BEVBox3D, DataProcessing
 
 from ...metrics.mAP import mAP
 
-logging.setLogRecordFactory(LogRecord)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

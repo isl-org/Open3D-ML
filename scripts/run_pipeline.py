@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+import logging
 import sys
 import yaml
 import pprint
@@ -150,4 +151,10 @@ def main():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     main()

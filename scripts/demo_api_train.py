@@ -1,3 +1,4 @@
+import logging
 from open3d.ml.datasets import (SemanticKITTI, ParisLille3D, Semantic3D, S3DIS,
                                 Toronto3D)
 from open3d.ml.torch.pipelines import SemanticSegmentation
@@ -69,6 +70,12 @@ def demo_inference(args):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     demo_train(args)
     demo_inference(args)
