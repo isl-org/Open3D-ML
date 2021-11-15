@@ -23,10 +23,11 @@ style="width:80%;display:block;margin:auto"></img>
 
 You can save 3D data as TensorBoard summary when working with either TensorFlow
 or PyTorch. The 3D data is saved as '.msgpack' files (serialized Open3D geometry
-data) in the plugins/Open3D sub-folder with the event files. The examples
+data) in the `plugins/Open3D` sub-folder with the event files. The examples
 described below are available in the
-`Open3D/examples/python/gui/tensorboard_pytorch.py` and
-`Open3D/examples/python/gui/tensorboard_tensorflow.py` files. Also see the
+`examples/python/gui/tensorboard_pytorch.py` and
+`examples/python/gui/tensorboard_tensorflow.py` files in the Open3D
+repository. Also see the
 `add_3d()` function documentation for a complete description of supported 3D
 geometry and material properties.
 
@@ -103,7 +104,7 @@ You can run this example either by pasting the code above in a Python prompt, or
 running the example as:
 
 ```sh
-python examples/python/visualization/tensorboard_pytorch.py small_scale
+python examples/python/gui/tensorboard_pytorch.py small_scale
 ```
 
 Now start tensorboard to visualize the data with:
@@ -153,7 +154,7 @@ pointing to an earlier step as a source of this geometry property. You can run
 this example with
 
 ```sh
-python examples/python/visualization/tensorboard_pytorch.py property_reference
+python examples/python/gui/tensorboard_pytorch.py property_reference
 ```
 
 The summary folder size will be smaller, but you will see the same geometry
@@ -221,10 +222,10 @@ specifies the Open3D material shader used.
 
 3DML models from Open3D have built in support for visualizing input data, ground
 truth and network predictions. Edit the YAML configuration files for your
-model+dataset combination in the `Open3D-ML/ml3d/configs` folder to start saving
-summary 3D data:
+model+dataset combination in the `ml3d/configs` folder in the Open3D-ML
+repository to start saving summary 3D data:
 
-```yml
+```yaml
 # Open3D for Tensorboard summary (3D data)
 summary:
   # Record summary in these stages (from train, valid, test)
@@ -277,7 +278,8 @@ style="width:100%;display:block;margin:auto">
 
 
 Next lets look at how to save 3D summaries from your own training code. The
-examples below are in the `Open3D-ML/examples/` folder.
+examples below are in the `examples/` folder in the Open3D-ML
+repository.
 
 Custom properties and semantic segmentation
 -------------------------------------------
@@ -286,8 +288,8 @@ We will read sample 3D point clouds and labels from disk and write them to a 3D
 summary. We will also write some random scores and features to disk. The
 workflow is the same when you want to write data during model training. Data may
 be written as PyTorch, TensorFlow, or Open3D tensors or Numpy arrays.  See
-`Open3D-ML/examples/tensorboard_pytorch.py` or
-`Open3D-ML/examples/tensorboard_tf.py` for the complete example.
+`examples/tensorboard_pytorch.py` or `examples/tensorboard_tf.py` in the
+Open3D-ML repository for the complete example.
 
 ```python
 # pcd_files and label_files are lists of .npy files containing the point cloud
