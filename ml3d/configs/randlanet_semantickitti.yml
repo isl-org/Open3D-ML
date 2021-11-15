@@ -2,13 +2,13 @@ dataset:
   name: SemanticKITTI
   dataset_path:  # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064, 
-    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274, 
+  class_weights: [55437630, 320797, 541736, 2578735, 3274484, 552662, 184064,
+    78858, 240942562, 17294618, 170599734, 6369672, 230413074, 101130274,
     476491114, 9833174, 129609852, 4506626, 1168181]
   test_result_folder: ./test
   test_split: ['11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   training_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', '10']
-  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09', 
+  all_split: ['00', '01', '02', '03', '04', '05', '06', '07', '09',
   '08', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21']
   validation_split: ['08']
   use_cache: true
@@ -51,3 +51,8 @@ pipeline:
   test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 1
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

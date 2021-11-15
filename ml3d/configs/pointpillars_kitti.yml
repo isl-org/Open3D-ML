@@ -29,7 +29,7 @@ model:
     voxel_size: &vsize
       [0.16, 0.16, 4]
     max_voxels: [16000, 40000]
-  
+
   voxel_encoder:
     in_channels: 4
     feat_channels: [64]
@@ -64,7 +64,7 @@ model:
     sizes: [[0.6, 0.8, 1.73], [0.6, 1.76, 1.73], [1.6, 3.9, 1.56]]
     rotations: [0, 1.57]
     iou_thr: [[0.35, 0.5], [0.35, 0.5], [0.45, 0.6]]
-  
+
   augment:
     PointShuffle: True
     ObjectRangeFilter:
@@ -104,4 +104,8 @@ pipeline:
     Person_sitting: Pedestrian
   }
   difficulties: [0, 1, 2]
-    
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

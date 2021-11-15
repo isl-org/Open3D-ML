@@ -138,8 +138,8 @@ class PVCNN(BaseModel):
 
         Args:
             inputs: A dict object for inputs with following keys
-                point (torch.float32): Input pointcloud (B, N,3)
-                feat (torch.float32): Input features (B, N, 9)
+                point (torch.float32): Input pointcloud (B, 3, N)
+                feat (torch.float32): Input features (B, 9, N)
 
         Returns:
             torch.float32 : probability distribution (B, N, C).

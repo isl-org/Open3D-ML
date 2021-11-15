@@ -401,9 +401,9 @@ class PointRCNN(BaseModel):
             labels = labels[fltr]
             scores = scores[fltr]
 
-            bboxes = bboxes.cpu().numpy()
-            scores = scores.cpu().numpy()
-            labels = labels.cpu().numpy()
+            bboxes = bboxes.cpu().detach().numpy()
+            scores = scores.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
             inference_result.append([])
 
             world_cam, cam_img = None, None
@@ -1412,9 +1412,12 @@ class ProposalTargetLayer(nn.Module):
             cur_roi, cur_gt = roi_boxes3d[idx], gt_boxes3d[idx]
 
             k = cur_gt.__len__() - 1
-            while cur_gt[k].sum() == 0:
+            while k >= 0 and cur_gt[k].sum() == 0:
                 k -= 1
             cur_gt = cur_gt[:k + 1]
+
+            if cur_gt.__len__() == 0:
+                cur_gt = torch.zeros(1, 7)
 
             # include gt boxes in the candidate rois
             iou3d = iou_3d(
