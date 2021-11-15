@@ -9,7 +9,7 @@ from ...utils import MODEL
 from ...datasets.augment import SemsegAugmentation
 
 if open3d.core.cuda.device_count() > 0:
-    import open3d.ml.tf.ops as ml_ops
+    from open3d.ml.tf.ops import trilinear_devoxelize as _trilinear_devoxelize
 
 
 def trilinear_devoxelize(features, coords, resolution, is_training=True):
@@ -18,7 +18,7 @@ def trilinear_devoxelize(features, coords, resolution, is_training=True):
             "Op 'trilinear_devoxelize` not implemented on CPU. Please use a CUDA enabled machine."
         )
 
-    outs, inds, wgts = ml_ops.trilinear_devoxelize(
+    outs, inds, wgts = _trilinear_devoxelize(
         tf.transpose(coords, perm=[0, 2, 1]),
         tf.transpose(features, perm=[0, 4, 1, 2, 3]), resolution, is_training)
     return tf.transpose(outs, perm=[0, 2, 1])
