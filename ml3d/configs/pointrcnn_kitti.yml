@@ -6,7 +6,7 @@ dataset:
 model:
   name: PointRCNN
   ckpt_path: # path/to/your/checkpoint
-  
+
   batcher: "ignore" # for TF, does use the batcher of the model class
 
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
@@ -98,7 +98,7 @@ model:
       cls_bg_thresh: 0.45
       cls_bg_thresh_lo: 0.05
       fg_ratio: 0.5
-      roi_per_image: 64
+      roi_per_image: 100
       aug_rot_range: 18
       hard_bg_ratio: 0.8
       roi_fg_aug_times: 10
@@ -136,4 +136,8 @@ pipeline:
     Van: Car
   }
   difficulties: [0, 1, 2]
-    
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

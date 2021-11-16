@@ -21,6 +21,7 @@ class BaseModel(ABC, tf.keras.Model):
     def __init__(self, **kwargs):
         super().__init__()
         self.cfg = Config(kwargs)
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
     def loss(self, results, inputs):
         """Computes the loss given the network input and outputs.

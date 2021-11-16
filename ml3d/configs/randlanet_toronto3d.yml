@@ -72,3 +72,8 @@ pipeline:
   val_batch_size: 2
   test_continue: false
   test_compute_metric: true
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

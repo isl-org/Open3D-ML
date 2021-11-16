@@ -3,7 +3,7 @@
 Jupyter Notebooks
 ===================================================================
 
-The following tutorials will demonstrate how you can create Jupyter Notebooks that can train a semantic segmentation usign TensorFlow and PyTorch.
+The following tutorials will demonstrate how you can create Jupyter Notebooks that can train a semantic segmentation using TensorFlow and PyTorch.
 
 .. toctree::
 

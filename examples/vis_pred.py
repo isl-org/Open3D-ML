@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
-import argparse
-import math
 import numpy as np
 import os
-import random
 import sys
-from os.path import exists, join, isfile, dirname, abspath, split
+from os.path import exists, join, dirname
 
 example_dir = os.path.dirname(os.path.realpath(__file__))
 

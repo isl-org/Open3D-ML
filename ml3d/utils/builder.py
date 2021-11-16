@@ -6,20 +6,12 @@ PIPELINE = Registry('pipeline')
 SAMPLER = Registry('sampler')
 
 
-def build(cfg, registry, args=None):
-    return build_from_cfg(cfg, registry, args)
-
-
-def build_network(cfg):
-    return build(cfg, NETWORK)
-
-
 def convert_device_name(framework):
     """Convert device to either cpu or cuda."""
     gpu_names = ["gpu", "cuda"]
     cpu_names = ["cpu"]
     if framework not in cpu_names + gpu_names:
-        raise KeyError("the device shoule either "
+        raise KeyError("the device should either "
                        "be cuda or cpu but got {}".format(framework))
     if framework in gpu_names:
         return "cuda"
@@ -32,7 +24,7 @@ def convert_framework_name(framework):
     tf_names = ["tf", "tensorflow", "TF"]
     torch_names = ["torch", "pytorch", "PyTorch"]
     if framework not in tf_names + torch_names:
-        raise KeyError("the framework shoule either "
+        raise KeyError("the framework should either "
                        "be tf or torch but got {}".format(framework))
     if framework in tf_names:
         return "tf"

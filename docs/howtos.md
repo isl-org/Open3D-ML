@@ -53,7 +53,7 @@ Second, we will construct the networks and pipelines, load the pretrained weight
 
     # see this function in examples/vis_pred.py, 
     # or it can be your customized dataloader,
-    # or you can use the exsisting get_data() methods in ml3d/datasets
+    # or you can use the existing get_data() methods in ml3d/datasets
     pcs = get_custom_data(pc_names, data_path)
 ```
 

@@ -11,6 +11,7 @@ def one_hot(index, classes):
 
 
 class CrossEntropyLoss(nn.Module):
+    """CrossEntropyLoss."""
 
     def __init__(self, loss_weight=1.0):
         """CrossEntropyLoss.
