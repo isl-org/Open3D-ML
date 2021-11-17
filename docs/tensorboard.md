@@ -167,7 +167,7 @@ In addition to geometry properties, we can save and visualize rich 3D models
 using PBR material properties.
 
 ```python
-MODEL_DIR = "examples/test_data/monkey"
+model_dir = "examples/test_data/monkey"
 logdir = "demo_logs/pytorch/monkey"
 model = o3d.t.geometry.TriangleMesh.from_legacy(
     o3d.io.read_triangle_mesh(os.path.join(model_dir, "monkey.obj")))

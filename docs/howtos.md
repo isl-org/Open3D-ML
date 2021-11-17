@@ -13,7 +13,7 @@ First, initialize a `Visualizer` and set up `LabelLUT` as label names to visuali
     from os.path import exists
     from ml3d.vis import Visualizer, LabelLUT
     from ml3d.datasets import SemanticKITTI
-    
+
     kitti_labels = SemanticKITTI.get_label_to_names()
     v = Visualizer()
     lut = LabelLUT()
@@ -30,7 +30,7 @@ Second, we will construct the networks and pipelines, load the pretrained weight
 
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
     randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
-    
+
     ckpt_path = "./logs/vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path):
         cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
@@ -48,16 +48,16 @@ Second, we will construct the networks and pipelines, load the pretrained weight
     pipeline_k = SemanticSegmentation(model)
     pipeline_k.load_ckpt(model.cfg.ckpt_path)
 
-    data_path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
+    data_path = ensure_demo_data()  # from examples/util.py, downloads demo data
     pc_names = ["000700", "000750"]
 
-    # see this function in examples/vis_pred.py, 
+    # see this function in examples/vis_pred.py,
     # or it can be your customized dataloader,
     # or you can use the existing get_data() methods in ml3d/datasets
     pcs = get_custom_data(pc_names, data_path)
 ```
 
-Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` is a list of point clouds and their predictions. Each point cloud is a dictionary like, 
+Third, we can run the inference and collect the results and send the results to `Visualizer.visualize(list_of_pointclouds_to_visualize)`. Note that the input to `visualize()` is a list of point clouds and their predictions. Each point cloud is a dictionary like,
 ```python
     vis_d = {
         "name": name,
@@ -113,7 +113,7 @@ example.
 To visualize the **int_attr** attribute select it as _Data_ and choose the
 one of the colormap shaders, which will assign a color to each value. Here we
 choose the rainbow colormap. Note that the colormap is automatically adjusted
-to the range of the data. It is also possible to edit the colormap in the 
+to the range of the data. It is also possible to edit the colormap in the
 visualizer to adjust it to specific use cases.
 ![Visualization of random_colors](images/visualizer_int_attr.png)
 
@@ -148,7 +148,7 @@ the model code to `ml3d/{tf,torch}/models`.
 
 All models should be derived from `BaseModel` defined in
 `ml3d/{tf,torch}/models/base_model.py` and must implement a set of functions
-that allow a pipeline to interact with the model. A minimal model for torch 
+that allow a pipeline to interact with the model. A minimal model for torch
 looks like this.
 
 ```python
@@ -167,7 +167,7 @@ class MyModel(BaseModel):
         optimizer = torch.optim.Adam(self.parameters(), lr=cfg_pipeline.adam_lr)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
-    
+
     def get_loss(self, Loss, results, inputs):
         labels = inputs['data'].labels # processed data from model.preprocess and/or model.transform.
 
@@ -184,9 +184,9 @@ class MyModel(BaseModel):
 ## Adding a new dataset
 
 For adding a new dataset, you can add the dataset code to `ml3d/datasets`.
-A Dataset class is independent of an ML framework and has to be derived from 
-`BaseDataset` defined in `ml3d/datasets/base_dataset.py`. You must implement 
-another class `MyDatasetSplit` which is used to return data and attributes 
+A Dataset class is independent of an ML framework and has to be derived from
+`BaseDataset` defined in `ml3d/datasets/base_dataset.py`. You must implement
+another class `MyDatasetSplit` which is used to return data and attributes
 for files corresponding to a particular split.
 
 ```python
@@ -196,42 +196,42 @@ class MyDataset(BaseDataset):
     def __init__(self, name="MyDataset"):
         super().__init__(name=name)
         # read file lists.
-     
+
     def get_split(self, split):
         return MyDatasetSplit(self, split=split)
-    
+
     def is_tested(self, attr):
         # checks whether attr['name'] is already tested.
-    
+
     def save_test_result(self, results, attr):
         # save results['predict_labels'] to file.
-    
+
 
 class MyDatasetSplit():
     def __init__(self, dataset, split='train'):
         self.split = split
         self.path_list = []
         # collect list of files relevant to split.
-    
+
     def __len__(self):
         return len(self.path_list)
-    
+
     def get_data(self, idx):
         path = self.path_list[idx]
         points, features, labels = read_pc(path)
         return {'point': points, 'feat': features, 'label': labels}
-    
+
     def get_attr(self, idx):
         path = self.path_list[idx]
         name = path.split('/')[-1]
         return {'name': name, 'path': path, 'split': self.split}
-    
+
 ```
 
 To test code with an already installed Open3D package you can set the
 environment variable `OPEN3D_ML_ROOT` to the root dir of the repo. This can be
 done with
-```bash 
+```bash
 source /path/to/Open3D-ML/set_open3d_ml_root.sh
 ```
 which will make the _ml_ namespace point to `ml3d` in the repo.
