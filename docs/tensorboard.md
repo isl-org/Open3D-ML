@@ -292,8 +292,6 @@ be written as PyTorch, TensorFlow, or Open3D tensors or Numpy arrays.  See
 Open3D-ML repository for the complete example.
 
 ```python
-# pcd_files and label_files are lists of .npy files containing the point cloud
-# and label data.
 writer = SummaryWriter(join(BASE_LOGDIR, "semseg-example"))
 for step in range(len(pcd_files)):
     # We will pretend these are the inputs and outputs of a Semantic
@@ -302,25 +300,34 @@ for step in range(len(pcd_files)):
     points = np.load(pcd_files[step])
     # int, shape (N, 1), or (B, N, 1) for a batch
     labels = np.load(label_files[step])
-    # we can also visualize random scores
-    random_scores = rng.random(labels.shape, dtype=np.float32)
+    # We can also visualize noisy scores (car, road, vegetation)
+    scores = np.hstack((labels == 1, labels == 9, labels == 15))
+    scores = np.clip(scores + rng.normal(0., 0.05, size=scores.shape), 0.,
+                     1.)
     # and outputs of some pretend network layers. The first 3 dimensions
-    # will be visualized as RGB colors
-    random_features = np.hstack(
-        (rng.random(labels.shape, dtype=np.float32),
-         rng.random(labels.shape, dtype=np.float32) - 0.5,
-         -rng.random(labels.shape, dtype=np.float32)))
+    # can be visualized as RGB colors. Here we will use distances from the
+    # centroids of (all points, road, vegetation).
+    centroid_all = np.mean(points, axis=0)
+    d_all = np.linalg.norm(points - centroid_all, axis=1)
+    centroid_road = np.mean(points[np.squeeze(labels) == 9, :], axis=0)
+    d_road = np.linalg.norm(points - centroid_road, axis=1)
+    centroid_vegetation = np.mean(points[np.squeeze(labels) == 15, :],
+                                  axis=0)
+    d_vegetation = np.linalg.norm(points - centroid_vegetation, axis=1)
+    features = np.stack((d_all, d_road, d_vegetation), axis=1)
 
-    # Prefix the data with "vertex_" to indicate that this is per vertex data.
-    writer.add_3d("semantic_segmentation", {
-        "vertex_positions": points,
-        "vertex_labels": labels,
-        "vertex_random_scores": random_scores,
-        "vertex_random_features": random_features
-    },
-                  step,
-                  label_to_names=KITTI_LABELS)
-
+    # You can use Torch tensors directly too.
+    # Prefix the data with "vertex_" for per vertex data.
+    writer.add_3d(
+        "semantic_segmentation",
+        {
+            "vertex_positions": points,  # (N, 3)
+            "vertex_labels": labels,  # (N, 1)
+            "vertex_scores": scores,  # (N, 3)
+            "vertex_features": features  # (N, 3)
+        },
+        step,
+        label_to_names=SEMANTIC_KITTI_LABELS)
 ```
 
 3D object detection
@@ -334,20 +341,27 @@ you want to write data during model training. Data may be written as PyTorch,
 TensorFlow, or Open3D tensors or Numpy arrays.
 
 ```python
-# pcd_files and bbox_files are lists of .npy files containing the point cloud
-# and bounding box data.
 writer = SummaryWriter(join(BASE_LOGDIR, "objdet-example"))
-for step in range(len(pcd_files)):
+for step in range(len(val_split)):  # one pointcloud per step
+    data = val_split.get_data(step)
     # We will pretend these are the inputs and outputs of an Object
-    # Detection model
-    # float, shape (N, 3), or (B, N, 3) for a batch
-    points = np.load(pcd_files[step])
-    # ????
-    bboxes = np.load(bbox_files[step])
-    # You can use Torch or Tensorflow tensors directly too
-    writer.add_3d("input_pointcloud", {"vertex_positions": points}, step)
-    # Write bounding boxes in a separate call
-    writer.add_3d("object_detection", {"bboxes": bboxes},
+    # Detection model. You can use Torch tensors directly too.
+    writer.add_3d(
+        "input_pointcloud",
+        {  # float, shape (N, 3), or (B, N, 3) for a batch
+            "vertex_positions": data['point'][:, :3],
+            # Extra features: float, shape (N, 1), or (B, N, 1) for a batch
+            # [should not be (N,)]
+            "vertex_intensities": data['point'][:, 3:]
+        },
+        step)
+    # We need label_class to be int, not str
+    for bb in data['bounding_boxes']:
+        if not isinstance(bb.label_class, int):
+            bb.label_class = name_to_labels[bb.label_class]
+    # Bounding boxes (pretend model output): (Nbb, ) or (B, Nbb) for a batch
+    # Write bounding boxes in a separate call.
+    writer.add_3d("object_detection", {"bboxes": data['bounding_boxes']},
                   step,
-                  label_to_names=KITTI_LABELS)
+                  label_to_names=dset.get_label_to_names())
 ```
