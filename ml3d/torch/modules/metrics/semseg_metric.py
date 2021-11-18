@@ -95,7 +95,7 @@ class SemSegMetric(object):
         """Computes the confusion matrix of one batch
 
         Args:
-            scores (torch.FloatTensor, shape (B?, C, N):
+            scores (torch.FloatTensor, shape (B?, N, C):
                 raw scores for each class.
             labels (torch.LongTensor, shape (B?, N)):
                 ground truth labels.
@@ -113,6 +113,8 @@ class SemSegMetric(object):
 
         if len(y) < C * C:
             y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
+        else:
+            y = y[:C*C]
 
         y = y.reshape(C, C)
 
