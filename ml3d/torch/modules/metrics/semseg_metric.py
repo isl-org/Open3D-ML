@@ -114,7 +114,7 @@ class SemSegMetric(object):
         if len(y) < C * C:
             y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
         else:
-            y = y[:C*C]
+            y = y[:C * C]
 
         y = y.reshape(C, C)
 
