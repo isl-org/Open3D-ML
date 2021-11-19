@@ -252,30 +252,41 @@ order.
 
 Now you can visualize the data in TensorBoard as before. The web interface
 allows showing and hiding points with different classes, changing their colors,
-and exploring predictions and intermediate network features.  Here is a video
-showing the different ways in which semantic segmentation summary data can be
-visualized in TensorBoard.
+and exploring predictions and intermediate network features.  Scalar network 
+features can be visualized with custom user editable colormaps, and 3D features
+can be visualized as RGB colors. Here is a video showing the different ways in
+which semantic segmentation summary data can be visualized in TensorBoard.
 
-<video controls title="Tensorboard semantic segmentation example"
-alt="Tensorboard semantic segmentation example"
+<video controls title="Tensorboard semantic segmentation and custom data example"
+alt="Tensorboard semantic segmentation and custom data example"
 style="width:100%;display:block;margin:auto">
-<source src="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_semseg.webm" type="video/webm">
-<a href="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_semseg.webm">Download the video.</a>
+<source src="https://user-images.githubusercontent.com/41028320/142569952-1c358cec-1632-409e-992b-cd62f792d81e.mov" type="video/webm">
 </video>
 
+[.](https://user-images.githubusercontent.com/41028320/142569952-1c358cec-1632-409e-992b-cd62f792d81e.mov)
 
 And this one shows different ways of visualizing object detection data,
-including bounding boxes. You can visualize multiple runs in side by side
-windows. To make it easy to compare data from different runs, The step,
-batch index and viewpoint of different runs can also be synchronized.
+including bounding boxes.
 
 <video controls title="Tensorboard object detection example"
 alt="Tensorboard object detection example"
 style="width:100%;display:block;margin:auto">
-<source src="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_objdet.webm" type="video/webm">
-<a href="https://github.com/isl-org/Open3D-ML/raw/6fb956a05f28f4f5ab536f75f500c76c769bc972/docs/images/tensorboard_objdet.webm">Download the video.</a>
+<source src="https://user-images.githubusercontent.com/41028320/142569965-786fafde-17b6-4adb-8e23-388d9bb4aac9.mov" type="video/webm">
 </video>
 
+[.](https://user-images.githubusercontent.com/41028320/142569965-786fafde-17b6-4adb-8e23-388d9bb4aac9.mov)
+
+You can also visualize multiple runs in side by side widgets. To make it easy to
+compare data from different runs, The step,batch index and viewpoint of different
+runs can also be synchronized.
+
+<video controls title="Tensorboard synchronized view example"
+alt="Tensorboard synchronized view example"
+style="width:100%;display:block;margin:auto">
+<source src="https://user-images.githubusercontent.com/41028320/142570826-5b09b3a4-e153-4d34-98c0-31caf529c3fe.mov" type="video/webm">
+</video>
+
+[.](https://user-images.githubusercontent.com/41028320/142570826-5b09b3a4-e153-4d34-98c0-31caf529c3fe.mov)
 
 Next lets look at how to save 3D summaries from your own training code. The
 examples below are in the `examples/` folder in the Open3D-ML
