@@ -323,7 +323,7 @@ The table shows the available models and datasets for the segmentation task and 
 | PointTransformer (tf)| - | - | [69.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointtransformer_s3dis_202109241350utc.zip) | - | - | - |
 
 
-> **_NOTE:_**  RandLA-Net comes with a [Creative Commons BY-NC-SA 4.0](https://github.com/QingyongHu/RandLA-Net/blob/master/LICENSE) license which prohibits commercial use. We are working on a new implementation which will be available to use in the upcoming release.
+> **_NOTE:_**  RandLA-Net comes with a [Creative Commons BY-NC-SA 4.0](https://github.com/QingyongHu/RandLA-Net/blob/master/LICENSE) license which prohibits commercial use. We are working on a new implementation which will be available under the standard Open3D license (MIT).
 
 ### Object Detection
 
