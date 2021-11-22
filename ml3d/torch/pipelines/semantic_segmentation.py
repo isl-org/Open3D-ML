@@ -14,7 +14,7 @@ from open3d.visualization.tensorboard_plugin import summary
 from .base_pipeline import BasePipeline
 from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
-from ..modules.losses import SemSegLoss
+from ..modules.losses import SemSegLoss, filter_valid_label
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
 from ...datasets import InferenceDummySplit
@@ -173,8 +173,13 @@ class SemanticSegmentation(BasePipeline):
         }
 
         metric = SemSegMetric()
-        metric.update(torch.tensor(inference_result['predict_scores']),
-                      torch.tensor(data['label']))
+
+        valid_scores, valid_labels = filter_valid_label(
+            torch.tensor(inference_result['predict_scores']),
+            torch.tensor(data['label']), model.cfg.num_classes,
+            model.cfg.ignored_label_inds, device)
+
+        metric.update(valid_scores, valid_labels)
         log.info(f"Accuracy : {metric.acc()}")
         log.info(f"IoU : {metric.iou()}")
 
