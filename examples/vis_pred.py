@@ -34,13 +34,11 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
         results_r = pipeline_r.run_inference(data)
         pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32)
-        # WARNING, THIS IS A HACK
         # Fill "unlabeled" value because predictions have no 0 values.
         pred_label_r[0] = 0
 
         results_k = pipeline_k.run_inference(data)
         pred_label_k = (results_k['predict_labels'] + 1).astype(np.int32)
-        # WARNING, THIS IS A HACK
         # Fill "unlabeled" value because predictions have no 0 values.
         pred_label_k[0] = 0
 
