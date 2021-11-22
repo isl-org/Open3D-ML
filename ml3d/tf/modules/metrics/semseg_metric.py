@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 
 class SemSegMetric(object):
@@ -114,7 +115,11 @@ class SemSegMetric(object):
         if len(y) < C * C:
             y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
         else:
-            y = y[:C * C]
+            if len(y) > C * C:
+                warnings.warn(
+                    "Prediction has fewer classes than ground truth. This may affect accuracy."
+                )
+            y = y[-(C * C):]  # last c*c elements.
 
         y = y.reshape(C, C)
 
