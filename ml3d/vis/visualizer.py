@@ -397,8 +397,7 @@ class Visualizer:
         def get_colors(self):
             """Returns a list of label keys."""
             return [
-                self._label2color[label]
-                for label in sorted(self._label2color.keys())
+                self._label2color[label] for label in self._label2color.keys()
             ]
 
         def set_on_changed(self, callback):  # takes no args, no return value
@@ -408,7 +407,7 @@ class Visualizer:
             """Updates the labels based on look-up table passsed."""
             self.widget.clear()
             root = self.widget.get_root_item()
-            for key in sorted(labellut.labels.keys()):
+            for key in labellut.labels.keys():
                 lbl = labellut.labels[key]
                 color = lbl.color
                 if len(color) == 3:
@@ -1574,7 +1573,7 @@ class Visualizer:
         """
         # Setup the labels
         lut = LabelLUT()
-        for val in sorted(dataset.label_to_names.values()):
+        for val in dataset.label_to_names.values():
             lut.add_label(val, val)
         self.set_lut("labels", lut)
 
