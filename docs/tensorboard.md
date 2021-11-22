@@ -263,7 +263,7 @@ style="width:100%;display:block;margin:auto">
 <source src="https://user-images.githubusercontent.com/41028320/142569952-1c358cec-1632-409e-992b-cd62f792d81e.mov" type="video/webm">
 </video>
 
-[.](https://user-images.githubusercontent.com/41028320/142569952-1c358cec-1632-409e-992b-cd62f792d81e.mov)
+[[download]](https://user-images.githubusercontent.com/41028320/142569952-1c358cec-1632-409e-992b-cd62f792d81e.mov)
 
 And this one shows different ways of visualizing object detection data,
 including bounding boxes.
@@ -274,7 +274,7 @@ style="width:100%;display:block;margin:auto">
 <source src="https://user-images.githubusercontent.com/41028320/142569965-786fafde-17b6-4adb-8e23-388d9bb4aac9.mov" type="video/webm">
 </video>
 
-[.](https://user-images.githubusercontent.com/41028320/142569965-786fafde-17b6-4adb-8e23-388d9bb4aac9.mov)
+[[download]](https://user-images.githubusercontent.com/41028320/142569965-786fafde-17b6-4adb-8e23-388d9bb4aac9.mov)
 
 You can also visualize multiple runs in side by side widgets. To make it easy to
 compare data from different runs, The step,batch index and viewpoint of different
@@ -286,7 +286,7 @@ style="width:100%;display:block;margin:auto">
 <source src="https://user-images.githubusercontent.com/41028320/142570826-5b09b3a4-e153-4d34-98c0-31caf529c3fe.mov" type="video/webm">
 </video>
 
-[.](https://user-images.githubusercontent.com/41028320/142570826-5b09b3a4-e153-4d34-98c0-31caf529c3fe.mov)
+[[download]](https://user-images.githubusercontent.com/41028320/142570826-5b09b3a4-e153-4d34-98c0-31caf529c3fe.mov)
 
 Next lets look at how to save 3D summaries from your own training code. The
 examples below are in the `examples/` folder in the Open3D-ML
