@@ -1,5 +1,4 @@
 ## 0.14
-
 * Added CHANGELOG
 * Added RandLA-Net's License (PR #423)
 * Fixed wrong label order in Visualizer (PR #422)
