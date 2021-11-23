@@ -1,4 +1,4 @@
-## Dev
+## 0.14
 
 * Added CHANGELOG
 * Added RandLA-Net's License (PR #423)
@@ -12,3 +12,41 @@
 * Added Point-Transformers Model (PR #327)
 * Python 3.9 support (PR #304)
 
+## 0.13
+* Added TensorFlow pipeline for PointRCNN (PR #246)
+* Added PyTorch pipeline for PointRCNN (PR #237)
+* Added prefetching and memory pinning (PR #236)
+* Added training pipelines for SparseConvUnet (torch and tf) (PR #233)
+* Added SparseConvUnet model for TensorFlow (PR #228)
+* Support for CUDA 11.0 (PR #224)
+* Added SparseConvUnet model for PyTorch (PR #223)
+* Added inference pipeline for PointRCNN (PR #218)
+* Added SunRGBD dataset support (PR #215)
+* Added ScanNet dataset support (PR #212)
+* Added bounding box support in S3DIS dataset (PR #210)
+
+## 0.12
+* Added Data Augmentation pipeline (PR #178)
+* Added metrics for PointPillars (PR #172)
+* Added PointPillars training pipeline for TensorFlow (PR #171)
+* Added PointPillars training pipeline for PyTorch (PR #170)
+* Added PointPillars model for TensorFlow (PR #159)
+* Added ShapeNet dataset support (PR #157)
+* Added Argoverse3D dataset support (PR #155)
+* Added PointPillars inference pipeline (PR #153)
+* Added dataset download scripts (PR #145)
+* Added Lyft dataset support (PR #138)
+* Added NuScenes dataset support (PR #137)
+* Added Waymo dataset support (PR #136)
+* Added KITTI dataset support (PR #128)
+* Added training and inference pipeline for Semantic Segmentation (TensorFlow) (PR #38)
+* Added visualizer (PR #33)
+* Added KPConv model (PR #22)
+* Added Tensorflow Dataloader (PR #17)
+* Added support for Custom dataset (PR #11)
+* Added Toronto3D dataset support (PR #10)
+* Added ParisLille3D dataset support (PR #9)
+* Added Semantic3D dataset support (PR #8)
+* Added dataloader class (PR #6)
+* Added support for S3DIS dataset (PR #5)
+* Added logging mechanism (PR #3)
