@@ -1,7 +1,24 @@
+# ----------------------------------------------------------------------------
+# -              Creative Commons BY-NC-SA 4.0 International                 -
+# ----------------------------------------------------------------------------
+
+# By exercising the Licensed Rights (defined below), You accept and agree to
+# be bound by the terms and conditions of this Creative
+# Commons Attribution-NonCommercial-ShareAlike 4.0 International Public
+# License ("Public License"). To the extent this Public License may be
+# interpreted as a contract, You are granted the Licensed Rights in
+# consideration of Your acceptance of these terms and conditions, and the
+# Licensor grants You such rights in consideration of benefits the Licensor
+# receives from making the Licensed Material available under these terms and
+# conditions.
+#
+# You can read the full license here
+# https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+# ----------------------------------------------------------------------------
+
 import torch
 import torch.nn as nn
 import numpy as np
-import random
 import time
 from tqdm import tqdm
 
@@ -21,9 +38,11 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
-    """Class defining RandLANet.
+    """Class defining RandLANet, a Semantic Segmentation model.
+    Based on the architecture
+    https://arxiv.org/abs/1911.11236#
 
-    A model for Semantic Segmentation.
+    Reference Implementation - https://github.com/QingyongHu/RandLA-Net
     """
 
     def __init__(
@@ -168,9 +187,8 @@ class RandLANet(BaseModel):
             num_points=self.cfg.num_points)
 
         label = label[selected_idxs]
-        if (feat is None):
-            feat = None
-        else:
+
+        if feat is not None:
             feat = feat[selected_idxs]
 
         t_normalize = cfg.get('t_normalize', {})
@@ -223,7 +241,7 @@ class RandLANet(BaseModel):
         self.inference_data = self.preprocess(data, attr)
         self.inference_proj_inds = self.inference_data['proj_inds']
         num_points = self.inference_data['search_tree'].data.shape[0]
-        self.possibility = np.random.rand(num_points) * 1e-3
+        self.possibility = self.rng.random(num_points) * 1e-3
         self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
                                    dtype=np.float16)
         self.pbar = tqdm(total=self.possibility.shape[0])

@@ -30,8 +30,6 @@ from torch import nn
 from torch.nn import functional as F
 
 import numpy as np
-import os
-import pickle
 from functools import partial
 
 from .base_model_objdet import BaseModel
@@ -42,8 +40,9 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.torch.ops import nms
 from ..utils.torch_utils import gen_CNN
-from ...datasets.utils import BEVBox3D, DataProcessing, ObjdetAugmentation
-from ...datasets.utils.operations import filter_by_min_points, points_in_box
+from ...datasets.utils import BEVBox3D, DataProcessing
+from ...datasets.utils.operations import points_in_box
+from ...datasets.augment import ObjdetAugmentation
 
 from ...utils import MODEL
 from ..modules.optimizers import OptimWrapper
@@ -100,6 +99,7 @@ class PointRCNN(BaseModel):
         assert mode == "RPN" or mode == "RCNN"
         self.mode = mode
 
+        self.augmenter = ObjdetAugmentation(self.cfg.augment, seed=self.rng)
         self.npoints = npoints
         self.classes = classes
         self.name2lbl = {n: i for i, n in enumerate(classes)}
@@ -183,71 +183,6 @@ class PointRCNN(BaseModel):
 
         return optimizer, scheduler
 
-    def load_gt_database(self, pickle_path, min_points_dict, sample_dict):
-        """Load ground truth object database.
-
-        Args:
-            pickle_path: Path of pickle file generated using `scripts/collect_bbox.py`.
-            min_points_dict: A dictionary to filter objects based on number of points inside.
-            sample_dict: A dictionary to decide number of objects to sample.
-
-        """
-        db_boxes = pickle.load(open(pickle_path, 'rb'))
-
-        if min_points_dict is not None:
-            db_boxes = filter_by_min_points(db_boxes, min_points_dict)
-
-        db_boxes_dict = {}
-        for key in sample_dict.keys():
-            db_boxes_dict[key] = []
-
-        for db_box in db_boxes:
-            if db_box.label_class in sample_dict.keys():
-                db_boxes_dict[db_box.label_class].append(db_box)
-
-        self.db_boxes_dict = db_boxes_dict
-
-    def augment_data(self, data, attr):
-        """Augment object detection data.
-
-        Available augmentations are:
-            `ObjectSample`: Insert objects from ground truth database.
-            `ObjectRangeFilter`: Filter pointcloud from given bounds.
-            `PointShuffle`: Shuffle the pointcloud.
-
-        Args:
-            data: A dictionary object returned from the dataset class.
-            attr: Attributes for current pointcloud.
-
-        Returns:
-            Augmented `data` dictionary.
-
-        """
-        cfg = self.cfg.augment
-
-        if 'ObjectSample' in cfg.keys():
-            if not hasattr(self, 'db_boxes_dict'):
-                data_path = attr['path']
-                # remove tail of path to get root data path
-                for _ in range(3):
-                    data_path = os.path.split(data_path)[0]
-                pickle_path = os.path.join(data_path, 'bboxes.pkl')
-                self.load_gt_database(pickle_path, **cfg['ObjectSample'])
-
-            data = ObjdetAugmentation.ObjectSample(
-                data,
-                db_boxes_dict=self.db_boxes_dict,
-                sample_dict=cfg['ObjectSample']['sample_dict'])
-
-        if cfg.get('ObjectRangeFilter', False):
-            data = ObjdetAugmentation.ObjectRangeFilter(
-                data, self.cfg.point_cloud_range)
-
-        if cfg.get('PointShuffle', False):
-            data = ObjdetAugmentation.PointShuffle(data)
-
-        return data
-
     def loss(self, results, inputs):
         if self.mode == "RPN":
             return self.rpn.loss(results, inputs)
@@ -273,8 +208,18 @@ class PointRCNN(BaseModel):
         return filtered
 
     def preprocess(self, data, attr):
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            seedseq = np.random.SeedSequence(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+            rng = np.random.default_rng(seedseq.spawn(1)[0])
+        else:
+            rng = self.rng
+
         if attr['split'] in ['train', 'training']:
-            data = self.augment_data(data, attr)
+            data = self.augmenter.augment(data, attr, seed=rng)
 
         data['bounding_boxes'] = self.filter_objects(data['bounding_boxes'])
 
@@ -366,27 +311,37 @@ class PointRCNN(BaseModel):
         points = data['point']
 
         if attr['split'] not in ['test', 'testing']:  #, 'val', 'validation']:
+            # If num_workers > 0, use new RNG with unique seed for each thread.
+            # Else, use default RNG.
+            if torch.utils.data.get_worker_info():
+                seedseq = np.random.SeedSequence(
+                    torch.utils.data.get_worker_info().seed +
+                    torch.utils.data.get_worker_info().id)
+                rng = np.random.default_rng(seedseq.spawn(1)[0])
+            else:
+                rng = self.rng
+
             if self.npoints < len(points):
                 pts_depth = points[:, 2]
                 pts_near_flag = pts_depth < 40.0
                 far_idxs_choice = np.where(pts_near_flag == 0)[0]
                 near_idxs = np.where(pts_near_flag == 1)[0]
-                near_idxs_choice = np.random.choice(near_idxs,
-                                                    self.npoints -
-                                                    len(far_idxs_choice),
-                                                    replace=False)
+                near_idxs_choice = rng.choice(near_idxs,
+                                              self.npoints -
+                                              len(far_idxs_choice),
+                                              replace=False)
 
                 choice = np.concatenate((near_idxs_choice, far_idxs_choice), axis=0) \
                     if len(far_idxs_choice) > 0 else near_idxs_choice
-                np.random.shuffle(choice)
+                rng.shuffle(choice)
             else:
                 choice = np.arange(0, len(points), dtype=np.int32)
                 if self.npoints > len(points):
-                    extra_choice = np.random.choice(choice,
-                                                    self.npoints - len(points),
-                                                    replace=False)
+                    extra_choice = rng.choice(choice,
+                                              self.npoints - len(points),
+                                              replace=False)
                     choice = np.concatenate((choice, extra_choice), axis=0)
-                np.random.shuffle(choice)
+                rng.shuffle(choice)
 
             points = points[choice, :]
 
@@ -446,9 +401,9 @@ class PointRCNN(BaseModel):
             labels = labels[fltr]
             scores = scores[fltr]
 
-            bboxes = bboxes.cpu().numpy()
-            scores = scores.cpu().numpy()
-            labels = labels.cpu().numpy()
+            bboxes = bboxes.cpu().detach().numpy()
+            scores = scores.cpu().detach().numpy()
+            labels = labels.cpu().detach().numpy()
             inference_result.append([])
 
             world_cam, cam_img = None, None
@@ -1457,9 +1412,12 @@ class ProposalTargetLayer(nn.Module):
             cur_roi, cur_gt = roi_boxes3d[idx], gt_boxes3d[idx]
 
             k = cur_gt.__len__() - 1
-            while cur_gt[k].sum() == 0:
+            while k >= 0 and cur_gt[k].sum() == 0:
                 k -= 1
             cur_gt = cur_gt[:k + 1]
+
+            if cur_gt.__len__() == 0:
+                cur_gt = torch.zeros(1, 7)
 
             # include gt boxes in the candidate rois
             iou3d = iou_3d(
