@@ -15,6 +15,7 @@ from open3d.ml.datasets import (
     Toronto3D,
 )
 from open3d.ml.vis import LabelLUT, Visualizer
+from util import ensure_demo_data
 
 
 def print_usage_and_exit():
@@ -159,7 +160,7 @@ def main():
             lut.add_label(kitti_labels[val], val)
         v.set_lut("labels", lut)
         v.set_lut("pred", lut)
-        path = os.path.dirname(os.path.realpath(__file__)) + "/demo_data"
+        path = ensure_demo_data()
 
         kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
         randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"

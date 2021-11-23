@@ -5,6 +5,8 @@ import os
 import sys
 from os.path import exists, join, dirname
 
+from util import ensure_demo_data
+
 example_dir = os.path.dirname(os.path.realpath(__file__))
 
 
@@ -140,7 +142,7 @@ def main():
     pipeline_k = ml3d.pipelines.SemanticSegmentation(model)
     pipeline_k.load_ckpt(model.cfg.ckpt_path)
 
-    data_path = example_dir + "/demo_data"
+    data_path = ensure_demo_data()
     pc_names = ["000700", "000750"]
     pcs = get_custom_data(pc_names, data_path)
     pcs_with_pred = pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k)
