@@ -2,7 +2,7 @@ dataset:
   name: S3DIS
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
+  class_weights: [3370714, 2856755, 4919229, 318158, 375640,
 478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
   ignored_label_inds: []
   num_points: 40960
@@ -50,3 +50,8 @@ pipeline:
   test_batch_size: 3
   train_sum_dir: train_log
   val_batch_size: 2
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

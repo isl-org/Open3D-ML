@@ -246,7 +246,13 @@ class PointPillars(BaseModel):
                                   points[:, :3] < max_val),
                    axis=-1))]
 
-        new_data = {'point': points, 'calib': data['calib']}
+        data['point'] = points
+
+        #Augment data
+        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
+            data = self.augment_data(data, attr)
+
+        new_data = {'point': data['point'], 'calib': data['calib']}
 
         if attr['split'] not in ['test', 'testing']:
             new_data['bbox_objs'] = data['bounding_boxes']
@@ -277,8 +283,8 @@ class PointPillars(BaseModel):
             db_boxes_dict[key] = []
 
         for db_box in db_boxes:
-            if db_box.name in sample_dict.keys():
-                db_boxes_dict[db_box.name].append(db_box)
+            if db_box.label_class in sample_dict.keys():
+                db_boxes_dict[db_box.label_class].append(db_box)
 
         self.db_boxes_dict = db_boxes_dict
 
@@ -309,10 +315,6 @@ class PointPillars(BaseModel):
         return data
 
     def transform(self, data, attr):
-        #Augment data
-        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
-            data = self.augment_data(data, attr)
-
         points = tf.constant(data['point'], dtype=tf.float32)
 
         t_data = {'point': points, 'calib': data['calib']}

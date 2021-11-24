@@ -63,6 +63,49 @@ class FurthestPointSampling(Function):
 furthest_point_sample = FurthestPointSampling.apply
 
 
+class FurthestPointSamplingV2(Function):
+    """Furthest Point Sampling with variable length batch support."""
+
+    @staticmethod
+    def forward(ctx, xyz, row_splits, new_row_splits):
+        """Forward pass.
+
+        Args:
+            ctx: Context.
+            xyz (torch.float32): Input pointcloud (N, 3).
+            row_splits (torch,int64): splits to define batch (b + 1,)
+            new_row_splits (torch.int64): splits for output batch lengths (b + 1,)
+
+        Returns:
+            Returns indices of sampled points with shape (new_row_splits[-1], ).
+        """
+        if not open3d.core.cuda.device_count() > 0:
+            raise NotImplementedError
+
+        if not xyz.is_contiguous():
+            raise ValueError(
+                "FurthestPointSampling : coordinates are not contiguous.")
+
+        idx = []
+        for i in range(0, row_splits.shape[0] - 1):
+            npoint = new_row_splits[i + 1] - new_row_splits[i]
+            start_i = row_splits[i]
+            end_i = row_splits[i + 1]
+            out = furthest_point_sampling(xyz[start_i:end_i].unsqueeze(0),
+                                          npoint) + row_splits[i]
+
+            idx += out
+
+        return torch.cat(idx, 0)
+
+    @staticmethod
+    def backward(xyz, a=None, b=None):
+        return None, None, None
+
+
+furthest_point_sample_v2 = FurthestPointSamplingV2.apply
+
+
 class ThreeNN(Function):
 
     @staticmethod

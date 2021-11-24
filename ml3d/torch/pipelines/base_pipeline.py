@@ -32,6 +32,7 @@ class BasePipeline(ABC):
 
         self.model = model
         self.dataset = dataset
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
         make_dir(self.cfg.main_log_dir)
         dataset_name = dataset.name if dataset is not None else ''
@@ -45,6 +46,8 @@ class BasePipeline(ABC):
         else:
             self.device = torch.device('cuda' if len(device.split(':')) ==
                                        1 else 'cuda:' + device.split(':')[1])
+        self.summary = {}
+        self.cfg.setdefault('summary', {})
 
     @abstractmethod
     def run_inference(self, data):

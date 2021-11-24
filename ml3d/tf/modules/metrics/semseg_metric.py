@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 
 
 class SemSegMetric(object):
@@ -95,7 +96,7 @@ class SemSegMetric(object):
         """Computes the confusion matrix of one batch
 
         Args:
-            scores (tf.FloatTensor, shape (B?, C, N):
+            scores (tf.FloatTensor, shape (B?, N, C):
                 raw scores for each class.
             labels (tf.LongTensor, shape (B?, N)):
                 ground truth labels.
@@ -113,6 +114,12 @@ class SemSegMetric(object):
 
         if len(y) < C * C:
             y = np.concatenate([y, np.zeros((C * C - len(y)), dtype=np.long)])
+        else:
+            if len(y) > C * C:
+                warnings.warn(
+                    "Prediction has fewer classes than ground truth. This may affect accuracy."
+                )
+            y = y[-(C * C):]  # last c*c elements.
 
         y = y.reshape(C, C)
 

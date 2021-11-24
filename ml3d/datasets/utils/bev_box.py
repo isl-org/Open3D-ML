@@ -106,7 +106,8 @@ class BEVBox3D(BoundingBox3D):
         the width, length and height of the box a is the yaw angle.
 
         Returns:
-            box: (7,)
+            box(7,)
+
         """
         bbox = np.zeros((7,))
         bbox[0:3] = self.center - [0, 0, self.size[1] / 2]
@@ -123,7 +124,7 @@ class BEVBox3D(BoundingBox3D):
                         | /
          left z <------ 0
 
-        Returns box in the common 7-sized vector representation:
+        Returns box in the common 7-sized vector representation.
         (x, y, z, l, h, w, a), where
         (x, y, z) is the bottom center of the box,
         (l, h, w) is the length, height, width of the box
