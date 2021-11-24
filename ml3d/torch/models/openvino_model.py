@@ -1,4 +1,5 @@
 import io
+import copy
 
 import torch
 
@@ -58,6 +59,7 @@ class OpenVINOModel:
         return inputs
 
     def _read_torch_model(self, inputs):
+        inputs = copy.deepcopy(inputs)
         tensors = self._get_inputs(inputs)
         input_names = self._get_input_names(tensors)
 
