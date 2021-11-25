@@ -9,7 +9,7 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
-from ...datasets.utils import BEVBox3D, DataProcessing, ObjdetAugmentation
+from ...datasets.utils import BEVBox3D, DataProcessing
 from ...datasets.utils.operations import points_in_box
 from ...datasets.augment import ObjdetAugmentation
 

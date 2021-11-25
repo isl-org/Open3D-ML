@@ -132,7 +132,6 @@ class BEVBox3D(BoundingBox3D):
 
         Returns:
             transformed box: (7,)
-
         """
         if self.world_cam is None:
             return self.to_xyzwhlr()[[1, 2, 0, 4, 5, 3, 6]]

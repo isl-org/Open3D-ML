@@ -6,7 +6,6 @@ dataset:
 model:
   name: PointRCNN
   ckpt_path: # path/to/your/checkpoint
-
   batcher: "ignore" # for TF, does use the batcher of the model class
 
   point_cloud_range: [0, -40, -1, 70.4, 40, 3]
