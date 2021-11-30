@@ -221,6 +221,7 @@ class DataModel(Model):
         # We could just create the TPointCloud here, but that would cause the UI
         # to block. If we do it on load then the loading dialog will display.
         self._name2srcdata = {}
+        self.bounding_box_data = []
         for d in userdata:
             name = d["name"]
             while name in self._data:  # ensure each name is unique
@@ -228,10 +229,14 @@ class DataModel(Model):
             self._init_data(name)
             self._name2srcdata[name] = d
 
+            if 'bounding_boxes' in d:
+                self.bounding_box_data.append(
+                    Model.BoundingBoxData(name, d['bounding_boxes']))
+
     def load(self, name, fail_if_no_space=False):
         """Load a pointcloud based on the name provided."""
         if self.is_loaded(name):
-            return
+            return True
 
         self.create_point_cloud(self._name2srcdata[name])
 
@@ -1652,6 +1657,8 @@ class Visualizer:
                         box_data.append(data)
                         current_group = []
             self._objects.bounding_box_data = box_data
+        else:
+            self._consolidate_bounding_boxes = True
 
         self._visualize("Open3D", width, height)
 
