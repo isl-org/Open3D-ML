@@ -120,8 +120,8 @@ class SparseConvUnet(BaseModel):
         # Randomly place pointcloud in 4096 size grid.
         grid_size = self.cfg.grid_size
         offset = -m + np.clip(
-            grid_size - M + m - 0.001, 0, None) * np.random.rand(3) + np.clip(
-                grid_size - M + m + 0.001, None, 0) * np.random.rand(3)
+            grid_size - M + m - 0.001, 0, None) * self.rng.random(3) + np.clip(
+                grid_size - M + m + 0.001, None, 0) * self.rng.random(3)
 
         points += offset
         idxs = (points.min(1) >= 0) * (points.max(1) < 4096)
@@ -230,8 +230,7 @@ class SparseConvUnet(BaseModel):
         return loss, labels, scores
 
     def get_optimizer(self, cfg_pipeline):
-
-        optimizer = tf.keras.optimizers.Adam(learning_rate=cfg_pipeline.adam_lr)
+        optimizer = tf.keras.optimizers.Adam(**cfg_pipeline.optimizer)
 
         return optimizer
 

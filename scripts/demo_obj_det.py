@@ -1,6 +1,4 @@
-import numpy as np
 import open3d.ml as _ml3d
-import math
 
 from open3d.ml.vis import Visualizer, BoundingBox3D, LabelLUT
 from open3d.ml import datasets

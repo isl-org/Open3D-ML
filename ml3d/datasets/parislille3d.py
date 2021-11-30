@@ -2,7 +2,6 @@ import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -191,7 +190,7 @@ class ParisLille3DSplit(BaseDatasetSplit):
         log.debug("get_data called {}".format(pc_path))
 
         pc = o3d.t.io.read_point_cloud(pc_path).point
-        points = pc["points"].numpy().astype(np.float32)
+        points = pc["positions"].numpy().astype(np.float32)
 
         if (self.split != 'test'):
             labels = pc["class"].numpy().astype(np.int32).reshape((-1,))

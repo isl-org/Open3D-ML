@@ -1,9 +1,6 @@
 import numpy as np
-import yaml
-import tensorflow as tf
 from abc import ABC, abstractmethod
-
-from os.path import join, exists, dirname, abspath
+from os.path import join
 
 from ...utils import Config, make_dir
 
@@ -31,6 +28,7 @@ class BasePipeline(ABC):
 
         self.model = model
         self.dataset = dataset
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
         make_dir(self.cfg.main_log_dir)
         dataset_name = dataset.name if dataset is not None else ''
@@ -38,6 +36,8 @@ class BasePipeline(ABC):
             self.cfg.main_log_dir,
             model.__class__.__name__ + '_' + dataset_name + '_tf')
         make_dir(self.cfg.logs_dir)
+        self.summary = {}
+        self.cfg.setdefault('summary', {})
 
     @abstractmethod
     def run_inference(self, data):

@@ -29,7 +29,7 @@ model:
     voxel_size: &vsize
       [0.32, 0.32, 6]
     max_voxels: [32000, 32000]
-  
+
   voxel_encoder:
     in_channels: 5
     feat_channels: [64]
@@ -69,7 +69,7 @@ model:
     dir_offset: 0.7854
     rotations: [0, 1.57]
     iou_thr: [[0.4, 0.55], [0.3, 0.5], [0.3, 0.5]]
-  
+
   augment:
     PointShuffle: True
     ObjectRangeFilter: True
@@ -104,4 +104,8 @@ pipeline:
   # evaluation properties
   overlaps: [0.5, 0.5, 0.7]
   difficulties: [0, 1, 2]
-    
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

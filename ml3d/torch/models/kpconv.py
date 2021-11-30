@@ -2,7 +2,6 @@ import time
 import math
 import torch
 import torch.nn as nn
-import open3d.core as o3c
 
 from tqdm import tqdm
 from torch.nn.parameter import Parameter
@@ -10,7 +9,8 @@ from torch.nn.init import kaiming_uniform_
 from sklearn.neighbors import KDTree
 
 from open3d.ml.contrib import subsample_batch
-from open3d.ml.contrib import radius_search
+from open3d.ml.torch.layers import FixedRadiusSearch
+from open3d.ml.torch.ops import ragged_to_dense
 
 # use relative import for being compatible with Open3d main repo
 from .base_model import BaseModel
@@ -2013,17 +2013,27 @@ def batch_neighbors(queries, supports, q_batches, s_batches, radius):
 
     Returns:
         neighbors indices
+
     """
-    ret = radius_search(
-        o3c.Tensor.from_numpy(queries), o3c.Tensor.from_numpy(supports),
-        o3c.Tensor.from_numpy(np.array(q_batches, dtype=np.int32)),
-        o3c.Tensor.from_numpy(np.array(s_batches, dtype=np.int32)),
-        radius).numpy()
+    q_splits = torch.zeros((len(q_batches) + 1,), dtype=torch.int64)
+    s_splits = torch.zeros((len(s_batches) + 1,), dtype=torch.int64)
+    q_splits[1:] = torch.cumsum(torch.LongTensor(q_batches), dim=0)
+    s_splits[1:] = torch.cumsum(torch.LongTensor(s_batches), dim=0)
 
-    num_points = supports.shape[0]
-    corret_ret = np.where(ret == -1, num_points, ret)
+    nns = FixedRadiusSearch()
+    result = nns(torch.from_numpy(supports), torch.from_numpy(queries), radius,
+                 s_splits, q_splits)
 
-    return corret_ret
+    idx = result.neighbors_index.reshape(-1, 1)
+    splits = result.neighbors_row_splits
+
+    max_nbrs = torch.max(splits[1:] - splits[:-1]).item()
+
+    dense_idx = ragged_to_dense(
+        idx, splits, max_nbrs,
+        torch.Tensor([supports.shape[0]]).to(torch.int32)).squeeze(2)
+
+    return dense_idx.numpy()
 
 
 def batch_grid_subsampling(points,

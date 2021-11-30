@@ -2,6 +2,7 @@ import yaml
 from abc import ABC, abstractmethod
 from os.path import join, exists, dirname, abspath
 import logging
+import numpy as np
 
 from ..utils import Config, get_module
 
@@ -54,6 +55,7 @@ class BaseDataset(ABC):
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
     @staticmethod
     @abstractmethod
