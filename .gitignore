@@ -26,3 +26,6 @@ test_kpconv/
 kernels/
 **/.fuse*
 train_log/
+
+*.pth
+examples/demo_data/

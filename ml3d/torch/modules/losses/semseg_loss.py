@@ -6,7 +6,7 @@ from ....datasets.utils import DataProcessing
 
 def filter_valid_label(scores, labels, num_classes, ignored_label_inds, device):
     """Loss functions for semantic segmentation."""
-    valid_scores = scores.reshape(-1, num_classes)
+    valid_scores = scores.reshape(-1, num_classes).to(device)
     valid_labels = labels.reshape(-1).to(device)
 
     ignored_bool = torch.zeros_like(valid_labels, dtype=torch.bool)

@@ -144,7 +144,7 @@ def main():
 
     data_path = ensure_demo_data()
     pc_names = ["000700", "000750"]
-    pcs = get_custom_data(pc_names, data_path)
+    pcs = get_custom_data(pc_names, os.path.join(data_path, 'SemanticKITTI'))
     pcs_with_pred = pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k)
 
     v.visualize(pcs_with_pred)
