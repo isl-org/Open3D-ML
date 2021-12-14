@@ -22,22 +22,22 @@ class RandLANet(BaseModel):
     """
 
     def __init__(
-        self,
-        name='RandLANet',
-        num_neighbors=16,
-        num_layers=4,
-        num_points=4096 * 11,
-        num_classes=19,
-        ignored_label_inds=[0],
-        sub_sampling_ratio=[4, 4, 4, 4],
-        in_channels=3,  # 3 + feature_dimension.
-        dim_features=8,
-        dim_output=[16, 64, 128, 256],
-        grid_size=0.06,
-        batcher='DefaultBatcher',
-        ckpt_path=None,
-        weight_decay=0.0,
-        **kwargs):
+            self,
+            name='RandLANet',
+            num_neighbors=16,
+            num_layers=4,
+            num_points=4096 * 11,
+            num_classes=19,
+            ignored_label_inds=[0],
+            sub_sampling_ratio=[4, 4, 4, 4],
+            in_channels=3,  # 3 + feature_dimension.
+            dim_features=8,
+            dim_output=[16, 64, 128, 256],
+            grid_size=0.06,
+            batcher='DefaultBatcher',
+            ckpt_path=None,
+            weight_decay=0.0,
+            **kwargs):
 
         super().__init__(name=name,
                          num_neighbors=num_neighbors,
@@ -64,7 +64,9 @@ class RandLANet(BaseModel):
         encoder_dim_list = []
         dim_feature = cfg.dim_features
         for i in range(cfg.num_layers):
-            self.encoder.append(LocalFeatureAggregation(dim_feature, cfg.dim_output[i], cfg.num_neighbors))
+            self.encoder.append(
+                LocalFeatureAggregation(dim_feature, cfg.dim_output[i],
+                                        cfg.num_neighbors))
             dim_feature = 2 * cfg.dim_output[i]
             if i == 0:
                 encoder_dim_list.append(dim_feature)
@@ -77,22 +79,18 @@ class RandLANet(BaseModel):
         # Decoder
         self.decoder = []
         for i in range(cfg.num_layers):
-            self.decoder.append(SharedMLP(
-                encoder_dim_list[-i - 2] + dim_feature,
-                encoder_dim_list[-i - 2],
-                transpose=True,
-                bn=True,
-                activation_fn=nn.ReLU()
-            ))
+            self.decoder.append(
+                SharedMLP(encoder_dim_list[-i - 2] + dim_feature,
+                          encoder_dim_list[-i - 2],
+                          transpose=True,
+                          bn=True,
+                          activation_fn=nn.ReLU()))
             dim_feature = encoder_dim_list[-i - 2]
 
         self.fc1 = nn.Sequential(
             SharedMLP(dim_feature, 64, bn=True, activation_fn=nn.ReLU()),
             SharedMLP(64, 32, bn=True, activation_fn=nn.ReLU()),
-            nn.Dropout(0.5),
-            SharedMLP(32, cfg.num_classes)
-        )
-    
+            nn.Dropout(0.5), SharedMLP(32, cfg.num_classes))
 
     def preprocess(self, data, attr):
         cfg = self.cfg
@@ -195,7 +193,9 @@ class RandLANet(BaseModel):
             pc = sub_points
 
         inputs['coords'] = [arr.to(self.device) for arr in input_points]
-        inputs['neighbor_indices'] = [arr.to(self.device) for arr in input_neighbors]
+        inputs['neighbor_indices'] = [
+            arr.to(self.device) for arr in input_neighbors
+        ]
         inputs['sub_idx'] = [arr.to(self.device) for arr in input_pools]
         inputs['interp_idx'] = [arr.to(self.device) for arr in input_up_samples]
         inputs['features'] = feat.to(self.device)
@@ -217,35 +217,39 @@ class RandLANet(BaseModel):
 
         """
         cfg = self.cfg
-        feat = inputs['features'] # (B, N, in_channels)
+        feat = inputs['features']  # (B, N, in_channels)
         coords_list = inputs['coords']
         neighbor_indices_list = inputs['neighbor_indices']
         subsample_indices_list = inputs['sub_idx']
         interpolation_indices_list = inputs['interp_idx']
 
-
-        feat = self.fc0(feat).transpose(-2, -1).unsqueeze(-1) # (B, dim_feature, N, 1)
-        feat = self.bn0(feat) # (B, d, N, 1)
+        feat = self.fc0(feat).transpose(-2, -1).unsqueeze(
+            -1)  # (B, dim_feature, N, 1)
+        feat = self.bn0(feat)  # (B, d, N, 1)
 
         # Encoder
         encoder_feat_list = []
         for i in range(cfg.num_layers):
-            feat_encoder_i = self.encoder[i](coords_list[i], feat, neighbor_indices_list[i])
-            feat_sampled_i = self.random_sample(feat_encoder_i, subsample_indices_list[i])
+            feat_encoder_i = self.encoder[i](coords_list[i], feat,
+                                             neighbor_indices_list[i])
+            feat_sampled_i = self.random_sample(feat_encoder_i,
+                                                subsample_indices_list[i])
             if i == 0:
                 encoder_feat_list.append(feat_encoder_i.clone())
             encoder_feat_list.append(feat_sampled_i.clone())
             feat = feat_sampled_i
-        
+
         feat = self.mlp(feat)
 
         # Decoder
         for i in range(cfg.num_layers):
-            feat_interpolation_i = self.nearest_interpolation(feat, interpolation_indices_list[-i - 1])
-            feat_decoder_i = torch.cat([encoder_feat_list[-i - 2], feat_interpolation_i], dim=1)
+            feat_interpolation_i = self.nearest_interpolation(
+                feat, interpolation_indices_list[-i - 1])
+            feat_decoder_i = torch.cat(
+                [encoder_feat_list[-i - 2], feat_interpolation_i], dim=1)
             feat_decoder_i = self.decoder[i](feat_decoder_i)
             feat = feat_decoder_i
-        
+
         scores = self.fc1(feat)
 
         return scores.squeeze(3).transpose(1, 2)
@@ -300,7 +304,6 @@ class RandLANet(BaseModel):
         interpolatedim_features = interpolatedim_features.unsqueeze(3)
         return interpolatedim_features
 
-
     def get_optimizer(self, cfg_pipeline):
         optimizer = torch.optim.Adam(self.parameters(),
                                      lr=cfg_pipeline.adam_lr,
@@ -331,27 +334,27 @@ class RandLANet(BaseModel):
 
     def inference_begin():
         pass
-    
+
     def inference_preprocess():
         pass
-    
+
     def inference_end():
         pass
+
 
 MODEL._register_module(RandLANet, 'torch')
 
 
 class SharedMLP(nn.Module):
-    def __init__(
-        self,
-        in_channels,
-        out_channels,
-        kernel_size=1,
-        stride=1,
-        transpose=False,
-        bn=False,
-        activation_fn=None
-    ):
+
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size=1,
+                 stride=1,
+                 transpose=False,
+                 bn=False,
+                 activation_fn=None):
         super(SharedMLP, self).__init__()
 
         if transpose:
@@ -362,14 +365,13 @@ class SharedMLP(nn.Module):
                 stride=stride,
             )
         else:
-            self.conv = nn.Conv2d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride
-            )
+            self.conv = nn.Conv2d(in_channels,
+                                  out_channels,
+                                  kernel_size,
+                                  stride=stride)
 
-        self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-6, momentum=0.01) if bn else None
+        self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-6,
+                                         momentum=0.01) if bn else None
         self.activation_fn = activation_fn
 
     def forward(self, input):
@@ -390,6 +392,7 @@ class SharedMLP(nn.Module):
 
 
 class LocalSpatialEncoding(nn.Module):
+
     def __init__(self, d, num_neighbors):
         super(LocalSpatialEncoding, self).__init__()
 
@@ -413,8 +416,10 @@ class LocalSpatialEncoding(nn.Module):
         dim = coords.shape[2]
 
         extended_indices = neighbor_indices.unsqueeze(1).expand(B, dim, N, K)
-        extended_coords = coords.transpose(-2, -1).unsqueeze(-1).expand(B, dim, N, K)
-        neighbor_coords = torch.gather(extended_coords, 2, extended_indices)  # (B, dim, N, K)
+        extended_coords = coords.transpose(-2, -1).unsqueeze(-1).expand(
+            B, dim, N, K)
+        neighbor_coords = torch.gather(extended_coords, 2,
+                                       extended_indices)  # (B, dim, N, K)
 
         return neighbor_coords
 
@@ -437,30 +442,35 @@ class LocalSpatialEncoding(nn.Module):
 
         neighbor_coords = self.gather_neighbor(coords, neighbor_indices)
 
-        extended_coords = coords.transpose(-2, -1).unsqueeze(-1).expand(B, 3, N, K)
+        extended_coords = coords.transpose(-2,
+                                           -1).unsqueeze(-1).expand(B, 3, N, K)
 
         relative_pos = extended_coords - neighbor_coords
-        relative_dist = torch.sqrt(torch.sum(torch.square(relative_pos), dim=1, keepdim=True))
+        relative_dist = torch.sqrt(
+            torch.sum(torch.square(relative_pos), dim=1, keepdim=True))
 
-        relative_features = torch.cat([relative_dist, relative_pos, extended_coords, neighbor_coords], dim=1)
+        relative_features = torch.cat(
+            [relative_dist, relative_pos, extended_coords, neighbor_coords],
+            dim=1)
         relative_features = self.mlp(relative_features)
 
-        neighbor_features = self.gather_neighbor(features.transpose(1, 2).squeeze(3), neighbor_indices)
- 
-        return torch.cat([
-            neighbor_features, relative_features
-        ], dim=1)
+        neighbor_features = self.gather_neighbor(
+            features.transpose(1, 2).squeeze(3), neighbor_indices)
+
+        return torch.cat([neighbor_features, relative_features], dim=1)
 
 
 class AttentivePooling(nn.Module):
+
     def __init__(self, in_channels, out_channels):
         super(AttentivePooling, self).__init__()
 
         self.score_fn = nn.Sequential(
-            nn.Linear(in_channels, in_channels, bias=False),
-            nn.Softmax(dim=-2)
-        )
-        self.mlp = SharedMLP(in_channels, out_channels, bn=True, activation_fn=nn.ReLU())
+            nn.Linear(in_channels, in_channels, bias=False), nn.Softmax(dim=-2))
+        self.mlp = SharedMLP(in_channels,
+                             out_channels,
+                             bn=True,
+                             activation_fn=nn.ReLU())
 
     def forward(self, x):
         """Forward pass of the Module.
@@ -472,29 +482,30 @@ class AttentivePooling(nn.Module):
             torch.Tensor of shape (B, d_out, N, 1).
         """
         # computing attention scores
-        scores = self.score_fn(x.permute(0,2,3,1)).permute(0,3,1,2)
+        scores = self.score_fn(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
 
         # sum over the neighbors
-        features = torch.sum(scores * x, dim=-1, keepdim=True) # shape (B, d_in, N, 1)
+        features = torch.sum(scores * x, dim=-1,
+                             keepdim=True)  # shape (B, d_in, N, 1)
 
         return self.mlp(features)
 
 
-
 class LocalFeatureAggregation(nn.Module):
+
     def __init__(self, d_in, d_out, num_neighbors):
         super(LocalFeatureAggregation, self).__init__()
 
         self.num_neighbors = num_neighbors
 
-        self.mlp1 = SharedMLP(d_in, d_out//2, activation_fn=nn.LeakyReLU(0.2))
-        self.mlp2 = SharedMLP(d_out, 2*d_out)
-        self.shortcut = SharedMLP(d_in, 2*d_out, bn=True)
+        self.mlp1 = SharedMLP(d_in, d_out // 2, activation_fn=nn.LeakyReLU(0.2))
+        self.mlp2 = SharedMLP(d_out, 2 * d_out)
+        self.shortcut = SharedMLP(d_in, 2 * d_out, bn=True)
 
-        self.lse1 = LocalSpatialEncoding(d_out//2, num_neighbors)
-        self.lse2 = LocalSpatialEncoding(d_out//2, num_neighbors)
+        self.lse1 = LocalSpatialEncoding(d_out // 2, num_neighbors)
+        self.lse2 = LocalSpatialEncoding(d_out // 2, num_neighbors)
 
-        self.pool1 = AttentivePooling(d_out, d_out//2)
+        self.pool1 = AttentivePooling(d_out, d_out // 2)
         self.pool2 = AttentivePooling(d_out, d_out)
 
         self.lrelu = nn.LeakyReLU()
@@ -524,4 +535,3 @@ class LocalFeatureAggregation(nn.Module):
         x = self.pool2(x)
 
         return self.lrelu(self.mlp2(x) + self.shortcut(feat))
-
