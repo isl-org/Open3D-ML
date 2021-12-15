@@ -74,7 +74,9 @@ class RandLANet(BaseModel):
 
         self.encoder = nn.ModuleList(self.encoder)
 
-        self.mlp = SharedMLP(dim_feature, dim_feature, activation_fn=nn.ReLU())
+        self.mlp = SharedMLP(dim_feature,
+                             dim_feature,
+                             activation_fn=nn.LeakyReLU(0.2))
 
         # Decoder
         self.decoder = []
@@ -83,16 +85,15 @@ class RandLANet(BaseModel):
                 SharedMLP(encoder_dim_list[-i - 2] + dim_feature,
                           encoder_dim_list[-i - 2],
                           transpose=True,
-                          bn=True,
-                          activation_fn=nn.ReLU()))
+                          activation_fn=nn.LeakyReLU(0.2)))
             dim_feature = encoder_dim_list[-i - 2]
 
         self.decoder = nn.ModuleList(self.decoder)
 
         self.fc1 = nn.Sequential(
-            SharedMLP(dim_feature, 64, bn=True, activation_fn=nn.ReLU()),
-            SharedMLP(64, 32, bn=True, activation_fn=nn.ReLU()),
-            nn.Dropout(0.5), SharedMLP(32, cfg.num_classes))
+            SharedMLP(dim_feature, 64, activation_fn=nn.LeakyReLU(0.2)),
+            SharedMLP(64, 32, activation_fn=nn.LeakyReLU(0.2)), nn.Dropout(0.5),
+            SharedMLP(32, cfg.num_classes, bn=False))
 
     def preprocess(self, data, attr):
         cfg = self.cfg
@@ -233,6 +234,9 @@ class RandLANet(BaseModel):
             -1)  # (B, dim_feature, N, 1)
         feat = self.bn0(feat)  # (B, d, N, 1)
 
+        l_relu = nn.LeakyReLU(0.2)
+        feat = l_relu(feat)
+
         # Encoder
         encoder_feat_list = []
         for i in range(cfg.num_layers):
@@ -359,22 +363,22 @@ class SharedMLP(nn.Module):
                  kernel_size=1,
                  stride=1,
                  transpose=False,
-                 bn=False,
+                 bn=True,
                  activation_fn=None):
         super(SharedMLP, self).__init__()
 
         if transpose:
-            self.conv = nn.ConvTranspose2d(
-                in_channels,
-                out_channels,
-                kernel_size,
-                stride=stride,
-            )
+            self.conv = nn.ConvTranspose2d(in_channels,
+                                           out_channels,
+                                           kernel_size=kernel_size,
+                                           stride=stride,
+                                           padding=(kernel_size - 1) // 2)
         else:
             self.conv = nn.Conv2d(in_channels,
                                   out_channels,
-                                  kernel_size,
-                                  stride=stride)
+                                  kernel_size=kernel_size,
+                                  stride=stride,
+                                  padding=(kernel_size - 1) // 2)
 
         self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-6,
                                          momentum=0.01) if bn else None
@@ -399,11 +403,12 @@ class SharedMLP(nn.Module):
 
 class LocalSpatialEncoding(nn.Module):
 
-    def __init__(self, d, num_neighbors):
+    def __init__(self, dim_in, dim_out, num_neighbors, encode_pos=False):
         super(LocalSpatialEncoding, self).__init__()
 
         self.num_neighbors = num_neighbors
-        self.mlp = SharedMLP(10, d, bn=True, activation_fn=nn.ReLU())
+        self.mlp = SharedMLP(dim_in, dim_out, activation_fn=nn.LeakyReLU(0.2))
+        self.encode_pos = encode_pos
 
         # self.device = device
 
@@ -429,7 +434,11 @@ class LocalSpatialEncoding(nn.Module):
 
         return neighbor_coords
 
-    def forward(self, coords, features, neighbor_indices):
+    def forward(self,
+                coords,
+                features,
+                neighbor_indices,
+                relative_features=None):
         """Forward pass of the Module.
 
         Args:
@@ -446,24 +455,33 @@ class LocalSpatialEncoding(nn.Module):
         # finding neighboring points
         B, N, K = neighbor_indices.size()
 
-        neighbor_coords = self.gather_neighbor(coords, neighbor_indices)
+        if self.encode_pos:
+            neighbor_coords = self.gather_neighbor(coords, neighbor_indices)
 
-        extended_coords = coords.transpose(-2,
-                                           -1).unsqueeze(-1).expand(B, 3, N, K)
+            extended_coords = coords.transpose(-2, -1).unsqueeze(-1).expand(
+                B, 3, N, K)
 
-        relative_pos = extended_coords - neighbor_coords
-        relative_dist = torch.sqrt(
-            torch.sum(torch.square(relative_pos), dim=1, keepdim=True))
+            relative_pos = extended_coords - neighbor_coords
+            relative_dist = torch.sqrt(
+                torch.sum(torch.square(relative_pos), dim=1, keepdim=True))
 
-        relative_features = torch.cat(
-            [relative_dist, relative_pos, extended_coords, neighbor_coords],
-            dim=1)
+            relative_features = torch.cat(
+                [relative_dist, relative_pos, extended_coords, neighbor_coords],
+                dim=1)
+
+        else:
+            if relative_features is None:
+                raise ValueError(
+                    "LocalSpatialEncoding: Require relative_features for second pass."
+                )
+
         relative_features = self.mlp(relative_features)
 
         neighbor_features = self.gather_neighbor(
             features.transpose(1, 2).squeeze(3), neighbor_indices)
 
-        return torch.cat([neighbor_features, relative_features], dim=1)
+        return torch.cat([neighbor_features, relative_features],
+                         dim=1), relative_features
 
 
 class AttentivePooling(nn.Module):
@@ -471,12 +489,11 @@ class AttentivePooling(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(AttentivePooling, self).__init__()
 
-        self.score_fn = nn.Sequential(
-            nn.Linear(in_channels, in_channels, bias=False), nn.Softmax(dim=-2))
+        self.score_fn = nn.Sequential(nn.Linear(in_channels, in_channels),
+                                      nn.Softmax(dim=-2))
         self.mlp = SharedMLP(in_channels,
                              out_channels,
-                             bn=True,
-                             activation_fn=nn.ReLU())
+                             activation_fn=nn.LeakyReLU(0.2))
 
     def forward(self, x):
         """Forward pass of the Module.
@@ -506,10 +523,13 @@ class LocalFeatureAggregation(nn.Module):
 
         self.mlp1 = SharedMLP(d_in, d_out // 2, activation_fn=nn.LeakyReLU(0.2))
         self.mlp2 = SharedMLP(d_out, 2 * d_out)
-        self.shortcut = SharedMLP(d_in, 2 * d_out, bn=True)
+        self.shortcut = SharedMLP(d_in, 2 * d_out)
 
-        self.lse1 = LocalSpatialEncoding(d_out // 2, num_neighbors)
-        self.lse2 = LocalSpatialEncoding(d_out // 2, num_neighbors)
+        self.lse1 = LocalSpatialEncoding(10,
+                                         d_out // 2,
+                                         num_neighbors,
+                                         encode_pos=True)
+        self.lse2 = LocalSpatialEncoding(d_out // 2, d_out // 2, num_neighbors)
 
         self.pool1 = AttentivePooling(d_out, d_out // 2)
         self.pool2 = AttentivePooling(d_out, d_out)
@@ -534,10 +554,13 @@ class LocalFeatureAggregation(nn.Module):
 
         x = self.mlp1(feat)
 
-        x = self.lse1(coords, x, neighbor_indices)
+        x, neighbor_features = self.lse1(coords, x, neighbor_indices)
         x = self.pool1(x)
 
-        x = self.lse2(coords, x, neighbor_indices)
+        x, _ = self.lse2(coords,
+                         x,
+                         neighbor_indices,
+                         relative_features=neighbor_features)
         x = self.pool2(x)
 
         return self.lrelu(self.mlp2(x) + self.shortcut(feat))
