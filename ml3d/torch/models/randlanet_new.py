@@ -87,6 +87,8 @@ class RandLANet(BaseModel):
                           activation_fn=nn.ReLU()))
             dim_feature = encoder_dim_list[-i - 2]
 
+        self.decoder = nn.ModuleList(self.decoder)
+
         self.fc1 = nn.Sequential(
             SharedMLP(dim_feature, 64, bn=True, activation_fn=nn.ReLU()),
             SharedMLP(64, 32, bn=True, activation_fn=nn.ReLU()),
@@ -107,10 +109,10 @@ class RandLANet(BaseModel):
         else:
             feat = np.array(data['feat'], dtype=np.float32)
 
-        # if cfg.get('t_align', False):
-        #     points_min = np.expand_dims(points.min(0), 0)
-        #     points_min[0, :2] = 0
-        #     points = points - points_min
+        if cfg.get('t_align', False):
+            points_min = np.expand_dims(points.min(0), 0)
+            points_min[0, :2] = 0
+            points = points - points_min
 
         split = attr['split']
         data = dict()
@@ -159,12 +161,12 @@ class RandLANet(BaseModel):
         if feat is not None:
             feat = feat[selected_idxs]
 
-        # t_normalize = cfg.get('t_normalize', {})
-        # pc, feat = trans_normalize(pc, feat, t_normalize)
+        t_normalize = cfg.get('t_normalize', {})
+        pc, feat = trans_normalize(pc, feat, t_normalize)
 
-        # if attr['split'] in ['training', 'train']:
-        #     t_augment = cfg.get('t_augment', None)
-        #     pc = trans_augment(pc, t_augment)
+        if attr['split'] in ['training', 'train']:
+            t_augment = cfg.get('t_augment', None)
+            pc = trans_augment(pc, t_augment)
 
         if feat is None:
             feat = pc.copy()
@@ -192,13 +194,11 @@ class RandLANet(BaseModel):
             input_up_samples.append(up_i.astype(np.int64))
             pc = sub_points
 
-        inputs['coords'] = [arr.to(self.device) for arr in input_points]
-        inputs['neighbor_indices'] = [
-            arr.to(self.device) for arr in input_neighbors
-        ]
-        inputs['sub_idx'] = [arr.to(self.device) for arr in input_pools]
-        inputs['interp_idx'] = [arr.to(self.device) for arr in input_up_samples]
-        inputs['features'] = feat.to(self.device)
+        inputs['coords'] = input_points
+        inputs['neighbor_indices'] = input_neighbors
+        inputs['sub_idx'] = input_pools
+        inputs['interp_idx'] = input_up_samples
+        inputs['features'] = feat
         inputs['point_inds'] = selected_idxs
         inputs['labels'] = label.astype(np.int64)
 
@@ -217,11 +217,17 @@ class RandLANet(BaseModel):
 
         """
         cfg = self.cfg
-        feat = inputs['features']  # (B, N, in_channels)
-        coords_list = inputs['coords']
-        neighbor_indices_list = inputs['neighbor_indices']
-        subsample_indices_list = inputs['sub_idx']
-        interpolation_indices_list = inputs['interp_idx']
+        feat = inputs['features'].to(self.device)  # (B, N, in_channels)
+        coords_list = [arr.to(self.device) for arr in inputs['coords']]
+        neighbor_indices_list = [
+            arr.to(self.device) for arr in inputs['neighbor_indices']
+        ]
+        subsample_indices_list = [
+            arr.to(self.device) for arr in inputs['sub_idx']
+        ]
+        interpolation_indices_list = [
+            arr.to(self.device) for arr in inputs['interp_idx']
+        ]
 
         feat = self.fc0(feat).transpose(-2, -1).unsqueeze(
             -1)  # (B, dim_feature, N, 1)
