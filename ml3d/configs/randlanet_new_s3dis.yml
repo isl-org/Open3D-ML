@@ -40,7 +40,6 @@ pipeline:
   test_batch_size: 3
   train_sum_dir: train_log
   val_batch_size: 2
-  grad_clip_norm: 1.0
   summary:
     record_for: []
     max_pts:

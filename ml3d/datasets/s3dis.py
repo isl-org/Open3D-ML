@@ -282,6 +282,7 @@ class S3DISSplit(BaseDatasetSplit):
         data = pickle.load(open(pc_path, 'rb'))
 
         pc, bboxes = data
+        pc = pc[~np.isnan(pc).any(1)]
 
         bboxes = self.dataset.read_bboxes(bboxes, self.cfg.ignored_objects)
 
