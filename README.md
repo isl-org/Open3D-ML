@@ -179,7 +179,12 @@ pipeline.run_train()
 ```
 
 For more examples see [`examples/`](https://github.com/isl-org/Open3D-ML/tree/master/examples)
-and the [`scripts/`](https://github.com/isl-org/Open3D-ML/tree/master/scripts) directories.
+and the [`scripts/`](https://github.com/isl-org/Open3D-ML/tree/master/scripts) directories. You
+can also enable saving training summaries in the config file and visualize ground truth and
+results with tensorboard. See this [tutorial](docs/tensorboard.md#3dml-models-training-and-inference)
+for details.
+
+<img width="640" src="https://user-images.githubusercontent.com/41028320/146465032-30696948-54f7-48df-bc48-add8d2e38421.jpg">
 
 ### 3D Object Detection
 
@@ -243,12 +248,16 @@ pipeline.run_train()
 
 Below is an example of visualization using KITTI. The example shows the use of bounding boxes for the KITTI dataset.
 
-<img width="480" src="https://github.com/isl-org/Open3D-ML/blob/master/docs/images/visualizer_BoundingBoxes.png?raw=true">
+<img width="640" src="https://github.com/isl-org/Open3D-ML/blob/master/docs/images/visualizer_BoundingBoxes.png?raw=true">
 
 
 For more examples see [`examples/`](https://github.com/isl-org/Open3D-ML/tree/master/examples)
-and the [`scripts/`](https://github.com/isl-org/Open3D-ML/tree/master/scripts) directories.
+and the [`scripts/`](https://github.com/isl-org/Open3D-ML/tree/master/scripts) directories. You
+can also enable saving training summaries in the config file and visualize ground truth and
+results with tensorboard. See this [tutorial](docs/tensorboard.md#3dml-models-training-and-inference)
+for details.
 
+<img width="640" src="https://user-images.githubusercontent.com/41028320/146465084-bc397e4c-494a-4464-a73d-525e82a9b6ce.jpg">
 
 ### Using predefined scripts
 
@@ -394,6 +403,7 @@ For downloading these datasets visit the respective webpages and have a look at 
 * [Visualize custom data](docs/howtos.md#visualize-custom-data)
 * [Adding a new model](docs/howtos.md#adding-a-new-model)
 * [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
+* [Visualize and compare input data, ground truth and results in TensorBoard](docs/tensorboard.md)
 
 ## Contribute
 There are many ways to contribute to this project. You can:
