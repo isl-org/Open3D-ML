@@ -1,28 +1,35 @@
 dataset:
-  name: S3DIS
+  name: ParisLille3D
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [3370714, 2856755, 4919229, 318158, 375640,
-478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
-  ignored_label_inds: []
-  num_points: 40960
-  test_area_idx: 3
+  class_weights: [53033221, 25821560,   546190, 54417,
+        180638,  3998129, 160899, 3441844, 9681606]
+  ignored_label_inds:
+  - 0
+  num_points: 65536
   test_result_folder: ./test
-  use_cache: False
+  val_files:
+  - Lille2.ply
+  use_cache: true
+  steps_per_epoch_train: 50
+  steps_per_epoch_valid: 10
+  sampler:
+    name: SemSegSpatiallyRegularSampler
 model:
   name: RandLANet
   batcher: DefaultBatcher
   ckpt_path: # path/to/your/checkpoint
   num_neighbors: 16
   num_layers: 5
-  num_points: 40960
-  num_classes: 13
-  ignored_label_inds: []
+  num_points: 65536
+  num_classes: 9
+  ignored_label_inds: [0]
   sub_sampling_ratio: [4, 4, 4, 4, 2]
-  in_channels: 6
+  in_channels: 3
   dim_features: 8
   dim_output: [16, 64, 128, 256, 512]
-  grid_size: 0.04
+  grid_size: 0.06
+  weight_decay: 0.001
   augment:
     rotate:
       method: vertical
@@ -31,17 +38,8 @@ model:
       max_s: 1.1
     noise:
       noise_std: 0.01
-    RandomDropout:
-      dropout_ratio: 0.1
     RandomHorizontalFlip:
       axes: [0, 1]
-    ChromaticAutoContrast:
-      randomize_blend_factor: True
-      blend_factor: 0.5
-    ChromaticTranslation:
-      trans_range_ratio: 0.1
-    ChromaticJitter:
-      std: 0.01
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
@@ -49,9 +47,9 @@ pipeline:
   learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 100
-  save_ckpt_freq: 20
-  scheduler_gamma: 0.95
-  test_batch_size: 3
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.9886
+  test_batch_size: 1
   train_sum_dir: train_log
   val_batch_size: 2
   summary:

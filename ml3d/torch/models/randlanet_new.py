@@ -37,6 +37,7 @@ class RandLANet(BaseModel):
             batcher='DefaultBatcher',
             ckpt_path=None,
             weight_decay=0.0,
+            augment=None,
             **kwargs):
 
         super().__init__(name=name,
@@ -53,8 +54,10 @@ class RandLANet(BaseModel):
                          batcher=batcher,
                          ckpt_path=ckpt_path,
                          weight_decay=weight_decay,
+                         augment=augment,
                          **kwargs)
         cfg = self.cfg
+        self.augmenter = SemsegAugmentation(cfg.augment, seed=self.rng)
 
         self.fc0 = nn.Linear(cfg.in_channels, cfg.dim_features)
         self.bn0 = nn.BatchNorm2d(cfg.dim_features, eps=1e-6, momentum=0.01)
@@ -118,7 +121,7 @@ class RandLANet(BaseModel):
         split = attr['split']
         data = dict()
 
-        if (feat is None):
+        if feat is None:
             sub_points, sub_labels = DataProcessing.grid_subsampling(
                 points, labels=labels, grid_size=cfg.grid_size)
             sub_feat = None
@@ -142,6 +145,16 @@ class RandLANet(BaseModel):
         return data
 
     def transform(self, data, attr, min_possibility_idx=None):
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            seedseq = np.random.SeedSequence(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+            rng = np.random.default_rng(seedseq.spawn(1)[0])
+        else:
+            rng = self.rng
+
         cfg = self.cfg
         inputs = dict()
 
@@ -162,12 +175,13 @@ class RandLANet(BaseModel):
         if feat is not None:
             feat = feat[selected_idxs]
 
-        t_normalize = cfg.get('t_normalize', {})
-        pc, feat = trans_normalize(pc, feat, t_normalize)
-
         if attr['split'] in ['training', 'train']:
-            t_augment = cfg.get('t_augment', None)
-            pc = trans_augment(pc, t_augment)
+            pc, feat, label = self.augmenter.augment(pc,
+                                                     feat,
+                                                     label,
+                                                     self.cfg.get(
+                                                         'augment', None),
+                                                     seed=rng)
 
         if feat is None:
             feat = pc.copy()
