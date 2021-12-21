@@ -18,6 +18,12 @@ if gpus:
     except RuntimeError as e:
         print(e)
 
+try:
+    from open3d.ml.torch.models import OpenVINOModel
+    openvino_available = True
+except:
+    openvino_available = False
+
 
 def test_randlanet_torch():
     import open3d.ml.torch as ml3d
@@ -52,16 +58,9 @@ def test_randlanet_torch():
         'features': torch.from_numpy(np.array([inputs['features']])),
         'labels': torch.from_numpy(np.array([inputs['labels']]))
     }
-    net.eval()
     out = net(inputs).detach().numpy()
 
     assert out.shape == (1, 5000, 10)
-
-    # TODO: issue with Gather
-    # ov_net = ml3d.models.OpenVINOModel(net)
-    # ov_out = ov_net(inputs).detach().numpy()
-    # assert ov_out.shape == out.shape
-    # assert np.max(np.abs(ov_out - out)) < 2e-4
 
 
 def test_randlanet_tf():
@@ -97,10 +96,11 @@ def test_randlanet_tf():
 
     assert out.shape == (1, 5000, 10)
 
-    ov_net = ml3d.models.OpenVINOModel(net)
-    ov_out = ov_net(inputs)
-    assert ov_out.shape == out.shape
-    assert np.max(np.abs(ov_out - out)) < 1e-6
+    if openvino_available:
+        ov_net = ml3d.models.OpenVINOModel(net)
+        ov_out = ov_net(inputs)
+        assert ov_out.shape == out.shape
+        assert np.max(np.abs(ov_out - out)) < 1e-6
 
 
 def test_kpconv_torch():
@@ -133,10 +133,12 @@ def test_kpconv_torch():
 
     assert out.shape[1] == 5
 
-    ov_net = ml3d.models.OpenVINOModel(net)
-    ov_out = ov_net(inputs['data']).detach().numpy()
-    assert ov_out.shape == out.shape
-    assert np.max(np.abs(ov_out - out)) < 1e-7
+    if openvino_available:
+        ov_net = ml3d.models.OpenVINOModel(net)
+        ov_net.to("cpu")
+        ov_out = ov_net(inputs['data']).detach().numpy()
+        assert ov_out.shape == out.shape
+        assert np.max(np.abs(ov_out - out)) < 1e-7
 
 
 def test_kpconv_tf():
@@ -179,10 +181,11 @@ def test_kpconv_tf():
 
     assert out.shape == (1000, 5)
 
-    ov_net = ml3d.models.OpenVINOModel(net)
-    ov_out = ov_net(inputs)
-    assert ov_out.shape == out.shape
-    assert np.max(np.abs(ov_out - out)) < 1e-5
+    if openvino_available:
+        ov_net = ml3d.models.OpenVINOModel(net)
+        ov_out = ov_net(inputs)
+        assert ov_out.shape == out.shape
+        assert np.max(np.abs(ov_out - out)) < 1e-5
 
 
 def test_pointpillars_torch():
@@ -210,12 +213,13 @@ def test_pointpillars_torch():
         boxes = net.inference_end(results, data)
         assert type(boxes) == list
 
-    ov_net = ml3d.models.OpenVINOModel(net)
-    ov_results = ov_net(data)
+    if openvino_available:
+        ov_net = ml3d.models.OpenVINOModel(net)
+        ov_results = ov_net(data)
 
-    for out, ref in zip(ov_results, results):
-        assert out.shape == ref.shape
-        assert torch.max(torch.abs(out - ref)) < 1e-5
+        for out, ref in zip(ov_results, results):
+            assert out.shape == ref.shape
+            assert torch.max(torch.abs(out - ref)) < 1e-5
 
 
 def test_pointpillars_tf():

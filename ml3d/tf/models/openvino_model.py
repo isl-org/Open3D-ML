@@ -4,11 +4,14 @@ import subprocess
 
 import numpy as np
 
-import mo_tf
 from openvino.inference_engine import IECore
 
 
 class OpenVINOModel:
+    """Class providing OpenVINO backend for TensorFlow models.
+
+    Class performs conversion to OpenVINO IR format using Model Optimizer tool.
+    """
 
     def __init__(self, base_model):
         self.ie = IECore()
@@ -16,6 +19,7 @@ class OpenVINOModel:
         self.base_model = base_model
         self.input_names = None
         self.input_ids = None
+        self.device = "CPU"
 
     def _read_tf_model(self, inputs):
         # Dump a model in SavedModel format
@@ -41,18 +45,26 @@ class OpenVINOModel:
         # Run Model Optimizer to get IR
         subprocess.run([
             sys.executable,
-            mo_tf.__file__,
+            '-m',
+            'mo',
             '--saved_model_dir=model',
             '--input_shape',
             ','.join(input_shapes),
             '--input',
             ','.join(self.input_names),
             '--extension',
-            os.path.join(os.path.dirname(__file__), 'openvino_ext'),
+            os.path.join(os.path.dirname(__file__), 'utils', 'openvino_ext'),
         ],
                        check=True)
 
-        self.exec_net = self.ie.load_network('saved_model.xml', 'CPU')
+        self.exec_net = self.ie.load_network('saved_model.xml', self.device)
+
+        try:
+            os.remove('saved_model.xml')
+            os.remove('saved_model.bin')
+            os.rmdir('model')
+        except Exception:
+            pass
 
     def __call__(self, inputs):
         if self.exec_net is None:
@@ -65,3 +77,6 @@ class OpenVINOModel:
         output = self.exec_net.infer(tensors)
         output = next(iter(output.values()))
         return output
+
+    def to(self, device):
+        self.device = device.upper()

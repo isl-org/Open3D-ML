@@ -4,6 +4,11 @@ from mo.graph.graph import Node
 
 
 class MinFrontExtractor(FrontExtractorOp):
+    """Support class which enables missed Min operation in OpenVINO.
+
+    TODO: will be fixed in next OpenVINO release (2022.1)
+    """
+
     op = 'Min'
     enabled = True
 

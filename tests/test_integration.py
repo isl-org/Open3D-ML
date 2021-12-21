@@ -42,4 +42,18 @@ def test_integration_tf():
     print(model)
 
 
+def test_integration_openvino():
+    try:
+        from openvino.inference_engine import IECore
+        openvino_available = True
+    except:
+        openvino_available = False
+
+    if not openvino_available:
+        return
+
+    from open3d.ml.torch.models import OpenVINOModel
+    from open3d.ml.tf.models import OpenVINOModel
+
+
 test_integration_torch()
