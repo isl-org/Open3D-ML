@@ -31,7 +31,7 @@ python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.or
 python -m pip install -U pytest=="$PYTEST_VER" \
     pytest-randomly=="$PYTEST_RANDOMLY_VER"
 python -m pip install -U yapf=="$YAPF_VER"
-python -m pip install -U openvino-dev==2021.4.1
+python -m pip install -U openvino-dev==2021.4.2
 
 echo 3. Configure for bundling the Open3D-ML part
 echo

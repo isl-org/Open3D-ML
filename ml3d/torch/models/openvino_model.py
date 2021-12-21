@@ -15,11 +15,16 @@ def pointpillars_extract_feats(self, x):
 
 
 class OpenVINOModel:
+    """Class providing OpenVINO backend for PyTorch models.
+
+    OpenVINO model is initialized from ONNX representation of PyTorch graph.
+    """
 
     def __init__(self, base_model):
         self.ie = IECore()
         self.exec_net = None
         self.base_model = base_model
+        self.device = "CPU"
 
         # A workaround for unsupported torch.square by ONNX
         torch.square = lambda x: torch.pow(x, 2)
@@ -55,7 +60,7 @@ class OpenVINOModel:
                 'x': x,
             }
         elif not isinstance(inputs, dict):
-            raise Exception(f"Unknown inputs type: {inputs.__class__}")
+            raise TypeError(f"Unknown inputs type: {inputs.__class__}")
         return inputs
 
     def _read_torch_model(self, inputs):
@@ -78,7 +83,7 @@ class OpenVINOModel:
         self.base_model.forward = origin_forward
 
         net = self.ie.read_network(buf.getvalue(), b'', init_from_buffer=True)
-        self.exec_net = self.ie.load_network(net, 'CPU')
+        self.exec_net = self.ie.load_network(net, self.device)
 
     def forward(self, inputs):
         if self.exec_net is None:
@@ -131,3 +136,6 @@ class OpenVINOModel:
 
     def transform(self, *args):
         return self.base_model.transform(*args)
+
+    def to(self, device):
+        self.device = device.upper()

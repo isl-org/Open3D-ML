@@ -4,4 +4,4 @@ torchvision==0.9.2+cpu ; sys_platform != 'darwin'
 torch==1.8.1 ; sys_platform == 'darwin'
 torchvision==0.9.1 ; sys_platform == 'darwin'
 tensorboard
-openvino==2021.4.1
+openvino==2021.4.2
