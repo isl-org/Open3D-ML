@@ -1,6 +1,6 @@
 # OpenVINO backend
 
-Open3D-ML allows to use [Intel OpenVINO](https://github.com/openvinotoolkit/openvino) as an optional backend for deep learning models.
+Open3D-ML allows to use [Intel OpenVINO](https://github.com/openvinotoolkit/openvino) as an optional backend for deep learning models inference.
 
 ## Usage
 
@@ -23,3 +23,9 @@ net.to("cpu")     # CPU device (default)
 net.to("gpu")     # GPU device
 net.to("myriad")  # VPU device
 ```
+
+## Supported models
+
+* `RandLA-Net` (tf, torch)
+* `KPConv` (tf, torch)
+* `PointPillars` (torch)
