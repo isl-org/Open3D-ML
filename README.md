@@ -394,6 +394,7 @@ For downloading these datasets visit the respective webpages and have a look at 
 * [Visualize custom data](docs/howtos.md#visualize-custom-data)
 * [Adding a new model](docs/howtos.md#adding-a-new-model)
 * [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
+* [Inference with Intel OpenVINO](docs/openvino.md)
 
 ## Contribute
 There are many ways to contribute to this project. You can:
