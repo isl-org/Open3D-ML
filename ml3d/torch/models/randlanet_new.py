@@ -38,7 +38,7 @@ class RandLANet(BaseModel):
             batcher='DefaultBatcher',
             ckpt_path=None,
             weight_decay=0.0,
-            augment=None,
+            augment={},
             **kwargs):
 
         super().__init__(name=name,
@@ -171,12 +171,22 @@ class RandLANet(BaseModel):
         if feat is not None:
             feat = feat[selected_idxs]
 
+        augment_cfg = self.cfg.get('augment', {})
+        val_augment_cfg = {}
+        if 'recenter' in augment_cfg:
+            val_augment_cfg['recenter'] = augment_cfg['recenter']
+            augment_cfg.pop('recenter')
+        if 'normalize' in augment_cfg:
+            val_augment_cfg['normalize'] = augment_cfg['normalize']
+            augment_cfg.pop('normalize')
+
+        self.augmenter.augment(pc, feat, label, val_augment_cfg, seed=rng)
+
         if attr['split'] in ['training', 'train']:
             pc, feat, label = self.augmenter.augment(pc,
                                                      feat,
                                                      label,
-                                                     self.cfg.get(
-                                                         'augment', None),
+                                                     augment_cfg,
                                                      seed=rng)
 
         if feat is None:

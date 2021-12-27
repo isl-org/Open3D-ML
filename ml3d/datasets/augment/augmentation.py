@@ -25,7 +25,8 @@ class Augmentation():
         if not cfg:
             return data
         dim = cfg.get('dim', [0, 1, 2])
-        return data[:, dim] - data.mean(0)[dim]
+        data[:, dim] = data[:, dim] - data.mean(0)[dim]
+        return data
 
     def normalize(self, pc, feat, cfg):
         """Normalize pointcloud and/or features.
