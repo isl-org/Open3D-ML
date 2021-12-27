@@ -13,7 +13,7 @@ class Augmentation():
         self.cfg = cfg
         self.rng = np.random.default_rng(seed)
 
-    def recenter(self, data):
+    def recenter(self, data, cfg):
         """Recenter pointcloud/features to origin.
 
         Typically used before rotating the pointcloud.
@@ -22,7 +22,10 @@ class Augmentation():
             data: Pointcloud or features.
 
         """
-        return data - data.mean(0)
+        if not cfg:
+            return data
+        dim = cfg.get('dim', [0, 1, 2])
+        return data[:, dim] - data.mean(0)[dim]
 
     def normalize(self, pc, feat, cfg):
         """Normalize pointcloud and/or features.
@@ -357,8 +360,7 @@ class SemsegAugmentation(Augmentation):
             self.rng = np.random.default_rng(seed)
 
         if 'recenter' in cfg:
-            if cfg['recenter']:
-                point = self.recenter(point)
+            point = self.recenter(point, cfg['recenter'])
 
         if 'normalize' in cfg:
             point, feat = self.normalize(point, feat, cfg['normalize'])

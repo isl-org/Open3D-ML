@@ -9,6 +9,7 @@ from sklearn.neighbors import KDTree
 from .base_model import BaseModel
 from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
+from ...datasets.augment import SemsegAugmentation
 from ..modules.losses import filter_valid_label
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
                                trans_crop_pc)
@@ -112,11 +113,6 @@ class RandLANet(BaseModel):
             feat = None
         else:
             feat = np.array(data['feat'], dtype=np.float32)
-
-        if cfg.get('t_align', False):
-            points_min = np.expand_dims(points.min(0), 0)
-            points_min[0, :2] = 0
-            points = points - points_min
 
         split = attr['split']
         data = dict()
@@ -356,14 +352,64 @@ class RandLANet(BaseModel):
 
         return loss, labels, scores
 
-    def inference_begin():
-        pass
+    def inference_begin(self, data):
+        self.test_smooth = 0.95
+        attr = {'split': 'test'}
+        self.inference_ori_data = data
+        self.inference_data = self.preprocess(data, attr)
+        self.inference_proj_inds = self.inference_data['proj_inds']
+        num_points = self.inference_data['search_tree'].data.shape[0]
+        self.possibility = self.rng.random(num_points) * 1e-3
+        self.test_probs = np.zeros(shape=[num_points, self.cfg.num_classes],
+                                   dtype=np.float16)
+        self.pbar = tqdm(total=self.possibility.shape[0])
+        self.pbar_update = 0
+        self.batcher = DefaultBatcher()
 
-    def inference_preprocess():
-        pass
+    def inference_preprocess(self):
+        min_possibility_idx = np.argmin(self.possibility)
+        attr = {'split': 'test'}
+        data = self.transform(self.inference_data, attr, min_possibility_idx)
+        inputs = {'data': data, 'attr': attr}
+        inputs = self.batcher.collate_fn([inputs])
+        self.inference_input = inputs
 
-    def inference_end():
-        pass
+        return inputs
+
+    def inference_end(self, inputs, results):
+
+        results = torch.reshape(results, (-1, self.cfg.num_classes))
+        m_softmax = torch.nn.Softmax(dim=-1)
+        results = m_softmax(results)
+        results = results.cpu().data.numpy()
+        probs = np.reshape(results, [-1, self.cfg.num_classes])
+
+        pred_l = np.argmax(probs, 1)
+
+        inds = inputs['data']['point_inds']
+        self.test_probs[inds] = self.test_smooth * self.test_probs[inds] + (
+            1 - self.test_smooth) * probs
+
+        self.pbar.update(self.possibility[self.possibility > 0.5].shape[0] -
+                         self.pbar_update)
+        self.pbar_update = self.possibility[self.possibility > 0.5].shape[0]
+        if np.min(self.possibility) > 0.5:
+            self.pbar.close()
+            pred_labels = np.argmax(self.test_probs, 1)
+
+            pred_labels = pred_labels[self.inference_proj_inds]
+            test_probs = self.test_probs[self.inference_proj_inds]
+            inference_result = {
+                'predict_labels': pred_labels,
+                'predict_scores': test_probs
+            }
+            data = self.inference_ori_data
+            acc = (pred_labels == data['label'] - 1).mean()
+
+            self.inference_result = inference_result
+            return True
+        else:
+            return False
 
 
 MODEL._register_module(RandLANet, 'torch')

@@ -29,6 +29,8 @@ model:
   dim_output: [16, 64, 128, 256]
   grid_size: 0.04
   augment:
+    recenter:
+      dim: [0, 1, 2]
     rotate:
       method: vertical
     scale:

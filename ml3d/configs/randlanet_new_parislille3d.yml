@@ -31,6 +31,8 @@ model:
   grid_size: 0.06
   weight_decay: 0.001
   augment:
+    recenter:
+      dim: [0, 1, 2]
     rotate:
       method: vertical
     scale:
