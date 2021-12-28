@@ -1,6 +1,6 @@
 """Tensorflow network models."""
 
-from .randlanet import RandLANet
+from .randlanet_new import RandLANet
 from .kpconv import KPFCNN
 from .point_pillars import PointPillars
 from .sparseconvnet import SparseConvUnet
