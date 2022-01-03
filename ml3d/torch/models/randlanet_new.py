@@ -171,7 +171,7 @@ class RandLANet(BaseModel):
         if feat is not None:
             feat = feat[selected_idxs]
 
-        augment_cfg = self.cfg.get('augment', {})
+        augment_cfg = self.cfg.get('augment', {}).copy()
         val_augment_cfg = {}
         if 'recenter' in augment_cfg:
             val_augment_cfg['recenter'] = augment_cfg['recenter']
@@ -592,18 +592,17 @@ class LocalFeatureAggregation(nn.Module):
         self.num_neighbors = num_neighbors
 
         self.mlp1 = SharedMLP(d_in, d_out // 2, activation_fn=nn.LeakyReLU(0.2))
-        self.mlp2 = SharedMLP(d_out, 2 * d_out)
-        self.shortcut = SharedMLP(d_in, 2 * d_out)
-
         self.lse1 = LocalSpatialEncoding(10,
                                          d_out // 2,
                                          num_neighbors,
                                          encode_pos=True)
-        self.lse2 = LocalSpatialEncoding(d_out // 2, d_out // 2, num_neighbors)
-
         self.pool1 = AttentivePooling(d_out, d_out // 2)
-        self.pool2 = AttentivePooling(d_out, d_out)
 
+        self.lse2 = LocalSpatialEncoding(d_out // 2, d_out // 2, num_neighbors)
+        self.pool2 = AttentivePooling(d_out, d_out)
+        self.mlp2 = SharedMLP(d_out, 2 * d_out)
+
+        self.shortcut = SharedMLP(d_in, 2 * d_out)
         self.lrelu = nn.LeakyReLU()
 
     def forward(self, coords, feat, neighbor_indices):

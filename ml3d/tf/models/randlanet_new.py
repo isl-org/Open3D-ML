@@ -463,7 +463,7 @@ class RandLANet(BaseModel):
                                                    pick_idx,
                                                    self.cfg.num_points)
 
-                augment_cfg = self.cfg.get('augment', {})
+                augment_cfg = self.cfg.get('augment', {}).copy()
                 val_augment_cfg = {}
                 if 'recenter' in augment_cfg:
                     val_augment_cfg['recenter'] = augment_cfg['recenter']
