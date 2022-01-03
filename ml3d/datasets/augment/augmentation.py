@@ -71,7 +71,7 @@ class Augmentation():
             cfg: configuration dictionary.
 
         """
-        if np.abs(pc[:, :3].mean()) > 1e-2:
+        if np.abs(pc[:, :2].mean()) > 1e-2:
             warnings.warn(
                 f"It is recommended to recenter the pointcloud before calling rotate."
             )
