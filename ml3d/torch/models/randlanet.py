@@ -7,7 +7,6 @@ from pathlib import Path
 from sklearn.neighbors import KDTree
 
 from .base_model import BaseModel
-from ..utils import helper_torch
 from ..dataloaders import DefaultBatcher
 from ...datasets.augment import SemsegAugmentation
 from ..modules.losses import filter_valid_label

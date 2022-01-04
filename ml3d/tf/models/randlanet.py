@@ -5,7 +5,6 @@ from tqdm import tqdm
 from sklearn.neighbors import KDTree
 
 from .base_model import BaseModel
-from ..utils import helper_tf
 from ...datasets.augment import SemsegAugmentation
 from ...utils import MODEL
 from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,

@@ -25,34 +25,23 @@ model:
   grid_size: 0.04
   augment:
     recenter:
-      dim: [0, 1, 2]
+      dim: [0, 1]
     rotate:
       method: vertical
     scale:
       min_s: 0.9
       max_s: 1.1
     noise:
-      noise_std: 0.01
-    RandomDropout:
-      dropout_ratio: 0.1
-    RandomHorizontalFlip:
-      axes: [0, 1]
-    ChromaticAutoContrast:
-      randomize_blend_factor: True
-      blend_factor: 0.5
-    ChromaticTranslation:
-      trans_range_ratio: 0.1
-    ChromaticJitter:
-      std: 0.01
+      noise_std: 0.001
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
   batch_size: 2
   learning_rate: 0.01
   main_log_dir: ./logs
-  max_epoch: 100
-  save_ckpt_freq: 20
-  scheduler_gamma: 0.95
+  max_epoch: 200
+  save_ckpt_freq: 3
+  scheduler_gamma: 0.99
   test_batch_size: 3
   train_sum_dir: train_log
   val_batch_size: 2
