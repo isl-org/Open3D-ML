@@ -1,6 +1,6 @@
 """Networks for torch."""
 
-from .randlanet_new import RandLANet
+from .randlanet import RandLANet
 from .kpconv import KPFCNN
 from .point_pillars import PointPillars
 from .sparseconvnet import SparseConvUnet
