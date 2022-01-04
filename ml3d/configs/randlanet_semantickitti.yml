@@ -27,19 +27,10 @@ model:
   in_channels: 3
   dim_features: 8
   dim_output: [16, 64, 128, 256]
-  grid_size: 0.04
+  grid_size: 0.06
   augment:
     recenter:
-      dim: [0, 1, 2]
-    rotate:
-      method: vertical
-    scale:
-      min_s: 0.9
-      max_s: 1.1
-    noise:
-      noise_std: 0.01
-    RandomHorizontalFlip:
-      axes: [0, 1]
+      dim: [0, 1]
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01

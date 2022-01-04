@@ -25,28 +25,22 @@ model:
   in_channels: 6
   dim_features: 8
   dim_output: [16, 64, 128, 256, 512]
-  grid_size: 0.05
+  grid_size: 0.06
   augment:
     recenter:
-      dim: [0, 1, 2]
+      dim: [0, 1]
+    normalize:
+      feat:
+        method: linear
+        bias: 0
+        scale: 255
     rotate:
       method: vertical
     scale:
       min_s: 0.9
       max_s: 1.1
     noise:
-      noise_std: 0.01
-    RandomDropout:
-      dropout_ratio: 0.1
-    RandomHorizontalFlip:
-      axes: [0, 1]
-    ChromaticAutoContrast:
-      randomize_blend_factor: True
-      blend_factor: 0.5
-    ChromaticTranslation:
-      trans_range_ratio: 0.1
-    ChromaticJitter:
-      std: 0.01
+      noise_std: 0.001
 pipeline:
   name: SemanticSegmentation
   adam_lr: 0.01
