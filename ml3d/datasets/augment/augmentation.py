@@ -20,6 +20,7 @@ class Augmentation():
 
         Args:
             data: Pointcloud or features.
+            cfg: configuration dictionary.
 
         """
         if not cfg:
@@ -162,6 +163,9 @@ class SemsegAugmentation(Augmentation):
             'ChromaticTranslation', 'ChromaticJitter',
             'HueSaturationTranslation'
         ]
+        if cfg is None:
+            return
+
         for method in cfg:
             if method not in all_methods:
                 warnings.warn(

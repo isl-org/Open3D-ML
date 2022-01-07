@@ -292,6 +292,7 @@ class RandLANet(BaseModel):
 
         Returns:
              pool_features = [B, N', d] pooled features matrix
+
         """
         feature = feature.squeeze(3)
         num_neigh = pool_idx.size()[2]
@@ -320,6 +321,7 @@ class RandLANet(BaseModel):
 
         Returns:
              [B, up_num_points, d] interpolated features matrix
+
         """
         feature = feature.squeeze(3)
         d = feature.size(1)
@@ -350,6 +352,7 @@ class RandLANet(BaseModel):
 
         Returns:
              loss
+
         """
         cfg = self.cfg
         labels = inputs['data']['labels']
@@ -478,6 +481,7 @@ class SharedMLP(nn.Module):
 
         Returns:
             torch.Tensor, shape (B, dim_out, N, K)
+
         """
         x = self.conv(input)
         if self.batch_norm:
@@ -504,7 +508,7 @@ class LocalSpatialEncoding(nn.Module):
         Args:
             coords: torch.Tensor of shape (B, N, d)
             neighbor_indices: torch.Tensor of shape (B, N, K)
-        
+
         Returns:
             gathered neighbors of shape (B, dim, N, K)
 
@@ -537,6 +541,7 @@ class LocalSpatialEncoding(nn.Module):
 
         Returns:
             torch.Tensor of shape (B, 2*d, N, K)
+
         """
         # finding neighboring points
         B, N, K = neighbor_indices.size()
@@ -589,6 +594,7 @@ class AttentivePooling(nn.Module):
 
         Returns:
             torch.Tensor of shape (B, d_out, N, 1).
+
         """
         # computing attention scores
         scores = self.score_fn(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)

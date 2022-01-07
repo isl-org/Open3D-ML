@@ -11,225 +11,6 @@ from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
                                trans_crop_pc)
 
 
-class SharedMLP(tf.keras.layers.Layer):
-
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=1,
-                 stride=1,
-                 transpose=False,
-                 bn=True,
-                 activation_fn=None):
-        super(SharedMLP, self).__init__()
-
-        if transpose:
-            self.conv = tf.keras.layers.Conv2DTranspose(filters=out_channels,
-                                                        kernel_size=kernel_size,
-                                                        strides=stride,
-                                                        padding='valid')
-        else:
-            self.conv = tf.keras.layers.Conv2D(filters=out_channels,
-                                               kernel_size=kernel_size,
-                                               strides=stride,
-                                               padding='valid')
-
-        self.batch_norm = tf.keras.layers.BatchNormalization(
-            axis=1, momentum=0.99, epsilon=1e-6) if bn else None
-        self.activation_fn = activation_fn
-
-    def call(self, input, training):
-        """Forward pass of the Module.
-
-        Args:
-            input: torch.Tensor of shape (B, dim_in, N, K)
-
-        Returns:
-            torch.Tensor, shape (B, dim_out, N, K)
-        """
-        x = self.conv(input)
-        if self.batch_norm:
-            x = self.batch_norm(x, training=training)
-        if self.activation_fn:
-            x = self.activation_fn(x)
-        return x
-
-
-class LocalSpatialEncoding(tf.keras.layers.Layer):
-
-    def __init__(self, dim_in, dim_out, num_neighbors, encode_pos=False):
-        super(LocalSpatialEncoding, self).__init__()
-
-        self.num_neighbors = num_neighbors
-        self.mlp = SharedMLP(dim_in,
-                             dim_out,
-                             activation_fn=tf.keras.layers.LeakyReLU(0.2))
-        self.encode_pos = encode_pos
-
-        # self.device = device
-
-    def gather_neighbor(self, coords, neighbor_indices):
-        """Gather features based on neighbor indices.
-
-        Args:
-            coords: torch.Tensor of shape (B, N, d)
-            neighbor_indices: torch.Tensor of shape (B, N, K)
-        
-        Returns:
-            gathered neighbors of shape (B, dim, N, K)
-
-        """
-        B, N, K = neighbor_indices.shape
-        dim = coords.shape[2]
-
-        extended_indices = tf.reshape(neighbor_indices, shape=(-1, N * K))
-        neighbor_coords = tf.gather(coords,
-                                    extended_indices,
-                                    axis=1,
-                                    batch_dims=1)
-
-        return tf.reshape(neighbor_coords, [-1, N, K, dim])
-
-    def call(self,
-             coords,
-             features,
-             neighbor_indices,
-             training,
-             relative_features=None):
-        """Forward pass of the Module.
-
-        Args:
-            coords: coordinates of the pointcloud
-                torch.Tensor of shape (B, N, 3)
-            features: features of the pointcloud.
-                torch.Tensor of shape (B, d, N, 1)
-            neighbor_indices: indices of k neighbours.
-                torch.Tensor of shape (B, N, K)
-
-        Returns:
-            torch.Tensor of shape (B, 2*d, N, K)
-        """
-        # finding neighboring points
-        B, N, K = neighbor_indices.shape
-
-        if self.encode_pos:
-            neighbor_coords = self.gather_neighbor(coords, neighbor_indices)
-
-            extended_coords = tf.tile(tf.expand_dims(
-                coords, axis=2), [1, 1, tf.shape(neighbor_indices)[-1], 1])
-            relative_pos = extended_coords - neighbor_coords
-            relative_dist = tf.sqrt(
-                tf.reduce_sum(tf.square(relative_pos), axis=-1, keepdims=True))
-            relative_features = tf.concat(
-                [relative_dist, relative_pos, extended_coords, neighbor_coords],
-                axis=-1)
-        else:
-            if relative_features is None:
-                raise ValueError(
-                    "LocalSpatialEncoding: Require relative_features for second pass."
-                )
-
-        relative_features = self.mlp(relative_features, training=training)
-
-        neighbor_features = self.gather_neighbor(tf.squeeze(features, axis=2),
-                                                 neighbor_indices)
-
-        return tf.concat([neighbor_features, relative_features],
-                         axis=-1), relative_features
-
-
-class AttentivePooling(tf.keras.layers.Layer):
-
-    def __init__(self, in_channels, out_channels):
-        super(AttentivePooling, self).__init__()
-
-        self.score_fn = tf.keras.models.Sequential(
-            ((tf.keras.layers.Dense(in_channels),
-              tf.keras.layers.Softmax(axis=-2))))
-
-        self.mlp = SharedMLP(in_channels,
-                             out_channels,
-                             activation_fn=tf.keras.layers.LeakyReLU(0.2))
-
-    def call(self, x, training):
-        """Forward pass of the Module.
-
-        Args:
-            x: tf.Tensor of shape (B, N, K, dim_in).
-
-        Returns:
-            torch.Tensor of shape (B, d_out, N, 1).
-        """
-        # computing attention scores
-        scores = self.score_fn(x)
-
-        # sum over the neighbors
-        features = tf.reduce_sum(scores * x, axis=-2,
-                                 keepdims=True)  # shape (B, d_in, N, 1)
-
-        return self.mlp(features, training=training)
-
-
-class LocalFeatureAggregation(tf.keras.layers.Layer):
-
-    def __init__(self, d_in, d_out, num_neighbors):
-        super(LocalFeatureAggregation, self).__init__()
-
-        self.num_neighbors = num_neighbors
-
-        self.mlp1 = SharedMLP(d_in,
-                              d_out // 2,
-                              activation_fn=tf.keras.layers.LeakyReLU(0.2))
-        self.mlp2 = SharedMLP(d_out, 2 * d_out)
-        self.shortcut = SharedMLP(d_in, 2 * d_out)
-
-        self.lse1 = LocalSpatialEncoding(10,
-                                         d_out // 2,
-                                         num_neighbors,
-                                         encode_pos=True)
-        self.lse2 = LocalSpatialEncoding(d_out // 2, d_out // 2, num_neighbors)
-
-        self.pool1 = AttentivePooling(d_out, d_out // 2)
-        self.pool2 = AttentivePooling(d_out, d_out)
-
-        self.lrelu = tf.keras.layers.LeakyReLU(0.2)
-
-    def call(self, coords, feat, neighbor_indices, training):
-        """Forward pass of the Module.
-
-        Args:
-            coords: coordinates of the pointcloud
-                torch.Tensor of shape (B, N, 3).
-            feat: features of the pointcloud.
-                torch.Tensor of shape (B, d, N, 1)
-            neighbor_indices: Indices of neighbors.
-
-        Returns:
-            torch.Tensor of shape (B, 2*d_out, N, 1).
-
-        """
-        # knn_output = knn(coords.cpu().contiguous(), coords.cpu().contiguous(), self.num_neighbors)
-
-        x = self.mlp1(feat, training=training)
-
-        x, neighbor_features = self.lse1(coords,
-                                         x,
-                                         neighbor_indices,
-                                         training=training)
-        x = self.pool1(x, training=training)
-
-        x, _ = self.lse2(coords,
-                         x,
-                         neighbor_indices,
-                         relative_features=neighbor_features,
-                         training=training)
-        x = self.pool2(x, training=training)
-
-        return self.lrelu(
-            self.mlp2(x, training=training) +
-            self.shortcut(feat, training=training))
-
-
 class RandLANet(BaseModel):
     """Class defining RandLANet, a Semantic Segmentation model.
     Based on the architecture
@@ -374,9 +155,13 @@ class RandLANet(BaseModel):
     def get_loss(self, Loss, results, inputs):
         """Runs the loss on outputs of the model.
 
-        :param outputs: logits
-        :param labels: labels
-        :return: loss
+        Args:
+            outputs: logits
+            labels: labels
+
+        Returns:
+             loss
+
         """
         cfg = self.cfg
         labels = inputs[-1]
@@ -390,9 +175,13 @@ class RandLANet(BaseModel):
     @staticmethod
     def random_sample(feature, pool_idx):
         """
-        :param feature: [B, N, d] input features matrix
-        :param pool_idx: [B, N', max_num] N' < N, N' is the selected position after pooling
-        :return: pool_features = [B, N', d] pooled features matrix
+        Args:
+            feature: [B, d, N, 1] input features matrix
+            pool_idx: [B, N', max_num] N' < N, N' is the selected position after pooling
+
+        Returns:
+             pool_features = [B, N', d] pooled features matrix
+
         """
         feature = tf.squeeze(feature, axis=2)
         num_neigh = tf.shape(pool_idx)[-1]
@@ -412,9 +201,13 @@ class RandLANet(BaseModel):
     @staticmethod
     def nearest_interpolation(feature, interp_idx):
         """
-        :param feature: [B, N, d] input features matrix
-        :param interp_idx: [B, up_num_points, 1] nearest neighbour index
-        :return: [B, up_num_points, d] interpolated features matrix
+        Args:
+            feature: [B, d, N] input features matrix
+            interp_idx: [B, up_num_points, 1] nearest neighbour index
+
+        Returns:
+             [B, up_num_points, d] interpolated features matrix
+
         """
         feature = tf.squeeze(feature, axis=2)
         batch_size = tf.shape(interp_idx)[0]
@@ -698,3 +491,221 @@ class RandLANet(BaseModel):
 
 
 MODEL._register_module(RandLANet, 'tf')
+
+
+class SharedMLP(tf.keras.layers.Layer):
+
+    def __init__(self,
+                 in_channels,
+                 out_channels,
+                 kernel_size=1,
+                 stride=1,
+                 transpose=False,
+                 bn=True,
+                 activation_fn=None):
+        super(SharedMLP, self).__init__()
+
+        if transpose:
+            self.conv = tf.keras.layers.Conv2DTranspose(filters=out_channels,
+                                                        kernel_size=kernel_size,
+                                                        strides=stride,
+                                                        padding='valid')
+        else:
+            self.conv = tf.keras.layers.Conv2D(filters=out_channels,
+                                               kernel_size=kernel_size,
+                                               strides=stride,
+                                               padding='valid')
+
+        self.batch_norm = tf.keras.layers.BatchNormalization(
+            axis=-1, momentum=0.99, epsilon=1e-6) if bn else None
+        self.activation_fn = activation_fn
+
+    def call(self, input, training):
+        """Forward pass of the Module.
+
+        Args:
+            input: tf.Tensor of shape (B, dim_in, N, K)
+
+        Returns:
+            tf.Tensor, shape (B, dim_out, N, K)
+        """
+        x = self.conv(input)
+        if self.batch_norm:
+            x = self.batch_norm(x, training=training)
+        if self.activation_fn:
+            x = self.activation_fn(x)
+        return x
+
+
+class LocalSpatialEncoding(tf.keras.layers.Layer):
+
+    def __init__(self, dim_in, dim_out, num_neighbors, encode_pos=False):
+        super(LocalSpatialEncoding, self).__init__()
+
+        self.num_neighbors = num_neighbors
+        self.mlp = SharedMLP(dim_in,
+                             dim_out,
+                             activation_fn=tf.keras.layers.LeakyReLU(0.2))
+        self.encode_pos = encode_pos
+
+        # self.device = device
+
+    def gather_neighbor(self, coords, neighbor_indices):
+        """Gather features based on neighbor indices.
+
+        Args:
+            coords: tf.Tensor of shape (B, N, d)
+            neighbor_indices: tf.Tensor of shape (B, N, K)
+
+        Returns:
+            gathered neighbors of shape (B, dim, N, K)
+
+        """
+        B, N, K = neighbor_indices.shape
+        dim = coords.shape[2]
+
+        extended_indices = tf.reshape(neighbor_indices, shape=(-1, N * K))
+        neighbor_coords = tf.gather(coords,
+                                    extended_indices,
+                                    axis=1,
+                                    batch_dims=1)
+
+        return tf.reshape(neighbor_coords, [-1, N, K, dim])
+
+    def call(self,
+             coords,
+             features,
+             neighbor_indices,
+             training,
+             relative_features=None):
+        """Forward pass of the Module.
+
+        Args:
+            coords: coordinates of the pointcloud
+                tf.Tensor of shape (B, N, 3)
+            features: features of the pointcloud.
+                tf.Tensor of shape (B, d, N, 1)
+            neighbor_indices: indices of k neighbours.
+                tf.Tensor of shape (B, N, K)
+
+        Returns:
+            tf.Tensor of shape (B, 2*d, N, K)
+        """
+        # finding neighboring points
+        B, N, K = neighbor_indices.shape
+
+        if self.encode_pos:
+            neighbor_coords = self.gather_neighbor(coords, neighbor_indices)
+
+            extended_coords = tf.tile(tf.expand_dims(
+                coords, axis=2), [1, 1, tf.shape(neighbor_indices)[-1], 1])
+            relative_pos = extended_coords - neighbor_coords
+            relative_dist = tf.sqrt(
+                tf.reduce_sum(tf.square(relative_pos), axis=-1, keepdims=True))
+            relative_features = tf.concat(
+                [relative_dist, relative_pos, extended_coords, neighbor_coords],
+                axis=-1)
+        else:
+            if relative_features is None:
+                raise ValueError(
+                    "LocalSpatialEncoding: Require relative_features for second pass."
+                )
+
+        relative_features = self.mlp(relative_features, training=training)
+
+        neighbor_features = self.gather_neighbor(tf.squeeze(features, axis=2),
+                                                 neighbor_indices)
+
+        return tf.concat([neighbor_features, relative_features],
+                         axis=-1), relative_features
+
+
+class AttentivePooling(tf.keras.layers.Layer):
+
+    def __init__(self, in_channels, out_channels):
+        super(AttentivePooling, self).__init__()
+
+        self.score_fn = tf.keras.models.Sequential(
+            ((tf.keras.layers.Dense(in_channels),
+              tf.keras.layers.Softmax(axis=-2))))
+
+        self.mlp = SharedMLP(in_channels,
+                             out_channels,
+                             activation_fn=tf.keras.layers.LeakyReLU(0.2))
+
+    def call(self, x, training):
+        """Forward pass of the Module.
+
+        Args:
+            x: tf.Tensor of shape (B, N, K, dim_in).
+
+        Returns:
+            tf.Tensor of shape (B, d_out, N, 1).
+        """
+        # computing attention scores
+        scores = self.score_fn(x)
+
+        # sum over the neighbors
+        features = tf.reduce_sum(scores * x, axis=-2,
+                                 keepdims=True)  # shape (B, d_in, N, 1)
+
+        return self.mlp(features, training=training)
+
+
+class LocalFeatureAggregation(tf.keras.layers.Layer):
+
+    def __init__(self, d_in, d_out, num_neighbors):
+        super(LocalFeatureAggregation, self).__init__()
+
+        self.num_neighbors = num_neighbors
+
+        self.mlp1 = SharedMLP(d_in,
+                              d_out // 2,
+                              activation_fn=tf.keras.layers.LeakyReLU(0.2))
+        self.lse1 = LocalSpatialEncoding(10,
+                                         d_out // 2,
+                                         num_neighbors,
+                                         encode_pos=True)
+        self.pool1 = AttentivePooling(d_out, d_out // 2)
+
+        self.lse2 = LocalSpatialEncoding(d_out // 2, d_out // 2, num_neighbors)
+        self.pool2 = AttentivePooling(d_out, d_out)
+        self.mlp2 = SharedMLP(d_out, 2 * d_out)
+
+        self.shortcut = SharedMLP(d_in, 2 * d_out)
+        self.lrelu = tf.keras.layers.LeakyReLU(0.2)
+
+    def call(self, coords, feat, neighbor_indices, training):
+        """Forward pass of the Module.
+
+        Args:
+            coords: coordinates of the pointcloud
+                tf.Tensor of shape (B, N, 3).
+            feat: features of the pointcloud.
+                tf.Tensor of shape (B, d, N, 1)
+            neighbor_indices: Indices of neighbors.
+
+        Returns:
+            tf.Tensor of shape (B, 2*d_out, N, 1).
+
+        """
+        # knn_output = knn(coords.cpu().contiguous(), coords.cpu().contiguous(), self.num_neighbors)
+
+        x = self.mlp1(feat, training=training)
+
+        x, neighbor_features = self.lse1(coords,
+                                         x,
+                                         neighbor_indices,
+                                         training=training)
+        x = self.pool1(x, training=training)
+
+        x, _ = self.lse2(coords,
+                         x,
+                         neighbor_indices,
+                         relative_features=neighbor_features,
+                         training=training)
+        x = self.pool2(x, training=training)
+
+        return self.lrelu(
+            self.mlp2(x, training=training) +
+            self.shortcut(feat, training=training))
