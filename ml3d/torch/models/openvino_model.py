@@ -75,15 +75,17 @@ class OpenVINOModel:
             self.base_model, tensors[input_names[0]])
 
         buf = io.BytesIO()
+        self.base_model.device = torch.device('cpu')
         self.base_model.eval()
         torch.onnx.export(self.base_model,
                           tensors,
                           buf,
                           input_names=input_names)
+
         self.base_model.forward = origin_forward
 
         net = self.ie.read_network(buf.getvalue(), b'', init_from_buffer=True)
-        self.exec_net = self.ie.load_network(net, self.device)
+        self.exec_net = self.ie.load_network(net, str(self.device).upper())
 
     def forward(self, inputs):
         if self.exec_net is None:
@@ -138,4 +140,4 @@ class OpenVINOModel:
         return self.base_model.transform(*args)
 
     def to(self, device):
-        self.device = device.upper()
+        self.device = device
