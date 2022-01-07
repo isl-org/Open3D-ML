@@ -22,7 +22,7 @@ if gpus:
 def test_randlanet_torch():
     import open3d.ml.torch as ml3d
 
-    net = ml3d.models.RandLANet(num_points=5000, num_classes=10, dim_input=6)
+    net = ml3d.models.RandLANet(num_points=5000, num_classes=10, in_channels=6)
     net.device = 'cpu'
 
     data = {
@@ -39,9 +39,12 @@ def test_randlanet_torch():
     data = net.preprocess(data, attr)
     inputs = net.transform(data, attr)
     inputs = {
-        'xyz': [torch.from_numpy(np.array([item])) for item in inputs['xyz']],
-        'neigh_idx': [
-            torch.from_numpy(np.array([item])) for item in inputs['neigh_idx']
+        'coords': [
+            torch.from_numpy(np.array([item])) for item in inputs['coords']
+        ],
+        'neighbor_indices': [
+            torch.from_numpy(np.array([item]))
+            for item in inputs['neighbor_indices']
         ],
         'sub_idx': [
             torch.from_numpy(np.array([item])) for item in inputs['sub_idx']
