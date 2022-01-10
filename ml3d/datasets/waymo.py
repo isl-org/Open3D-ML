@@ -166,7 +166,7 @@ class Waymo(BaseDataset):
         Tr_velo_to_cam = Waymo._extend_matrix(Tr_velo_to_cam)
 
         world_cam = np.transpose(rect_4x4 @ Tr_velo_to_cam)
-        cam_img = np.transpose(P2)
+        cam_img = np.transpose(np.vstack((P2.reshape(3, 4), [0, 0, 0, 1])))
 
         return {'world_cam': world_cam, 'cam_img': cam_img}
 
