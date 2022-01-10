@@ -22,6 +22,7 @@ class BaseModel(ABC, torch.nn.Module):
         super().__init__()
 
         self.cfg = Config(kwargs)
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
     @abstractmethod
     def get_loss(self, results, inputs):

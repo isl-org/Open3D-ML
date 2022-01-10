@@ -1,0 +1,21 @@
+batch_size: 2
+val_batch_size: 1
+test_batch_size: 1
+max_epoch: 200
+save_ckpt_freq: 5
+main_log_dir: ./logs
+train_sum_dir: train_log
+device: gpu
+# Open3D for Tensorboard summary (3D data)
+summary:
+# Record summary in these stages (from train, valid, test)
+record_for: []
+# Subsample point cloud if n_pts exceeds this value. Empty => save all
+# points in the summary.
+max_pts:
+# Only write input point cloud in the first epoch. In other epochs, use
+# reference to the first step. Do not use if each epoch has a different
+# order of minibatches.
+use_reference: false
+# Write at most this many initial samples from each batch
+max_outputs: 1

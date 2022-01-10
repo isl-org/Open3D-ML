@@ -57,7 +57,6 @@ class SemanticKITTI(BaseDataset):
             name: The name of the dataset (Semantic3D in this case).
             cache_dir: The directory where the cache is stored.
             use_cache: Indicates if the dataset should be cached.
-            num_points: The maximum number of points to use when splitting the dataset.
             class_weights: The class weights to use in the dataset.
             ignored_label_inds: A list of labels that should be ignored in the dataset.
             test_result_folder: The folder where the test results should be stored.
@@ -104,7 +103,7 @@ class SemanticKITTI(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -177,6 +176,7 @@ class SemanticKITTI(BaseDataset):
             attr: The attributes that correspond to the outputs passed in results.
         """
         cfg = self.cfg
+        pred = results['predict_labels']
         name = attr['name']
         name_seq, name_points = name.split("_")
 
@@ -185,6 +185,8 @@ class SemanticKITTI(BaseDataset):
         save_path = join(test_path, name_seq, 'predictions')
         make_dir(save_path)
         test_file_name = name_points
+        pred = results['predict_labels']
+
         for ign in cfg.ignored_label_inds:
             pred[pred >= ign] += 1
 
@@ -213,7 +215,7 @@ class SemanticKITTI(BaseDataset):
 
             store_path = join(save_path, name_points + '.label')
             pred = pred + 1
-            pred = remap_lut[pred].astype(np.uint32)
+            pred = self.remap_lut[pred].astype(np.uint32)
             pred.tofile(store_path)
 
     def get_split_list(self, split):

@@ -53,6 +53,7 @@ class Scannet(BaseDataset):
             'garbagebin'
         ]
         self.cat2label = {cat: self.classes.index(cat) for cat in self.classes}
+        self.cat2label['ignored'] = -1
         self.label2cat = {self.cat2label[t]: t for t in self.cat2label}
         self.cat_ids = np.array(
             [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
@@ -91,8 +92,7 @@ class Scannet(BaseDataset):
                 self.test_scenes.append(join(self.dataset_path, scene))
 
         self.semantic_ids = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
-            39
+            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39
         ]
 
     def get_label_to_names(self):

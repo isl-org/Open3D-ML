@@ -1,10 +1,9 @@
 import hashlib
-from pathlib import Path
 from typing import Callable
 import numpy as np
 
 from os import makedirs, listdir
-from os.path import exists, join, isfile, dirname, abspath, splitext
+from os.path import exists, join, splitext
 
 
 def make_dir(folder_name):

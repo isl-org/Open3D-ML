@@ -23,7 +23,7 @@ class BasePipeline(ABC):
         Args:
             model: A network model.
             dataset: A dataset, or None for inference model.
-            devce: 'gpu' or 'cpu'.
+            device: 'gpu' or 'cpu'.
             kwargs:
 
         Returns:
@@ -37,6 +37,7 @@ class BasePipeline(ABC):
 
         self.model = model
         self.dataset = dataset
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
         make_dir(self.cfg.main_log_dir)
         dataset_name = dataset.name if dataset is not None else ''
@@ -51,6 +52,9 @@ class BasePipeline(ABC):
         else:
             self.device = torch.device('cuda')
             self.device_ids = device_ids
+
+        self.summary = {}
+        self.cfg.setdefault('summary', {})
 
     @abstractmethod
     def run_inference(self, data):

@@ -1,4 +1,5 @@
 import math
+import sys
 import numpy as np
 import threading
 import open3d as o3d
@@ -33,9 +34,9 @@ class Model:
 
     def __init__(self):
         # Note: the tpointcloud cannot store the actual data arrays, because
-        # the tpointcloud requires specific names for some arrays (e.g. "points",
-        # "colors"). So the tpointcloud exists for rendering and initially only
-        # contains the "points" array.
+        # the tpointcloud requires specific names for some arrays (e.g.
+        # "positions", "colors"). So the tpointcloud exists for rendering and
+        # initially only contains the "positions" array.
         self.tclouds = {}  # name -> tpointcloud
         self.data_names = []  # the order data will be displayed / animated
         self.bounding_box_data = []  # [BoundingBoxData]
@@ -85,10 +86,10 @@ class Model:
             # because the resulting arrays won't be contiguous. However,
             # TensorList can be inplace.
             xyz = pts[:, [0, 1, 2]]
-            tcloud.point["points"] = Visualizer._make_tcloud_array(xyz,
-                                                                   copy=True)
+            tcloud.point["positions"] = Visualizer._make_tcloud_array(xyz,
+                                                                      copy=True)
         else:
-            tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
+            tcloud.point["positions"] = Visualizer._make_tcloud_array(pts)
         self.tclouds[name] = tcloud
 
         # Add scalar attributes and vector3 attributes
@@ -200,7 +201,7 @@ class Model:
             tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
-            pts = tcloud.point["points"].numpy()
+            pts = tcloud.point["positions"].numpy()
             min_val = (pts[:, 0].min(), pts[:, 1].min(), pts[:, 2].min())
             max_val = (pts[:, 0].max(), pts[:, 1].max(), pts[:, 2].max())
             return [min_val, max_val]
@@ -220,6 +221,7 @@ class DataModel(Model):
         # We could just create the TPointCloud here, but that would cause the UI
         # to block. If we do it on load then the loading dialog will display.
         self._name2srcdata = {}
+        self.bounding_box_data = []
         for d in userdata:
             name = d["name"]
             while name in self._data:  # ensure each name is unique
@@ -227,10 +229,14 @@ class DataModel(Model):
             self._init_data(name)
             self._name2srcdata[name] = d
 
+            if 'bounding_boxes' in d:
+                self.bounding_box_data.append(
+                    Model.BoundingBoxData(name, d['bounding_boxes']))
+
     def load(self, name, fail_if_no_space=False):
         """Load a pointcloud based on the name provided."""
         if self.is_loaded(name):
-            return
+            return True
 
         self.create_point_cloud(self._name2srcdata[name])
 
@@ -294,7 +300,10 @@ class DatasetModel(Model):
                 self._attr_rename["feat"] = "colors"
                 self._attr_rename["feature"] = "colors"
         else:
-            print("[ERROR] Dataset split has no data")
+            print(
+                "[ERROR] Dataset split has no data. Please check that you are pointing to the correct directory for the dataset."
+            )
+            sys.exit(-1)
 
     def is_loaded(self, name):
         """Check if the data is loaded."""
@@ -349,7 +358,7 @@ class DatasetModel(Model):
         for (attr, arr) in raw_data.items():
             pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
-        pcloud_size += pcloud.point["points"].num_elements() * 64
+        pcloud_size += pcloud.point["positions"].num_elements() * 64
         return pcloud_size
 
     def unload(self, name):
@@ -393,8 +402,7 @@ class Visualizer:
         def get_colors(self):
             """Returns a list of label keys."""
             return [
-                self._label2color[label]
-                for label in sorted(self._label2color.keys())
+                self._label2color[label] for label in self._label2color.keys()
             ]
 
         def set_on_changed(self, callback):  # takes no args, no return value
@@ -404,7 +412,7 @@ class Visualizer:
             """Updates the labels based on look-up table passsed."""
             self.widget.clear()
             root = self.widget.get_root_item()
-            for key in sorted(labellut.labels.keys()):
+            for key in labellut.labels.keys():
                 lbl = labellut.labels[key]
                 color = lbl.color
                 if len(color) == 3:
@@ -787,6 +795,24 @@ class Visualizer:
         vgrid.add_child(gui.Label("BG Color"))
         vgrid.add_child(bgcolor)
 
+        list_selector = gui.CollapsableVert("Selector", 0, indented_margins)
+        list_selector_grid = gui.VGrid(4, 0.25 * em)
+        list_selector_grid.add_child(gui.Label("lower"))
+        list_selector.add_child(list_selector_grid)
+        self._lower_val = gui.NumberEdit(gui.NumberEdit.INT)
+        self._lower_val.int_value = 0
+        self._prev_lower_val = 0
+        self._lower_val.set_limits(0, len(self._objects.data_names) - 1)
+        self._lower_val.set_on_value_changed(self._on_lower_val)
+        list_selector_grid.add_child(self._lower_val)
+        list_selector_grid.add_child(gui.Label("upper"))
+        self._upper_val = gui.NumberEdit(gui.NumberEdit.INT)
+        self._upper_val.int_value = 0
+        self._prev_upper_val = 0
+        self._upper_val.set_limits(0, len(self._objects.data_names) - 1)
+        self._upper_val.set_on_value_changed(self._on_upper_val)
+        list_selector_grid.add_child(self._upper_val)
+
         view_tab = gui.TabControl()
         view_tab.set_on_selected_tab_changed(self._on_display_tab_changed)
         model.add_child(view_tab)
@@ -795,7 +821,10 @@ class Visualizer:
         self._dataset = gui.TreeView()
         self._dataset.set_on_selection_changed(
             self._on_dataset_selection_changed)
-        view_tab.add_tab("List", self._dataset)
+        list_grid = gui.Vert(2)
+        list_grid.add_child(list_selector)
+        list_grid.add_child(self._dataset)
+        view_tab.add_tab("List", list_grid)
 
         # ... animation slider
         v = gui.Vert()
@@ -820,9 +849,20 @@ class Visualizer:
         self._play.horizontal_padding_em = 0.5
         self._play.vertical_padding_em = 0
         self._play.set_on_clicked(self._on_start_animation)
+        self._next = gui.Button(">")
+        self._next.horizontal_padding_em = 0.5
+        self._next.vertical_padding_em = 0
+        self._next.set_on_clicked(self._on_next)
+        self._prev = gui.Button("<")
+        self._prev.horizontal_padding_em = 0.5
+        self._prev.vertical_padding_em = 0
+        self._prev.set_on_clicked(self._on_prev)
+
         h = gui.Horiz()
         h.add_stretch()
+        h.add_child(self._prev)
         h.add_child(self._play)
+        h.add_child(self._next)
         h.add_stretch()
         v.add_child(h)
 
@@ -1081,7 +1121,7 @@ class Visualizer:
                 channel = max(0, self._colormap_channel.selected_index)
                 scalar = attr[:, channel]
         else:
-            shape = [len(tcloud.point["points"].numpy())]
+            shape = [len(tcloud.point["positions"].numpy())]
             scalar = np.zeros(shape, dtype='float32')
         tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(
             scalar)
@@ -1109,7 +1149,7 @@ class Visualizer:
 
     def _get_material(self):
         self._update_gradient()
-        material = rendering.Material()
+        material = rendering.MaterialRecord()
         if self._shader.selected_text == self.SOLID_NAME:
             material.shader = "unlitSolidColor"
             c = self._color.color_value
@@ -1137,7 +1177,7 @@ class Visualizer:
         else:
             lut = None
 
-        mat = rendering.Material()
+        mat = rendering.MaterialRecord()
         mat.shader = "unlitLine"
         mat.line_width = 2 * self.window.scaling
 
@@ -1375,11 +1415,60 @@ class Visualizer:
         self._play.text = "Play"
         self._play.set_on_clicked(self._on_start_animation)
 
+    def _on_next(self):
+        self._slider.int_value += 1
+        self._on_animation_slider_changed(self._slider.int_value)
+
+    def _on_prev(self):
+        self._slider.int_value -= 1
+        self._on_animation_slider_changed(self._slider.int_value)
+
     def _on_bgcolor_changed(self, new_color):
         bg_color = [
             new_color.red, new_color.green, new_color.blue, new_color.alpha
         ]
         self._3d.scene.set_background(bg_color)
+        self._3d.force_redraw()
+
+    def _on_lower_val(self, val):
+        if val > self._upper_val.int_value:
+            self._lower_val.int_value = self._upper_val.int_value
+        if val < int(self._lower_val.minimum_value):
+            self._lower_val.int_value = int(self._lower_val.minimum_value)
+        self._uncheck_bw_lims()
+        self._check_bw_lims()
+        self._prev_lower_val = int(self._lower_val.int_value)
+
+    def _on_upper_val(self, val):
+        if val < self._lower_val.int_value:
+            self._upper_val.int_value = self._lower_val.int_value
+        if val > int(self._upper_val.maximum_value):
+            self._upper_val.int_value = int(self._upper_val.maximum_value)
+        self._uncheck_bw_lims()
+        self._check_bw_lims()
+        self._prev_upper_val = int(self._upper_val.int_value)
+
+    def _uncheck_bw_lims(self):
+        if self._prev_lower_val < self._lower_val.int_value:
+            for i in range(self._prev_lower_val, self._lower_val.int_value):
+                name = self._objects.data_names[i]
+                self._name2treenode[name].checkbox.checked = False
+                self._3d.scene.show_geometry(name, False)
+        if self._prev_upper_val > self._upper_val.int_value:
+            for i in range(self._upper_val.int_value + 1,
+                           self._prev_upper_val + 1):
+                name = self._objects.data_names[i]
+                self._name2treenode[name].checkbox.checked = False
+                self._3d.scene.show_geometry(name, False)
+
+    def _check_bw_lims(self):
+        for i in range(self._lower_val.int_value,
+                       self._upper_val.int_value + 1):
+            name = self._objects.data_names[i]
+            self._name2treenode[name].checkbox.checked = True
+            item = [j for j, k in self._treeid2name.items() if name == k][0]
+            self._on_dataset_selection_changed(item)
+            self._3d.scene.show_geometry(name, True)
         self._3d.force_redraw()
 
     def _on_datasource_changed(self, attr_name, idx):
@@ -1489,7 +1578,7 @@ class Visualizer:
         """
         # Setup the labels
         lut = LabelLUT()
-        for val in sorted(dataset.label_to_names.values()):
+        for val in dataset.label_to_names.values():
             lut.add_label(val, val)
         self.set_lut("labels", lut)
 
@@ -1568,6 +1657,8 @@ class Visualizer:
                         box_data.append(data)
                         current_group = []
             self._objects.bounding_box_data = box_data
+        else:
+            self._consolidate_bounding_boxes = True
 
         self._visualize("Open3D", width, height)
 

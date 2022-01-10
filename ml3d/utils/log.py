@@ -17,7 +17,7 @@ class LogRecord(logging.LogRecord):
 
 
 def get_runid(path):
-    """Get runid or an experiment."""
+    """Get runid for an experiment."""
     name = Path(path).name
     if not os.path.exists(Path(path).parent):
         return '00001'

@@ -19,7 +19,7 @@ def convert_device_name(framework, device_ids):
     gpu_names = ["gpu", "cuda"]
     cpu_names = ["cpu"]
     if framework not in cpu_names + gpu_names:
-        raise KeyError("the device shoule either "
+        raise KeyError("the device should either "
                        "be cuda or cpu but got {}".format(framework))
     assert type(device_ids) is list
     device_ids_new = []
@@ -37,7 +37,7 @@ def convert_framework_name(framework):
     tf_names = ["tf", "tensorflow", "TF"]
     torch_names = ["torch", "pytorch", "PyTorch"]
     if framework not in tf_names + torch_names:
-        raise KeyError("the framework shoule either "
+        raise KeyError("the framework should either "
                        "be tf or torch but got {}".format(framework))
     if framework in tf_names:
         return "tf"

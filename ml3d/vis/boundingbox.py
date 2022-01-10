@@ -80,24 +80,33 @@ class BoundingBox3D:
         return s
 
     @staticmethod
-    def create_lines(boxes, lut=None):
-        """Creates and returns an open3d.geometry.LineSet that can be used to
-        render the boxes.
+    def create_lines(boxes, lut=None, out_format="lineset"):
+        """Creates a LineSet that can be used to render the boxes.
 
         Args:
-            boxes: the list of bounding boxes
-            lut: a ml3d.vis.LabelLUT that is used to look up the color based on
+            boxes: The list of bounding boxes.
+            lut: An ml3d.vis.LabelLUT that is used to look up the color based on
                 the label_class argument of the BoundingBox3D constructor. If
                 not provided, a color of 50% grey will be used. (optional)
+            out_format (str): Output format. Can be "lineset" (default) for the
+                Open3D lineset or "dict" for a dictionary of lineset properties.
+
+        Returns:
+            For out_format == "lineset": open3d.geometry.LineSet
+            For out_format == "dict": Dictionary of lineset properties
+                ("vertex_positions", "line_indices", "line_colors", "bbox_labels",
+                "bbox_confidences").
         """
+        if out_format not in ('lineset', 'dict'):
+            raise ValueError("Please specify an output_format of 'lineset' "
+                             "(default) or 'dict'.")
         nverts = 14
         nlines = 17
         points = np.zeros((nverts * len(boxes), 3), dtype="float32")
         indices = np.zeros((nlines * len(boxes), 2), dtype="int32")
         colors = np.zeros((nlines * len(boxes), 3), dtype="float32")
 
-        for i in range(0, len(boxes)):
-            box = boxes[i]
+        for i, box in enumerate(boxes):
             pidx = nverts * i
             x = 0.5 * box.size[0] * box.left
             y = 0.5 * box.size[1] * box.up
@@ -123,8 +132,7 @@ class BoundingBox3D:
             points[pidx + 13] = arrow_mid - head_length * box.left
 
         # It is faster to break the indices and colors into their own loop.
-        for i in range(0, len(boxes)):
-            box = boxes[i]
+        for i, box in enumerate(boxes):
             pidx = nverts * i
             idx = nlines * i
             indices[idx:idx +
@@ -148,9 +156,18 @@ class BoundingBox3D:
             colors[idx:idx +
                    nlines] = c  # copies c to each element in the range
 
-        lines = o3d.geometry.LineSet()
-        lines.points = o3d.utility.Vector3dVector(points)
-        lines.lines = o3d.utility.Vector2iVector(indices)
-        lines.colors = o3d.utility.Vector3dVector(colors)
+        if out_format == "lineset":
+            lines = o3d.geometry.LineSet()
+            lines.points = o3d.utility.Vector3dVector(points)
+            lines.lines = o3d.utility.Vector2iVector(indices)
+            lines.colors = o3d.utility.Vector3dVector(colors)
+        elif out_format == "dict":
+            lines = {
+                "vertex_positions": points,
+                "line_indices": indices,
+                "line_colors": colors,
+                "bbox_labels": tuple(b.label_class for b in boxes),
+                "bbox_confidences": tuple(b.confidence for b in boxes)
+            }
 
         return lines

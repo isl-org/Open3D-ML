@@ -2,7 +2,6 @@ import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -130,7 +129,7 @@ class Custom3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -177,13 +176,13 @@ class Custom3D(BaseDataset):
              'all'.
         """
         if split in ['test', 'testing']:
-            random.shuffle(self.test_files)
+            self.rng.shuffle(self.test_files)
             return self.test_files
         elif split in ['val', 'validation']:
-            random.shuffle(self.val_files)
+            self.rng.shuffle(self.val_files)
             return self.val_files
         elif split in ['train', 'training']:
-            random.shuffle(self.train_files)
+            self.rng.shuffle(self.train_files)
             return self.train_files
         elif split in ['all']:
             files = self.val_files + self.train_files + self.test_files
@@ -199,7 +198,7 @@ class Custom3D(BaseDataset):
             attr: The attribute that needs to be checked.
 
         Returns:
-            If the dataum attribute is tested, then resturn the path where the
+            If the dataum attribute is tested, then return the path where the
             attribute is stored; else, returns false.
         """
         cfg = self.cfg

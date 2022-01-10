@@ -1,15 +1,7 @@
-from abc import abstractmethod
-from tqdm import tqdm
-from os.path import exists, join, isfile, dirname, abspath, split
-from pathlib import Path
-import random
-
 import tensorflow as tf
-import numpy as np
-from ...utils import Cache, get_hash
 
-from ...datasets.utils import DataProcessing
-from sklearn.neighbors import KDTree
+from tqdm import tqdm
+from ...utils import Cache, get_hash
 
 
 class TFDataloader():
@@ -44,7 +36,7 @@ class TFDataloader():
          * Checks if preprocess is available. If yes, then uses the preprocessed data.
          * Checks if cache is used. If not, then uses data from the cache.
 
-        **Args:**
+        Args:
             dataset: The 3DML dataset object. You can use the base dataset,
                 sample datasets, or a custom dataset.
             model: 3DML model object.

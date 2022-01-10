@@ -1,0 +1,41 @@
+dataset:
+  name: S3DIS
+  dataset_path: # path/to/your/dataset
+  cache_dir: ./logs/cache
+  class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
+478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
+  ignored_label_inds: []
+  num_points: 40960
+  test_area_idx: 5
+  test_result_folder: ./test
+  use_cache: False
+model:
+  name: PVCNN
+  batcher: DefaultBatcher
+  ckpt_path: # path/to/your/checkpoint
+  num_classes: 13
+  num_points: 40960
+  extra_feature_channels: 6
+  width_multiplier: 1
+  voxel_resolution_multiplier: 2
+  ignored_label_inds: [-1]
+  augment: None
+pipeline:
+  name: SemanticSegmentation
+  optimizer:
+    lr: 0.001
+    weight_decay: 0.00001
+    betas: [0.9, 0.999]
+  batch_size: 4
+  main_log_dir: ./logs
+  max_epoch: 256
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.99
+  test_batch_size: 1
+  train_sum_dir: train_log
+  val_batch_size: 4
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1
