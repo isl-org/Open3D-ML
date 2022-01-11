@@ -10,6 +10,68 @@ from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
 
+class SparseConvFunc(torch.autograd.Function):
+    @staticmethod
+    def symbolic(g, cls, feat, in_pos, out_pos, voxel_size):
+        kernel = cls.state_dict()["kernel"]
+        offset = cls.state_dict()["offset"]
+        kernel = g.op("Constant", value_t=kernel)
+        offset = g.op("Constant", value_t=offset)
+        return g.op("org.open3d::SparseConv", feat, in_pos, kernel, offset)
+
+    @staticmethod
+    def forward(self, cls, feat, in_pos, out_pos, voxel_size):
+        return cls.origin_forward(feat, in_pos, out_pos, voxel_size)
+
+
+class SparseConvONNX(SparseConv):
+    """
+    This is a support class which helps export network with SparseConv in ONNX format.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if kwargs["normalize"]:
+            raise NotImplementedError("SparseConv with normalization")
+        if kwargs["use_bias"]:
+            raise NotImplementedError("SparseConv with bias")
+        self.origin_forward = super().forward
+
+    def forward(self, feat, in_pos, out_pos, voxel_size):
+        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size)
+
+
+class SparseConvTransposeFunc(torch.autograd.Function):
+    @staticmethod
+    def symbolic(g, cls, feat, in_pos, out_pos, voxel_size):
+        kernel = cls.state_dict()["kernel"]
+        offset = cls.state_dict()["offset"]
+        kernel = g.op("Constant", value_t=kernel)
+        offset = g.op("Constant", value_t=offset)
+        return g.op("org.open3d::SparseConvTranspose", feat, in_pos, kernel, offset)
+
+    @staticmethod
+    def forward(self, cls, feat, in_pos, out_pos, voxel_size):
+        return cls.origin_forward(feat, in_pos, out_pos, voxel_size)
+
+
+class SparseConvTransposeONNX(SparseConvTranspose):
+    """
+    This is a support class which helps export network with SparseConvTranspose in ONNX format.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if kwargs["kernel_size"][0] % 2:
+            raise NotImplementedError("SparseConvTranspose with even kernel_size")
+        if kwargs["normalize"]:
+            raise NotImplementedError("SparseConvTranspose with normalization")
+        if kwargs["use_bias"]:
+            raise NotImplementedError("SparseConvTranspose with bias")
+        self.origin_forward = super().forward
+
+    def forward(self, feat, in_pos, out_pos, voxel_size):
+        return SparseConvTransposeFunc.apply(self, feat, in_pos, out_pos, voxel_size)
+
+
 class SparseConvUnet(BaseModel):
     """Semantic Segmentation model.
 
@@ -70,27 +132,29 @@ class SparseConvUnet(BaseModel):
         self.linear = LinearBlock(multiplier, num_classes)
         self.output_layer = OutputLayer()
 
-    def forward(self, inputs):
-        pos_list = []
-        feat_list = []
-        index_map_list = []
+    # def forward(self, inputs):
+    def forward(self, feat_list, pos_list, index_map_list):
+        # pos_list = []
+        # feat_list = []
+        # index_map_list = []
 
-        for i in range(len(inputs.batch_lengths)):
-            pos = inputs.point[i]
-            feat = inputs.feat[i]
-            feat, pos, index_map = self.input_layer(feat, pos)
-            pos_list.append(pos)
-            feat_list.append(feat)
-            index_map_list.append(index_map)
+        # for i in range(len(inputs.batch_lengths)):
+        #     pos = inputs.point[i]
+        #     feat = inputs.feat[i]
+        #     feat, pos, index_map = self.input_layer(feat, pos)
+        #     pos_list.append(pos)
+        #     feat_list.append(feat)
+        #     index_map_list.append(index_map)
 
+        # Here
         feat_list = self.sub_sparse_conv(feat_list, pos_list, voxel_size=1.0)
         feat_list = self.unet(pos_list, feat_list)
-        feat_list = self.batch_norm(feat_list)
-        feat_list = self.relu(feat_list)
-        feat_list = self.linear(feat_list)
-        output = self.output_layer(feat_list, index_map_list)
+        # feat_list = self.batch_norm(feat_list)
+        # feat_list = self.relu(feat_list)
+        # feat_list = self.linear(feat_list)
+        # output = self.output_layer(feat_list, index_map_list)
 
-        return output
+        return feat_list
 
     def preprocess(self, data, attr):
         # If num_workers > 0, use new RNG with unique seed for each thread.
@@ -198,7 +262,7 @@ class SparseConvUnet(BaseModel):
             results: Output of the model.
             inputs: Input of the model.
             device: device(cpu or cuda).
-        
+
         Returns:
             Returns loss, labels and scores.
         """
@@ -231,15 +295,16 @@ class BatchNormBlock(nn.Module):
         self.bn = nn.BatchNorm1d(m, eps=eps, momentum=momentum)
 
     def forward(self, feat_list):
-        lengths = [feat.shape[0] for feat in feat_list]
-        out = self.bn(torch.cat(feat_list, 0))
-        out_list = []
-        start = 0
-        for l in lengths:
-            out_list.append(out[start:start + l])
-            start += l
+        # lengths = [feat.shape[0] for feat in feat_list]
+        # out = self.bn(torch.cat(feat_list, 0))
+        # out_list = []
+        # start = 0
+        # for l in lengths:
+        #     out_list.append(out[start:start + l])
+        #     start += l
 
-        return out_list
+        # return out_list
+        return [self.bn(feat) for feat in feat_list]
 
     def __name__(self):
         return "BatchNormBlock"
@@ -252,15 +317,16 @@ class ReLUBlock(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, feat_list):
-        lengths = [feat.shape[0] for feat in feat_list]
-        out = self.relu(torch.cat(feat_list, 0))
-        out_list = []
-        start = 0
-        for l in lengths:
-            out_list.append(out[start:start + l])
-            start += l
+        # lengths = [feat.shape[0] for feat in feat_list]
+        # out = self.relu(torch.cat(feat_list, 0))
+        # out_list = []
+        # start = 0
+        # for l in lengths:
+        #     out_list.append(out[start:start + l])
+        #     start += l
 
-        return out_list
+        # return out_list
+        return [self.relu(feat) for feat in feat_list]
 
     def __name__(self):
         return "ReLUBlock"
@@ -359,12 +425,12 @@ class SubmanifoldSparseConv(nn.Module):
                 offset = 0.5
 
         offset = torch.full((3,), offset, dtype=torch.float32)
-        self.net = SparseConv(in_channels=in_channels,
-                              filters=filters,
-                              kernel_size=kernel_size,
-                              use_bias=use_bias,
-                              offset=offset,
-                              normalize=normalize)
+        self.net = SparseConvONNX(in_channels=in_channels,
+                                  filters=filters,
+                                  kernel_size=kernel_size,
+                                  use_bias=use_bias,
+                                  offset=offset,
+                                  normalize=normalize)
 
     def forward(self,
                 features_list,
@@ -395,7 +461,7 @@ def calculate_grid(in_positions):
 
     out_pos = out_pos + filter
     out_pos = out_pos[out_pos.min(1).values >= 0]
-    out_pos = out_pos[(~((out_pos.long() % 2).bool()).any(1))]
+    out_pos = out_pos[(~((out_pos.long() % 2).bool()).max(1)[0])]
     out_pos = torch.unique(out_pos, dim=0)
 
     return out_pos + 0.5
@@ -419,12 +485,12 @@ class Convolution(nn.Module):
                 offset = -0.5
 
         offset = torch.full((3,), offset, dtype=torch.float32)
-        self.net = SparseConv(in_channels=in_channels,
-                              filters=filters,
-                              kernel_size=kernel_size,
-                              use_bias=use_bias,
-                              offset=offset,
-                              normalize=normalize)
+        self.net = SparseConvONNX(in_channels=in_channels,
+                                  filters=filters,
+                                  kernel_size=kernel_size,
+                                  use_bias=use_bias,
+                                  offset=offset,
+                                  normalize=normalize)
 
     def forward(self, features_list, in_positions_list, voxel_size=1.0):
         out_positions_list = []
@@ -462,12 +528,12 @@ class DeConvolution(nn.Module):
                 offset = -0.5
 
         offset = torch.full((3,), offset, dtype=torch.float32)
-        self.net = SparseConvTranspose(in_channels=in_channels,
-                                       filters=filters,
-                                       kernel_size=kernel_size,
-                                       use_bias=use_bias,
-                                       offset=offset,
-                                       normalize=normalize)
+        self.net = SparseConvTransposeONNX(in_channels=in_channels,
+                                           filters=filters,
+                                           kernel_size=kernel_size,
+                                           use_bias=use_bias,
+                                           offset=offset,
+                                           normalize=normalize)
 
     def forward(self,
                 features_list,

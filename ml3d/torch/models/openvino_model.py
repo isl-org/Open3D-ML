@@ -2,6 +2,7 @@ import io
 import copy
 
 import torch
+from torch import nn
 
 from openvino.inference_engine import IECore
 
@@ -14,6 +15,47 @@ def pointpillars_extract_feats(self, x):
     return x
 
 
+# class DenseSparseConv(nn.Module):
+#     def __init__(self, sparse_conv):
+#         super().__init__()
+
+#         self.conv3d = nn.Conv3d(
+#             sparse_conv.in_channels,
+#             sparse_conv.filters,
+#             sparse_conv.kernel_size,
+#             padding='same',
+#             bias=False)
+
+#         weight = sparse_conv.state_dict()["kernel"].permute(4, 3, 2, 1, 0)
+#         self.conv3d.load_state_dict({"weight": weight})
+
+#     def forward(self, features_list, in_positions_list, voxel_size):
+#         inp_positions_int = in_positions_list[0]
+#         # print(in_positions_list[0])
+#         # exit()
+#         inp_volume = np.zeros(
+#             (1, max_grid_extent, max_grid_extent, max_grid_extent, in_channels),
+#             dtype=dtype)
+
+#         inp_volume[0, inp_positions_int[:, 2], inp_positions_int[:, 1],
+#             inp_positions_int[:, 0], :] = features_list[0]
+
+
+# def replace_sparse_conv(model):
+#     for name, l in model.named_children():
+#         layer_type = l.__class__.__name__
+#         if layer_type == "SubmanifoldSparseConv":
+#             dense_conv = DenseSparseConv(l.net)
+#             setattr(model, name, dense_conv)
+#             pass
+#         elif layer_type == "Convolution":
+#             pass
+#         elif layer_type == "DeConvolution":
+#             pass
+#         else:
+#             replace_sparse_conv(l)
+
+
 class OpenVINOModel:
     """Class providing OpenVINO backend for PyTorch models.
 
@@ -22,6 +64,7 @@ class OpenVINOModel:
 
     def __init__(self, base_model):
         self.ie = IECore()
+        self.ie.add_extension("/home/dkurt/openvino_pytorch_unpool/user_ie_extensions/build/libuser_cpu_extension.so", "CPU")
         self.exec_net = None
         self.base_model = base_model
         self.device = "CPU"
@@ -59,6 +102,25 @@ class OpenVINOModel:
             inputs = {
                 'x': x,
             }
+        elif isinstance(inputs, dataloaders.concat_batcher.SparseConvUnetBatch):
+            pos_list = []
+            feat_list = []
+            index_map_list = []
+
+            for i in range(len(inputs.batch_lengths)):
+                pos = inputs.point[i]
+                feat = inputs.feat[i]
+                feat, pos, index_map = self.base_model.input_layer(feat, pos)
+                pos_list.append(pos)
+                feat_list.append(feat)
+                index_map_list.append(torch.tensor(index_map, dtype=torch.long))
+            print(index_map_list)
+
+            inputs = {
+                'feat': feat_list,
+                'pos': pos_list,
+                'index_map_list': index_map_list,
+            }
         elif not isinstance(inputs, dict):
             raise TypeError(f"Unknown inputs type: {inputs.__class__}")
         return inputs
@@ -70,9 +132,10 @@ class OpenVINOModel:
 
         # Forward origin inputs instead of export <tensors>
         origin_forward = self.base_model.forward
-        self.base_model.forward = lambda x: origin_forward(inputs)
-        self.base_model.extract_feats = lambda *args: pointpillars_extract_feats(
-            self.base_model, tensors[input_names[0]])
+        self.base_model.forward = lambda x: origin_forward(tensors["feat"], tensors["pos"], tensors["index_map_list"])
+        # replace_sparse_conv(self.base_model)
+        # self.base_model.extract_feats = lambda *args: pointpillars_extract_feats(
+        #     self.base_model, tensors[input_names[0]])
 
         buf = io.BytesIO()
         self.base_model.device = torch.device('cpu')
@@ -80,6 +143,7 @@ class OpenVINOModel:
         torch.onnx.export(self.base_model,
                           tensors,
                           buf,
+                          operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH,
                           input_names=input_names)
 
         self.base_model.forward = origin_forward
@@ -105,6 +169,8 @@ class OpenVINOModel:
                 if tensor.nelement() > 0:
                     tensors[name] = tensor.detach().numpy()
 
+        print("Fine")
+        exit()
         output = self.exec_net.infer(tensors)
 
         if len(output) == 1:
