@@ -1,12 +1,13 @@
 import logging
 import re
+import numpy as np
+import torch
+import torch.distributed as dist
+
 from datetime import datetime
 from os.path import exists, join
 from pathlib import Path
-
 from tqdm import tqdm
-import numpy as np
-import torch
 from torch.utils.data import DataLoader
 
 from .base_pipeline import BasePipeline
@@ -255,18 +256,21 @@ class ObjectDetection(BasePipeline):
         """Run training with train data split."""
         torch.manual_seed(self.rng.integers(np.iinfo(
             np.int32).max))  # Random reproducible seed for torch
+        rank = self.rank  # Rank for distributed training
         model = self.model
         device = self.device
         dataset = self.dataset
 
         cfg = self.cfg
 
-        log.info("DEVICE : {}".format(device))
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        if rank == 0:
+            log.info("DEVICE : {}".format(device))
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
+            log_file_path = join(cfg.logs_dir,
+                                 'log_train_' + timestamp + '.txt')
+            log.info("Logging in file : {}".format(log_file_path))
+            log.addHandler(logging.FileHandler(log_file_path))
 
         batcher = ConcatBatcher(device, model.cfg.name)
 
@@ -277,15 +281,22 @@ class ObjectDetection(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
-        train_loader = DataLoader(
-            train_split,
-            batch_size=cfg.batch_size,
-            num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', False),
-            collate_fn=batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
-                torch.utils.data.get_worker_info().seed))
-        )  # numpy expects np.uint32, whereas torch returns np.uint64.
+
+        if self.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                train_split)
+        else:
+            train_sampler = None
+
+        train_loader = DataLoader(train_split,
+                                  batch_size=cfg.batch_size,
+                                  num_workers=cfg.get('num_workers', 0),
+                                  pin_memory=cfg.get('pin_memory', False),
+                                  collate_fn=batcher.collate_fn,
+                                  sampler=train_sampler)
+        #     worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+        #         torch.utils.data.get_worker_info().seed))
+        # )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 
@@ -301,23 +312,31 @@ class ObjectDetection(BasePipeline):
                                     runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
-        self.save_config(writer)
+        if rank == 0:
+            self.save_config(writer)
+            log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
         # wrap model for multiple GPU
-        model = CustomDataParallel(model, device_ids=self.device_ids)
+        if self.distributed:
+            model.cuda(self.device)
+            model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[self.device])
 
-        log.info("Writing summary in {}.".format(self.tensorboard_dir))
         record_summary = 'train' in cfg.get('summary').get('record_for', [])
 
-        log.info("Started training")
+        if rank == 0:
+            log.info("Started training")
+
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-            model.train()
+            if self.distributed:
+                train_sampler.set_epoch(epoch)
 
+            model.train()
             self.losses = {}
 
             process_bar = tqdm(train_loader, desc='training')
-            for data in process_bar:
+            for data in train_loader:
                 data.to(device)
                 results = model(data)
                 loss = model.get_loss(results, data)
@@ -331,7 +350,7 @@ class ObjectDetection(BasePipeline):
                 self.optimizer.step()
 
                 # Record visualization for the last iteration
-                if record_summary and process_bar.n == process_bar.total - 1:
+                if rank == 0 and record_summary and process_bar.n == process_bar.total - 1:
                     boxes = model.inference_end(results, data)
                     self.summary['train'] = self.get_3d_summary(boxes,
                                                                 data,
@@ -351,13 +370,13 @@ class ObjectDetection(BasePipeline):
                 self.scheduler.step()
 
             # --------------------- validation
-            if (epoch % cfg.get("validation_freq", 1)) == 0:
+            if rank == 0 and (epoch % cfg.get("validation_freq", 1)) == 0:
                 self.run_valid()
 
-            self.save_logs(writer, epoch)
-
-            if epoch % cfg.save_ckpt_freq == 0:
-                self.save_ckpt(epoch)
+            if rank == 0:
+                self.save_logs(writer, epoch)
+                if epoch % cfg.save_ckpt_freq == 0:
+                    self.save_ckpt(epoch)
 
     def get_3d_summary(self,
                        infer_bboxes_batch,
@@ -480,7 +499,8 @@ class ObjectDetection(BasePipeline):
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
-        make_dir(train_ckpt_dir)
+        if self.rank == 0:
+            make_dir(train_ckpt_dir)
 
         epoch = 0
         if ckpt_path is None:

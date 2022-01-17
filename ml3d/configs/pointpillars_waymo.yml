@@ -10,7 +10,7 @@ model:
 
   batcher: "ignore"
 
-  point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
+  point_cloud_range: [-80, -80, -6, 85, 85, 7]
   classes: ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
 
   loss:
@@ -31,7 +31,7 @@ model:
     max_voxels: [32000, 32000]
 
   voxel_encoder:
-    in_channels: 5
+    in_channels: 4
     feat_channels: [64]
     voxel_size: *vsize
 
@@ -70,18 +70,18 @@ model:
     rotations: [0, 1.57]
     iou_thr: [[0.4, 0.55], [0.3, 0.5], [0.3, 0.5]]
 
-  augment:
-    PointShuffle: True
-    ObjectRangeFilter: True
-    ObjectSample:
-      min_points_dict:
-        VEHICLE: 5
-        PEDESTRIAN: 10
-        CYCLIST: 10
-      sample_dict:
-        VEHICLE: 15
-        PEDESTRIAN: 10
-        CYCLIST: 10
+  augment: {}
+    # PointShuffle: True
+    # ObjectRangeFilter: True
+    # ObjectSample:
+    #   min_points_dict:
+    #     VEHICLE: 5
+    #     PEDESTRIAN: 10
+    #     CYCLIST: 10
+    #   sample_dict:
+    #     VEHICLE: 15
+    #     PEDESTRIAN: 10
+    #     CYCLIST: 10
 
 
 pipeline:

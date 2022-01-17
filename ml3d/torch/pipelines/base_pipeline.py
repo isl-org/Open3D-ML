@@ -16,7 +16,7 @@ class BasePipeline(ABC):
                  model,
                  dataset=None,
                  device='cuda',
-                 device_ids=[0],
+                 distributed=False,
                  **kwargs):
         """Initialize.
 
@@ -46,12 +46,22 @@ class BasePipeline(ABC):
             model.__class__.__name__ + '_' + dataset_name + '_torch')
         make_dir(self.cfg.logs_dir)
 
+        self.distributed = distributed
+
+        self.rank = kwargs.get('rank', 0)
+
         if device == 'cpu' or not torch.cuda.is_available():
+            if distributed:
+                raise ValueError(
+                    "Distributed training is ON, but CUDA not available.")
             self.device = torch.device('cpu')
-            self.device_ids = [-1]
         else:
-            self.device = torch.device('cuda')
-            self.device_ids = device_ids
+            if distributed:
+                self.device = torch.device(device)
+                print("Using device", self.device)
+                torch.cuda.set_device(self.device)
+            else:
+                self.device = torch.device('cuda')
 
         self.summary = {}
         self.cfg.setdefault('summary', {})

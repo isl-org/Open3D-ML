@@ -3,6 +3,8 @@ import argparse
 import sys
 import yaml
 import pprint
+import os
+import torch.distributed as dist
 
 from pathlib import Path
 
@@ -70,6 +72,8 @@ def main():
     rng = np.random.default_rng(args.seed)
     if framework == 'torch':
         import open3d.ml.torch as ml3d
+        import torch.multiprocessing as mp
+        import torch.distributed as dist
     else:
         import tensorflow as tf
         import open3d.ml.tf as ml3d
@@ -101,24 +105,20 @@ def main():
         cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model = \
                         _ml3d.utils.Config.merge_cfg_file(cfg, args, extra_dict)
 
-        cfg_dict_dataset['seed'] = rng
-        cfg_dict_model['seed'] = rng
-        cfg_dict_pipeline['seed'] = rng
-
-        dataset = Dataset(cfg_dict_dataset.pop('dataset_path', None),
-                          **cfg_dict_dataset)
-
         if args.mode is not None:
             cfg_dict_model["mode"] = args.mode
-        model = Model(**cfg_dict_model)
-
         if args.max_epochs is not None:
             cfg_dict_pipeline["max_epochs"] = args.max_epochs
         if args.batch_size is not None:
             cfg_dict_pipeline["batch_size"] = args.batch_size
+
+        cfg_dict_dataset['seed'] = rng
+        cfg_dict_model['seed'] = rng
+        cfg_dict_pipeline['seed'] = rng
+
         cfg_dict_pipeline["device"] = args.device
         cfg_dict_pipeline["device_ids"] = args.device_ids
-        pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
+
     else:
         if (args.pipeline and args.model and args.dataset) is None:
             raise ValueError("Please specify pipeline, model, and dataset " +
@@ -136,24 +136,86 @@ def main():
         cfg_dict_model['seed'] = rng
         cfg_dict_pipeline['seed'] = rng
 
-        dataset = Dataset(**cfg_dict_dataset)
-        model = Model(**cfg_dict_model, mode=args.mode)
-        pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
-
     with open(Path(__file__).parent / 'README.md', 'r') as f:
         readme = f.read()
-    pipeline.cfg_tb = {
+
+    cfg_tb = {
         'readme': readme,
         'cmd_line': cmd_line,
         'dataset': pprint.pformat(cfg_dict_dataset, indent=2),
         'model': pprint.pformat(cfg_dict_model, indent=2),
         'pipeline': pprint.pformat(cfg_dict_pipeline, indent=2)
     }
+    args.cfg_tb = cfg_tb
+    args.distributed = framework == 'torch' and args.device != 'cpu' and len(
+        args.device_ids) > 1
+
+    if not args.distributed:
+        # print("not distr : ")
+        # exit(0)
+        dataset = Dataset(**cfg_dict_dataset)
+        model = Model(**cfg_dict_model, mode=args.mode)
+        pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)
+
+        pipeline.cfg_tb = cfg_tb
+
+        if args.split == 'test':
+            pipeline.run_test()
+        else:
+            pipeline.run_train()
+
+    else:
+        mp.spawn(main_worker,
+                 args=(Dataset, Model, Pipeline, cfg_dict_dataset,
+                       cfg_dict_model, cfg_dict_pipeline, args),
+                 nprocs=len(args.device_ids))
+
+
+def setup(rank, world_size):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+
+    # initialize the process group
+    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+
+
+def cleanup():
+    dist.destroy_process_group()
+
+
+def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
+                cfg_dict_model, cfg_dict_pipeline, args):
+    world_size = len(args.device_ids)
+    setup(rank, world_size)
+
+    cfg_dict_dataset['rank'] = rank
+    cfg_dict_model['rank'] = rank
+    cfg_dict_pipeline['rank'] = rank
+
+    device = f"cuda:{args.device_ids[rank]}"
+    print(f"rank = {rank}, world_size = {world_size}, gpu = {device}")
+
+    cfg_dict_model['device'] = device
+    cfg_dict_pipeline['device'] = device
+
+    dataset = Dataset(**cfg_dict_dataset)
+    model = Model(**cfg_dict_model, mode=args.mode)
+    pipeline = Pipeline(model,
+                        dataset,
+                        distributed=args.distributed,
+                        **cfg_dict_pipeline)
+
+    with open(Path(__file__).parent / 'README.md', 'r') as f:
+        readme = f.read()
+    pipeline.cfg_tb = args.cfg_tb
 
     if args.split == 'test':
-        pipeline.run_test()
+        if rank == 0:
+            pipeline.run_test()
     else:
         pipeline.run_train()
+
+    cleanup()
 
 
 if __name__ == '__main__':

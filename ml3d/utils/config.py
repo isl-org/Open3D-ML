@@ -272,3 +272,9 @@ class Config(object):
 
     def __getitem__(self, name):
         return self._cfg_dict.__getitem__(name)
+
+    def __getstate__(self):
+        return self.cfg_dict
+
+    def __setstate__(self, state):
+        self.cfg_dict = state
