@@ -155,7 +155,7 @@ class RandLANet(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
         lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            cfg_pipeline.adam_lr,
+            cfg_pipeline.optimizer.learning_rate,
             decay_steps=100000,
             decay_rate=cfg_pipeline.scheduler_gamma)
         optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)

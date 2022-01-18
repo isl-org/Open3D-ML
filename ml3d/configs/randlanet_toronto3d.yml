@@ -41,9 +41,9 @@ model:
         method: linear
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.01
+  optimizer:
+    lr: 0.001
   batch_size: 2
-  learning_rate: 0.01
   main_log_dir: ./logs
   max_epoch: 200
   save_ckpt_freq: 5

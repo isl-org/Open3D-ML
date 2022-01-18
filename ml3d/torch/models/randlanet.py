@@ -50,7 +50,6 @@ class RandLANet(BaseModel):
             grid_size=0.06,
             batcher='DefaultBatcher',
             ckpt_path=None,
-            weight_decay=0.0,
             augment={},
             **kwargs):
 
@@ -67,7 +66,6 @@ class RandLANet(BaseModel):
                          grid_size=grid_size,
                          batcher=batcher,
                          ckpt_path=ckpt_path,
-                         weight_decay=weight_decay,
                          augment=augment,
                          **kwargs)
         cfg = self.cfg
@@ -351,8 +349,7 @@ class RandLANet(BaseModel):
 
     def get_optimizer(self, cfg_pipeline):
         optimizer = torch.optim.Adam(self.parameters(),
-                                     lr=cfg_pipeline.adam_lr,
-                                     weight_decay=self.cfg.weight_decay)
+                                     **cfg_pipeline.optimizer)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(
             optimizer, cfg_pipeline.scheduler_gamma)
         return optimizer, scheduler
