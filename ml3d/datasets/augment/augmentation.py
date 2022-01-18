@@ -20,7 +20,8 @@ class Augmentation():
 
         Args:
             data: Pointcloud or features.
-            cfg: configuration dictionary.
+            cfg: config dict where
+                Key 'dim' specifies dimension to be recentered.
 
         """
         if not cfg:

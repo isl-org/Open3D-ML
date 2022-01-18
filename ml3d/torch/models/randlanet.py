@@ -19,6 +19,20 @@ class RandLANet(BaseModel):
     """Class defining RandLANet, a Semantic Segmentation model.
     Based on the architecture
     https://arxiv.org/abs/1911.11236#
+
+    Reference Implementation - https://github.com/QingyongHu/RandLA-Net
+
+    RandLA-Net is an efficient and lightweight neural architecture which directly infer
+    per-point semantics for large-scale point clouds. The key approach is to use random
+    point sampling instead of more complex point selection approaches. Although
+    remarkably computation and memory efficient, random sampling can discard key features
+    by chance. To overcome this, we introduce a novel local feature aggregation module to
+    progressively increase the receptive field for each 3D point, thereby effectively
+    preserving geometric details.
+
+    Architecture
+    .. image:: https://user-images.githubusercontent.com/23613902/150006228-34fb9e04-76b6-4022-af08-c308da6dcaae.png
+
     """
 
     def __init__(
@@ -173,11 +187,9 @@ class RandLANet(BaseModel):
         augment_cfg = self.cfg.get('augment', {}).copy()
         val_augment_cfg = {}
         if 'recenter' in augment_cfg:
-            val_augment_cfg['recenter'] = augment_cfg['recenter']
-            augment_cfg.pop('recenter')
+            val_augment_cfg['recenter'] = augment_cfg.pop('recenter')
         if 'normalize' in augment_cfg:
-            val_augment_cfg['normalize'] = augment_cfg['normalize']
-            augment_cfg.pop('normalize')
+            val_augment_cfg['normalize'] = augment_cfg.pop('normalize')
 
         self.augmenter.augment(pc, feat, label, val_augment_cfg, seed=rng)
 
@@ -193,8 +205,10 @@ class RandLANet(BaseModel):
         else:
             feat = np.concatenate([pc, feat], axis=1)
 
-        assert cfg.in_channels == feat.shape[
-            1], "Wrong feature dimension, please update dim_input(3 + feature_dimension) in config"
+        if cfg.in_channels != feat.shape[1]:
+            raise RuntimeError(
+                "Wrong feature dimension, please update in_channels(3 + feature_dimension) in config"
+            )
 
         input_points = []
         input_neighbors = []
@@ -344,14 +358,16 @@ class RandLANet(BaseModel):
         return optimizer, scheduler
 
     def get_loss(self, Loss, results, inputs, device):
-        """Runs the loss on outputs of the model.
+        """Calculate the loss on output of the model.
 
         Args:
-            outputs: logits
-            labels: labels
+            Loss: Object of type `SemSegLoss`.
+            results: Output of the model (B, N, C).
+            inputs: Input of the model.
+            device: device(cpu or cuda).
 
         Returns:
-             loss
+            Returns loss, labels and scores.
 
         """
         cfg = self.cfg
@@ -424,6 +440,18 @@ class RandLANet(BaseModel):
             return False
 
     def update_probs(self, inputs, results, test_probs, test_labels):
+        """Update test probabilities with probs from current tested patch.
+
+        Args:
+            inputs: input to the model.
+            results: output of the model.
+            test_probs: probabilities for whole pointcloud
+            test_labels: ground truth for whole pointcloud.
+
+        Returns:
+            updated probabilities and labels
+
+        """
         self.test_smooth = 0.95
 
         for b in range(results.size()[0]):
@@ -445,6 +473,9 @@ MODEL._register_module(RandLANet, 'torch')
 
 
 class SharedMLP(nn.Module):
+    """Module consisting of commonly used layers conv, batchnorm
+    and any activation function.
+    """
 
     def __init__(self,
                  in_channels,
@@ -492,6 +523,9 @@ class SharedMLP(nn.Module):
 
 
 class LocalSpatialEncoding(nn.Module):
+    """This module computes k neighbour feature encoding for each point.
+    Encoding consists of absolute distance, relative distance, positions.
+    """
 
     def __init__(self, dim_in, dim_out, num_neighbors, encode_pos=False):
         super(LocalSpatialEncoding, self).__init__()
@@ -499,8 +533,6 @@ class LocalSpatialEncoding(nn.Module):
         self.num_neighbors = num_neighbors
         self.mlp = SharedMLP(dim_in, dim_out, activation_fn=nn.LeakyReLU(0.2))
         self.encode_pos = encode_pos
-
-        # self.device = device
 
     def gather_neighbor(self, coords, neighbor_indices):
         """Gather features based on neighbor indices.
@@ -538,6 +570,8 @@ class LocalSpatialEncoding(nn.Module):
                 torch.Tensor of shape (B, d, N, 1)
             neighbor_indices: indices of k neighbours.
                 torch.Tensor of shape (B, N, K)
+            relative_features: relative neighbor features calculated
+              on first pass. Required for second pass.
 
         Returns:
             torch.Tensor of shape (B, 2*d, N, K)
@@ -576,6 +610,9 @@ class LocalSpatialEncoding(nn.Module):
 
 
 class AttentivePooling(nn.Module):
+    """This module pools down k neighbour features to a single encoding
+    using weighted average with attention scores.
+    """
 
     def __init__(self, in_channels, out_channels):
         super(AttentivePooling, self).__init__()
@@ -607,6 +644,10 @@ class AttentivePooling(nn.Module):
 
 
 class LocalFeatureAggregation(nn.Module):
+    """The neighbour features returned from LocalSpatialEncoding
+    and pooled from AttentivePooling are aggregated and processed
+    in multiple layers in this module.
+    """
 
     def __init__(self, d_in, d_out, num_neighbors):
         super(LocalFeatureAggregation, self).__init__()
@@ -641,8 +682,6 @@ class LocalFeatureAggregation(nn.Module):
             torch.Tensor of shape (B, 2*d_out, N, 1).
 
         """
-        # knn_output = knn(coords.cpu().contiguous(), coords.cpu().contiguous(), self.num_neighbors)
-
         x = self.mlp1(feat)
 
         x, neighbor_features = self.lse1(coords, x, neighbor_indices)

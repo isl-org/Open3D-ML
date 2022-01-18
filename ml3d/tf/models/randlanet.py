@@ -15,6 +15,20 @@ class RandLANet(BaseModel):
     """Class defining RandLANet, a Semantic Segmentation model.
     Based on the architecture
     https://arxiv.org/abs/1911.11236#
+
+    Reference Implementation - https://github.com/QingyongHu/RandLA-Net
+
+    RandLA-Net is an efficient and lightweight neural architecture which directly infer
+    per-point semantics for large-scale point clouds. The key approach is to use random
+    point sampling instead of more complex point selection approaches. Although
+    remarkably computation and memory efficient, random sampling can discard key features
+    by chance. To overcome this, we introduce a novel local feature aggregation module to
+    progressively increase the receptive field for each 3D point, thereby effectively
+    preserving geometric details.
+
+    Architecture
+    .. image:: https://user-images.githubusercontent.com/23613902/150006228-34fb9e04-76b6-4022-af08-c308da6dcaae.png
+
     """
 
     def __init__(
@@ -73,8 +87,6 @@ class RandLANet(BaseModel):
                 encoder_dim_list.append(dim_feature)
             encoder_dim_list.append(dim_feature)
 
-        # self.encoder = tf.keras.models.Sequential(self.encoder)
-
         self.mlp = SharedMLP(dim_feature,
                              dim_feature,
                              activation_fn=tf.keras.layers.LeakyReLU(0.2))
@@ -88,8 +100,6 @@ class RandLANet(BaseModel):
                           transpose=True,
                           activation_fn=tf.keras.layers.LeakyReLU(0.2)))
             dim_feature = encoder_dim_list[-i - 2]
-
-        # self.decoder = tf.keras.models.Sequential(self.decoder)
 
         self.fc1 = tf.keras.models.Sequential(
             (SharedMLP(dim_feature,
@@ -153,14 +163,16 @@ class RandLANet(BaseModel):
         return optimizer
 
     def get_loss(self, Loss, results, inputs):
-        """Runs the loss on outputs of the model.
+        """Calculate the loss on output of the model.
 
         Args:
-            outputs: logits
-            labels: labels
+            Loss: Object of type `SemSegLoss`.
+            results: Output of the model (B, N, C).
+            inputs: Input of the model.
+            device: device(cpu or cuda).
 
         Returns:
-             loss
+            Returns loss, labels and scores.
 
         """
         cfg = self.cfg
@@ -282,8 +294,10 @@ class RandLANet(BaseModel):
                 else:
                     feat = np.concatenate([pc, feat], axis=1)
 
-                assert cfg.in_channels == feat.shape[
-                    1], "Wrong feature dimension, please update in_channels(3 + feature_dimension) in config"
+                if cfg.in_channels != feat.shape[1]:
+                    raise RuntimeError(
+                        "Wrong feature dimension, please update in_channels(3 + feature_dimension) in config"
+                    )
 
                 yield (pc.astype(np.float32), feat.astype(np.float32),
                        label.astype(np.float32))
@@ -323,8 +337,10 @@ class RandLANet(BaseModel):
         else:
             feat = np.concatenate([pc, feat], axis=1)
 
-        assert self.cfg.in_channels == feat.shape[
-            1], "Wrong feature dimension, please update in_channels(3 + feature_dimension) in config"
+        if self.cfg.in_channels != feat.shape[1]:
+            raise RuntimeError(
+                "Wrong feature dimension, please update in_channels(3 + feature_dimension) in config"
+            )
 
         features = feat
         input_points = []
@@ -385,11 +401,6 @@ class RandLANet(BaseModel):
         input_list += [feat, label]
 
         return input_list
-
-        # input_list = input_points + input_neighbors + input_pools + input_up_samples
-        # input_list += [feat, label]
-
-        # return input_list
 
     def inference_begin(self, data):
         self.test_smooth = 0.95
@@ -494,6 +505,9 @@ MODEL._register_module(RandLANet, 'tf')
 
 
 class SharedMLP(tf.keras.layers.Layer):
+    """Module consisting of commonly used layers conv, batchnorm
+    and any activation function.
+    """
 
     def __init__(self,
                  in_channels,
@@ -538,6 +552,9 @@ class SharedMLP(tf.keras.layers.Layer):
 
 
 class LocalSpatialEncoding(tf.keras.layers.Layer):
+    """This module computes k neighbour feature encoding for each point.
+    Encoding consists of absolute distance, relative distance, positions.
+    """
 
     def __init__(self, dim_in, dim_out, num_neighbors, encode_pos=False):
         super(LocalSpatialEncoding, self).__init__()
@@ -547,8 +564,6 @@ class LocalSpatialEncoding(tf.keras.layers.Layer):
                              dim_out,
                              activation_fn=tf.keras.layers.LeakyReLU(0.2))
         self.encode_pos = encode_pos
-
-        # self.device = device
 
     def gather_neighbor(self, coords, neighbor_indices):
         """Gather features based on neighbor indices.
@@ -587,6 +602,9 @@ class LocalSpatialEncoding(tf.keras.layers.Layer):
                 tf.Tensor of shape (B, d, N, 1)
             neighbor_indices: indices of k neighbours.
                 tf.Tensor of shape (B, N, K)
+            training: whether called under training mode.
+            relative_features: relative neighbor features calculated
+              on first pass. Required for second pass.
 
         Returns:
             tf.Tensor of shape (B, 2*d, N, K)
@@ -621,6 +639,9 @@ class LocalSpatialEncoding(tf.keras.layers.Layer):
 
 
 class AttentivePooling(tf.keras.layers.Layer):
+    """This module pools down k neighbour features to a single encoding
+    using weighted average with attention scores.
+    """
 
     def __init__(self, in_channels, out_channels):
         super(AttentivePooling, self).__init__()
@@ -653,6 +674,10 @@ class AttentivePooling(tf.keras.layers.Layer):
 
 
 class LocalFeatureAggregation(tf.keras.layers.Layer):
+    """The neighbour features returned from LocalSpatialEncoding
+    and pooled from AttentivePooling are aggregated and processed
+    in multiple layers in this module.
+    """
 
     def __init__(self, d_in, d_out, num_neighbors):
         super(LocalFeatureAggregation, self).__init__()
