@@ -5,6 +5,7 @@ import yaml
 import pprint
 import os
 import torch.distributed as dist
+from torch import multiprocessing
 
 from pathlib import Path
 
@@ -219,4 +220,5 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
 
 
 if __name__ == '__main__':
+    multiprocessing.set_start_method('spawn')
     main()

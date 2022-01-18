@@ -156,7 +156,8 @@ class ObjectDetection(BasePipeline):
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
+        if self.rank == 0:
+            log.addHandler(logging.FileHandler(log_file_path))
 
         batcher = ConcatBatcher(device, model.cfg.name)
 
@@ -168,16 +169,24 @@ class ObjectDetection(BasePipeline):
                                       shuffle=True,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
-        valid_loader = DataLoader(
-            valid_split,
-            batch_size=cfg.val_batch_size,
-            num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', False),
-            collate_fn=batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
-                torch.utils.data.get_worker_info().seed)))
 
-        record_summary = 'valid' in cfg.get('summary').get('record_for', [])
+        if self.distributed:
+            valid_sampler = torch.utils.data.distributed.DistributedSampler(
+                valid_split)
+        else:
+            valid_sampler = None
+
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.val_batch_size,
+                                  num_workers=cfg.get('num_workers', 0),
+                                  pin_memory=cfg.get('pin_memory', False),
+                                  collate_fn=batcher.collate_fn,
+                                  sampler=valid_sampler)
+        # worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+        #     torch.utils.data.get_worker_info().seed)))
+
+        record_summary = self.rank == 0 and 'valid' in cfg.get('summary').get(
+            'record_for', [])
         log.info("Started validation")
 
         self.valid_losses = {}
@@ -322,7 +331,8 @@ class ObjectDetection(BasePipeline):
             model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[self.device])
 
-        record_summary = 'train' in cfg.get('summary').get('record_for', [])
+        record_summary = self.rank == 0 and 'train' in cfg.get('summary').get(
+            'record_for', [])
 
         if rank == 0:
             log.info("Started training")
@@ -336,22 +346,35 @@ class ObjectDetection(BasePipeline):
             self.losses = {}
 
             process_bar = tqdm(train_loader, desc='training')
-            for data in train_loader:
+            for data in process_bar:
                 data.to(device)
                 results = model(data)
-                loss = model.get_loss(results, data)
+                if self.distributed:
+                    loss = model.module.get_loss(results, data)
+                else:
+                    loss = model.get_loss(results, data)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()
                 loss_sum.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
+                if self.distributed:
+                    if model.module.cfg.get('grad_clip_norm', -1) > 0:
+                        torch.nn.utils.clip_grad_value_(
+                            model.module.parameters(),
+                            model.module.cfg.grad_clip_norm)
+                else:
+                    if model.cfg.get('grad_clip_norm', -1) > 0:
+                        torch.nn.utils.clip_grad_value_(
+                            model.parameters(), model.cfg.grad_clip_norm)
+
                 self.optimizer.step()
 
                 # Record visualization for the last iteration
-                if rank == 0 and record_summary and process_bar.n == process_bar.total - 1:
-                    boxes = model.inference_end(results, data)
+                if record_summary and process_bar.n == process_bar.total - 1:
+                    if self.distributed:
+                        boxes = model.module.inference_end(results, data)
+                    else:
+                        boxes = model.inference_end(results, data)
                     self.summary['train'] = self.get_3d_summary(boxes,
                                                                 data,
                                                                 epoch,
@@ -366,11 +389,15 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
+                if self.distributed:
+                    dist.barrier()
+
             if self.scheduler is not None:
                 self.scheduler.step()
 
             # --------------------- validation
-            if rank == 0 and (epoch % cfg.get("validation_freq", 1)) == 0:
+            # if rank == 0 and (epoch % cfg.get("validation_freq", 1)) == 0:
+            if epoch % cfg.get("validation_freq", 1) == 0:
                 self.run_valid()
 
             if rank == 0:
