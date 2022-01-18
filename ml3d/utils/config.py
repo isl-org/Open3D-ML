@@ -160,34 +160,7 @@ class Config(object):
         }
         cfg = Config(cfg_dict)
 
-        if args.device is not None:
-            cfg.pipeline.device = args.device
-        if args.split is not None:
-            cfg.pipeline.split = args.split
-        if args.main_log_dir is not None:
-            cfg.pipeline.main_log_dir = args.main_log_dir
-        if args.dataset_path is not None:
-            cfg.dataset.dataset_path = args.dataset_path
-
-        extra_cfg_dict = {'model': {}, 'dataset': {}, 'pipeline': {}}
-
-        for full_key, v in extra_dict.items():
-            d = extra_cfg_dict
-            key_list = full_key.split('.')
-            for subkey in key_list[:-1]:
-                d.setdefault(subkey, ConfigDict())
-                d = d[subkey]
-            subkey = key_list[-1]
-            d[subkey] = v
-
-        cfg_dict_dataset = Config._merge_a_into_b(cfg.dataset,
-                                                  extra_cfg_dict['dataset'])
-        cfg_dict_pipeline = Config._merge_a_into_b(cfg.pipeline,
-                                                   extra_cfg_dict['pipeline'])
-        cfg_dict_model = Config._merge_a_into_b(cfg.model,
-                                                extra_cfg_dict['model'])
-
-        return cfg_dict_dataset, cfg_dict_pipeline, cfg_dict_model
+        return Config.merge_cfg_file(cfg, args, extra_dict)
 
     @staticmethod
     def _merge_a_into_b(a, b):
