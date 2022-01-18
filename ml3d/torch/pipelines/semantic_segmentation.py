@@ -16,14 +16,9 @@ from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBa
 from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss, filter_valid_label
 from ..modules.metrics import SemSegMetric
-from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
+from ...utils import make_dir, PIPELINE, get_runid, code2md
 from ...datasets import InferenceDummySplit
 
-logging.setLogRecordFactory(LogRecord)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

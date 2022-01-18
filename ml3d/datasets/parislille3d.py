@@ -10,10 +10,6 @@ import open3d as o3d
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

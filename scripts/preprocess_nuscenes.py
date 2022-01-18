@@ -5,6 +5,7 @@ except ImportError:
     raise ImportError('Please run "pip install nuscenes-devkit" '
                       'to install the official devkit first.')
 
+import logging
 import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
@@ -223,6 +224,12 @@ class NuScenesProcess():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     out_path = args.out_path
     if out_path is None:

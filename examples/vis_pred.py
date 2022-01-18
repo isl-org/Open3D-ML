@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
 import numpy as np
 import os
@@ -8,6 +9,8 @@ from os.path import exists, join, dirname
 from util import ensure_demo_data
 
 example_dir = os.path.dirname(os.path.realpath(__file__))
+
+log = logging.getLogger(__name__)
 
 
 def get_custom_data(pc_names, path):
@@ -151,4 +154,10 @@ def main():
 
 
 if __name__ == "__main__":
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s - %(asctime)s - %(module)s - %(message)s",
+    )
+
     main()
