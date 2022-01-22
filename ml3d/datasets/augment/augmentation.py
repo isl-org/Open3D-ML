@@ -73,6 +73,7 @@ class Augmentation():
             cfg: configuration dictionary.
 
         """
+        # Not checking for height dimension as preserving absolute height dimension improves some models.
         if np.abs(pc[:, :2].mean()) > 1e-2:
             warnings.warn(
                 f"It is recommended to recenter the pointcloud before calling rotate."
@@ -553,7 +554,7 @@ class ObjdetAugmentation(Augmentation):
 
         if 'recenter' in cfg:
             if cfg['recenter']:
-                data['point'] = self.recenter(data['point'])
+                data['point'] = self.recenter(data['point'], cfg['recenter'])
 
         if 'normalize' in cfg:
             data['point'], _ = self.normalize(data['point'], None,

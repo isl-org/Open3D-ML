@@ -10,8 +10,7 @@ from .base_model import BaseModel
 from ..dataloaders import DefaultBatcher
 from ...datasets.augment import SemsegAugmentation
 from ..modules.losses import filter_valid_label
-from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
-                               trans_crop_pc)
+from ...datasets.utils import DataProcessing
 from ...utils import MODEL
 
 

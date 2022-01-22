@@ -7,8 +7,7 @@ from sklearn.neighbors import KDTree
 from .base_model import BaseModel
 from ...datasets.augment import SemsegAugmentation
 from ...utils import MODEL
-from ...datasets.utils import (DataProcessing, trans_normalize, trans_augment,
-                               trans_crop_pc)
+from ...datasets.utils import (DataProcessing, trans_normalize, trans_crop_pc)
 
 
 class RandLANet(BaseModel):
@@ -610,8 +609,6 @@ class LocalSpatialEncoding(tf.keras.layers.Layer):
             tf.Tensor of shape (B, 2*d, N, K)
         """
         # finding neighboring points
-        B, N, K = neighbor_indices.shape
-
         if self.encode_pos:
             neighbor_coords = self.gather_neighbor(coords, neighbor_indices)
 
