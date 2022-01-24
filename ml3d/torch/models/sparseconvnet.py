@@ -149,9 +149,9 @@ class SparseConvUnet(BaseModel):
         # Here
         feat_list = self.sub_sparse_conv(feat_list, pos_list, voxel_size=1.0)
         feat_list = self.unet(pos_list, feat_list)
-        # feat_list = self.batch_norm(feat_list)
-        # feat_list = self.relu(feat_list)
-        # feat_list = self.linear(feat_list)
+        feat_list = self.batch_norm(feat_list)
+        feat_list = self.relu(feat_list)
+        feat_list = self.linear(feat_list)
         output = self.output_layer(feat_list, index_map_list)
 
         return output
