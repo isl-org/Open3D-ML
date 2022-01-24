@@ -12,15 +12,16 @@ from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
 class SparseConvFunc(torch.autograd.Function):
     @staticmethod
-    def symbolic(g, cls, feat, in_pos, out_pos, voxel_size):
+    def symbolic(g, cls, feat, in_pos, out_pos, voxel_size, transpose):
         kernel = cls.state_dict()["kernel"]
         offset = cls.state_dict()["offset"]
         kernel = g.op("Constant", value_t=kernel)
         offset = g.op("Constant", value_t=offset)
-        return g.op("org.open3d::SparseConv", feat, in_pos, kernel, offset)
+        name = f"org.open3d::SparseConv{'Transpose' if transpose else ''}"
+        return g.op(name, feat, in_pos, kernel, offset)
 
     @staticmethod
-    def forward(self, cls, feat, in_pos, out_pos, voxel_size):
+    def forward(self, cls, feat, in_pos, out_pos, voxel_size, transpose):
         return cls.origin_forward(feat, in_pos, out_pos, voxel_size)
 
 
@@ -30,28 +31,10 @@ class SparseConvONNX(SparseConv):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if kwargs["normalize"]:
-            raise NotImplementedError("SparseConv with normalization")
-        if kwargs["use_bias"]:
-            raise NotImplementedError("SparseConv with bias")
         self.origin_forward = super().forward
 
     def forward(self, feat, in_pos, out_pos, voxel_size):
-        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size)
-
-
-class SparseConvTransposeFunc(torch.autograd.Function):
-    @staticmethod
-    def symbolic(g, cls, feat, in_pos, out_pos, voxel_size):
-        kernel = cls.state_dict()["kernel"]
-        offset = cls.state_dict()["offset"]
-        kernel = g.op("Constant", value_t=kernel)
-        offset = g.op("Constant", value_t=offset)
-        return g.op("org.open3d::SparseConvTranspose", feat, in_pos, kernel, offset)
-
-    @staticmethod
-    def forward(self, cls, feat, in_pos, out_pos, voxel_size):
-        return cls.origin_forward(feat, in_pos, out_pos, voxel_size)
+        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size, False)
 
 
 class SparseConvTransposeONNX(SparseConvTranspose):
@@ -60,16 +43,10 @@ class SparseConvTransposeONNX(SparseConvTranspose):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if kwargs["kernel_size"][0] % 2:
-            raise NotImplementedError("SparseConvTranspose with even kernel_size")
-        if kwargs["normalize"]:
-            raise NotImplementedError("SparseConvTranspose with normalization")
-        if kwargs["use_bias"]:
-            raise NotImplementedError("SparseConvTranspose with bias")
         self.origin_forward = super().forward
 
     def forward(self, feat, in_pos, out_pos, voxel_size):
-        return SparseConvTransposeFunc.apply(self, feat, in_pos, out_pos, voxel_size)
+        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size, True)
 
 
 class SparseConvUnet(BaseModel):
@@ -132,21 +109,19 @@ class SparseConvUnet(BaseModel):
         self.linear = LinearBlock(multiplier, num_classes)
         self.output_layer = OutputLayer()
 
-    # def forward(self, inputs):
-    def forward(self, feat_list, pos_list, index_map_list):
-        # pos_list = []
-        # feat_list = []
-        # index_map_list = []
+    def forward(self, inputs):
+        pos_list = []
+        feat_list = []
+        index_map_list = []
 
-        # for i in range(len(inputs.batch_lengths)):
-        #     pos = inputs.point[i]
-        #     feat = inputs.feat[i]
-        #     feat, pos, index_map = self.input_layer(feat, pos)
-        #     pos_list.append(pos)
-        #     feat_list.append(feat)
-        #     index_map_list.append(index_map)
+        for i in range(len(inputs.batch_lengths)):
+            pos = inputs.point[i]
+            feat = inputs.feat[i]
+            feat, pos, index_map = self.input_layer(feat, pos)
+            pos_list.append(pos)
+            feat_list.append(feat)
+            index_map_list.append(index_map)
 
-        # Here
         feat_list = self.sub_sparse_conv(feat_list, pos_list, voxel_size=1.0)
         feat_list = self.unet(pos_list, feat_list)
         feat_list = self.batch_norm(feat_list)

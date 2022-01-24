@@ -89,10 +89,22 @@ class OpenVINOModel:
 
         # Forward origin inputs instead of export <tensors>
         origin_forward = self.base_model.forward
-        self.base_model.forward = lambda x: origin_forward(tensors["feat"], tensors["pos"], tensors["index_map_list"])
-        # replace_sparse_conv(self.base_model)
-        # self.base_model.extract_feats = lambda *args: pointpillars_extract_feats(
-        #     self.base_model, tensors[input_names[0]])
+        self.base_model.forward = lambda x: origin_forward(inputs)
+        if self.base_model.__class__.__name__ == "SparseConvUnet":
+
+            def sparseconvunet_input_layer(feat, pos):
+                feat = tensors["feat"].pop(0)
+                pos = tensors["pos"].pop(0)
+                index_map = tensors["index_map_list"].pop(0)
+                tensors["feat"].append(feat)
+                tensors["pos"].append(pos)
+                tensors["index_map_list"].append(index_map)
+                return feat, pos, index_map
+
+            self.base_model.input_layer.forward = sparseconvunet_input_layer
+        elif self.base_model.__class__.__name__ == "PointPillars":
+            self.base_model.extract_feats = lambda *args: pointpillars_extract_feats(
+                self.base_model, tensors[input_names[0]])
 
         buf = io.BytesIO()
         self.base_model.device = torch.device('cpu')
@@ -116,8 +128,6 @@ class OpenVINOModel:
 
         tensors = {}
         for name, tensor in inputs.items():
-            # if name.startswith("index_map_list"):
-            #     continue
             if name == 'labels':
                 continue
             if isinstance(tensor, list):
@@ -163,6 +173,7 @@ class OpenVINOModel:
         return self.base_model.transform(*args)
 
     def update_probs(self, *args):
+        self.base_model.trans_point_sampler = self.trans_point_sampler
         return self.base_model.update_probs(*args)
 
     def to(self, device):
