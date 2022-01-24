@@ -22,7 +22,9 @@ class OpenVINOModel:
 
     def __init__(self, base_model):
         self.ie = IECore()
-        self.ie.add_extension("/home/dkurt/openvino_pytorch_unpool/user_ie_extensions/build/libuser_cpu_extension.so", "CPU")
+        self.ie.add_extension(
+            "/home/dkurt/openvino_pytorch_unpool/user_ie_extensions/build/libuser_cpu_extension.so",
+            "CPU")
         self.exec_net = None
         self.base_model = base_model
         self.device = "CPU"
@@ -112,7 +114,8 @@ class OpenVINOModel:
         torch.onnx.export(self.base_model,
                           tensors,
                           buf,
-                          operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH,
+                          operator_export_type=torch.onnx.OperatorExportTypes.
+                          ONNX_FALLTHROUGH,
                           input_names=input_names)
 
         self.base_model.forward = origin_forward

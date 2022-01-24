@@ -11,6 +11,7 @@ from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
 
 class SparseConvFunc(torch.autograd.Function):
+
     @staticmethod
     def symbolic(g, cls, feat, in_pos, out_pos, voxel_size, transpose):
         kernel = cls.state_dict()["kernel"]
@@ -29,24 +30,28 @@ class SparseConvONNX(SparseConv):
     """
     This is a support class which helps export network with SparseConv in ONNX format.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.origin_forward = super().forward
 
     def forward(self, feat, in_pos, out_pos, voxel_size):
-        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size, False)
+        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size,
+                                    False)
 
 
 class SparseConvTransposeONNX(SparseConvTranspose):
     """
     This is a support class which helps export network with SparseConvTranspose in ONNX format.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.origin_forward = super().forward
 
     def forward(self, feat, in_pos, out_pos, voxel_size):
-        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size, True)
+        return SparseConvFunc.apply(self, feat, in_pos, out_pos, voxel_size,
+                                    True)
 
 
 class SparseConvUnet(BaseModel):
@@ -445,6 +450,7 @@ def calculate_grid(in_positions):
 # There are issues with calculate_grid export with ONNX and inference using OpenVINO,
 # so we implement it in C++
 class CalculateGridONNX(torch.autograd.Function):
+
     @staticmethod
     def symbolic(g, in_positions):
         return g.op("org.open3d::calculate_grid", in_positions)

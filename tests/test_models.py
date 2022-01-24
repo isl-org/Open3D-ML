@@ -240,3 +240,35 @@ def test_pointpillars_tf():
     boxes = net.inference_end(results, data)
 
     assert type(boxes) == list
+
+
+def test_sparseconv_torch():
+    import open3d.ml.torch as ml3d
+    from open3d.ml.utils import Config
+
+    cfg_path = base + '/ml3d/configs/sparseconvunet_scannet.yml'
+    cfg = Config.load_from_file(cfg_path)
+
+    net = ml3d.models.SparseConvUnet(**cfg.model, device='cpu')
+
+    batcher = ml3d.dataloaders.ConcatBatcher('cpu', model='SparseConvUnet')
+    data = {
+        'feat': np.array(np.random.random((1000, 3)), dtype=np.float32),
+        'point': np.array(np.random.random((1000, 3)), dtype=np.float32),
+    }
+    data = net.preprocess(data, {'split': 'test'})
+    data = net.transform(data, {'split': 'test'})
+    data = batcher.collate_fn([{'data': data, 'attr': {'split': 'test'}}])
+
+    net.eval()
+    with torch.no_grad():
+        results = net(data['data'])
+        print(results)
+
+    if openvino_available:
+        ov_net = ml3d.models.OpenVINOModel(net)
+        ov_results = ov_net(data['data'])
+        print(ov_results)
+
+    assert results.shape == ov_results.shape
+    assert torch.max(torch.abs(results - ov_results)) < 1e-3
