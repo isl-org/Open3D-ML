@@ -3,6 +3,7 @@ import copy
 
 import torch
 
+from openvino_extensions import get_extensions_path
 from openvino.inference_engine import IECore
 
 from .. import dataloaders
@@ -22,9 +23,7 @@ class OpenVINOModel:
 
     def __init__(self, base_model):
         self.ie = IECore()
-        self.ie.add_extension(
-            "/home/dkurt/openvino_pytorch_unpool/user_ie_extensions/build/libuser_cpu_extension.so",
-            "CPU")
+        self.ie.add_extension(get_extensions_path(), "CPU")
         self.exec_net = None
         self.base_model = base_model
         self.device = "CPU"

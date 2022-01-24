@@ -27,7 +27,8 @@ class SparseConvFunc(torch.autograd.Function):
 
 
 class SparseConvONNX(SparseConv):
-    """
+    """ONNX compatible SparseConv
+
     This is a support class which helps export network with SparseConv in ONNX format.
     """
 
@@ -41,7 +42,8 @@ class SparseConvONNX(SparseConv):
 
 
 class SparseConvTransposeONNX(SparseConvTranspose):
-    """
+    """ONNX compatible SparseConvTranspose
+
     This is a support class which helps export network with SparseConvTranspose in ONNX format.
     """
 
@@ -450,6 +452,10 @@ def calculate_grid(in_positions):
 # There are issues with calculate_grid export with ONNX and inference using OpenVINO,
 # so we implement it in C++
 class CalculateGridONNX(torch.autograd.Function):
+    """ONNX compatible wrapper for calculate_grid method
+
+    This is a support class which helps export network in ONNX format.
+    """
 
     @staticmethod
     def symbolic(g, in_positions):

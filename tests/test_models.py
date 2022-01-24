@@ -263,12 +263,10 @@ def test_sparseconv_torch():
     net.eval()
     with torch.no_grad():
         results = net(data['data'])
-        print(results)
 
     if openvino_available:
         ov_net = ml3d.models.OpenVINOModel(net)
         ov_results = ov_net(data['data'])
-        print(ov_results)
 
-    assert results.shape == ov_results.shape
-    assert torch.max(torch.abs(results - ov_results)) < 1e-3
+        assert results.shape == ov_results.shape
+        assert torch.max(torch.abs(results - ov_results)) < 1e-3
