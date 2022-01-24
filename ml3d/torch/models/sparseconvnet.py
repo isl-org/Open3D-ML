@@ -152,9 +152,9 @@ class SparseConvUnet(BaseModel):
         # feat_list = self.batch_norm(feat_list)
         # feat_list = self.relu(feat_list)
         # feat_list = self.linear(feat_list)
-        # output = self.output_layer(feat_list, index_map_list)
+        output = self.output_layer(feat_list, index_map_list)
 
-        return feat_list
+        return output
 
     def preprocess(self, data, attr):
         # If num_workers > 0, use new RNG with unique seed for each thread.
@@ -461,10 +461,22 @@ def calculate_grid(in_positions):
 
     out_pos = out_pos + filter
     out_pos = out_pos[out_pos.min(1).values >= 0]
-    out_pos = out_pos[(~((out_pos.long() % 2).bool()).max(1)[0])]
+    out_pos = out_pos[(~((out_pos.long() % 2).bool()).any(1))]
     out_pos = torch.unique(out_pos, dim=0)
 
     return out_pos + 0.5
+
+
+# There are issues with calculate_grid export with ONNX and inference using OpenVINO,
+# so we implement it in C++
+class CalculateGridONNX(torch.autograd.Function):
+    @staticmethod
+    def symbolic(g, in_positions):
+        return g.op("org.open3d::calculate_grid", in_positions)
+
+    @staticmethod
+    def forward(self, in_positions):
+        return calculate_grid(in_positions)
 
 
 class Convolution(nn.Module):
@@ -495,7 +507,7 @@ class Convolution(nn.Module):
     def forward(self, features_list, in_positions_list, voxel_size=1.0):
         out_positions_list = []
         for in_positions in in_positions_list:
-            out_positions_list.append(calculate_grid(in_positions))
+            out_positions_list.append(CalculateGridONNX.apply(in_positions))
 
         out_feat = []
         for feat, in_pos, out_pos in zip(features_list, in_positions_list,

@@ -2,7 +2,6 @@ import io
 import copy
 
 import torch
-from torch import nn
 
 from openvino.inference_engine import IECore
 
@@ -13,47 +12,6 @@ def pointpillars_extract_feats(self, x):
     x = self.backbone(x)
     x = self.neck(x)
     return x
-
-
-# class DenseSparseConv(nn.Module):
-#     def __init__(self, sparse_conv):
-#         super().__init__()
-
-#         self.conv3d = nn.Conv3d(
-#             sparse_conv.in_channels,
-#             sparse_conv.filters,
-#             sparse_conv.kernel_size,
-#             padding='same',
-#             bias=False)
-
-#         weight = sparse_conv.state_dict()["kernel"].permute(4, 3, 2, 1, 0)
-#         self.conv3d.load_state_dict({"weight": weight})
-
-#     def forward(self, features_list, in_positions_list, voxel_size):
-#         inp_positions_int = in_positions_list[0]
-#         # print(in_positions_list[0])
-#         # exit()
-#         inp_volume = np.zeros(
-#             (1, max_grid_extent, max_grid_extent, max_grid_extent, in_channels),
-#             dtype=dtype)
-
-#         inp_volume[0, inp_positions_int[:, 2], inp_positions_int[:, 1],
-#             inp_positions_int[:, 0], :] = features_list[0]
-
-
-# def replace_sparse_conv(model):
-#     for name, l in model.named_children():
-#         layer_type = l.__class__.__name__
-#         if layer_type == "SubmanifoldSparseConv":
-#             dense_conv = DenseSparseConv(l.net)
-#             setattr(model, name, dense_conv)
-#             pass
-#         elif layer_type == "Convolution":
-#             pass
-#         elif layer_type == "DeConvolution":
-#             pass
-#         else:
-#             replace_sparse_conv(l)
 
 
 class OpenVINOModel:
@@ -114,7 +72,6 @@ class OpenVINOModel:
                 pos_list.append(pos)
                 feat_list.append(feat)
                 index_map_list.append(torch.tensor(index_map, dtype=torch.long))
-            print(index_map_list)
 
             inputs = {
                 'feat': feat_list,
@@ -159,6 +116,8 @@ class OpenVINOModel:
 
         tensors = {}
         for name, tensor in inputs.items():
+            # if name.startswith("index_map_list"):
+            #     continue
             if name == 'labels':
                 continue
             if isinstance(tensor, list):
@@ -169,8 +128,6 @@ class OpenVINOModel:
                 if tensor.nelement() > 0:
                     tensors[name] = tensor.detach().numpy()
 
-        print("Fine")
-        exit()
         output = self.exec_net.infer(tensors)
 
         if len(output) == 1:
@@ -204,6 +161,9 @@ class OpenVINOModel:
 
     def transform(self, *args):
         return self.base_model.transform(*args)
+
+    def update_probs(self, *args):
+        return self.base_model.update_probs(*args)
 
     def to(self, device):
         self.device = device
