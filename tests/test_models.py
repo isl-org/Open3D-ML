@@ -252,10 +252,15 @@ def test_sparseconv_torch():
     net = ml3d.models.SparseConvUnet(**cfg.model, device='cpu')
 
     batcher = ml3d.dataloaders.ConcatBatcher('cpu', model='SparseConvUnet')
+
+    inp_pos = np.random.randint(0, 10, [1000, 3])
+    inp_pos = np.unique(inp_pos, axis=0).astype(np.float32)
+    inp_pos += np.random.random(inp_pos.shape).astype(np.float32)  # [0, 1)
     data = {
-        'feat': np.array(np.random.random((1000, 3)), dtype=np.float32),
-        'point': np.array(np.random.random((1000, 3)), dtype=np.float32),
+        'feat': np.array(np.random.random(inp_pos.shape), dtype=np.float32),
+        'point': inp_pos,
     }
+
     data = net.preprocess(data, {'split': 'test'})
     data = net.transform(data, {'split': 'test'})
     data = batcher.collate_fn([{'data': data, 'attr': {'split': 'test'}}])

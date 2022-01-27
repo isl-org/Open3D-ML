@@ -19,7 +19,7 @@ class SparseConvFunc(torch.autograd.Function):
         kernel = g.op("Constant", value_t=kernel)
         offset = g.op("Constant", value_t=offset)
         name = f"org.open3d::SparseConv{'Transpose' if transpose else ''}"
-        return g.op(name, feat, in_pos, kernel, offset)
+        return g.op(name, feat, in_pos, out_pos, kernel, offset)
 
     @staticmethod
     def forward(self, cls, feat, in_pos, out_pos, voxel_size, transpose):
