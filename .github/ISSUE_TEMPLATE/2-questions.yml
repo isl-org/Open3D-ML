@@ -1,6 +1,6 @@
 name: Ask a Question
 description: Ask a question on how to use Open3D, how to implement something, etc.
-title: "Summarize the question. (e.g., \"How to run reconstruction system with RealSense D435i? \")"
+title: "Summarize the question. (e.g., \"How to do inference on custom dataset ? \")"
 labels: [question]
 
 body:
@@ -9,9 +9,9 @@ body:
   attributes:
     label: "Checklist"
     options:
-      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D/issues)."
+      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D-ML/issues)."
         required: true
-      - label: "For Python issues, I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
+      - label: "I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
         required: true
       - label: "I have checked the [release documentation](http://www.open3d.org/docs/release/) and the [latest documentation](http://www.open3d.org/docs/latest/) (for `master` branch)."
         required: true

@@ -1,6 +1,6 @@
 name: Feature Request
 description: New feature request. Request to add some new functionality or improve the existing ones.
-title: "Summarize your request. (e.g., \"Request to add ROS to Open3D PointCloud conversion support?\")"
+title: "Summarize your request. (e.g., \"Request to add more models in Open3D-ML model zoo\")"
 labels: [feature request]
 
 body:
@@ -9,9 +9,9 @@ body:
   attributes:
     label: "Checklist"
     options:
-      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D/issues)."
+      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D-ML/issues)."
         required: true
-      - label: "For Python issues, I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
+      - label: "I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
         required: true
       - label: "I have checked the [release documentation](http://www.open3d.org/docs/release/) and the [latest documentation](http://www.open3d.org/docs/latest/) (for `master` branch)."
         required: true
@@ -19,7 +19,7 @@ body:
 - type: textarea
   attributes:
     description: >
-        Describe what feature you'd like to have in Open3D.
+        Describe what feature you'd like to have in Open3D-ML.
     label: "Proposed new feature or change"
   validations:
     required: true

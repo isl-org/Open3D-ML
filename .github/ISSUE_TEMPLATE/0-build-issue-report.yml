@@ -1,6 +1,6 @@
 name: Report an Installation or Build Issue
-description: I have trouble installing or compiling Open3D.
-title: "Summarize the issue and your environments (e.g., \"Cannot compile on Ubuntu 20.04 with OpenBLAS\")"
+description: I have trouble installing or compiling Open3D-ML.
+title: "Summarize the issue and your environments (e.g., \"Cannot import ml3d on Ubuntu 20.04 with CUDA\")"
 labels: [build/install issue]
 
 body:
@@ -9,9 +9,9 @@ body:
   attributes:
     label: "Checklist"
     options:
-      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D/issues)."
+      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D-ML/issues)."
         required: true
-      - label: "For Python issues, I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
+      - label: "I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
         required: true
       - label: "I have checked the [release documentation](http://www.open3d.org/docs/release/) and the [latest documentation](http://www.open3d.org/docs/latest/) (for `master` branch)."
         required: true
@@ -25,28 +25,23 @@ body:
       Providing *detailed* instructions is crucial for other to help with
       the issues. Here is an example for reference you may modify.
     value: >
-      #### I first cloned Open3D by:
+      #### I first cloned Open3D-ML by:
 
       ```
 
-      git clone https://github.com/isl-org/Open3D.git
+      git clone https://github.com/isl-org/Open3D-ML.git
 
-      cd Open3D
-
-      ```
-
-
-      #### Then, I build Open3D (on Ubuntu 20.04, with CUDA 11.5) with:
+      cd Open3D-ML
 
       ```
 
-      mkdir build
 
-      cd build
+      #### Then, I set OPEN3D_ML_ROOT with:
 
-      cmake -DBUILD_SHARED_LIBS=OFF -DBUILD_CUDA_MODULE=OFF -DUSE_BLAS=ON -DBUILD_WEBRTC=OFF ..
+      ```
 
-      make -j$(nproc)
+      source set_open3d_ml_root.sh
+
 
       ```
 
