@@ -2,17 +2,17 @@ import tensorflow as tf
 
 
 class FocalLoss(tf.Module):
+    """`Focal Loss <https://arxiv.org/abs/1708.02002>`_
+
+    Args:
+        gamma (float, optional): The gamma for calculating the modulating
+            factor. Defaults to 2.0.
+        alpha (float, optional): A balanced form for Focal Loss.
+            Defaults to 0.25.
+        loss_weight (float, optional): Weight of loss. Defaults to 1.0.
+    """
 
     def __init__(self, gamma=2.0, alpha=0.25, loss_weight=1.0):
-        """`Focal Loss <https://arxiv.org/abs/1708.02002>`_
-
-        Args:
-            gamma (float, optional): The gamma for calculating the modulating
-                factor. Defaults to 2.0.
-            alpha (float, optional): A balanced form for Focal Loss.
-                Defaults to 0.25.
-            loss_weight (float, optional): Weight of loss. Defaults to 1.0.
-        """
         super(FocalLoss, self).__init__()
         self.gamma = gamma
         self.alpha = alpha
@@ -22,7 +22,7 @@ class FocalLoss(tf.Module):
 
         pred_sigmoid = tf.math.sigmoid(pred)
 
-        if len(pred.shape) > 1 and int(pred.shape[-1]) > 1:
+        if len(pred.shape) > 1:
             target = tf.one_hot(target, int(pred.shape[-1]))
         target = tf.cast(target, pred.dtype)
 

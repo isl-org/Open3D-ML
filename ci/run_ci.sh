@@ -3,8 +3,8 @@
 # The following environment variables are required:
 # - NPROC
 #
-TENSORFLOW_VER="2.5.0"
-TORCH_GLNX_VER="1.8.1+cpu"
+TENSORFLOW_VER="2.5.2"
+TORCH_GLNX_VER="1.8.2+cpu"
 YAPF_VER="0.30.0"
 PYTEST_VER="6.0.1"
 PYTEST_RANDOMLY_VER="3.8.0"
@@ -27,10 +27,11 @@ git clone --recursive --branch master https://github.com/isl-org/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -U tensorflow-cpu==$TENSORFLOW_VER
-python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.org/whl/torch_stable.html
+python -m pip install -U torch==${TORCH_GLNX_VER} -f https://download.pytorch.org/whl/lts/1.8/torch_lts.html
 python -m pip install -U pytest=="$PYTEST_VER" \
     pytest-randomly=="$PYTEST_RANDOMLY_VER"
 python -m pip install -U yapf=="$YAPF_VER"
+python -m pip install -U openvino-dev==2021.4.2
 
 echo 3. Configure for bundling the Open3D-ML part
 echo
@@ -38,6 +39,7 @@ mkdir Open3D/build
 pushd Open3D/build
 cmake -DBUNDLE_OPEN3D_ML=ON \
     -DOPEN3D_ML_ROOT=$PATH_TO_OPEN3D_ML \
+    -DGLIBCXX_USE_CXX11_ABI=OFF \
     -DBUILD_TENSORFLOW_OPS=ON \
     -DBUILD_PYTORCH_OPS=ON \
     -DBUILD_GUI=OFF \

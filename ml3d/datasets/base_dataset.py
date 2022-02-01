@@ -2,6 +2,7 @@ import yaml
 from abc import ABC, abstractmethod
 from os.path import join, exists, dirname, abspath
 import logging
+import numpy as np
 
 from ..utils import Config, get_module
 
@@ -54,11 +55,12 @@ class BaseDataset(ABC):
 
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
+        self.rng = np.random.default_rng(kwargs.get('seed', None))
 
     @staticmethod
     @abstractmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and

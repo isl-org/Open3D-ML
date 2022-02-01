@@ -1,13 +1,12 @@
 import numpy as np
 import pandas as pd
-import os, sys, glob, pickle
-from pathlib import Path
-from os.path import join, exists, dirname, abspath
-from tqdm import tqdm
-import random
-import shutil
-from tqdm import tqdm
+import os, glob
 import argparse
+
+from pathlib import Path
+from os.path import join, exists
+from tqdm import tqdm
+from tqdm import tqdm
 from open3d.ml.datasets import utils
 
 

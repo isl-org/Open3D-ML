@@ -228,6 +228,8 @@ def center_to_corner_box2d(boxes, origin=0.5):
     Returns:
         np.ndarray: Corners with the shape of (N, 4, 2).
     """
+    if len(boxes) == 0:
+        return np.zeros((0, 4, 2))
     flat_boxes = np.array([box.to_xyzwhlr() for box in boxes])
     centers = flat_boxes[:, 0:2]
     dims = flat_boxes[:, 3:5]
@@ -350,6 +352,8 @@ def points_in_box(points,
     Returns:
         np.ndarray, shape=[N, M]: Indices of points in each box.
     """
+    if len(rbbox) == 0:
+        return np.zeros((0, 7))
     if camera_frame:
         assert cam_world is not None, "Provide cam_to_world matrix if points are in camera frame."
 

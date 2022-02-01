@@ -2,7 +2,7 @@ dataset:
   name: S3DIS
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  class_weights: [3370714, 2856755, 4919229, 318158, 375640, 
+  class_weights: [3370714, 2856755, 4919229, 318158, 375640,
 478001, 974733, 650464, 791496, 88727, 1284130, 229758, 2272837]
   ignored_label_inds: []
   num_points: 40960
@@ -13,40 +13,40 @@ model:
   name: RandLANet
   batcher: DefaultBatcher
   ckpt_path: # path/to/your/checkpoint
-  dim_feature: 8
-  dim_input: 6
-  dim_output:
-  - 16
-  - 64
-  - 128
-  - 256
-  - 512
-  grid_size: 0.04
-  ignored_label_inds: []
-  k_n: 16
-  num_classes: 13
+  num_neighbors: 16
   num_layers: 5
   num_points: 40960
-  sub_sampling_ratio:
-  - 4
-  - 4
-  - 4
-  - 4
-  - 2
-  t_normalize:
-    method: linear
-    normalize_points: False
-    feat_bias: 0
-    feat_scale: 1
+  num_classes: 13
+  ignored_label_inds: []
+  sub_sampling_ratio: [4, 4, 4, 4, 2]
+  in_channels: 6
+  dim_features: 8
+  dim_output: [16, 64, 128, 256, 512]
+  grid_size: 0.04
+  augment:
+    recenter:
+      dim: [0, 1]
+    rotate:
+      method: vertical
+    scale:
+      min_s: 0.9
+      max_s: 1.1
+    noise:
+      noise_std: 0.001
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.01
+  optimizer:
+    lr: 0.001
   batch_size: 2
-  learning_rate: 0.01
   main_log_dir: ./logs
-  max_epoch: 100
-  save_ckpt_freq: 20
-  scheduler_gamma: 0.95
+  max_epoch: 200
+  save_ckpt_freq: 3
+  scheduler_gamma: 0.99
   test_batch_size: 3
   train_sum_dir: train_log
   val_batch_size: 2
+  summary:
+    record_for: []
+    max_pts:
+    use_reference: false
+    max_outputs: 1

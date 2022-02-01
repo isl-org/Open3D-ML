@@ -17,7 +17,7 @@ The table shows the available models and datasets for the segmentation task and 
 
 
 ## Models
-The followings are the models we implemented in this model zoo.
+The following are the models we implemented in this model zoo.
 * KPConv ([github](https://github.com/HuguesTHOMAS/KPConv)): [KPConv: Flexible and Deformable Convolution for Point Clouds](https://arxiv.org/abs/1904.08889).
 * RandLA-Net ([github](https://github.com/QingyongHu/RandLA-Net)) [RandLA-Net: Efficient Semantic Segmentation of Large-Scale Point Clouds](https://arxiv.org/abs/1911.11236).
 

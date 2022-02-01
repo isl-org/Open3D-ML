@@ -3,7 +3,6 @@ import pandas as pd
 import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
-import random
 from sklearn.neighbors import KDTree
 import logging
 
@@ -103,7 +102,7 @@ class Semantic3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -217,14 +216,8 @@ class Semantic3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
-
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
 
     def __len__(self):
         return len(self.path_list)

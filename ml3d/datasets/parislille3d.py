@@ -2,7 +2,6 @@ import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -79,7 +78,7 @@ class ParisLille3D(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -146,7 +145,7 @@ class ParisLille3D(BaseDataset):
                         attr: The attribute that needs to be checked.
 
         Returns:
-            If the dataum attribute is tested, then resturn the path where the attribute is stored; else, returns false.
+            If the dataum attribute is tested, then return the path where the attribute is stored; else, returns false.
         """
         cfg = self.cfg
         name = attr['name']
@@ -182,6 +181,8 @@ class ParisLille3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
 
     def __len__(self):
         return len(self.path_list)
@@ -191,7 +192,7 @@ class ParisLille3DSplit(BaseDatasetSplit):
         log.debug("get_data called {}".format(pc_path))
 
         pc = o3d.t.io.read_point_cloud(pc_path).point
-        points = pc["points"].numpy().astype(np.float32)
+        points = pc["positions"].numpy().astype(np.float32)
 
         if (self.split != 'test'):
             labels = pc["class"].numpy().astype(np.int32).reshape((-1,))

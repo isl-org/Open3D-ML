@@ -75,7 +75,7 @@ class Waymo(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -207,7 +207,7 @@ class Waymo(BaseDataset):
         elif split in ['test', 'testing']:
             return self.test_files
         elif split in ['val', 'validation']:
-            return val_files
+            return self.val_files
         elif split in ['all']:
             return self.train_files + self.val_files + self.test_files
         else:

@@ -3,7 +3,6 @@ import pandas as pd
 import os, glob, pickle
 from pathlib import Path
 from os.path import join, exists, dirname, abspath, isdir
-import random
 from sklearn.neighbors import KDTree
 from tqdm import tqdm
 import logging
@@ -98,7 +97,7 @@ class S3DIS(BaseDataset):
 
     @staticmethod
     def get_label_to_names():
-        """Returns a label to names dictonary object.
+        """Returns a label to names dictionary object.
 
         Returns:
             A dict where keys are label numbers and
@@ -266,14 +265,8 @@ class S3DISSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
-
-        self.cfg = dataset.cfg
-        path_list = dataset.get_split_list(split)
-        log.info("Found {} pointclouds for {}".format(len(path_list), split))
-
-        self.path_list = path_list
-        self.split = split
-        self.dataset = dataset
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
 
     def __len__(self):
         return len(self.path_list)
@@ -283,6 +276,7 @@ class S3DISSplit(BaseDatasetSplit):
         data = pickle.load(open(pc_path, 'rb'))
 
         pc, bboxes = data
+        pc = pc[~np.isnan(pc).any(1)]
 
         bboxes = self.dataset.read_bboxes(bboxes, self.cfg.ignored_objects)
 

@@ -1,4 +1,5 @@
 import math
+import sys
 import numpy as np
 import threading
 import open3d as o3d
@@ -33,9 +34,9 @@ class Model:
 
     def __init__(self):
         # Note: the tpointcloud cannot store the actual data arrays, because
-        # the tpointcloud requires specific names for some arrays (e.g. "points",
-        # "colors"). So the tpointcloud exists for rendering and initially only
-        # contains the "points" array.
+        # the tpointcloud requires specific names for some arrays (e.g.
+        # "positions", "colors"). So the tpointcloud exists for rendering and
+        # initially only contains the "positions" array.
         self.tclouds = {}  # name -> tpointcloud
         self.tcams = {}  # name -> tcams
         self.data_names = []  # the order data will be displayed / animated
@@ -88,10 +89,10 @@ class Model:
             # because the resulting arrays won't be contiguous. However,
             # TensorList can be inplace.
             xyz = pts[:, [0, 1, 2]]
-            tcloud.point["points"] = Visualizer._make_tcloud_array(xyz,
-                                                                   copy=True)
+            tcloud.point["positions"] = Visualizer._make_tcloud_array(xyz,
+                                                                      copy=True)
         else:
-            tcloud.point["points"] = Visualizer._make_tcloud_array(pts)
+            tcloud.point["positions"] = Visualizer._make_tcloud_array(pts)
         self.tclouds[name] = tcloud
 
         # Add scalar attributes and vector3 attributes
@@ -217,7 +218,7 @@ class Model:
             tcloud = self.tclouds[name]
             # Ideally would simply return tcloud.compute_aabb() here, but it can
             # be very slow on macOS with clang 11.0
-            pts = tcloud.point["points"].numpy()
+            pts = tcloud.point["positions"].numpy()
             min_val = (pts[:, 0].min(), pts[:, 1].min(), pts[:, 2].min())
             max_val = (pts[:, 0].max(), pts[:, 1].max(), pts[:, 2].max())
             return [min_val, max_val]
@@ -237,6 +238,7 @@ class DataModel(Model):
         # We could just create the TPointCloud here, but that would cause the UI
         # to block. If we do it on load then the loading dialog will display.
         self._name2srcdata = {}
+        self.bounding_box_data = []
         for d in userdata:
             name = d["name"]
             while name in self._data:  # ensure each name is unique
@@ -244,10 +246,14 @@ class DataModel(Model):
             self._init_data(name)
             self._name2srcdata[name] = d
 
+            if 'bounding_boxes' in d:
+                self.bounding_box_data.append(
+                    Model.BoundingBoxData(name, d['bounding_boxes']))
+
     def load(self, name, fail_if_no_space=False):
         """Load a pointcloud based on the name provided."""
         if self.is_loaded(name):
-            return
+            return True
 
         self.create_point_cloud(self._name2srcdata[name])
 
@@ -311,7 +317,10 @@ class DatasetModel(Model):
                 self._attr_rename["feat"] = "colors"
                 self._attr_rename["feature"] = "colors"
         else:
-            print("[ERROR] Dataset split has no data")
+            print(
+                "[ERROR] Dataset split has no data. Please check that you are pointing to the correct directory for the dataset."
+            )
+            sys.exit(-1)
 
     def is_loaded(self, name):
         """Check if the data is loaded."""
@@ -379,7 +388,7 @@ class DatasetModel(Model):
             if not isinstance(arr, dict):
                 pcloud_size += arr.size * 4
         # Point cloud consumes 64 bytes of per point of GPU memory
-        pcloud_size += pcloud.point["points"].num_elements() * 64
+        pcloud_size += pcloud.point["positions"].num_elements() * 64
         # TODO: add memory for point cloud color and semantics
         # TODO: add memory for cam images
         return pcloud_size
@@ -427,8 +436,7 @@ class Visualizer:
         def get_colors(self):
             """Returns a list of label keys."""
             return [
-                self._label2color[label]
-                for label in sorted(self._label2color.keys())
+                self._label2color[label] for label in self._label2color.keys()
             ]
 
         def set_on_changed(self, callback):  # takes no args, no return value
@@ -438,7 +446,7 @@ class Visualizer:
             """Updates the labels based on look-up table passsed."""
             self.widget.clear()
             root = self.widget.get_root_item()
-            for key in sorted(labellut.labels.keys()):
+            for key in labellut.labels.keys():
                 lbl = labellut.labels[key]
                 color = lbl.color
                 if len(color) == 3:
@@ -1186,7 +1194,7 @@ class Visualizer:
                 channel = max(0, self._colormap_channel.selected_index)
                 scalar = attr[:, channel]
         else:
-            shape = [len(tcloud.point["points"].numpy())]
+            shape = [len(tcloud.point["positions"].numpy())]
             scalar = np.zeros(shape, dtype='float32')
         tcloud.point["__visualization_scalar"] = Visualizer._make_tcloud_array(
             scalar)
@@ -1214,7 +1222,7 @@ class Visualizer:
 
     def _get_material(self):
         self._update_gradient()
-        material = rendering.Material()
+        material = rendering.MaterialRecord()
         if self._shader.selected_text == self.SOLID_NAME:
             material.shader = "unlitSolidColor"
             c = self._color.color_value
@@ -1242,7 +1250,7 @@ class Visualizer:
         else:
             lut = None
 
-        mat = rendering.Material()
+        mat = rendering.MaterialRecord()
         mat.shader = "unlitLine"
         mat.line_width = 2 * self.window.scaling
 
@@ -1668,7 +1676,7 @@ class Visualizer:
         """
         # Setup the labels
         lut = LabelLUT()
-        for val in sorted(dataset.label_to_names.values()):
+        for val in dataset.label_to_names.values():
             lut.add_label(val, val)
         self.set_lut("labels", lut)
 
@@ -1747,6 +1755,8 @@ class Visualizer:
                         box_data.append(data)
                         current_group = []
             self._objects.bounding_box_data = box_data
+        else:
+            self._consolidate_bounding_boxes = True
 
         self._visualize("Open3D", width, height)
 

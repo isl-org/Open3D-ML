@@ -128,6 +128,7 @@ class ScannetProcess():
 
         # Load axis alignment matrix
         lines = open(meta_file).readlines()
+        axis_align_matrix = np.eye(4)
         for line in lines:
             if 'axisAlignment' in line:
                 axis_align_matrix = [
@@ -210,7 +211,7 @@ class ScannetProcess():
         """
         assert os.path.isfile(filename)
         data = o3d.t.io.read_point_cloud(filename)
-        points = data.point["points"].numpy().astype(np.float32)
+        points = data.point["positions"].numpy().astype(np.float32)
         colors = data.point["colors"].numpy().astype(np.float32)
         vertices = np.concatenate([points, colors], axis=1)
         return vertices

@@ -12,28 +12,27 @@ def one_hot(index, classes):
 
 
 class FocalLoss(nn.Module):
+    """`Focal Loss <https://arxiv.org/abs/1708.02002>`_
+
+    Args:
+        gamma (float, optional): The gamma for calculating the modulating
+            factor. Defaults to 2.0.
+        alpha (float, optional): A balanced form for Focal Loss.
+            Defaults to 0.25.
+        loss_weight (float, optional): Weight of loss. Defaults to 1.0.
+    """
 
     def __init__(self, gamma=2.0, alpha=0.25, loss_weight=1.0):
-        """`Focal Loss <https://arxiv.org/abs/1708.02002>`_
-
-        Args:
-            gamma (float, optional): The gamma for calculating the modulating
-                factor. Defaults to 2.0.
-            alpha (float, optional): A balanced form for Focal Loss.
-                Defaults to 0.25.
-            loss_weight (float, optional): Weight of loss. Defaults to 1.0.
-        """
         super(FocalLoss, self).__init__()
         self.gamma = gamma
         self.alpha = alpha
         self.loss_weight = loss_weight
 
     def forward(self, pred, target, weight=None, avg_factor=None):
-
         pred_sigmoid = pred.sigmoid()
-
-        if len(pred.shape) > 1 and int(pred.shape[-1]) > 1:
+        if len(pred.shape) > 1:
             target = one_hot(target, int(pred.shape[-1]))
+
         target = target.type_as(pred)
 
         pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)

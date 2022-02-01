@@ -9,7 +9,7 @@ from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.tf.ops import nms
 from ..utils.tf_utils import gen_CNN
-from ...datasets.utils import BEVBox3D, DataProcessing, ObjdetAugmentation
+from ...datasets.utils import BEVBox3D, DataProcessing
 from ...datasets.utils.operations import points_in_box
 from ...datasets.augment import ObjdetAugmentation
 
@@ -82,7 +82,7 @@ class PointRCNN(BaseModel):
 
     def call(self, inputs, training=True):
         cls_score, reg_score, backbone_xyz, backbone_features = self.rpn(
-            inputs[0], training=self.mode == "RPN" and training)
+            inputs[0], training=(self.mode == "RPN" and training))
 
         if self.mode != "RPN":
             cls_score = tf.stop_gradient(cls_score)
@@ -94,7 +94,8 @@ class PointRCNN(BaseModel):
         rois, _ = self.rpn.proposal_layer(rpn_scores_raw,
                                           reg_score,
                                           backbone_xyz,
-                                          training=training)  # (B, M, 7)
+                                          training=self.mode == "RPN" and
+                                          training)  # (B, M, 7)
         rois = tf.stop_gradient(rois)
 
         output = {"rois": rois, "cls": cls_score, "reg": reg_score}
@@ -184,7 +185,7 @@ class PointRCNN(BaseModel):
         """Generates labels for RPN network.
 
         Classifies each point as foreground/background based on points inside bbox.
-        We don't train on ambigious points which are just outside bounding boxes(calculated
+        We don't train on ambiguous points which are just outside bounding boxes(calculated
         by `extended_boxes`).
         Also computes regression labels for bounding box proposals(in bounding box frame).
 
@@ -350,9 +351,9 @@ class PointRCNN(BaseModel):
                 pos = pos + [0, 0, dim[1] / 2]
                 yaw = bbox[-1]
 
-                name = self.lbl2name.get(label[0], "ignore")
                 inference_result[-1].append(
-                    BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
+                    BEVBox3D(pos, dim, yaw, label[0], score, world_cam,
+                             cam_img))
 
         return inference_result
 
@@ -364,10 +365,12 @@ class PointRCNN(BaseModel):
                 batch = [dataset[i + bi]['data'] for bi in range(batch_size)]
                 points = tf.stack([b['point'] for b in batch], axis=0)
 
-                bboxes = [
-                    b.get('bboxes', tf.zeros((0, 7), dtype=tf.float32))
-                    for b in batch
-                ]
+                bboxes = []
+                for b in batch:
+                    if ('bboxes' not in b) or len(b['bboxes']) == 0:
+                        bboxes.append(tf.zeros((0, 7), dtype=tf.float32))
+                    else:
+                        bboxes.append(b['bboxes'])
                 max_gt = 0
                 for bbox in bboxes:
                     max_gt = max(max_gt, bbox.shape[0])
@@ -1470,9 +1473,12 @@ class ProposalTargetLayer(tf.keras.layers.Layer):
             cur_roi, cur_gt = roi_boxes3d[idx], gt_boxes3d[idx]
 
             k = cur_gt.__len__() - 1
-            while tf.reduce_sum(cur_gt[k]) == 0:
+            while k >= 0 and tf.reduce_sum(cur_gt[k]) == 0:
                 k -= 1
             cur_gt = cur_gt[:k + 1]
+
+            if cur_gt.__len__() == 0:
+                cur_gt = tf.zeros((1, 7), tf.float32)
 
             # include gt boxes in the candidate rois
             iou3d = iou_3d(cur_roi.numpy()[:, [0, 1, 2, 5, 3, 4, 6]],

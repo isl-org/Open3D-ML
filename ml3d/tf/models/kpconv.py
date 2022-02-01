@@ -12,13 +12,13 @@ from tqdm import tqdm
 
 # use relative import for being compatible with Open3d main repo
 from open3d.ml.tf.ops import *
+from open3d.ml.tf.layers import FixedRadiusSearch
 from .network_blocks import *
 from .base_model import BaseModel
 from ...utils import MODEL
 from ...datasets.utils import DataProcessing, trans_normalize
 from .network_blocks import *
 from open3d.ml.tf.ops import batch_grid_subsampling as tf_batch_subsampling
-from open3d.ml.tf.ops import batch_ordered_neighbors as tf_batch_neighbors
 
 
 class KPFCNN(BaseModel):
@@ -631,10 +631,10 @@ class KPFCNN(BaseModel):
                 break
 
         # Return inputs
-        # Batch unstacking (with last layer indices for optionnal classif loss)
+        # Batch unstacking (with last layer indices for optional classif loss)
         stacked_batch_inds_0 = self.stack_batch_inds(input_batches_len[0])
 
-        # Batch unstacking (with last layer indices for optionnal classif loss)
+        # Batch unstacking (with last layer indices for optional classif loss)
         stacked_batch_inds_1 = self.stack_batch_inds(input_batches_len[-1])
 
         if object_labels is None:
@@ -1041,3 +1041,20 @@ class KPFCNN(BaseModel):
 
 
 MODEL._register_module(KPFCNN, 'tf')
+
+
+def tf_batch_neighbors(queries, points, q_batches, p_batches, r):
+    nns = FixedRadiusSearch()
+    q_splits = tf.cast(
+        tf.concat([tf.constant([0]), tf.cumsum(q_batches)], axis=0), tf.int64)
+    p_splits = tf.cast(
+        tf.concat([tf.constant([0]), tf.cumsum(p_batches)], axis=0), tf.int64)
+    result = nns(points, queries, r, p_splits, q_splits)
+
+    idx = result.neighbors_index
+    splits = result.neighbors_row_splits
+
+    ragged_idx = tf.RaggedTensor.from_row_splits(idx, splits)
+    dense_idx = ragged_idx.to_tensor(default_value=tf.shape(points)[0])
+
+    return dense_idx

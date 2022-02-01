@@ -53,6 +53,7 @@ class Scannet(BaseDataset):
             'garbagebin'
         ]
         self.cat2label = {cat: self.classes.index(cat) for cat in self.classes}
+        self.cat2label['ignored'] = -1
         self.label2cat = {self.cat2label[t]: t for t in self.cat2label}
         self.cat_ids = np.array(
             [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39])
@@ -91,8 +92,7 @@ class Scannet(BaseDataset):
                 self.test_scenes.append(join(self.dataset_path, scene))
 
         self.semantic_ids = [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36,
-            39
+            3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 24, 28, 33, 34, 36, 39
         ]
 
     def get_label_to_names(self):
@@ -171,15 +171,8 @@ class ScannetSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
         super().__init__(dataset, split)
-        self.cfg = dataset.cfg
-
-        self.path_list = dataset.get_split_list(split)
-
         log.info("Found {} pointclouds for {}".format(len(self.path_list),
                                                       split))
-
-        self.split = split
-        self.dataset = dataset
 
     def __len__(self):
         return len(self.path_list)
