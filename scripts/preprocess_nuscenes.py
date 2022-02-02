@@ -5,13 +5,12 @@ except ImportError:
     raise ImportError('Please run "pip install nuscenes-devkit" '
                       'to install the official devkit first.')
 
-import numpy as np
-import os, sys, glob, pickle
-from pathlib import Path
-from os.path import join, exists, dirname, abspath
+import os
+import pickle
+from os.path import join
 from os import makedirs
-import random
 import argparse
+import numpy as np
 from tqdm import tqdm
 from pyquaternion import Quaternion
 
