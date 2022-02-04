@@ -769,12 +769,15 @@ class Visualizer:
     def _init_dataset(self, dataset, split, indices):
         self._objects = DatasetModel(dataset, split, indices)
         self._modality = dict()
-        if 'lidar_path' in self._objects._dataset.infos[0]:
-            self._modality['use_lidar'] = True
-        if 'cams' in self._objects._dataset.infos[0]:
-            self._modality['use_camera'] = True
-            self._cam_names = list(
-                self._objects._dataset.infos[0]['cams'].keys())
+        self._modality['use_lidar'] = True
+        self._modality['use_camera'] = False
+        if hasattr(self._objects._dataset, 'infos'):
+            if 'lidar_path' in self._objects._dataset.infos[0]:
+                self._modality['use_lidar'] = True
+            if 'cams' in self._objects._dataset.infos[0]:
+                self._modality['use_camera'] = True
+                self._cam_names = list(
+                    self._objects._dataset.infos[0]['cams'].keys())
 
     def _init_data(self, data):
         self._objects = DataModel(data)
@@ -1272,7 +1275,7 @@ class Visualizer:
 
             self._3d.scene.remove_geometry(name)
             if len(boxes) > 0:
-                lines = BoundingBox3D.create_lines(boxes, lut=None)
+                lines = BoundingBox3D.create_lines(boxes, lut)
                 self._3d.scene.add_geometry(name, lines, mat)
 
                 if name not in self._name2treenode:
@@ -1287,7 +1290,7 @@ class Visualizer:
                     return
 
             for bbox_data in self._objects.bounding_box_data:
-                lines = BoundingBox3D.create_lines(bbox_data.boxes, lut=None)
+                lines = BoundingBox3D.create_lines(bbox_data.boxes, lut)
                 self._3d.scene.add_geometry(bbox_data.name, lines, mat)
 
             for bbox_data in self._objects.bounding_box_data:
@@ -1411,7 +1414,7 @@ class Visualizer:
     def _on_layout(self, context=None):
         frame = self.window.content_rect
         em = self.window.theme.font_size
-        panel_width = 60 * em  #20 * em
+        panel_width = 35 * em  #20 * em
         panel_rect = gui.Rect(frame.get_right() - panel_width, frame.y,
                               panel_width, frame.height - frame.y)
         self._panel.frame = panel_rect
@@ -1511,15 +1514,17 @@ class Visualizer:
         self._prev_img_mode = idx
         if idx == 0:  # or name == 'raw'
             for n in self._objects.data_names:
-                self._objects.create_cams(n,
-                                          self._objects._data[n]['cams'],
-                                          update=False)
+                if self._objects.is_loaded(n):
+                    self._objects.create_cams(n,
+                                              self._objects._data[n]['cams'],
+                                              update=False)
         elif idx == 1:  # or name == 'bbox_3d'
             for n in self._objects.data_names:
-                self._objects.create_cams(n,
-                                          self._objects._data[n]['cams'],
-                                          key='bbox_3d',
-                                          update=False)
+                if self._objects.is_loaded(n):
+                    self._objects.create_cams(n,
+                                              self._objects._data[n]['cams'],
+                                              key='bbox_3d',
+                                              update=False)
 
     def _on_bgcolor_changed(self, new_color):
         bg_color = [
@@ -1655,8 +1660,8 @@ class Visualizer:
                           dataset,
                           split,
                           indices=None,
-                          width=1920,
-                          height=1080):
+                          width=1280,
+                          height=768):
         """Visualize a dataset.
 
         Example:
@@ -1688,8 +1693,8 @@ class Visualizer:
                   data,
                   lut=None,
                   bounding_boxes=None,
-                  width=1920,
-                  height=1080):
+                  width=1280,
+                  height=768):
         """Visualize a custom point cloud data.
 
         Example:
