@@ -1245,7 +1245,7 @@ class BatchNormBlock(nn.Module):
             x = x.transpose(0, 2)
             x = self.batch_norm(x)
             x = x.transpose(0, 2)
-            return x.squeeze()
+            return x.squeeze(2)
         else:
             return x + self.bias
 

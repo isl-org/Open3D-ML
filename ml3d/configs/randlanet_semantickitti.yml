@@ -18,39 +18,31 @@ model:
   name: RandLANet
   batcher: DefaultBatcher
   ckpt_path: # path/to/your/checkpoint
-  dim_feature: 8
-  dim_input: 3
-  dim_output:
-  - 16
-  - 64
-  - 128
-  - 256
-  grid_size: 0.06
-  ignored_label_inds:
-  - 0
-  k_n: 16
-  num_classes: 19
+  num_neighbors: 16
   num_layers: 4
   num_points: 45056
-  sub_sampling_ratio:
-  - 4
-  - 4
-  - 4
-  - 4
-  t_normalize:
-    recentering: []
+  num_classes: 19
+  ignored_label_inds: [0]
+  sub_sampling_ratio: [4, 4, 4, 4]
+  in_channels: 3
+  dim_features: 8
+  dim_output: [16, 64, 128, 256]
+  grid_size: 0.06
+  augment:
+    recenter:
+      dim: [0, 1]
 pipeline:
   name: SemanticSegmentation
-  adam_lr: 0.01
-  batch_size: 1
-  learning_rate: 0.01
+  optimizer:
+    lr: 0.001
+  batch_size: 4
   main_log_dir: ./logs
   max_epoch: 100
-  save_ckpt_freq: 2
-  scheduler_gamma: 0.95
+  save_ckpt_freq: 5
+  scheduler_gamma: 0.9886
   test_batch_size: 1
   train_sum_dir: train_log
-  val_batch_size: 1
+  val_batch_size: 2
   summary:
     record_for: []
     max_pts:

@@ -177,6 +177,8 @@ class ParisLille3DSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='training'):
         super().__init__(dataset, split=split)
+        log.info("Found {} pointclouds for {}".format(len(self.path_list),
+                                                      split))
 
     def __len__(self):
         return len(self.path_list)
