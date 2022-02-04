@@ -1,5 +1,5 @@
 name: Report a Bug
-description: I found a possible bug while using Open3D.
+description: I found a possible bug while using Open3D-ML.
 title: "Summarize the bug (e.g., \"Segmentation Fault while training RandLANet on S3DIS\")"
 labels: [bug]
 

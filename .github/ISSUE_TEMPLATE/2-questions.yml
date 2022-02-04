@@ -1,5 +1,5 @@
 name: Ask a Question
-description: Ask a question on how to use Open3D, how to implement something, etc.
+description: Ask a question on how to use Open3D-ML, how to implement something, etc.
 title: "Summarize the question. (e.g., \"How to do inference on custom dataset ? \")"
 labels: [question]
 
