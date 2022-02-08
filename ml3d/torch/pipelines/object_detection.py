@@ -227,6 +227,22 @@ class ObjectDetection(BasePipeline):
         similar_classes = cfg.get("similar_classes", {})
         difficulties = cfg.get("difficulties", [0])
 
+        if self.distributed:
+            gt_gather = [None for _ in range(dist.get_world_size())]
+            pred_gather = [None for _ in range(dist.get_world_size())]
+
+            dist.gather_object(gt, gt_gather if self.rank == 0 else None, dst=0)
+            dist.gather_object(pred,
+                               pred_gather if self.rank == 0 else None,
+                               dst=0)
+
+            if self.rank == 0:
+                gt = sum(gt_gather, [])
+                pred = sum(pred_gather, [])
+
+        if self.rank != 0:
+            return
+
         ap = mAP(pred,
                  gt,
                  model.classes,
@@ -399,6 +415,8 @@ class ObjectDetection(BasePipeline):
             # if rank == 0 and (epoch % cfg.get("validation_freq", 1)) == 0:
             if epoch % cfg.get("validation_freq", 1) == 0:
                 self.run_valid()
+                if self.distributed:
+                    dist.barrier()
 
             if rank == 0:
                 self.save_logs(writer, epoch)
@@ -528,6 +546,8 @@ class ObjectDetection(BasePipeline):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
         if self.rank == 0:
             make_dir(train_ckpt_dir)
+        if self.distributed:
+            dist.barrier()
 
         epoch = 0
         if ckpt_path is None:
