@@ -5,5 +5,4 @@ torch==1.8.1 ; sys_platform == 'darwin'
 torchvision==0.9.1 ; sys_platform == 'darwin'
 tensorboard
 openvino==2021.4.2
---index https://test.pypi.org/simple
 openvino-extensions~=2021.4.2

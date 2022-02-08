@@ -277,16 +277,10 @@ class BatchNormBlock(nn.Module):
         self.bn = nn.BatchNorm1d(m, eps=eps, momentum=momentum)
 
     def forward(self, feat_list):
-        # lengths = [feat.shape[0] for feat in feat_list]
-        # out = self.bn(torch.cat(feat_list, 0))
-        # out_list = []
-        # start = 0
-        # for l in lengths:
-        #     out_list.append(out[start:start + l])
-        #     start += l
-
-        # return out_list
-        return [self.bn(feat) for feat in feat_list]
+        lengths = [feat.shape[0] for feat in feat_list]
+        out = self.bn(torch.cat(feat_list, 0))
+        out_list = torch.split(out, lengths)
+        return out_list
 
     def __name__(self):
         return "BatchNormBlock"
@@ -299,16 +293,10 @@ class ReLUBlock(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, feat_list):
-        # lengths = [feat.shape[0] for feat in feat_list]
-        # out = self.relu(torch.cat(feat_list, 0))
-        # out_list = []
-        # start = 0
-        # for l in lengths:
-        #     out_list.append(out[start:start + l])
-        #     start += l
-
-        # return out_list
-        return [self.relu(feat) for feat in feat_list]
+        lengths = [feat.shape[0] for feat in feat_list]
+        out = self.relu(torch.cat(feat_list, 0))
+        out_list = torch.split(out, lengths)
+        return out_list
 
     def __name__(self):
         return "ReLUBlock"

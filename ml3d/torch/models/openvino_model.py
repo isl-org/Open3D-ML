@@ -115,6 +115,7 @@ class OpenVINOModel:
                           buf,
                           operator_export_type=torch.onnx.OperatorExportTypes.
                           ONNX_FALLTHROUGH,
+                          opset_version=11,
                           input_names=input_names)
 
         self.base_model.forward = origin_forward
