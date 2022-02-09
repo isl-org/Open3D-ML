@@ -484,7 +484,7 @@ class ObjdetAugmentation(Augmentation):
             sampled_points = np.concatenate(
                 [box.points_inside_box for box in sampled], axis=0)
             points = remove_points_in_boxes(points, sampled)
-            points = np.concatenate([sampled_points, points], axis=0)
+            points = np.concatenate([sampled_points[:, :4], points], axis=0)
 
         return {
             'point': points,

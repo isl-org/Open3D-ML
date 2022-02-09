@@ -29,7 +29,6 @@ class Waymo(BaseDataset):
                  name='Waymo',
                  cache_dir='./logs/cache',
                  use_cache=False,
-                 val_split=3,
                  **kwargs):
         """Initialize the function by passing the dataset and other details.
 
@@ -38,7 +37,6 @@ class Waymo(BaseDataset):
             name: The name of the dataset (Waymo in this case).
             cache_dir: The directory where the cache is stored.
             use_cache: Indicates if the dataset should be cached.
-            val_split: The split value to get a set of images for training, validation, for testing.
 
         Returns:
             class: The corresponding class.
@@ -47,7 +45,6 @@ class Waymo(BaseDataset):
                          name=name,
                          cache_dir=cache_dir,
                          use_cache=use_cache,
-                         val_split=val_split,
                          **kwargs)
 
         cfg = self.cfg
@@ -63,15 +60,15 @@ class Waymo(BaseDataset):
         self.val_files = []
 
         for f in self.all_files:
-            idx = Path(f).name.replace('.bin', '')[:3]
-            idx = int(idx)
-            if idx < cfg.val_split:
+            if 'train' in f:
                 self.train_files.append(f)
-            else:
+            elif 'val' in f:
                 self.val_files.append(f)
-
-        self.test_files = glob(
-            join(cfg.dataset_path, 'testing', 'velodyne', '*.bin'))
+            elif 'test' in f:
+                self.test_files.append(f)
+            else:
+                log.warning(
+                    f"Skipping {f}, prefix must be one of train, test or val.")
 
     @staticmethod
     def get_label_to_names():

@@ -39,16 +39,17 @@ class BasePipeline(ABC):
         self.dataset = dataset
         self.rng = np.random.default_rng(kwargs.get('seed', None))
 
-        make_dir(self.cfg.main_log_dir)
+        self.distributed = distributed
+        self.rank = kwargs.get('rank', 0)
+
         dataset_name = dataset.name if dataset is not None else ''
         self.cfg.logs_dir = join(
             self.cfg.main_log_dir,
             model.__class__.__name__ + '_' + dataset_name + '_torch')
-        make_dir(self.cfg.logs_dir)
 
-        self.distributed = distributed
-
-        self.rank = kwargs.get('rank', 0)
+        if self.rank == 0:
+            make_dir(self.cfg.main_log_dir)
+            make_dir(self.cfg.logs_dir)
 
         if device == 'cpu' or not torch.cuda.is_available():
             if distributed:

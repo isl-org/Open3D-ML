@@ -37,10 +37,10 @@ def parse_args():
                         default=16,
                         type=int)
 
-    parser.add_argument('--is_test',
-                        help='True for processing test data (default False)',
-                        default=False,
-                        type=bool)
+    parser.add_argument('--split',
+                        help='One of {train, val, test} (default train)',
+                        default='train',
+                        type=str)
 
     args = parser.parse_args()
 
@@ -65,9 +65,9 @@ class Waymo2KITTI():
         is_test (bool): Whether in the test_mode. Default: False.
     """
 
-    def __init__(self, dataset_path, save_dir='', workers=8, is_test=False):
+    def __init__(self, dataset_path, save_dir='', workers=8, split='train'):
 
-        self.write_image = True
+        self.write_image = False
         self.filter_empty_3dboxes = True
         self.filter_no_label_zone_points = True
 
@@ -85,8 +85,8 @@ class Waymo2KITTI():
         self.dataset_path = dataset_path
         self.save_dir = save_dir
         self.workers = int(workers)
-        self.is_test = is_test
-        self.prefix = ''
+        self.is_test = split == 'test'
+        self.prefix = split + '_'
         self.save_track_id = False
 
         self.tfrecord_files = sorted(
@@ -152,8 +152,6 @@ class Waymo2KITTI():
         return len(self.tfrecord_files)
 
     def save_image(self, frame, file_idx, frame_idx):
-        self.prefix = ''
-
         for img in frame.images:
             img_path = Path(self.image_save_dir + str(img.name - 1)) / (
                 self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) +
@@ -453,6 +451,8 @@ if __name__ == '__main__':
     out_path = args.out_path
     if out_path is None:
         args.out_path = args.dataset_path
+    if args.split not in ['train', 'val', 'test']:
+        raise ValueError("split must be one of {train, val, test}")
     converter = Waymo2KITTI(args.dataset_path, args.out_path, args.workers,
-                            args.is_test)
+                            args.split)
     converter.convert()

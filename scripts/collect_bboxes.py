@@ -1,6 +1,8 @@
 from os.path import join
 import argparse
 import pickle
+import random
+from tqdm import tqdm
 from open3d.ml.datasets import utils
 from open3d.ml import datasets
 import multiprocessing
@@ -26,6 +28,13 @@ def parse_args():
                         type=int,
                         default=multiprocessing.cpu_count(),
                         required=False)
+    parser.add_argument(
+        '--max_pc',
+        help=
+        'Boxes from random N pointclouds will be saved. Default None(save from whole dataset).',
+        type=int,
+        default=None,
+        required=False)
 
     args = parser.parse_args()
 
@@ -77,11 +86,18 @@ if __name__ == '__main__':
     classname = getattr(datasets, args.dataset_type)
     dataset = classname(args.dataset_path)
     train = dataset.get_split('train')
+    max_pc = len(train) if args.max_pc is None else args.max_pc
 
-    print("Found", len(train), "traning samples")
-    print("This may take a few minutes...")
+    query_pc = range(len(train)) if max_pc >= len(train) else random.sample(
+        range(len(train)), max_pc)
+
+    print(f"Found {len(train)} traning samples, Using {max_pc}")
+    print(
+        f"Using {args.num_cpus} number of cpus, This may take a few minutes...")
     with multiprocessing.Pool(args.num_cpus) as p:
-        bboxes = p.map(process_boxes, range(len(train)))
+        bboxes = list(tqdm(p.imap(process_boxes, query_pc),
+                           total=len(query_pc)))
         bboxes = [e for l in bboxes for e in l]
         file = open(join(out_path, 'bboxes.pkl'), 'wb')
         pickle.dump(bboxes, file)
+        print(f"Saved {len(bboxes)} boxes.")
