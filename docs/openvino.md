@@ -1,6 +1,15 @@
 # OpenVINO backend
 
-Open3D-ML allows to use [Intel OpenVINO](https://github.com/openvinotoolkit/openvino) as an optional backend for deep learning models inference.
+Open3D-ML allows to use [Intel
+OpenVINO](https://github.com/openvinotoolkit/openvino) as an optional backend for deep learning models inference.
+
+## Install
+
+Install a compatible version of OpenVINO with:
+
+```sh
+pip install -r requirements-openvino.txt
+```
 
 ## Usage
 

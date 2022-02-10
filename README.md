@@ -261,7 +261,7 @@ for details.
 
 ### Using predefined scripts
 
-[`scripts/run_pipeline.py`](https://github.com/isl-org/Open3D-ML/tree/master/scripts/run_pipeline.py)
+[`scripts/run_pipeline.py`](https://github.com/isl-org/Open3D-ML/blob/master/scripts/run_pipeline.py)
 provides an easy interface for training and evaluating a model on a dataset. It saves
 the trouble of defining specific model and passing exact configuration.
 
@@ -382,11 +382,11 @@ The following is a list of datasets for which we provide dataset reader classes.
 * SemanticKITTI ([project page](http://semantic-kitti.org/))
 * Toronto 3D ([github](https://github.com/WeikaiTan/Toronto-3D))
 * Semantic 3D ([project-page](http://www.semantic3d.net/))
-* S3DIS ([project-page](http://3dsemantics.stanford.edu/))
+* S3DIS ([project-page](http://buildingparser.stanford.edu/dataset.html))
 * Paris-Lille 3D ([project-page](https://npm3d.fr/paris-lille-3d))
 * Argoverse ([project-page](https://www.argoverse.org/))
 * KITTI ([project-page](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d))
-* Lyft ([project-page](https://self-driving.lyft.com/level5/data/))
+* Lyft ([project-page](https://level-5.global/data))
 * nuScenes ([project-page](https://www.nuscenes.org/))
 * Waymo ([project-page](https://waymo.com/open/))
 * ScanNet([project-page](http://www.scan-net.org/))
@@ -425,7 +425,7 @@ Please also check out our communication channels to get in contact with the comm
 
 <!--* [GitHub Issue](https://github.com/isl-org/Open3D/issues): bug reports, feature requests, etc.-->
 * [Forum](https://github.com/isl-org/Open3D/discussions): discussion on the usage of Open3D.
-* [Discord Chat](https://discord.gg/D35BGvn): online chats, discussions,
+* [Discord Chat](https://discord.com/invite/D35BGvn): online chats, discussions,
   and collaboration with other users and developers.
 
 ## Citation
