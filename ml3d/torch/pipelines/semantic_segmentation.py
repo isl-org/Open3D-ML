@@ -189,6 +189,7 @@ class SemanticSegmentation(BasePipeline):
         model.device = device
         model.to(device)
         model.eval()
+        self.metric_test = SemSegMetric()
 
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
@@ -238,11 +239,27 @@ class SemanticSegmentation(BasePipeline):
                         'predict_scores': self.ori_test_probs.pop()
                     }
                     attr = self.dataset_split.get_attr(test_sampler.cloud_id)
+                    gt_labels = self.dataset_split.get_data(
+                        test_sampler.cloud_id)['label']
+                    if (gt_labels > 0).any():
+                        valid_scores, valid_labels = filter_valid_label(
+                            torch.tensor(
+                                inference_result['predict_scores']).to(device),
+                            torch.tensor(gt_labels).to(device),
+                            model.cfg.num_classes, model.cfg.ignored_label_inds,
+                            device)
+
+                        self.metric_test.update(valid_scores, valid_labels)
+                        log.info(f"Accuracy : {self.metric_test.acc()}")
+                        log.info(f"IoU : {self.metric_test.iou()}")
                     dataset.save_test_result(inference_result, attr)
                     # Save only for the first batch
                     if 'test' in record_summary and 'test' not in self.summary:
                         self.summary['test'] = self.get_3d_summary(
                             results, inputs['data'], 0, save_gt=False)
+        log.info(
+            f"Overall Testing Accuracy : {self.metric_test.acc()[-1]}, mIoU : {self.metric_test.iou()[-1]}"
+        )
 
         log.info("Finished testing")
 

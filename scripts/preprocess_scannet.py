@@ -129,6 +129,7 @@ class ScannetProcess():
 
         # Load axis alignment matrix
         lines = open(meta_file).readlines()
+        axis_align_matrix = np.eye(4)
         for line in lines:
             if 'axisAlignment' in line:
                 axis_align_matrix = [
