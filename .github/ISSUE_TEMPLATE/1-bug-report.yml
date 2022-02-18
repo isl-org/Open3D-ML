@@ -1,0 +1,108 @@
+name: Report a Bug
+description: I found a possible bug while using Open3D-ML.
+title: "Summarize the bug (e.g., \"Segmentation Fault while training RandLANet on S3DIS\")"
+labels: [bug]
+
+body:
+
+- type: checkboxes
+  attributes:
+    label: "Checklist"
+    options:
+      - label: "I have searched for [similar issues](https://github.com/isl-org/Open3D-ML/issues)."
+        required: true
+      - label: "I have tested with the [latest development wheel](http://www.open3d.org/docs/latest/getting_started.html#development-version-pip)."
+        required: true
+      - label: "I have checked the [release documentation](http://www.open3d.org/docs/release/) and the [latest documentation](http://www.open3d.org/docs/latest/) (for `master` branch)."
+        required: true
+
+- type: textarea
+  attributes:
+    label: "Describe the issue"
+    description: >
+      Provide the *detailed* description of the issue you are facing. Include
+      references to any documentation or issues you referred.
+    placeholder: |
+      I have been trying to train RandLANet on S3DIS dataset using tensorflow
+      pipeline. However, I get segmentation fault after few epochs. I am using
+      the default config present in ml3d/configs/
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Steps to reproduce the bug"
+    description: >
+      Please provide step-by-step instructions and full source code to reproduce
+      the bug. The instructions shall be self-contained.
+    placeholder: |
+      << your code here >>
+
+      import os
+      import sys
+      import open3d.ml as _ml3d
+      import open3d.ml.tf  as ml3d
+
+      cfg_file = "/content/Desktop/point_pillars/Open3D-ML/ml3d/configs/pointpillars_kitti.yml"
+      cfg = _ml3d.utils.Config.load_from_file(cfg_file)
+
+      model = ml3d.models.PointPillars(**cfg.model) #ml3d.models.PointPillars(**cfg.model)
+
+      datapath =  "/content/Desktop/KITTI_DATASET/KITTI_PTCLOUD_DATA/data_object_velodyne"
+
+      dataset = ml3d.datasets.KITTI(dataset_path=datapath, use_cache = True)
+
+      pipeline = ml3d.pipelines.ObjectDetection(model=model, dataset = dataset, **cfg.pipeline)
+
+      pipeline.run_train()
+
+    render: python
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Error message"
+    description: >
+      Please include the *full* error message, if any. You may submit/attach
+      the entire terminal output with the error message. If you are reporting a
+      segfault please include a debugger backtrace.
+    placeholder: |
+      << Full error message >>
+  validations:
+    required: false
+
+- type: textarea
+  attributes:
+    label: "Expected behavior"
+    description: >
+      A clear and concise description of what you expected to happen.
+
+- type: textarea
+  attributes:
+    label: "Open3D, Python and System information"
+    value: >
+      - Operating system: (e.g. OSX 10.15, Ubuntu 18.04, Windows 10 64-bit)
+
+      - Python version: (e.g. Python 3.8 / output from `import sys  print(sys.version)`)
+
+      - Open3D version: (output from python: `print(open3d.__version__)`)
+
+      - System type: (x84 / arm64 / apple-silicon / jetson / rpi)
+
+      - Is this remote workstation?: yes or no
+
+      - How did you install Open3D?: (e.g. pip, conda, build from source)
+
+      - Compiler version (if built from source): (e.g. gcc 7.5, clang 7.0)
+    render: markdown
+  validations:
+    required: true
+
+- type: textarea
+  attributes:
+    label: "Additional information"
+    description: >
+      Please add any additional information that could help us diagnose the
+      problem better. Provide screenshots if applicable. You may attach
+      log files, generated wheel, or any other files, that could be helpful.

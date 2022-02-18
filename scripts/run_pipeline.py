@@ -1,5 +1,6 @@
 import numpy as np
 import argparse
+import logging
 import sys
 import yaml
 import pprint
@@ -76,6 +77,8 @@ def main():
         import torch.multiprocessing as mp
         import torch.distributed as dist
     else:
+        os.environ[
+            'TF_CPP_MIN_LOG_LEVEL'] = '1'  # Disable INFO messages from tf
         import tensorflow as tf
         import open3d.ml.tf as ml3d
 
@@ -223,5 +226,10 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     multiprocessing.set_start_method('spawn')
     sys.exit(main())

@@ -1,3 +1,14 @@
+## 0.15
+* Add support for Images and their visualization (#366)
+* Add RandLANet MIT licensed implementation (#454)
+* Refactor config parsing (#460)
+* Update pl3d, s3dis, scannet and semantic3d datasets to BaseDataSplit (#451)
+* Fix missing axis_align_matrix in Scannet preprocesing (#456)
+* Fix OpenVINOModel in Torch pipeline (#447)
+* Intel OpenVINO backend (#406)
+* Downgrade torch on Mac to 1.8.1 (#436) (#439)
+* Add bounding boxes to Visualizer DataModel (#431)
+
 ## 0.14
 * Added CHANGELOG
 * Added RandLA-Net's License (PR #423)

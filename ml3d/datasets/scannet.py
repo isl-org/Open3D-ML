@@ -8,10 +8,6 @@ from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 from .utils import BEVBox3D
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 
@@ -171,15 +167,8 @@ class ScannetSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
         super().__init__(dataset, split)
-        self.cfg = dataset.cfg
-
-        self.path_list = dataset.get_split_list(split)
-
         log.info("Found {} pointclouds for {}".format(len(self.path_list),
                                                       split))
-
-        self.split = split
-        self.dataset = dataset
 
     def __len__(self):
         return len(self.path_list)

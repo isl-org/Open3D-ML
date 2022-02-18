@@ -5,14 +5,15 @@ except ImportError:
     raise ImportError('Please run "pip install nuscenes-devkit" '
                       'to install the official devkit first.')
 
-import numpy as np
-import os, sys, glob, pickle
-from pathlib import Path
-from os.path import join, exists, dirname, abspath
+import logging
+import os
+import pickle
+from os.path import join
 from os import makedirs
-import random
 import argparse
+import numpy as np
 from tqdm import tqdm
+from pyquaternion import Quaternion
 
 
 def parse_args():
@@ -134,6 +135,67 @@ class NuScenesProcess():
             print(f"Saved train info at {join(out_path, 'infos_train.pkl')}")
             print(f"Saved val info at {join(out_path, 'infos_val.pkl')}")
 
+    def obtain_sensor2top(self,
+                          sensor_token,
+                          l2e_t,
+                          l2e_r_mat,
+                          e2g_t,
+                          e2g_r_mat,
+                          sensor_type='lidar'):
+        """Obtain the info with RT matric from general sensor to Top LiDAR.
+
+        Args:
+            nusc (class): Dataset class in the nuScenes dataset.
+            sensor_token (str): Sample data token corresponding to the
+                specific sensor type.
+            l2e_t (np.ndarray): Translation from lidar to ego in shape (1, 3).
+            l2e_r_mat (np.ndarray): Rotation matrix from lidar to ego
+                in shape (3, 3).
+            e2g_t (np.ndarray): Translation from ego to global in shape (1, 3).
+            e2g_r_mat (np.ndarray): Rotation matrix from ego to global
+                in shape (3, 3).
+            sensor_type (str): Sensor to calibrate. Default: 'lidar'.
+
+        Returns:
+            sweep (dict): Sweep information after transformation.
+        """
+        nusc = self.nusc
+        sd_rec = nusc.get('sample_data', sensor_token)
+        cs_record = nusc.get('calibrated_sensor',
+                             sd_rec['calibrated_sensor_token'])
+        pose_record = nusc.get('ego_pose', sd_rec['ego_pose_token'])
+        data_path = str(nusc.get_sample_data_path(sd_rec['token']))
+        if os.getcwd() in data_path:  # path from lyftdataset is absolute path
+            data_path = data_path.split(f'{os.getcwd()}/')[-1]  # relative path
+        sweep = {
+            'data_path': data_path,
+            'type': sensor_type,
+            'sample_data_token': sd_rec['token'],
+            'sensor2ego_translation': cs_record['translation'],
+            'sensor2ego_rotation': cs_record['rotation'],
+            'ego2global_translation': pose_record['translation'],
+            'ego2global_rotation': pose_record['rotation'],
+            'timestamp': sd_rec['timestamp']
+        }
+        l2e_r_s = sweep['sensor2ego_rotation']
+        l2e_t_s = sweep['sensor2ego_translation']
+        e2g_r_s = sweep['ego2global_rotation']
+        e2g_t_s = sweep['ego2global_translation']
+
+        # obtain the RT from sensor to Top LiDAR
+        # sweep->ego->global->ego'->lidar
+        l2e_r_s_mat = Quaternion(l2e_r_s).rotation_matrix
+        e2g_r_s_mat = Quaternion(e2g_r_s).rotation_matrix
+        R = (l2e_r_s_mat.T @ e2g_r_s_mat.T) @ (
+            np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T)
+        T = (l2e_t_s @ e2g_r_s_mat.T + e2g_t_s) @ (
+            np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T)
+        T -= e2g_t @ (np.linalg.inv(e2g_r_mat).T @ np.linalg.inv(l2e_r_mat).T
+                     ) + l2e_t @ np.linalg.inv(l2e_r_mat).T
+        sweep['sensor2lidar_rotation'] = R.T  # points @ R.T + T
+        sweep['sensor2lidar_translation'] = T
+        return sweep
+
     def process_scenes(self):
         nusc = self.nusc
         train_info = []
@@ -154,12 +216,37 @@ class NuScenesProcess():
             data = {
                 'lidar_path': lidar_path,
                 'token': sample['token'],
+                'cams': dict(),
                 'lidar2ego_tr': calib_rec['translation'],
                 'lidar2ego_rot': calib_rec['rotation'],
                 'ego2global_tr': pose_rec['translation'],
                 'ego2global_rot': pose_rec['rotation'],
                 'timestamp': sample['timestamp']
             }
+
+            l2e_r = data['lidar2ego_rot']
+            l2e_t = data['lidar2ego_tr']
+            e2g_r = data['ego2global_rot']
+            e2g_t = data['ego2global_tr']
+            l2e_r_mat = Quaternion(l2e_r).rotation_matrix
+            e2g_r_mat = Quaternion(e2g_r).rotation_matrix
+
+            # obtain 6 image's information per frame
+            camera_types = [
+                'CAM_FRONT',
+                'CAM_FRONT_RIGHT',
+                'CAM_FRONT_LEFT',
+                'CAM_BACK',
+                'CAM_BACK_LEFT',
+                'CAM_BACK_RIGHT',
+            ]
+            for cam in camera_types:
+                cam_token = sample['data'][cam]
+                cam_path, _, cam_intrinsic = nusc.get_sample_data(cam_token)
+                cam_info = self.obtain_sensor2top(cam_token, l2e_t, l2e_r_mat,
+                                                  e2g_t, e2g_r_mat, cam)
+                cam_info.update(cam_intrinsic=cam_intrinsic)
+                data['cams'].update({cam: cam_info})
 
             if not self.is_test:
                 annotations = [
@@ -223,6 +310,12 @@ class NuScenesProcess():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     out_path = args.out_path
     if out_path is None:

@@ -1,2 +1,1 @@
 tensorflow~=2.5.2
-openvino-dev==2021.4.2

@@ -1,20 +1,16 @@
-import numpy as np
-import os, argparse, pickle, sys
-from os.path import exists, join, isfile, dirname, abspath, split
+import os
+import pickle
+from os.path import join
 from pathlib import Path
-from glob import glob
 import logging
-import yaml
+import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 from .base_dataset import BaseDataset
-from ..utils import Config, make_dir, DATASET
+from ..utils import DATASET
 from .utils import BEVBox3D
+import open3d as o3d
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 
@@ -36,7 +32,8 @@ class NuScenes(BaseDataset):
 
         Args:
             dataset_path: The path to the dataset to use.
-            info_path: The path to the file that includes information about the dataset. This is default to dataset path if nothing is provided.
+            info_path: The path to the file that includes information about the
+                dataset. This is default to dataset path if nothing is provided.
             name: The name of the dataset (NuScenes in this case).
             cache_dir: The directory where the cache is stored.
             use_cache: Indicates if the dataset should be cached.
@@ -139,6 +136,44 @@ class NuScenes(BaseDataset):
 
         return objects
 
+    def read_cams(self, cam_dict):
+        """Reads image data from the cam dict provided.
+
+        Args:
+            cam_dict (Dict): Mapping from camera names to dict with image
+                information ('data_path', 'sensor2lidar_translation',
+                'sensor2lidar_rotation', 'cam_intrinsic').
+
+        Returns:
+            A dict with keys as camera names and value as images.
+        """
+        assert [Path(val['data_path']).exists() for _, val in cam_dict.items()]
+
+        res_dict = dict()
+        for cam in cam_dict.keys():
+            res_dict[cam] = dict()
+            res_dict[cam]['img'] = np.array(
+                o3d.io.read_image(cam_dict[cam]['data_path']))
+
+            # obtain lidar to cam transformation matrix
+            lidar2cam_r = np.linalg.inv(cam_dict[cam]['sensor2lidar_rotation'])
+            lidar2cam_t = cam_dict[cam][
+                'sensor2lidar_translation'] @ lidar2cam_r.T
+            lidar2cam_rt = np.eye(4)
+            lidar2cam_rt[:3, :3] = lidar2cam_r.T
+            lidar2cam_rt[3, :3] = -lidar2cam_t
+            intrinsic = cam_dict[cam]['cam_intrinsic']
+            viewpad = np.eye(4)
+            viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
+            # obtain lidar to image transformation matrix
+            lidar2img_rt = (viewpad @ lidar2cam_rt.T)
+
+            res_dict[cam]['lidar2cam_rt'] = lidar2cam_rt
+            res_dict[cam]['lidar2img_rt'] = lidar2img_rt
+            res_dict[cam]['cam_intrinsic'] = cam_dict[cam]['cam_intrinsic']
+
+        return res_dict
+
     def get_split(self, split):
         """Returns a dataset split.
 
@@ -162,8 +197,9 @@ class NuScenes(BaseDataset):
             A dataset split object providing the requested subset of the data.
 
         Raises:
-            ValueError: Indicates that the split name passed is incorrect. The split name should be one of
-            'training', 'test', 'validation', or 'all'.
+            ValueError: Indicates that the split name passed is incorrect. The
+                split name should be one of 'training', 'test', 'validation', or
+                'all'.
         """
         if split in ['train', 'training']:
             return self.train_info
@@ -182,7 +218,8 @@ class NuScenes(BaseDataset):
                         attr: The attribute that needs to be checked.
 
         Returns:
-            If the dataum attribute is tested, then return the path where the attribute is stored; else, returns false.
+            If the dataum attribute is tested, then return the path where the
+                attribute is stored; else, returns false.
         """
         pass
 
@@ -190,8 +227,10 @@ class NuScenes(BaseDataset):
         """Saves the output of a model.
 
         Args:
-            results: The output of a model for the datum associated with the attribute passed.
-            attr: The attributes that correspond to the outputs passed in results.
+            results: The output of a model for the datum associated with the
+                attribute passed.
+            attr: The attributes that correspond to the outputs passed in
+                results.
         """
         pass
 
@@ -232,6 +271,9 @@ class NuSceneSplit():
             'calib': calib,
             'bounding_boxes': label,
         }
+
+        if 'cams' in info:
+            data['cams'] = self.dataset.read_cams(info['cams'])
 
         return data
 

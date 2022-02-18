@@ -12,13 +12,8 @@ from .base_pipeline import BasePipeline
 from ..modules.losses import SemSegLoss
 from ..modules.metrics import SemSegMetric
 from ..dataloaders import TFDataloader
-from ...utils import make_dir, LogRecord, PIPELINE, get_runid, code2md
+from ...utils import make_dir, PIPELINE, get_runid, code2md
 
-logging.setLogRecordFactory(LogRecord)
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

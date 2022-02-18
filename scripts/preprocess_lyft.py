@@ -4,6 +4,7 @@ except ImportError:
     raise ImportError('Please run "pip install lyft_dataset_sdk" '
                       'to install the official devkit first.')
 
+import logging
 import numpy as np
 import os, sys, glob, pickle
 from pathlib import Path
@@ -208,6 +209,12 @@ class LyftProcess():
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     args.out_path = args.out_path or args.dataset_path
     converter = LyftProcess(args.dataset_path, args.out_path, args.version)

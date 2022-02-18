@@ -13,16 +13,22 @@ class Augmentation():
         self.cfg = cfg
         self.rng = np.random.default_rng(seed)
 
-    def recenter(self, data):
+    def recenter(self, data, cfg):
         """Recenter pointcloud/features to origin.
 
         Typically used before rotating the pointcloud.
 
         Args:
             data: Pointcloud or features.
+            cfg: config dict where
+                Key 'dim' specifies dimension to be recentered.
 
         """
-        return data - data.mean(0)
+        if not cfg:
+            return data
+        dim = cfg.get('dim', [0, 1, 2])
+        data[:, dim] = data[:, dim] - data.mean(0)[dim]
+        return data
 
     def normalize(self, pc, feat, cfg):
         """Normalize pointcloud and/or features.
@@ -67,7 +73,8 @@ class Augmentation():
             cfg: configuration dictionary.
 
         """
-        if np.abs(pc[:, :3].mean()) > 1e-2:
+        # Not checking for height dimension as preserving absolute height dimension improves some models.
+        if np.abs(pc[:, :2].mean()) > 1e-2:
             warnings.warn(
                 f"It is recommended to recenter the pointcloud before calling rotate."
             )
@@ -158,6 +165,9 @@ class SemsegAugmentation(Augmentation):
             'ChromaticTranslation', 'ChromaticJitter',
             'HueSaturationTranslation'
         ]
+        if cfg is None:
+            return
+
         for method in cfg:
             if method not in all_methods:
                 warnings.warn(
@@ -357,8 +367,7 @@ class SemsegAugmentation(Augmentation):
             self.rng = np.random.default_rng(seed)
 
         if 'recenter' in cfg:
-            if cfg['recenter']:
-                point = self.recenter(point)
+            point = self.recenter(point, cfg['recenter'])
 
         if 'normalize' in cfg:
             point, feat = self.normalize(point, feat, cfg['normalize'])
@@ -545,7 +554,7 @@ class ObjdetAugmentation(Augmentation):
 
         if 'recenter' in cfg:
             if cfg['recenter']:
-                data['point'] = self.recenter(data['point'])
+                data['point'] = self.recenter(data['point'], cfg['recenter'])
 
         if 'normalize' in cfg:
             data['point'], _ = self.normalize(data['point'], None,

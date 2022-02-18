@@ -1,3 +1,4 @@
+import logging
 import open3d.ml as _ml3d
 
 from open3d.ml.vis import Visualizer, BoundingBox3D, LabelLUT
@@ -135,5 +136,11 @@ def main(args):
 
 
 if __name__ == '__main__':
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
+    )
+
     args = parse_args()
     main(args)
