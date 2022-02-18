@@ -152,8 +152,6 @@ def main():
         args.device_ids) > 1
 
     if not args.distributed:
-        # print("not distr : ")
-        # exit(0)
         dataset = Dataset(**cfg_dict_dataset)
         model = Model(**cfg_dict_model, mode=args.mode)
         pipeline = Pipeline(model, dataset, **cfg_dict_pipeline)

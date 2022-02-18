@@ -53,6 +53,7 @@ class Waymo(BaseDataset):
         self.dataset_path = cfg.dataset_path
         self.num_classes = 4
         self.label_to_names = self.get_label_to_names()
+        self.shuffle = kwargs.get('shuffle', False)
 
         self.all_files = sorted(
             glob(join(cfg.dataset_path, 'velodyne', '*.bin')))
@@ -69,6 +70,9 @@ class Waymo(BaseDataset):
             else:
                 log.warning(
                     f"Skipping {f}, prefix must be one of train, test or val.")
+        if self.shuffle:
+            log.info("Shuffling training files...")
+            self.rng.shuffle(self.train_files)
 
     @staticmethod
     def get_label_to_names():

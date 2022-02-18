@@ -155,8 +155,8 @@ class ObjectDetection(BasePipeline):
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
         if self.rank == 0:
+            log.info("Logging in file : {}".format(log_file_path))
             log.addHandler(logging.FileHandler(log_file_path))
 
         batcher = ConcatBatcher(device, model.cfg.name)
@@ -207,12 +207,12 @@ class ObjectDetection(BasePipeline):
                 boxes = model.inference_end(results, data)
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
-                # Save only for the first batch
-                if record_summary and 'valid' not in self.summary:
+                if record_summary:
                     self.summary['valid'] = self.get_3d_summary(boxes,
                                                                 data,
                                                                 epoch,
                                                                 results=results)
+                record_summary = False  # Save only for the first batch
 
         sum_loss = 0
         desc = "validation - "
