@@ -11,7 +11,6 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 from .base_pipeline import BasePipeline
-from .dataparallel import CustomDataParallel
 from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
 # pylint: disable-next=unused-import
