@@ -312,15 +312,16 @@ class ObjectDetection(BasePipeline):
         else:
             train_sampler = None
 
-        train_loader = DataLoader(train_split,
-                                  batch_size=cfg.batch_size,
-                                  num_workers=cfg.get('num_workers', 0),
-                                  pin_memory=cfg.get('pin_memory', False),
-                                  collate_fn=batcher.collate_fn,
-                                  sampler=train_sampler)
-        #     worker_init_fn=lambda x: np.random.seed(x + np.uint32(
-        #         torch.utils.data.get_worker_info().seed))
-        # )  # numpy expects np.uint32, whereas torch returns np.uint64.
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            num_workers=cfg.get('num_workers', 0),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=batcher.collate_fn,
+            sampler=train_sampler,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed))
+        )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg.optimizer)
 

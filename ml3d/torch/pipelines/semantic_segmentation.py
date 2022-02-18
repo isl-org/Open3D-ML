@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader
 # pylint: disable-next=unused-import
 from open3d.visualization.tensorboard_plugin import summary
 from .base_pipeline import BasePipeline
-from .dataparallel import CustomDataParallel
 from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
 from ..modules.losses import SemSegLoss, filter_valid_label
@@ -102,7 +101,6 @@ class SemanticSegmentation(BasePipeline):
             momentum=0.98,
             main_log_dir='./logs/',
             device='cuda',
-            device_ids=[0],
             split='train',
             train_sum_dir='train_log',
             **kwargs):
@@ -122,7 +120,6 @@ class SemanticSegmentation(BasePipeline):
                          momentum=momentum,
                          main_log_dir=main_log_dir,
                          device=device,
-                         device_ids=device_ids,
                          split=split,
                          train_sum_dir=train_sum_dir,
                          **kwargs)
@@ -309,6 +306,7 @@ class SemanticSegmentation(BasePipeline):
         dataset = self.dataset
 
         cfg = self.cfg
+        model.to(device)
 
         log.info("DEVICE : {}".format(device))
         timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
@@ -379,9 +377,6 @@ class SemanticSegmentation(BasePipeline):
 
         writer = SummaryWriter(self.tensorboard_dir)
         self.save_config(writer)
-
-        model = CustomDataParallel(model, device_ids=self.device_ids)
-
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
         record_summary = cfg.get('summary').get('record_for', [])
 
@@ -397,6 +392,8 @@ class SemanticSegmentation(BasePipeline):
             model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
                 self.optimizer.zero_grad()
                 results = model(inputs['data'])
                 loss, gt_labels, predict_scores = model.get_loss(
@@ -429,6 +426,8 @@ class SemanticSegmentation(BasePipeline):
             with torch.no_grad():
                 for step, inputs in enumerate(
                         tqdm(valid_loader, desc='validation')):
+                    if hasattr(inputs['data'], 'to'):
+                        inputs['data'].to(device)
 
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
