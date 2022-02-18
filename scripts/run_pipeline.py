@@ -191,6 +191,11 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
     cfg_dict_model['rank'] = rank
     cfg_dict_pipeline['rank'] = rank
 
+    rng = np.random.default_rng(args.seed + rank)
+    cfg_dict_dataset['seed'] = rng
+    cfg_dict_model['seed'] = rng
+    cfg_dict_pipeline['seed'] = rng
+
     device = f"cuda:{args.device_ids[rank]}"
     print(f"rank = {rank}, world_size = {world_size}, gpu = {device}")
 
@@ -219,4 +224,4 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
 
 if __name__ == '__main__':
     multiprocessing.set_start_method('spawn')
-    main()
+    sys.exit(main())

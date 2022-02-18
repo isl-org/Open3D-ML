@@ -24,6 +24,7 @@ class BasePipeline(ABC):
             model: A network model.
             dataset: A dataset, or None for inference model.
             device: 'gpu' or 'cpu'.
+            distributed: Whether to use multiple gpus.
             kwargs:
 
         Returns:
@@ -59,7 +60,7 @@ class BasePipeline(ABC):
         else:
             if distributed:
                 self.device = torch.device(device)
-                print("Using device", self.device)
+                print(f"Rank : {self.rank} using device : {self.device}")
                 torch.cuda.set_device(self.device)
             else:
                 self.device = torch.device('cuda')
