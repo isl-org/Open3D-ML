@@ -2,7 +2,7 @@ dataset:
   name: Waymo
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  steps_per_epoch_train: 5000
+  steps_per_epoch_train: 4000
 
 model:
   name: PointPillars
@@ -10,7 +10,7 @@ model:
 
   batcher: "ignore"
 
-  point_cloud_range: [-80, -80, -6, 85, 85, 7]
+  point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
   classes: ['VEHICLE', 'PEDESTRIAN', 'CYCLIST']
 
   loss:
@@ -37,13 +37,13 @@ model:
 
   scatter:
     in_channels: 64
-    output_shape: [520, 520]
+    output_shape: [468, 468]
 
   backbone:
     in_channels: 64
     out_channels: [64, 128, 256]
     layer_nums: [3, 5, 5]
-    layer_strides: [2, 2, 2]
+    layer_strides: [1, 2, 2]
 
   neck:
     in_channels: [64, 128, 256]
@@ -57,38 +57,39 @@ model:
     nms_pre: 4096
     score_thr: 0.1
     ranges: [
-      [-80, -80, 1.142, 85, 85, 1.142],
-      [-80, -80, 1.139, 85, 85, 1.139],
-      [-80, -80, 1.149, 85, 85, 1.149],
+      [-74.88, -74.88, -0.0345, 74.88, 74.88, -0.0345],
+      [-74.88, -74.88, -0.1188, 74.88, 74.88, -0.1188],
+      [-74.88, -74.88, 0, 74.88, 74.88, 0],
     ]
     sizes: [
-      [1.98, 4.50, 1.96],  # VEHICLE
-      [0.91, 1.94, 1.78],  # CYCLIST
-      [0.84, 0.91, 1.70]   # PEDESTRIAN
+      [2.08, 4.73, 1.77],  # VEHICLE
+      [0.84, 1.81, 1.77],  # CYCLIST
+      [0.84, 0.91, 1.74]   # PEDESTRIAN
     ]
     dir_offset: 0.7854
     rotations: [0, 1.57]
     iou_thr: [[0.4, 0.55], [0.3, 0.5], [0.3, 0.5]]
 
-  augment: {}
-    # PointShuffle: True
-    # ObjectRangeFilter: True
-    # ObjectSample:
-    #   min_points_dict:
-    #     VEHICLE: 5
-    #     PEDESTRIAN: 10
-    #     CYCLIST: 10
-    #   sample_dict:
-    #     VEHICLE: 15
-    #     PEDESTRIAN: 10
-    #     CYCLIST: 10
+  augment:
+    PointShuffle: True
+    ObjectRangeFilter:
+      point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
+    ObjectSample:
+      min_points_dict:
+        VEHICLE: 5
+        PEDESTRIAN: 10
+        CYCLIST: 10
+      sample_dict:
+        VEHICLE: 15
+        PEDESTRIAN: 10
+        CYCLIST: 10
 
 
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
   batch_size: 6
-  val_batch_size: 1
+  val_batch_size: 6
   test_batch_size: 1
   save_ckpt_freq: 5
   max_epoch: 200
@@ -102,10 +103,10 @@ pipeline:
     weight_decay: 0.01
 
   # evaluation properties
-  overlaps: [0.5, 0.5, 0.7]
+  overlaps: [0.5, 0.5, 0.5]
   difficulties: [0, 1, 2]
   summary:
-    record_for: []
+    record_for: [train, valid]
     max_pts:
     use_reference: false
     max_outputs: 1
