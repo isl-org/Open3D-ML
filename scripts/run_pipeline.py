@@ -212,8 +212,6 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
                         distributed=args.distributed,
                         **cfg_dict_pipeline)
 
-    with open(Path(__file__).parent / 'README.md', 'r') as f:
-        readme = f.read()
     pipeline.cfg_tb = args.cfg_tb
 
     if args.split == 'test':
