@@ -1,5 +1,8 @@
-import torch
 import re
+import collections
+
+import torch
+
 
 container_abcs = collections.abc
 string_classes = (str, bytes)
