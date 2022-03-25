@@ -339,7 +339,9 @@ class ObjectDetection(BasePipeline):
             model.cuda(self.device)
             model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[self.device])
-            # model.get_loss = model.module.get_loss
+            model.get_loss = model.module.get_loss
+            model.cfg = model.module.cfg
+            model.inference_end = model.module.inference_end
 
         record_summary = self.rank == 0 and 'train' in cfg.get('summary').get(
             'record_for', [])
@@ -359,10 +361,7 @@ class ObjectDetection(BasePipeline):
             for data in process_bar:
                 data.to(device)
                 results = model(data)
-                if self.distributed:
-                    loss = model.module.get_loss(results, data)
-                else:
-                    loss = model.get_loss(results, data)
+                loss = model.get_loss(results, data)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()
@@ -381,10 +380,7 @@ class ObjectDetection(BasePipeline):
 
                 # Record visualization for the last iteration
                 if record_summary and process_bar.n == process_bar.total - 1:
-                    if self.distributed:
-                        boxes = model.module.inference_end(results, data)
-                    else:
-                        boxes = model.inference_end(results, data)
+                    boxes = model.inference_end(results, data)
                     self.summary['train'] = self.get_3d_summary(boxes,
                                                                 data,
                                                                 epoch,
