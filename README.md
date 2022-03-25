@@ -411,6 +411,7 @@ There are many ways to contribute to this project. You can:
 * Add code for reading a new dataset
 * Share parameters and weights for an existing model
 * Report problems and bugs
+* Add or fix the docstrings, documentation, comments
 
 Please, **make your pull requests to the** [**dev**](https://github.com/isl-org/Open3D-ML/tree/dev) branch.
 Open3D is a community effort. We welcome and celebrate contributions from the
