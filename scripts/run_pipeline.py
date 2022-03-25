@@ -43,6 +43,18 @@ def parse_args():
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
     parser.add_argument('--seed', help='random seed', default=0)
+    parser.add_argument(
+        '--host',
+        help='Host for distributed training, default: localhost',
+        default='localhost')
+    parser.add_argument('--port',
+                        help='port for distributed training, default: 12355',
+                        default='12355')
+    parser.add_argument(
+        '--backend',
+        help=
+        'backend for distributed training. One of (nccl, gloo)}, default: gloo',
+        default='gloo')
 
     args, unknown = parser.parse_known_args()
 
@@ -173,12 +185,12 @@ def main():
                  nprocs=len(args.device_ids))
 
 
-def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+def setup(rank, world_size, args):
+    os.environ['MASTER_ADDR'] = args.host
+    os.environ['MASTER_PORT'] = args.port
 
     # initialize the process group
-    dist.init_process_group("gloo", rank=rank, world_size=world_size)
+    dist.init_process_group(args.backend, rank=rank, world_size=world_size)
 
 
 def cleanup():
@@ -188,7 +200,7 @@ def cleanup():
 def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
                 cfg_dict_model, cfg_dict_pipeline, args):
     world_size = len(args.device_ids)
-    setup(rank, world_size)
+    setup(rank, world_size, args)
 
     cfg_dict_dataset['rank'] = rank
     cfg_dict_model['rank'] = rank
@@ -229,5 +241,5 @@ if __name__ == '__main__':
         format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
     )
 
-    multiprocessing.set_start_method('spawn')
+    multiprocessing.set_start_method('forkserver')
     sys.exit(main())

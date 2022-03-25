@@ -8,13 +8,13 @@ except ImportError:
 import logging
 import numpy as np
 import os, sys, glob, pickle
-from pathlib import Path
-from os.path import join, exists, dirname, abspath
-from os import makedirs
-import random
 import argparse
 import tensorflow as tf
 import matplotlib.image as mpimg
+
+from pathlib import Path
+from os.path import join, exists, dirname, abspath
+from os import makedirs
 from multiprocessing import Pool
 from tqdm import tqdm
 from waymo_open_dataset.utils import range_image_utils, transform_utils
@@ -58,6 +58,25 @@ class Waymo2KITTI():
     """Waymo to KITTI converter.
 
     This class converts tfrecord files from Waymo dataset to KITTI format.
+    KITTI format : (type, truncated, occluded, alpha, bbox, dimensions(3), location(3), 
+                   rotation_y(1), score(1, optional))
+        type (string): Describes the type of object.
+        truncated (float): Ranges from 0(non-truncated) to 1(truncated).
+        occluded (int): Integer(0, 1, 2, 3) signifies state fully visible, partly
+                        occluded, largely occluded, unknown.
+        alpha (float): Observation angle of object, ranging [-pi..pi].
+        bbox (float): 2d bounding box of object in the image.
+        dimensions (float): 3D object dimensions: h, w, l in meters.
+        location (float): 3D object location: x,y,z in camera coordinates (in meters).
+        rotation_y (float): rotation around Y-axis in camera coordinates [-pi..pi].
+        score (float): Only for predictions, indicating confidence in detection.
+    
+    Conversion writes following files:
+        pointcloud(np.float32) : pointcloud data with shape [N, 6]. Consists of
+                                 (x, y, z, intensity, elongation, timestamp).
+        images(np.uint8): camera images are saved if `write_image` is True.
+        calibrations(np.float32): Intinsic and Extrinsic matrix for all cameras.
+        label(np.float32): Bounding box information in KITTI format.
 
     Args:
         dataset_path (str): Directory to load waymo raw data.
@@ -137,7 +156,6 @@ class Waymo2KITTI():
             if (self.selected_waymo_locations is not None and
                     frame.context.stats.location
                     not in self.selected_waymo_locations):
-                print("continue")
                 continue
 
             if self.write_image:
@@ -208,7 +226,6 @@ class Waymo2KITTI():
                 f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt',
                 'w+') as fp_calib:
             fp_calib.write(calib_context)
-            fp_calib.close()
 
     def save_pose(self, frame, file_idx, frame_idx):
         pose = np.array(frame.pose.transform).reshape(4, 4)
@@ -226,7 +243,6 @@ class Waymo2KITTI():
         for labels in frame.projected_lidar_labels:
             name = labels.name
             for label in labels.labels:
-                # TODO: need a workaround as bbox may not belong to front cam
                 bbox = [
                     label.box.center_x - label.box.length / 2,
                     label.box.center_y - label.box.width / 2,
@@ -255,9 +271,6 @@ class Waymo2KITTI():
             if my_type not in self.selected_waymo_classes:
                 continue
 
-            # if self.filter_empty_3dboxes and obj.num_lidar_points_in_box < 1:
-            #     continue
-
             height = obj.box.height
             width = obj.box.width
             length = obj.box.length
@@ -265,11 +278,6 @@ class Waymo2KITTI():
             x = obj.box.center_x
             y = obj.box.center_y
             z = obj.box.center_z
-
-            # # project bounding box to the virtual reference frame
-            # pt_ref = self.T_velo_to_front_cam @ \
-            #     np.array([x, y, z, 1]).reshape((4, 1))
-            # x, y, z, _ = pt_ref.flatten().tolist()
 
             rotation_y = -obj.box.heading - np.pi / 2
             track_id = obj.id

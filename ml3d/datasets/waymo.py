@@ -91,18 +91,17 @@ class Waymo(BaseDataset):
         """Reads lidar data from the path provided.
 
         Returns:
-            A data object with lidar information.
+            pc: pointcloud data with shape [N, 6], where
+                the format is xyzRGB.
         """
-        assert Path(path).exists()
-
         return np.fromfile(path, dtype=np.float32).reshape(-1, 6)
 
     @staticmethod
     def read_label(path, calib):
-        """Reads labels of bound boxes.
+        """Reads labels of bounding boxes.
 
         Returns:
-            The data objects with bound boxes information.
+            The data objects with bounding boxes information.
         """
         if not Path(path).exists():
             return None
@@ -132,24 +131,22 @@ class Waymo(BaseDataset):
         Returns:
             The camera and the camera image used in calibration.
         """
-        assert Path(path).exists()
-
         with open(path, 'r') as f:
             lines = f.readlines()
         obj = lines[0].strip().split(' ')[1:]
-        P0 = np.array(obj, dtype=np.float32)
+        unused_P0 = np.array(obj, dtype=np.float32)
 
         obj = lines[1].strip().split(' ')[1:]
-        P1 = np.array(obj, dtype=np.float32)
+        unused_P1 = np.array(obj, dtype=np.float32)
 
         obj = lines[2].strip().split(' ')[1:]
         P2 = np.array(obj, dtype=np.float32)
 
         obj = lines[3].strip().split(' ')[1:]
-        P3 = np.array(obj, dtype=np.float32)
+        unused_P3 = np.array(obj, dtype=np.float32)
 
         obj = lines[4].strip().split(' ')[1:]
-        P4 = np.array(obj, dtype=np.float32)
+        unused_P4 = np.array(obj, dtype=np.float32)
 
         obj = lines[5].strip().split(' ')[1:]
         R0 = np.array(obj, dtype=np.float32).reshape(3, 3)
@@ -210,7 +207,7 @@ class Waymo(BaseDataset):
         else:
             raise ValueError("Invalid split {}".format(split))
 
-    def is_tested():
+    def is_tested(attr):
         """Checks if a datum in the dataset has been tested.
 
         Args:
@@ -220,16 +217,16 @@ class Waymo(BaseDataset):
             If the datum attribute is tested, then return the path where the
                 attribute is stored; else, returns false.
         """
-        pass
+        raise NotImplementedError()
 
-    def save_test_result():
+    def save_test_result(results, attr):
         """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
             attr: The attributes that correspond to the outputs passed in results.
         """
-        pass
+        raise NotImplementedError()
 
 
 class WaymoSplit():
@@ -279,6 +276,7 @@ class Object3d(BEVBox3D):
     """
 
     def __init__(self, center, size, label, calib):
+        # ground truth files doesn't have confidence value.
         confidence = float(label[15]) if label.__len__() == 16 else -1.0
 
         world_cam = calib['world_cam']

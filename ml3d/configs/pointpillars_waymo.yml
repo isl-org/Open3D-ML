@@ -106,7 +106,7 @@ pipeline:
   overlaps: [0.5, 0.5, 0.5]
   difficulties: [0, 1, 2]
   summary:
-    record_for: [train, valid]
+    record_for: []
     max_pts:
     use_reference: false
     max_outputs: 1

@@ -176,8 +176,6 @@ class ObjectDetection(BasePipeline):
                                   pin_memory=cfg.get('pin_memory', False),
                                   collate_fn=batcher.collate_fn,
                                   sampler=valid_sampler)
-        # worker_init_fn=lambda x: np.random.seed(x + np.uint32(
-        #     torch.utils.data.get_worker_info().seed)))
 
         record_summary = self.rank == 0 and 'valid' in cfg.get('summary').get(
             'record_for', [])
@@ -341,6 +339,7 @@ class ObjectDetection(BasePipeline):
             model.cuda(self.device)
             model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[self.device])
+            # model.get_loss = model.module.get_loss
 
         record_summary = self.rank == 0 and 'train' in cfg.get('summary').get(
             'record_for', [])

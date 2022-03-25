@@ -1,12 +1,13 @@
 import logging
-from os.path import join
 import argparse
 import pickle
-import random
+import numpy as np
+import multiprocessing
+
 from tqdm import tqdm
+from os.path import join
 from open3d.ml.datasets import utils
 from open3d.ml import datasets
-import multiprocessing
 
 
 def parse_args():
@@ -25,7 +26,7 @@ def parse_args():
                         default="KITTI",
                         required=False)
     parser.add_argument('--num_cpus',
-                        help='Name of dataset class',
+                        help='Number of threads to use.',
                         type=int,
                         default=multiprocessing.cpu_count(),
                         required=False)
@@ -95,8 +96,9 @@ if __name__ == '__main__':
     train = dataset.get_split('train')
     max_pc = len(train) if args.max_pc is None else args.max_pc
 
-    query_pc = range(len(train)) if max_pc >= len(train) else random.sample(
-        range(len(train)), max_pc)
+    rng = np.random.default_rng()
+    query_pc = range(len(train)) if max_pc >= len(train) else rng.choice(
+        range(len(train)), max_pc, replace=False)
 
     print(f"Found {len(train)} traning samples, Using {max_pc}")
     print(

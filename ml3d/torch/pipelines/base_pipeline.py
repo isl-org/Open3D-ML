@@ -23,7 +23,7 @@ class BasePipeline(ABC):
         Args:
             model: A network model.
             dataset: A dataset, or None for inference model.
-            device: 'gpu' or 'cpu'.
+            device: 'cuda' or 'cpu'.
             distributed: Whether to use multiple gpus.
             kwargs:
 
@@ -59,8 +59,8 @@ class BasePipeline(ABC):
 
         if device == 'cpu' or not torch.cuda.is_available():
             if distributed:
-                raise ValueError(
-                    "Distributed training is ON, but CUDA not available.")
+                raise NotImplementedError(
+                    "Distributed training for CPU is not supported yet.")
             self.device = torch.device('cpu')
         else:
             if distributed:
