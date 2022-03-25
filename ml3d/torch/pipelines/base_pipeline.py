@@ -1,23 +1,31 @@
 import numpy as np
 import torch
 from abc import ABC, abstractmethod
+from typing import Optional
+from typing_extensions import Literal
 
 from os.path import join
 
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config, make_dir
-
+from ...datasets.base_dataset import BaseDataset
 
 class BasePipeline(ABC):
     """Base pipeline class."""
 
-    def __init__(self, model, dataset=None, device='gpu', **kwargs):
+    def __init__(
+            self,
+            model: torch.nn.Module,
+            dataset: Optional[BaseDataset]=None, 
+            device: Literal["cpu", "cuda"]="cpu", 
+            **kwargs
+        ):
         """Initialize.
 
         Args:
-            model: A network model.
-            dataset: A dataset, or None for inference model.
-            device: 'gpu' or 'cpu'.
+            model (torch.nn.Module): A network model.
+            dataset (Optional[BaseDataset]): A dataset, or None for inference model.
+            device: 'gpu' or 'cuda'.
             kwargs:
 
         Returns:
