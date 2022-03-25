@@ -1,9 +1,8 @@
 import numpy as np
-import yaml
 import torch
 from abc import ABC, abstractmethod
 
-from os.path import join, exists, dirname, abspath
+from os.path import join
 
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config, make_dir

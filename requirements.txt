@@ -7,3 +7,4 @@ pyyaml>=5.4.1
 scikit-learn>=0.21
 tqdm
 pyquaternion
+typing-extensions

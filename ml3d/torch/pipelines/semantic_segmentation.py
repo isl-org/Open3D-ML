@@ -2,6 +2,7 @@ import logging
 from os.path import exists, join
 from pathlib import Path
 from datetime import datetime
+from typing_extensions import TypedDict
 
 import numpy as np
 from tqdm import tqdm
@@ -21,7 +22,9 @@ from ...datasets import InferenceDummySplit
 
 log = logging.getLogger(__name__)
 
-
+class InferenceResult(TypedDict):
+    predict_labels: np.ndarray
+    predict_scores: np.ndarray
 class SemanticSegmentation(BasePipeline):
     """This class allows you to perform semantic segmentation for both training
     and inference using the Torch. This pipeline has multiple stages: Pre-
@@ -119,7 +122,7 @@ class SemanticSegmentation(BasePipeline):
                          train_sum_dir=train_sum_dir,
                          **kwargs)
 
-    def run_inference(self, data):
+    def run_inference(self, data) -> InferenceResult:
         """Run inference on given data.
 
         Args:
@@ -162,10 +165,10 @@ class SemanticSegmentation(BasePipeline):
                 results = model(inputs['data'])
                 self.update_tests(infer_sampler, inputs, results)
 
-        inference_result = {
-            'predict_labels': self.ori_test_labels.pop(),
-            'predict_scores': self.ori_test_probs.pop()
-        }
+        inference_result = InferenceResult(
+            predict_labels = self.ori_test_labels.pop(),
+            predict_scores = self.ori_test_probs.pop()
+        )
 
         metric = SemSegMetric()
 
@@ -678,10 +681,10 @@ class SemanticSegmentation(BasePipeline):
         ckpt = torch.load(ckpt_path, map_location=self.device)
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
-            log.info(f'Loading checkpoint optimizer_state_dict')
+            log.info('Loading checkpoint optimizer_state_dict')
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
-            log.info(f'Loading checkpoint scheduler_state_dict')
+            log.info('Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
     def save_ckpt(self, epoch):

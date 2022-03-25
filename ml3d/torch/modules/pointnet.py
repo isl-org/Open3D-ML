@@ -29,7 +29,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from typing import List
+from typing import List, Tuple
 
 from ..utils.torch_utils import gen_CNN
 
@@ -119,7 +119,7 @@ class _PointnetSAModuleBase(nn.Module):
     def forward(self,
                 xyz: torch.Tensor,
                 features: torch.Tensor = None,
-                new_xyz=None) -> (torch.Tensor, torch.Tensor):
+                new_xyz=None) -> Tuple[torch.Tensor, torch.Tensor]:
         r"""
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
         :param features: (B, N, C) tensor of the descriptors of the the features
