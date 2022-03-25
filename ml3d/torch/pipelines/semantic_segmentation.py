@@ -129,7 +129,7 @@ class SemanticSegmentation(BasePipeline):
             data: A raw data.
 
         Returns:
-            Returns the inference results.
+            (InferenceResult) Returns the inference results.
         """
         cfg = self.cfg
         model = self.model
