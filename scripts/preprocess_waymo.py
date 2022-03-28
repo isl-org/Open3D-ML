@@ -1,25 +1,26 @@
 try:
     from waymo_open_dataset import dataset_pb2
+    from waymo_open_dataset.utils import range_image_utils, transform_utils
+    from waymo_open_dataset.utils.frame_utils import \
+        parse_range_image_and_camera_projection
 except ImportError:
     raise ImportError(
-        'Please run "pip install waymo-open-dataset-tf-2-1-0==1.2.0" '
+        'Please clone "https://github.com/waymo-research/waymo-open-dataset.git" '
+        'checkout branch "r1.3", and append its path to PYTHONPATH '
         'to install the official devkit first.')
 
 import logging
 import numpy as np
 import os, sys, glob, pickle
-from pathlib import Path
-from os.path import join, exists, dirname, abspath
-from os import makedirs
-import random
 import argparse
 import tensorflow as tf
 import matplotlib.image as mpimg
+
+from pathlib import Path
+from os.path import join, exists, dirname, abspath
+from os import makedirs
 from multiprocessing import Pool
 from tqdm import tqdm
-from waymo_open_dataset.utils import range_image_utils, transform_utils
-from waymo_open_dataset.utils.frame_utils import \
-    parse_range_image_and_camera_projection
 
 
 def parse_args():
@@ -38,10 +39,10 @@ def parse_args():
                         default=16,
                         type=int)
 
-    parser.add_argument('--is_test',
-                        help='True for processing test data (default False)',
-                        default=False,
-                        type=bool)
+    parser.add_argument('--split',
+                        help='One of {train, val, test} (default train)',
+                        default='train',
+                        type=str)
 
     args = parser.parse_args()
 
@@ -58,6 +59,25 @@ class Waymo2KITTI():
     """Waymo to KITTI converter.
 
     This class converts tfrecord files from Waymo dataset to KITTI format.
+    KITTI format : (type, truncated, occluded, alpha, bbox, dimensions(3), location(3), 
+                   rotation_y(1), score(1, optional))
+        type (string): Describes the type of object.
+        truncated (float): Ranges from 0(non-truncated) to 1(truncated).
+        occluded (int): Integer(0, 1, 2, 3) signifies state fully visible, partly
+                        occluded, largely occluded, unknown.
+        alpha (float): Observation angle of object, ranging [-pi..pi].
+        bbox (float): 2d bounding box of object in the image.
+        dimensions (float): 3D object dimensions: h, w, l in meters.
+        location (float): 3D object location: x,y,z in camera coordinates (in meters).
+        rotation_y (float): rotation around Y-axis in camera coordinates [-pi..pi].
+        score (float): Only for predictions, indicating confidence in detection.
+    
+    Conversion writes following files:
+        pointcloud(np.float32) : pointcloud data with shape [N, 6]. Consists of
+                                 (x, y, z, intensity, elongation, timestamp).
+        images(np.uint8): camera images are saved if `write_image` is True.
+        calibrations(np.float32): Intinsic and Extrinsic matrix for all cameras.
+        label(np.float32): Bounding box information in KITTI format.
 
     Args:
         dataset_path (str): Directory to load waymo raw data.
@@ -66,11 +86,11 @@ class Waymo2KITTI():
         is_test (bool): Whether in the test_mode. Default: False.
     """
 
-    def __init__(self, dataset_path, save_dir='', workers=8, is_test=False):
+    def __init__(self, dataset_path, save_dir='', workers=8, split='train'):
 
-        self.write_image = True
+        self.write_image = False
         self.filter_empty_3dboxes = True
-        self.filter_no_label_zone_points = True
+        self.filter_no_label_zone_points = False
 
         self.classes = ['VEHICLE', 'PEDESTRIAN', 'SIGN', 'CYCLIST']
 
@@ -86,8 +106,8 @@ class Waymo2KITTI():
         self.dataset_path = dataset_path
         self.save_dir = save_dir
         self.workers = int(workers)
-        self.is_test = is_test
-        self.prefix = ''
+        self.is_test = split == 'test'
+        self.prefix = split + '_'
         self.save_track_id = False
 
         self.tfrecord_files = sorted(
@@ -137,7 +157,6 @@ class Waymo2KITTI():
             if (self.selected_waymo_locations is not None and
                     frame.context.stats.location
                     not in self.selected_waymo_locations):
-                print("continue")
                 continue
 
             if self.write_image:
@@ -153,8 +172,6 @@ class Waymo2KITTI():
         return len(self.tfrecord_files)
 
     def save_image(self, frame, file_idx, frame_idx):
-        self.prefix = ''
-
         for img in frame.images:
             img_path = Path(self.image_save_dir + str(img.name - 1)) / (
                 self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) +
@@ -210,7 +227,6 @@ class Waymo2KITTI():
                 f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt',
                 'w+') as fp_calib:
             fp_calib.write(calib_context)
-            fp_calib.close()
 
     def save_pose(self, frame, file_idx, frame_idx):
         pose = np.array(frame.pose.transform).reshape(4, 4)
@@ -228,7 +244,6 @@ class Waymo2KITTI():
         for labels in frame.projected_lidar_labels:
             name = labels.name
             for label in labels.labels:
-                # TODO: need a workaround as bbox may not belong to front cam
                 bbox = [
                     label.box.center_x - label.box.length / 2,
                     label.box.center_y - label.box.width / 2,
@@ -257,9 +272,6 @@ class Waymo2KITTI():
             if my_type not in self.selected_waymo_classes:
                 continue
 
-            # if self.filter_empty_3dboxes and obj.num_lidar_points_in_box < 1:
-            #     continue
-
             height = obj.box.height
             width = obj.box.width
             length = obj.box.length
@@ -267,11 +279,6 @@ class Waymo2KITTI():
             x = obj.box.center_x
             y = obj.box.center_y
             z = obj.box.center_z
-
-            # # project bounding box to the virtual reference frame
-            # pt_ref = self.T_velo_to_front_cam @ \
-            #     np.array([x, y, z, 1]).reshape((4, 1))
-            # x, y, z, _ = pt_ref.flatten().tolist()
 
             rotation_y = -obj.box.heading - np.pi / 2
             track_id = obj.id
@@ -306,7 +313,7 @@ class Waymo2KITTI():
         fp_label_all.close()
 
     def save_lidar(self, frame, file_idx, frame_idx):
-        range_images, camera_projections, range_image_top_pose = parse_range_image_and_camera_projection(
+        range_images, camera_projections, seg_labels, range_image_top_pose = parse_range_image_and_camera_projection(
             frame)
 
         # First return
@@ -314,6 +321,7 @@ class Waymo2KITTI():
             self.convert_range_image_to_point_cloud(
                 frame,
                 range_images,
+                seg_labels,
                 camera_projections,
                 range_image_top_pose,
                 ri_index=0
@@ -327,6 +335,7 @@ class Waymo2KITTI():
             self.convert_range_image_to_point_cloud(
                 frame,
                 range_images,
+                seg_labels,
                 camera_projections,
                 range_image_top_pose,
                 ri_index=1
@@ -351,6 +360,7 @@ class Waymo2KITTI():
     def convert_range_image_to_point_cloud(self,
                                            frame,
                                            range_images,
+                                           seg_labels,
                                            camera_projections,
                                            range_image_top_pose,
                                            ri_index=0):
@@ -360,6 +370,7 @@ class Waymo2KITTI():
         cp_points = []
         intensity = []
         elongation = []
+        semseg_labels = []
 
         frame_pose = tf.convert_to_tensor(
             value=np.reshape(np.array(frame.pose.transform), [4, 4]))
@@ -380,6 +391,7 @@ class Waymo2KITTI():
             range_image_top_pose_tensor_translation)
         for c in calibrations:
             range_image = range_images[c.name][ri_index]
+            seg_label = seg_labels[c.name][ri_index]
             if len(c.beam_inclinations) == 0:
                 beam_inclinations = range_image_utils.compute_inclination(
                     tf.constant(
@@ -416,9 +428,12 @@ class Waymo2KITTI():
                     frame_pose=frame_pose_local)
 
             range_image_cartesian = tf.squeeze(range_image_cartesian, axis=0)
+            print(range_image_cartesian.shape)
             points_tensor = tf.gather_nd(range_image_cartesian,
                                          tf.compat.v1.where(range_image_mask))
-
+            print(points_tensor.shape)
+            print(seg_label.shape)
+            exit(0)
             cp = camera_projections[c.name][ri_index]
             cp_tensor = tf.reshape(tf.convert_to_tensor(value=cp.data),
                                    cp.shape.dims)
@@ -460,6 +475,8 @@ if __name__ == '__main__':
     out_path = args.out_path
     if out_path is None:
         args.out_path = args.dataset_path
+    if args.split not in ['train', 'val', 'test']:
+        raise ValueError("split must be one of {train, val, test}")
     converter = Waymo2KITTI(args.dataset_path, args.out_path, args.workers,
-                            args.is_test)
+                            args.split)
     converter.convert()
