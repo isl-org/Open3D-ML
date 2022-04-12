@@ -312,20 +312,20 @@ class SemanticSegmentation(BasePipeline):
     def run_train(self):
         torch.manual_seed(self.rng.integers(np.iinfo(
             np.int32).max))  # Random reproducible seed for torch
+        rank = self.rank  # Rank for distributed training
         model = self.model
         device = self.device
-        model.device = device
         dataset = self.dataset
 
         cfg = self.cfg
-        model.to(device)
+        if rank == 0:
+            log.info("DEVICE : {}".format(device))
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log.info("DEVICE : {}".format(device))
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
-        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
+            log_file_path = join(cfg.logs_dir,
+                                 'log_train_' + timestamp + '.txt')
+            log.info("Logging in file : {}".format(log_file_path))
+            log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLoss(self, model, dataset, device)
         self.metric_train = SemSegMetric()
@@ -335,6 +335,7 @@ class SemanticSegmentation(BasePipeline):
 
         train_dataset = dataset.get_split('train')
         train_sampler = train_dataset.sampler
+
         train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
@@ -343,12 +344,20 @@ class SemanticSegmentation(BasePipeline):
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
 
+        if self.distributed:
+            if train_sampler is not None:
+                raise NotImplementedError(
+                    "Distributed training with sampler is not supported yet!")
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                train_split)
+
         train_loader = DataLoader(
             train_split,
             batch_size=cfg.batch_size,
-            sampler=get_sampler(train_sampler),
-            num_workers=cfg.get('num_workers', 2),
-            pin_memory=cfg.get('pin_memory', True),
+            sampler=train_sampler
+            if self.distributed else get_sampler(train_sampler),
+            num_workers=cfg.get('num_workers', 0),
+            pin_memory=cfg.get('pin_memory', False),
             collate_fn=self.batcher.collate_fn,
             worker_init_fn=lambda x: np.random.seed(x + np.uint32(
                 torch.utils.data.get_worker_info().seed))
@@ -388,9 +397,21 @@ class SemanticSegmentation(BasePipeline):
                                     runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
-        self.save_config(writer)
-        log.info("Writing summary in {}.".format(self.tensorboard_dir))
-        record_summary = cfg.get('summary').get('record_for', [])
+        if rank == 0:
+            self.save_config(writer)
+            log.info("Writing summary in {}.".format(self.tensorboard_dir))
+
+        # wrap model for multiple GPU
+        if self.distributed:
+            model.cuda(self.device)
+            model.device = self.device
+            model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[self.device])
+            model.get_loss = model.module.get_loss
+            model.cfg = model.module.cfg
+
+        record_summary = cfg.get('summary').get('record_for',
+                                                []) if self.rank == 0 else []
 
         log.info("Started training")
 

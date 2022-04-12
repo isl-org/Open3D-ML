@@ -6,7 +6,7 @@ dataset:
   test_result_folder: ./test
   use_cache: False
   sampler:
-    name: 'SemSegRandomSampler'
+    name: None
 model:
   name: SparseConvUnet
   batcher: ConcatBatcher

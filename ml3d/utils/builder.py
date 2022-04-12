@@ -55,6 +55,8 @@ def get_module(module_type, module_name, framework=None, **kwargs):
         return get_from_name(module_name, DATASET, framework)
 
     elif module_type == "sampler":
+        if module_name is None:
+            return None
         return get_from_name(module_name, SAMPLER, framework)
 
     elif module_type == "model":

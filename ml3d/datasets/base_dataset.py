@@ -127,10 +127,16 @@ class BaseDatasetSplit(ABC):
         if split in ['test']:
             sampler_cls = get_module('sampler', 'SemSegSpatiallyRegularSampler')
         else:
-            sampler_cfg = self.cfg.get('sampler',
-                                       {'name': 'SemSegRandomSampler'})
+            # sampler_cfg = self.cfg.get('sampler',
+            #                            {'name': 'SemSegRandomSampler'})
+            sampler_cfg = self.cfg.get('sampler', {'name': None})
+            if sampler_cfg['name'] == "None":
+                sampler_cfg['name'] = None
             sampler_cls = get_module('sampler', sampler_cfg['name'])
-        self.sampler = sampler_cls(self)
+        if sampler_cls is None:
+            self.sampler = None
+        else:
+            self.sampler = sampler_cls(self)
 
     @abstractmethod
     def __len__(self):
