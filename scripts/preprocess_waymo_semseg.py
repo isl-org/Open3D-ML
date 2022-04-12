@@ -6,8 +6,7 @@ try:
 except ImportError:
     raise ImportError(
         'Please clone "https://github.com/waymo-research/waymo-open-dataset.git" '
-        'checkout branch "r1.3", and append its path to PYTHONPATH '
-        'to install the official devkit first.')
+        'checkout branch "r1.3", and install the official devkit first')
 
 import logging
 import numpy as np
@@ -21,6 +20,14 @@ from os.path import join, exists, dirname, abspath
 from os import makedirs
 from multiprocessing import Pool
 from tqdm import tqdm
+
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+    except RuntimeError as e:
+        print(e)
 
 
 def parse_args():
@@ -142,17 +149,23 @@ class Waymo2KITTI():
                 makedirs(f'{d}{str(i)}', exist_ok=True)
 
     def convert(self):
-        print("Start converting ...")
+        print(f"Start converting {len(self)} files ...")
+        # for i in tqdm(range(len(self))):
+        #     self.process_one(i)
         with Pool(self.workers) as p:
             p.map(self.process_one, [i for i in range(len(self))])
 
     def process_one(self, file_idx):
+        print(f"Converting : {file_idx}")
         path = self.tfrecord_files[file_idx]
         dataset = tf.data.TFRecordDataset(path, compression_type='')
 
         for frame_idx, data in enumerate(dataset):
             frame = dataset_pb2.Frame()
             frame.ParseFromString(bytearray(data.numpy()))
+            if (not frame.lasers[0].ri_return1.segmentation_label_compressed
+               ) and (not self.is_test):
+                continue
 
             if (self.selected_waymo_locations is not None and
                     frame.context.stats.location
@@ -165,16 +178,13 @@ class Waymo2KITTI():
             self.save_lidar(frame, file_idx, frame_idx)
             self.save_pose(frame, file_idx, frame_idx)
 
-            if not self.is_test:
-                self.save_label(frame, file_idx, frame_idx)
-
     def __len__(self):
         return len(self.tfrecord_files)
 
     def save_image(self, frame, file_idx, frame_idx):
         for img in frame.images:
             img_path = Path(self.image_save_dir + str(img.name - 1)) / (
-                self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) +
+                self.prefix + str(file_idx).zfill(4) + str(frame_idx).zfill(4) +
                 '.npy')
             image = tf.io.decode_jpeg(img.image).numpy()
 
@@ -224,7 +234,7 @@ class Waymo2KITTI():
 
         with open(
                 f'{self.calib_save_dir}/{self.prefix}' +
-                f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt',
+                f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.txt',
                 'w+') as fp_calib:
             fp_calib.write(calib_context)
 
@@ -232,92 +242,15 @@ class Waymo2KITTI():
         pose = np.array(frame.pose.transform).reshape(4, 4)
         np.savetxt(
             join(f'{self.pose_save_dir}/{self.prefix}' +
-                 f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt'),
+                 f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.txt'),
             pose)
-
-    def save_label(self, frame, file_idx, frame_idx):
-        fp_label_all = open(
-            f'{self.label_all_save_dir}/{self.prefix}' +
-            f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt', 'w+')
-        id_to_bbox = dict()
-        id_to_name = dict()
-        for labels in frame.projected_lidar_labels:
-            name = labels.name
-            for label in labels.labels:
-                bbox = [
-                    label.box.center_x - label.box.length / 2,
-                    label.box.center_y - label.box.width / 2,
-                    label.box.center_x + label.box.length / 2,
-                    label.box.center_y + label.box.width / 2
-                ]
-                id_to_bbox[label.id] = bbox
-                id_to_name[label.id] = name - 1
-
-        for obj in frame.laser_labels:
-            bounding_box = None
-            name = None
-            id = obj.id
-            for lidar in self.lidar_list:
-                if id + lidar in id_to_bbox:
-                    bounding_box = id_to_bbox.get(id + lidar)
-                    name = str(id_to_name.get(id + lidar))
-                    break
-
-            if bounding_box is None or name is None:
-                name = '0'
-                bounding_box = (0, 0, 0, 0)
-
-            my_type = self.type_list[obj.type]
-
-            if my_type not in self.selected_waymo_classes:
-                continue
-
-            height = obj.box.height
-            width = obj.box.width
-            length = obj.box.length
-
-            x = obj.box.center_x
-            y = obj.box.center_y
-            z = obj.box.center_z
-
-            rotation_y = -obj.box.heading - np.pi / 2
-            track_id = obj.id
-
-            # not available
-            truncated = 0
-            occluded = 0
-            alpha = -10
-
-            line = my_type + \
-                ' {} {} {} {} {} {} {} {} {} {} {} {} {} {}\n'.format(
-                    round(truncated, 2), occluded, round(alpha, 2),
-                    round(bounding_box[0], 2), round(bounding_box[1], 2),
-                    round(bounding_box[2], 2), round(bounding_box[3], 2),
-                    round(height, 2), round(width, 2), round(length, 2),
-                    round(x, 2), round(y, 2), round(z, 2),
-                    round(rotation_y, 2))
-
-            if self.save_track_id:
-                line_all = line[:-1] + ' ' + name + ' ' + track_id + '\n'
-            else:
-                line_all = line[:-1] + ' ' + name + '\n'
-
-            fp_label = open(
-                f'{self.label_save_dir}{name}/{self.prefix}' +
-                f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt', 'a')
-            fp_label.write(line)
-            fp_label.close()
-
-            fp_label_all.write(line_all)
-
-        fp_label_all.close()
 
     def save_lidar(self, frame, file_idx, frame_idx):
         range_images, camera_projections, seg_labels, range_image_top_pose = parse_range_image_and_camera_projection(
             frame)
 
         # First return
-        points_0, cp_points_0, intensity_0, elongation_0 = \
+        points_0, cp_points_0, intensity_0, elongation_0, seg_label_0 = \
             self.convert_range_image_to_point_cloud(
                 frame,
                 range_images,
@@ -329,9 +262,10 @@ class Waymo2KITTI():
         points_0 = np.concatenate(points_0, axis=0)
         intensity_0 = np.concatenate(intensity_0, axis=0)
         elongation_0 = np.concatenate(elongation_0, axis=0)
+        seg_label_0 = np.concatenate(seg_label_0, axis=0)
 
         # Second return
-        points_1, cp_points_1, intensity_1, elongation_1 = \
+        points_1, cp_points_1, intensity_1, elongation_1, seg_label_1 = \
             self.convert_range_image_to_point_cloud(
                 frame,
                 range_images,
@@ -343,24 +277,26 @@ class Waymo2KITTI():
         points_1 = np.concatenate(points_1, axis=0)
         intensity_1 = np.concatenate(intensity_1, axis=0)
         elongation_1 = np.concatenate(elongation_1, axis=0)
+        seg_label_1 = np.concatenate(seg_label_1, axis=0)
 
         points = np.concatenate([points_0, points_1], axis=0)
         intensity = np.concatenate([intensity_0, intensity_1], axis=0)
         elongation = np.concatenate([elongation_0, elongation_1], axis=0)
+        semseg_labels = np.concatenate([seg_label_0, seg_label_1], axis=0)
         timestamp = frame.timestamp_micros * np.ones_like(intensity)
 
         # concatenate x,y,z, intensity, elongation, timestamp (6-dim)
         point_cloud = np.column_stack(
-            (points, intensity, elongation, timestamp))
+            (points, intensity, elongation, timestamp, semseg_labels))
 
         pc_path = f'{self.point_cloud_save_dir}/{self.prefix}' + \
-            f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.bin'
+            f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.bin'
         point_cloud.astype(np.float32).tofile(pc_path)
 
     def convert_range_image_to_point_cloud(self,
                                            frame,
                                            range_images,
-                                           seg_labels,
+                                           segmentation_labels,
                                            camera_projections,
                                            range_image_top_pose,
                                            ri_index=0):
@@ -391,7 +327,6 @@ class Waymo2KITTI():
             range_image_top_pose_tensor_translation)
         for c in calibrations:
             range_image = range_images[c.name][ri_index]
-            seg_label = seg_labels[c.name][ri_index]
             if len(c.beam_inclinations) == 0:
                 beam_inclinations = range_image_utils.compute_inclination(
                     tf.constant(
@@ -428,12 +363,8 @@ class Waymo2KITTI():
                     frame_pose=frame_pose_local)
 
             range_image_cartesian = tf.squeeze(range_image_cartesian, axis=0)
-            print(range_image_cartesian.shape)
             points_tensor = tf.gather_nd(range_image_cartesian,
                                          tf.compat.v1.where(range_image_mask))
-            print(points_tensor.shape)
-            print(seg_label.shape)
-            exit(0)
             cp = camera_projections[c.name][ri_index]
             cp_tensor = tf.reshape(tf.convert_to_tensor(value=cp.data),
                                    cp.shape.dims)
@@ -450,7 +381,19 @@ class Waymo2KITTI():
                                              tf.where(range_image_mask))
             elongation.append(elongation_tensor.numpy())
 
-        return points, cp_points, intensity, elongation
+            if c.name in segmentation_labels:
+                sl = segmentation_labels[c.name][ri_index]
+                sl_tensor = tf.reshape(tf.convert_to_tensor(sl.data),
+                                       sl.shape.dims)
+                sl_points_tensor = tf.gather_nd(sl_tensor,
+                                                tf.where(range_image_mask))
+            else:
+                sl_points_tensor = tf.zeros([points_tensor.shape[0], 2],
+                                            dtype=tf.int32)
+
+            semseg_labels.append(sl_points_tensor.numpy())
+
+        return points, cp_points, intensity, elongation, semseg_labels
 
     @staticmethod
     def cart_to_homo(mat):
