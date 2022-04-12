@@ -6,7 +6,7 @@ from glob import glob
 import logging
 import yaml
 
-from .base_dataset import BaseDataset
+from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import Config, make_dir, DATASET
 from .utils import BEVBox3D
 
@@ -161,9 +161,10 @@ class WaymoSemSeg(BaseDataset):
         raise NotImplementedError()
 
 
-class WaymoSplit():
+class WaymoSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
+        super().__init__(dataset, split=split)
         self.cfg = dataset.cfg
         path_list = dataset.get_split_list(split)
         log.info("Found {} pointclouds for {}".format(len(path_list), split))

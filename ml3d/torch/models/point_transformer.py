@@ -718,6 +718,7 @@ def knn_batch(points,
     if points_row_splits.shape[0] != queries_row_splits.shape[0]:
         raise ValueError("KNN(points and queries must have same batch size)")
 
+    device = points.device
     points = points.cpu()
     queries = queries.cpu()
 
@@ -730,9 +731,11 @@ def knn_batch(points,
                      return_distances=True)
     if return_distances:
         return ans.neighbors_index.reshape(
-            -1, k).long().cuda(), ans.neighbors_distance.reshape(-1, k).cuda()
+            -1,
+            k).long().to(device), ans.neighbors_distance.reshape(-1,
+                                                                 k).to(device)
     else:
-        return ans.neighbors_index.reshape(-1, k).long().cuda()
+        return ans.neighbors_index.reshape(-1, k).long().to(device)
 
 
 def interpolation(points,

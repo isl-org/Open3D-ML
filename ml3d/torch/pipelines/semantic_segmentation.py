@@ -336,6 +336,9 @@ class SemanticSegmentation(BasePipeline):
         train_dataset = dataset.get_split('train')
         train_sampler = train_dataset.sampler
 
+        valid_dataset = dataset.get_split('validation')
+        valid_sampler = valid_dataset.sampler
+
         train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
@@ -344,12 +347,22 @@ class SemanticSegmentation(BasePipeline):
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
 
+        valid_split = TorchDataloader(dataset=valid_dataset,
+                                      preprocess=model.preprocess,
+                                      transform=model.transform,
+                                      sampler=valid_sampler,
+                                      use_cache=dataset.cfg.use_cache,
+                                      steps_per_epoch=dataset.cfg.get(
+                                          'steps_per_epoch_valid', None))
+
         if self.distributed:
-            if train_sampler is not None:
+            if train_sampler is not None or valid_sampler is not None:
                 raise NotImplementedError(
                     "Distributed training with sampler is not supported yet!")
             train_sampler = torch.utils.data.distributed.DistributedSampler(
                 train_split)
+            valid_sampler = torch.utild.data.distributed.DistributedSampler(
+                valid_split)
 
         train_loader = DataLoader(
             train_split,
@@ -363,20 +376,11 @@ class SemanticSegmentation(BasePipeline):
                 torch.utils.data.get_worker_info().seed))
         )  # numpy expects np.uint32, whereas torch returns np.uint64.
 
-        valid_dataset = dataset.get_split('validation')
-        valid_sampler = valid_dataset.sampler
-        valid_split = TorchDataloader(dataset=valid_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      sampler=valid_sampler,
-                                      use_cache=dataset.cfg.use_cache,
-                                      steps_per_epoch=dataset.cfg.get(
-                                          'steps_per_epoch_valid', None))
-
         valid_loader = DataLoader(
             valid_split,
             batch_size=cfg.val_batch_size,
-            sampler=get_sampler(valid_sampler),
+            sampler=valid_sampler
+            if self.distributed else get_sampler(valid_sampler),
             num_workers=cfg.get('num_workers', 2),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
@@ -413,16 +417,19 @@ class SemanticSegmentation(BasePipeline):
         record_summary = cfg.get('summary').get('record_for',
                                                 []) if self.rank == 0 else []
 
-        log.info("Started training")
+        if rank == 0:
+            log.info("Started training")
 
         for epoch in range(0, cfg.max_epoch + 1):
-
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            if self.distributed:
+                train_sampler.set_epoch(epoch)
+
             model.train()
             self.metric_train.reset()
             self.metric_val.reset()
             self.losses = []
-            model.trans_point_sampler = train_sampler.get_point_sampler()
+            # model.trans_point_sampler = train_sampler.get_point_sampler()
 
             for step, inputs in enumerate(tqdm(train_loader, desc='training')):
                 if hasattr(inputs['data'], 'to'):
@@ -437,8 +444,13 @@ class SemanticSegmentation(BasePipeline):
 
                 loss.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
+                    if self.distributed:
+                        torch.nn.utils.clip_grad_value_(
+                            model.module.parameters(), model.cfg.grad_clip_norm)
+                    else:
+                        torch.nn.utils.clip_grad_value_(
+                            model.parameters(), model.cfg.grad_clip_norm)
+
                 self.optimizer.step()
 
                 self.metric_train.update(predict_scores, gt_labels)
@@ -449,12 +461,16 @@ class SemanticSegmentation(BasePipeline):
                     self.summary['train'] = self.get_3d_summary(
                         results, inputs['data'], epoch)
 
-            self.scheduler.step()
+                if self.distributed:
+                    dist.barrier()
+
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # --------------------- validation
             model.eval()
             self.valid_losses = []
-            model.trans_point_sampler = valid_sampler.get_point_sampler()
+            # model.trans_point_sampler = valid_sampler.get_point_sampler()
 
             with torch.no_grad():
                 for step, inputs in enumerate(
@@ -477,10 +493,14 @@ class SemanticSegmentation(BasePipeline):
                         self.summary['valid'] = self.get_3d_summary(
                             results, inputs['data'], epoch)
 
-            self.save_logs(writer, epoch)
+            if self.distributed:
+                # TODO (sanskar): accumulate confusion matrix for all process.
+                dist.barrier()
 
-            if epoch % cfg.save_ckpt_freq == 0:
-                self.save_ckpt(epoch)
+            if rank == 0:
+                self.save_logs(writer, epoch)
+                if epoch % cfg.save_ckpt_freq == 0:
+                    self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
         """Get the batcher to be used based on the device and split."""
