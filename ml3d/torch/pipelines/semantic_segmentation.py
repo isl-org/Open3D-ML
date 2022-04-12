@@ -381,7 +381,7 @@ class SemanticSegmentation(BasePipeline):
             batch_size=cfg.val_batch_size,
             sampler=valid_sampler
             if self.distributed else get_sampler(valid_sampler),
-            num_workers=cfg.get('num_workers', 2),
+            num_workers=cfg.get('num_workers', 0),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
             worker_init_fn=lambda x: np.random.seed(x + np.uint32(
