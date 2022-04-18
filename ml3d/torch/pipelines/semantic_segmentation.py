@@ -395,7 +395,7 @@ class SemanticSegmentation(BasePipeline):
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         is_resume = model.cfg.get('is_resume', True)
-        self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
+        start_ep = self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
 
         dataset_name = dataset.name if dataset is not None else ''
         tensorboard_dir = join(
@@ -423,7 +423,7 @@ class SemanticSegmentation(BasePipeline):
         if rank == 0:
             log.info("Started training")
 
-        for epoch in range(0, cfg.max_epoch + 1):
+        for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
             if self.distributed:
                 train_sampler.set_epoch(epoch)
@@ -432,9 +432,10 @@ class SemanticSegmentation(BasePipeline):
             self.metric_train.reset()
             self.metric_val.reset()
             self.losses = []
-            # model.trans_point_sampler = train_sampler.get_point_sampler()
+            # model.trans_point_sampler = train_sampler.get_point_sampler()  # TODO: fix this for model with samplers.
 
-            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+            progress_bar = tqdm(train_loader, desc='training')
+            for inputs in progress_bar:
                 if hasattr(inputs['data'], 'to'):
                     inputs['data'].to(device)
                 self.optimizer.zero_grad()
@@ -459,10 +460,17 @@ class SemanticSegmentation(BasePipeline):
                 self.metric_train.update(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
+
                 # Save only for the first pcd in batch
-                if 'train' in record_summary and step == 0:
+                if 'train' in record_summary and progress_bar.n == 0:
                     self.summary['train'] = self.get_3d_summary(
                         results, inputs['data'], epoch)
+
+                desc = "training - Epoch: %d, loss: %.3f" % (epoch,
+                                                             loss.cpu().item())
+                # if rank == 0:
+                progress_bar.set_description(desc)
+                progress_bar.refresh()
 
                 if self.distributed:
                     dist.barrier()
@@ -713,10 +721,10 @@ class SemanticSegmentation(BasePipeline):
         if ckpt_path is None:
             ckpt_path = latest_torch_ckpt(train_ckpt_dir)
             if ckpt_path is not None and is_resume:
-                log.info('ckpt_path not given. Restore from the latest ckpt')
+                log.info("ckpt_path not given. Restore from the latest ckpt")
             else:
                 log.info('Initializing from scratch.')
-                return
+                return 0
 
         if not exists(ckpt_path):
             raise FileNotFoundError(f' ckpt {ckpt_path} not found')
@@ -726,11 +734,15 @@ class SemanticSegmentation(BasePipeline):
 
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
-            log.info(f'Loading checkpoint optimizer_state_dict')
+            log.info('Loading checkpoint optimizer_state_dict')
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
-            log.info(f'Loading checkpoint scheduler_state_dict')
+            log.info('Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+
+        epoch = 0 if 'epoch' not in ckpt else ckpt['epoch']
+
+        return epoch
 
     def save_ckpt(self, epoch):
         """Save a checkpoint at the passed epoch."""

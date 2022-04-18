@@ -154,9 +154,11 @@ class Waymo2KITTI():
         # for i in tqdm(range(len(self))):
         #     self.process_one(i)
         # with Pool(self.workers) as p:
-            # tqdm(p.imap(self.process_one, [i for i in range(len(self))]), total=len(self))
-            # p.map(self.process_one, [i for i in range(len(self))])
-        process_map(self.process_one, range(len(self)), max_workers=self.workers)
+        # tqdm(p.imap(self.process_one, [i for i in range(len(self))]), total=len(self))
+        # p.map(self.process_one, [i for i in range(len(self))])
+        process_map(self.process_one,
+                    range(len(self)),
+                    max_workers=self.workers)
 
     def process_one(self, file_idx):
         print(f"Converting : {file_idx}")
