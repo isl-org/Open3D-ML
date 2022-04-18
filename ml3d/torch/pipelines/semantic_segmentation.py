@@ -1,11 +1,12 @@
 import logging
+import numpy as np
+import torch
+import torch.distributed as dist
+
 from os.path import exists, join
 from pathlib import Path
 from datetime import datetime
-
-import numpy as np
 from tqdm import tqdm
-import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
@@ -361,7 +362,7 @@ class SemanticSegmentation(BasePipeline):
                     "Distributed training with sampler is not supported yet!")
             train_sampler = torch.utils.data.distributed.DistributedSampler(
                 train_split)
-            valid_sampler = torch.utild.data.distributed.DistributedSampler(
+            valid_sampler = torch.utils.data.distributed.DistributedSampler(
                 valid_split)
 
         train_loader = DataLoader(
@@ -387,6 +388,10 @@ class SemanticSegmentation(BasePipeline):
             worker_init_fn=lambda x: np.random.seed(x + np.uint32(
                 torch.utils.data.get_worker_info().seed)))
 
+        # Optimizer must be created after moving model to specific device.
+        model.cuda(self.device)
+        model.device = self.device
+
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         is_resume = model.cfg.get('is_resume', True)
@@ -407,8 +412,6 @@ class SemanticSegmentation(BasePipeline):
 
         # wrap model for multiple GPU
         if self.distributed:
-            model.cuda(self.device)
-            model.device = self.device
             model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[self.device])
             model.get_loss = model.module.get_loss
@@ -702,7 +705,10 @@ class SemanticSegmentation(BasePipeline):
         want to resume.
         """
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
-        make_dir(train_ckpt_dir)
+        if self.rank == 0:
+            make_dir(train_ckpt_dir)
+        if self.distributed:
+            dist.barrier()
 
         if ckpt_path is None:
             ckpt_path = latest_torch_ckpt(train_ckpt_dir)
@@ -717,6 +723,7 @@ class SemanticSegmentation(BasePipeline):
 
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
+
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
             log.info(f'Loading checkpoint optimizer_state_dict')
