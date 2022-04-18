@@ -20,6 +20,7 @@ from os.path import join, exists, dirname, abspath
 from os import makedirs
 from multiprocessing import Pool
 from tqdm import tqdm
+from tqdm.contrib.concurrent import process_map  # or thread_map
 
 gpus = tf.config.experimental.list_physical_devices('GPU')
 if gpus:
@@ -152,8 +153,10 @@ class Waymo2KITTI():
         print(f"Start converting {len(self)} files ...")
         # for i in tqdm(range(len(self))):
         #     self.process_one(i)
-        with Pool(self.workers) as p:
-            p.map(self.process_one, [i for i in range(len(self))])
+        # with Pool(self.workers) as p:
+            # tqdm(p.imap(self.process_one, [i for i in range(len(self))]), total=len(self))
+            # p.map(self.process_one, [i for i in range(len(self))])
+        process_map(self.process_one, range(len(self)), max_workers=self.workers)
 
     def process_one(self, file_idx):
         print(f"Converting : {file_idx}")
