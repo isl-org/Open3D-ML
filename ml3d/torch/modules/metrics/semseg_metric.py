@@ -23,6 +23,17 @@ class SemSegMetric(object):
             assert self.confusion_matrix.shape == conf.shape
             self.confusion_matrix += conf
 
+    def __iadd__(self, otherMetric):
+        if self.confusion_matrix is None and otherMetric.confusion_matrix is None:
+            pass
+        elif self.confusion_matrix is None:
+            self.confusion_matrix = otherMetric.confusion_matrix
+        elif otherMetric.confusion_matrix is None:
+            pass
+        else:
+            self.confusion_matrix += otherMetric.confusion_matrix
+        return self
+
     def acc(self):
         """Compute the per-class accuracies and the overall accuracy.
 

@@ -181,7 +181,7 @@ class WaymoSplit(BaseDatasetSplit):
         pc_path = self.path_list[idx]
 
         pc = self.dataset.read_lidar(pc_path)
-        feat = pc[:, 3:6]
+        feat = pc[:, 3:5]  # intensity, elongation
         label = pc[:, 7].astype(np.int32)
         pc = pc[:, :3]
 

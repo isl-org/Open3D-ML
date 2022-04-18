@@ -505,7 +505,14 @@ class SemanticSegmentation(BasePipeline):
                             results, inputs['data'], epoch)
 
             if self.distributed:
-                # TODO (sanskar): accumulate confusion matrix for all process.
+                metric_gather = [None for _ in range(dist.get_world_size())]
+                dist.gather_object(self.metric_val,
+                                   metric_gather if rank == 0 else None,
+                                   dst=0)
+                if rank == 0:
+                    for m in metric_gather[1:]:
+                        self.metric_val += m
+
                 dist.barrier()
 
             if rank == 0:
