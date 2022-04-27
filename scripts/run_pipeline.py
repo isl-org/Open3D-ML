@@ -43,6 +43,11 @@ def parse_args():
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
     parser.add_argument('--seed', help='random seed', default=0)
+    parser.add_argument('--nodes', help='number of nodes', default=1, type=int)
+    parser.add_argument('--node_rank',
+                        help='ranking within the nodes, default: 0',
+                        default=0,
+                        type=int)
     parser.add_argument(
         '--host',
         help='Host for distributed training, default: localhost',
@@ -197,9 +202,10 @@ def cleanup():
     dist.destroy_process_group()
 
 
-def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
+def main_worker(local_rank, Dataset, Model, Pipeline, cfg_dict_dataset,
                 cfg_dict_model, cfg_dict_pipeline, args):
-    world_size = len(args.device_ids)
+    rank = args.node_rank * len(args.device_ids) + local_rank
+    world_size = args.nodes * len(args.device_ids)
     setup(rank, world_size, args)
 
     cfg_dict_dataset['rank'] = rank
@@ -211,8 +217,10 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
     cfg_dict_model['seed'] = rng
     cfg_dict_pipeline['seed'] = rng
 
-    device = f"cuda:{args.device_ids[rank]}"
-    print(f"rank = {rank}, world_size = {world_size}, gpu = {device}")
+    device = f"cuda:{args.device_ids[local_rank]}"
+    print(
+        f"local_rank = {local_rank}, rank = {rank}, world_size = {world_size}, gpu = {device}"
+    )
 
     cfg_dict_model['device'] = device
     cfg_dict_pipeline['device'] = device
