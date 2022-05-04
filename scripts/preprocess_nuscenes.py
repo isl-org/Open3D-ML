@@ -219,12 +219,8 @@ class NuScenesProcess():
             lidar_path = os.path.abspath(lidar_path)
             assert os.path.exists(lidar_path)
 
-            lidarseg_path = nusc.get('lidarseg', lidar_token)['filename']
-            lidarseg_path = os.path.abspath(os.path.join(self.dataset_path, lidarseg_path))
-
             data = {
                 'lidar_path': lidar_path,
-                'lidarseg_path': lidarseg_path,
                 'token': sample['token'],
                 'cams': dict(),
                 'lidar2ego_tr': calib_rec['translation'],
@@ -259,6 +255,11 @@ class NuScenesProcess():
                 data['cams'].update({cam: cam_info})
 
             if not self.is_test:
+                lidarseg_path = nusc.get('lidarseg', lidar_token)['filename']
+                lidarseg_path = os.path.abspath(os.path.join(self.dataset_path, lidarseg_path))
+                assert os.path.exists(lidarseg_path)
+                data['lidarseg_path'] = lidarseg_path
+
                 annotations = [
                     nusc.get('sample_annotation', token)
                     for token in sample['anns']
