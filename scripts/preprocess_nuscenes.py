@@ -58,10 +58,16 @@ class NuScenesProcess():
         assert version in ['v1.0-trainval', 'v1.0-test', 'v1.0-mini']
         self.is_test = 'test' in version
         self.out_path = out_path
+        self.dataset_path = dataset_path
 
         self.nusc = NuScenes(version=version,
                              dataroot=dataset_path,
                              verbose=True)
+
+        ## Get semantic label stats
+        # nusc = self.nusc
+        # print(nusc.list_lidarseg_categories(sort_by='count'))
+        # print(nusc.lidarseg_idx2name_mapping)
 
         if version == 'v1.0-trainval':
             train_scenes = splits.train
@@ -213,8 +219,12 @@ class NuScenesProcess():
             lidar_path = os.path.abspath(lidar_path)
             assert os.path.exists(lidar_path)
 
+            lidarseg_path = nusc.get('lidarseg', lidar_token)['filename']
+            lidarseg_path = os.path.abspath(os.path.join(self.dataset_path, lidarseg_path))
+
             data = {
                 'lidar_path': lidar_path,
+                'lidarseg_path': lidarseg_path,
                 'token': sample['token'],
                 'cams': dict(),
                 'lidar2ego_tr': calib_rec['translation'],
