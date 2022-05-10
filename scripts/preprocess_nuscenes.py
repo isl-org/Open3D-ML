@@ -256,7 +256,8 @@ class NuScenesProcess():
 
             if not self.is_test:
                 lidarseg_path = nusc.get('lidarseg', lidar_token)['filename']
-                lidarseg_path = os.path.abspath(os.path.join(self.dataset_path, lidarseg_path))
+                lidarseg_path = os.path.abspath(
+                    os.path.join(self.dataset_path, lidarseg_path))
                 assert os.path.exists(lidarseg_path)
                 data['lidarseg_path'] = lidarseg_path
 
