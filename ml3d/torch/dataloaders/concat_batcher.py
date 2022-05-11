@@ -452,6 +452,38 @@ class SparseConvUnetBatch:
         return [b for b in batches if len(b.point)]  # filter empty batch
 
 
+class SparseConvUnetMegaLoaderBatch:
+
+    def __init__(self, batches):
+        pc = []
+        feat = []
+        label = []
+        lengths = []
+
+        for batch in batches:
+            data = batch['data']
+            pc.append(data['point'])
+            feat.append(data['feat'])
+            label.append(data['label'])
+            lengths.append(data['point'].shape[0])
+
+        self.point = pc
+        self.feat = feat
+        self.label = label
+        self.batch_lengths = lengths
+
+    def pin_memory(self):
+        self.point = [pc.pin_memory() for pc in self.point]
+        self.feat = [feat.pin_memory() for feat in self.feat]
+        self.label = [label.pin_memory() for label in self.label]
+        return self
+
+    def to(self, device):
+        self.point = [pc.to(device) for pc in self.point]
+        self.feat = [feat.to(device) for feat in self.feat]
+        self.label = [label.to(device) for label in self.label]
+
+
 class PointTransformerBatch:
 
     def __init__(self, batches):
