@@ -452,13 +452,14 @@ class SparseConvUnetBatch:
         return [b for b in batches if len(b.point)]  # filter empty batch
 
 
-class SparseConvUnetMegaLoaderBatch:
+class SparseConvUnetMegaModelBatch:
 
     def __init__(self, batches):
         pc = []
         feat = []
         label = []
         lengths = []
+        dataset_idx = []
 
         for batch in batches:
             data = batch['data']
@@ -467,10 +468,17 @@ class SparseConvUnetMegaLoaderBatch:
             label.append(data['label'])
             lengths.append(data['point'].shape[0])
 
+            attr = batch['attr']
+            if 'dataset_idx' not in attr:
+                raise ValueError(
+                    "dataset_idx is missing. Please use MegaLoader.")
+            dataset_idx.append(attr['dataset_idx'])
+
         self.point = pc
         self.feat = feat
         self.label = label
         self.batch_lengths = lengths
+        self.dataset_idx = np.array(dataset_idx, dtype=np.int32)
 
     def pin_memory(self):
         self.point = [pc.pin_memory() for pc in self.point]
@@ -617,6 +625,9 @@ class ConcatBatcher(object):
 
         elif self.model == "SparseConvUnet":
             return {'data': SparseConvUnetBatch(batches), 'attr': {}}
+
+        elif self.model == "SparseConvUnetMegaModel":
+            return {'data': SparseConvUnetMegaModelBatch(batches), 'attr': {}}
 
         elif self.model == "PointTransformer":
             return {'data': PointTransformerBatch(batches), 'attr': {}}

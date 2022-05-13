@@ -73,12 +73,7 @@ class SparseConvUnetMegaModel(BaseModel):
         if len(num_classes) != num_heads:
             raise ValueError("Pass num_classes for each segmentation head.")
 
-        self.linear = []
-        for i in range(num_heads):
-            self.linear.append(
-                nn.Sequential(LinearBlock(multiplier, 2 * multiplier),
-                              LinearBlock(2 * multiplier, num_classes[i])))
-
+        self.linear = LinearBlock(multiplier, num_classes)
         self.output_layer = OutputLayer()
 
     def forward(self, inputs):
@@ -281,14 +276,20 @@ class ReLUBlock(nn.Module):
 
 class LinearBlock(nn.Module):
 
-    def __init__(self, a, b):
+    def __init__(self, in_dim, num_classes):
         super(LinearBlock, self).__init__()
-        self.linear = nn.Linear(a, b)
+
+        self.linear = []
+        self.num_classes = num_classes
+        for i in range(len(num_classes)):
+            self.linear.append(
+                nn.Sequential(nn.Linear(in_dim, 2 * in_dim),
+                              nn.Linear(2 * in_dim, num_classes[i])))
 
     def forward(self, feat_list):
         out_list = []
-        for feat in feat_list:
-            out_list.append(self.linear(feat))
+        for i, feat in enumerate(feat_list):
+            out_list.append(self.linear[i](feat))
 
         return out_list
 
