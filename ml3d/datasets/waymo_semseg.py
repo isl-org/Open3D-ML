@@ -47,8 +47,8 @@ class WaymoSemSeg(BaseDataset):
 
         self.name = cfg.name
         self.dataset_path = cfg.dataset_path
-        self.num_classes = 23
         self.label_to_names = self.get_label_to_names()
+        self.num_classes = len(self.label_to_names)
         self.shuffle = kwargs.get('shuffle', False)
 
         self.all_files = sorted(

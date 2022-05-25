@@ -14,6 +14,7 @@ from . import samplers
 
 from .kitti import KITTI
 from .nuscenes import NuScenes
+from .nuscenes_semseg import NuScenesSemSeg
 from .waymo import Waymo
 from .waymo_semseg import WaymoSemSeg
 from .lyft import Lyft
@@ -30,5 +31,6 @@ __all__ = [
     'Custom3D', 'utils', 'augment', 'samplers', 'KITTI', 'Waymo', 'NuScenes',
     'Lyft', 'ShapeNet', 'SemSegRandomSampler', 'InferenceDummySplit',
     'SemSegSpatiallyRegularSampler', 'Argoverse', 'Scannet', 'SunRGBD',
-    'MatterportObjects', 'WaymoSemSeg', 'KITTI360', 'MegaLoader'
+    'MatterportObjects', 'WaymoSemSeg', 'KITTI360', 'MegaLoader',
+    'NuScenesSemSeg'
 ]
