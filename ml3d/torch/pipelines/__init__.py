@@ -2,5 +2,8 @@
 
 from .semantic_segmentation import SemanticSegmentation
 from .object_detection import ObjectDetection
+from .semantic_segmentation_multi_head import SemanticSegmentationMultiHead
 
-__all__ = ['SemanticSegmentation', 'ObjectDetection']
+__all__ = [
+    'SemanticSegmentation', 'ObjectDetection', 'SemanticSegmentationMultiHead'
+]

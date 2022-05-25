@@ -474,11 +474,16 @@ class SparseConvUnetMegaModelBatch:
                     "dataset_idx is missing. Please use MegaLoader.")
             dataset_idx.append(attr['dataset_idx'])
 
+        if len(set(dataset_idx)) != 1:
+            raise ValueError(
+                "Multiple datasets in a single batch is not supported."
+                "Make sure to pass same batch size to dataset and pipeline")
+
         self.point = pc
         self.feat = feat
         self.label = label
         self.batch_lengths = lengths
-        self.dataset_idx = np.array(dataset_idx, dtype=np.int32)
+        self.dataset_idx = dataset_idx[0]
 
     def pin_memory(self):
         self.point = [pc.pin_memory() for pc in self.point]

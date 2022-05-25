@@ -29,11 +29,11 @@ class SparseConvUnetMegaModel(BaseModel):
 
     def __init__(
             self,
-            name="SparseConvUnet",
+            name="SparseConvUnetMegaModel",
             device="cuda",
             num_heads=1,  # number of segmentation heads.
-            multiplier=16,  # Proportional to number of neurons in each layer.
-            voxel_size=0.05,
+            multiplier=4,  # Proportional to number of neurons in each layer.
+            voxel_size=0.1,
             conv_block_reps=1,  # Conv block repetitions.
             residual_blocks=False,
             in_channels=3,
@@ -41,24 +41,28 @@ class SparseConvUnetMegaModel(BaseModel):
             grid_size=4096,
             batcher='ConcatBatcher',
             augment=None,
+            ckpt_path=None,
             **kwargs):
-        super(SparseConvUnet, self).__init__(name=name,
-                                             device=device,
-                                             num_heads=num_heads,
-                                             multiplier=multiplier,
-                                             voxel_size=voxel_size,
-                                             conv_block_reps=conv_block_reps,
-                                             residual_blocks=residual_blocks,
-                                             in_channels=in_channels,
-                                             num_classes=num_classes,
-                                             grid_size=grid_size,
-                                             batcher=batcher,
-                                             augment=augment,
-                                             **kwargs)
+        super(SparseConvUnetMegaModel,
+              self).__init__(name=name,
+                             device=device,
+                             num_heads=num_heads,
+                             multiplier=multiplier,
+                             voxel_size=voxel_size,
+                             conv_block_reps=conv_block_reps,
+                             residual_blocks=residual_blocks,
+                             in_channels=in_channels,
+                             num_classes=num_classes,
+                             grid_size=grid_size,
+                             batcher=batcher,
+                             augment=augment,
+                             ckpt_path=ckpt_path,
+                             **kwargs)
         cfg = self.cfg
         self.device = device
         self.augmenter = SemsegAugmentation(cfg.augment, seed=self.rng)
         self.multiplier = cfg.multiplier
+        self.num_heads = num_heads
         self.input_layer = InputLayer()
         self.sub_sparse_conv = SubmanifoldSparseConv(in_channels=in_channels,
                                                      filters=multiplier,
@@ -93,7 +97,7 @@ class SparseConvUnetMegaModel(BaseModel):
         feat_list = self.unet(pos_list, feat_list)
         feat_list = self.batch_norm(feat_list)
         feat_list = self.relu(feat_list)
-        feat_list = self.linear(feat_list)
+        feat_list = self.linear(feat_list, inputs.dataset_idx)
         output = self.output_layer(feat_list, index_map_list)
 
         return output
@@ -206,30 +210,31 @@ class SparseConvUnetMegaModel(BaseModel):
             results: Output of the model.
             inputs: Input of the model.
             device: device(cpu or cuda).
-        
+
         Returns:
             Returns loss, labels and scores.
         """
         cfg = self.cfg
-        labels = torch.cat(inputs['data'].label, 0)
+        labels = torch.cat(inputs['data'].label, 0).to(torch.LongTensor())
 
-        scores, labels = filter_valid_label(results, labels, cfg.num_classes,
-                                            cfg.ignored_label_inds, device)
+        loss = Loss.weighted_CrossEntropyLoss[inputs['data'].dataset_idx](
+            results, labels)
 
-        loss = Loss.weighted_CrossEntropyLoss(scores, labels)
-
-        return loss, labels, scores
+        return loss, labels, results
 
     def get_optimizer(self, cfg_pipeline):
-        optimizer = torch.optim.Adam(self.parameters(),
-                                     **cfg_pipeline.optimizer)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(
-            optimizer, cfg_pipeline.scheduler_gamma)
+        # optimizer = torch.optim.Adam(self.parameters(),
+        #                              **cfg_pipeline.optimizer)
+        # scheduler = torch.optim.lr_scheduler.ExponentialLR(
+        #     optimizer, cfg_pipeline.scheduler_gamma)
+
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.99)
 
         return optimizer, scheduler
 
 
-MODEL._register_module(SparseConvUnet, 'torch')
+MODEL._register_module(SparseConvUnetMegaModel, 'torch')
 
 
 class BatchNormBlock(nn.Module):
@@ -279,17 +284,19 @@ class LinearBlock(nn.Module):
     def __init__(self, in_dim, num_classes):
         super(LinearBlock, self).__init__()
 
-        self.linear = []
+        linear = []
         self.num_classes = num_classes
         for i in range(len(num_classes)):
-            self.linear.append(
+            linear.append(
                 nn.Sequential(nn.Linear(in_dim, 2 * in_dim),
                               nn.Linear(2 * in_dim, num_classes[i])))
 
-    def forward(self, feat_list):
+        self.linear = nn.ModuleList(linear)
+
+    def forward(self, feat_list, dataset_idx):
         out_list = []
         for i, feat in enumerate(feat_list):
-            out_list.append(self.linear[i](feat))
+            out_list.append(self.linear[dataset_idx](feat))
 
         return out_list
 
@@ -352,7 +359,10 @@ class OutputLayer(nn.Module):
         out = []
         for feat, index_map in zip(features_list, index_map_list):
             out.append(feat[index_map])
-        return torch.cat(out, 0)
+
+        out = torch.cat(out, 0)
+
+        return out
 
 
 class SubmanifoldSparseConv(nn.Module):

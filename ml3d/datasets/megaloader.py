@@ -21,6 +21,7 @@ class MegaLoader():
 
     def __init__(self,
                  config_paths,
+                 batch_size=1,
                  name='MegaLoader',
                  cache_dir='./logs/cache',
                  use_cache=False,
@@ -39,8 +40,17 @@ class MegaLoader():
             test_result_folder: The folder where the test results should be stored.
         """
 
+        kwargs['config_paths'] = config_paths
+        kwargs['name'] = name
+        kwargs['cache_dir'] = cache_dir
+        kwargs['use_cache'] = use_cache
+        kwargs['ignored_label_inds'] = ignored_label_inds
+        kwargs['test_result_folder'] = test_result_folder
+        kwargs['batch_size'] = batch_size
+
         self.cfg = Config(kwargs)
         self.name = self.cfg.name
+        self.batch_size = batch_size
         self.rng = np.random.default_rng(kwargs.get('seed', None))
         self.ignored_labels = np.array([])
 
@@ -48,7 +58,9 @@ class MegaLoader():
         self.configs = [
             Config.load_from_file(cfg_path) for cfg_path in config_paths
         ]
-        self.datasets = [get_module('dataset', cfg.name) for cfg in configs]
+        self.datasets = [
+            get_module('dataset', cfg.name)(**cfg) for cfg in self.configs
+        ]
 
     def get_split(self, split):
         """Returns a dataset split.
@@ -133,24 +145,34 @@ class MegaLoaderSplit():
         ]
         self.num_datasets = dataset.num_datasets
 
-        log.info("Found {} pointclouds for {}".format(len(self.path_list),
-                                                      split))
+        # log.info("Found {} pointclouds for {}".format(len(self.path_list),
+        #                                               split))
 
     def __len__(self):
         lens = [len(a) for a in self.dataset_splits]
         return max(lens) * self.num_datasets
 
     def get_data(self, idx):
-        dataset_idx = idx % self.num_datasets
-        idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
+        dataset_idx = (idx // self.dataset.batch_size) % self.num_datasets
+        idx = ((((idx // self.dataset.batch_size) // self.num_datasets) *
+                self.dataset.batch_size) + idx % self.dataset.batch_size) % len(
+                    self.dataset_splits[dataset_idx])
+
+        # dataset_idx = idx % self.num_datasets
+        # idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
 
         data = self.dataset_splits[dataset_idx].get_data(idx)
 
         return data
 
     def get_attr(self, idx):
-        dataset_idx = idx % self.num_datasets
-        idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
+        dataset_idx = (idx // self.dataset.batch_size) % self.num_datasets
+        idx = ((((idx // self.dataset.batch_size) // self.num_datasets) *
+                self.dataset.batch_size) + idx % self.dataset.batch_size) % len(
+                    self.dataset_splits[dataset_idx])
+
+        # dataset_idx = idx % self.num_datasets
+        # idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
         attr = self.dataset_splits[dataset_idx].get_attr(idx)
         attr['dataset_idx'] = dataset_idx
 
