@@ -215,7 +215,8 @@ class SparseConvUnetMegaModel(BaseModel):
             Returns loss, labels and scores.
         """
         cfg = self.cfg
-        labels = torch.cat(inputs['data'].label, 0).to(torch.LongTensor()).to(results.device)
+        labels = torch.cat(inputs['data'].label,
+                           0).to(torch.LongTensor()).to(results.device)
 
         loss = Loss.weighted_CrossEntropyLoss[inputs['data'].dataset_idx](
             results, labels)
@@ -338,7 +339,8 @@ class InputLayer(nn.Module):
 
         features_avg = in_positions.clone()
         for i in range(features_avg.shape[1]):
-            features_avg[:, i] = reduce_subarrays_sum(features[:, i], v.voxel_point_row_splits)
+            features_avg[:, i] = reduce_subarrays_sum(features[:, i],
+                                                      v.voxel_point_row_splits)
 
         features_avg = features_avg / count.unsqueeze(1)
 

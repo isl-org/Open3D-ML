@@ -57,7 +57,12 @@ class SemSegLoss(object):
 class SemSegLossV2(object):
     """Loss functions for semantic segmentation."""
 
-    def __init__(self, num_heads, num_classes, ignored_labels=[], device='cpu', weights=None):
+    def __init__(self,
+                 num_heads,
+                 num_classes,
+                 ignored_labels=[],
+                 device='cpu',
+                 weights=None):
         super(SemSegLossV2, self).__init__()
         # weighted_CrossEntropyLoss
         self.weighted_CrossEntropyLoss = []

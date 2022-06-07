@@ -329,8 +329,10 @@ class SemanticSegmentationMultiHead(BasePipeline):
             log.info("Logging in file : {}".format(log_file_path))
             log.addHandler(logging.FileHandler(log_file_path))
 
-        Loss = SemSegLossV2(model.num_heads, model.cfg.num_classes,
-                            model.cfg.ignored_label_inds, device=device)
+        Loss = SemSegLossV2(model.num_heads,
+                            model.cfg.num_classes,
+                            model.cfg.ignored_label_inds,
+                            device=device)
         self.metric_train = [SemSegMetric() for i in range(num_heads)]
         self.metric_val = [SemSegMetric() for i in range(num_heads)]
 
@@ -500,7 +502,8 @@ class SemanticSegmentationMultiHead(BasePipeline):
                     if predict_scores.size()[-1] == 0:
                         continue
 
-                    self.metric_val[dataset_idx].update(predict_scores, gt_labels)
+                    self.metric_val[dataset_idx].update(predict_scores,
+                                                        gt_labels)
 
                     self.valid_losses[dataset_idx].append(loss.cpu().item())
                     # Save only for the first batch
@@ -677,7 +680,8 @@ class SemanticSegmentationMultiHead(BasePipeline):
 
     def save_logs(self, writer, epoch, dataset_idx):
         """Save logs from the training and send results to TensorBoard."""
-        if len(self.metric_train[dataset_idx]) == 0 or len(self.metric_val[dataset_idx]) == 0:
+        if len(self.metric_train[dataset_idx]) == 0 or len(
+                self.metric_val[dataset_idx]) == 0:
             return
 
         train_accs = self.metric_train[dataset_idx].acc()
