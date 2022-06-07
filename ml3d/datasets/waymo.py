@@ -55,6 +55,7 @@ class Waymo(BaseDataset):
             glob(join(cfg.dataset_path, 'velodyne', '*.bin')))
         self.train_files = []
         self.val_files = []
+        self.test_files = []
 
         for f in self.all_files:
             if 'train' in f:
