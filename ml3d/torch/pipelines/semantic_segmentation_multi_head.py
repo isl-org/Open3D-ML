@@ -330,7 +330,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
             log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLossV2(model.num_heads, model.cfg.num_classes,
-                            model.cfg.ignored_label_inds)
+                            model.cfg.ignored_label_inds, device=device)
         self.metric_train = [SemSegMetric() for i in range(num_heads)]
         self.metric_val = [SemSegMetric() for i in range(num_heads)]
 
@@ -492,7 +492,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
                         tqdm(valid_loader, desc='validation')):
                     if hasattr(inputs['data'], 'to'):
                         inputs['data'].to(device)
-
+                    dataset_idx = inputs['data'].dataset_idx
                     results = model(inputs['data'])
                     loss, gt_labels, predict_scores = model.get_loss(
                         Loss, results, inputs, device)
@@ -500,7 +500,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
                     if predict_scores.size()[-1] == 0:
                         continue
 
-                    self.metric_val.update(predict_scores, gt_labels)
+                    self.metric_val[dataset_idx].update(predict_scores, gt_labels)
 
                     self.valid_losses[dataset_idx].append(loss.cpu().item())
                     # Save only for the first batch
@@ -677,13 +677,14 @@ class SemanticSegmentationMultiHead(BasePipeline):
 
     def save_logs(self, writer, epoch, dataset_idx):
         """Save logs from the training and send results to TensorBoard."""
+        if len(self.metric_train[dataset_idx]) == 0 or len(self.metric_val[dataset_idx]) == 0:
+            return
+
         train_accs = self.metric_train[dataset_idx].acc()
-        # val_accs = self.metric_val[dataset_idx].acc()
-        val_accs = self.metric_train[dataset_idx].acc()
+        val_accs = self.metric_val[dataset_idx].acc()
 
         train_ious = self.metric_train[dataset_idx].iou()
-        # val_ious = self.metric_val[dataset_idx].iou()
-        val_ious = self.metric_train[dataset_idx].iou()
+        val_ious = self.metric_val[dataset_idx].iou()
 
         loss_dict = {
             'Training loss': np.mean(self.losses[dataset_idx]),

@@ -107,7 +107,7 @@ class WaymoSemSeg(BaseDataset):
         Returns:
             A dataset split object providing the requested subset of the data.
         """
-        return WaymoSplit(self, split=split)
+        return WaymoSemSegSplit(self, split=split)
 
     def get_split_list(self, split):
         """Returns the list of data splits available.
@@ -162,7 +162,7 @@ class WaymoSemSeg(BaseDataset):
         raise NotImplementedError()
 
 
-class WaymoSplit(BaseDatasetSplit):
+class WaymoSemSegSplit(BaseDatasetSplit):
 
     def __init__(self, dataset, split='train'):
         super().__init__(dataset, split=split)

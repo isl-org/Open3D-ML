@@ -13,6 +13,7 @@ class SemSegMetric(object):
         super(SemSegMetric, self).__init__()
         self.confusion_matrix = None
         self.num_classes = None
+        self.count = 0
 
     def update(self, scores, labels):
         conf = self.get_confusion_matrix(scores, labels)
@@ -22,6 +23,7 @@ class SemSegMetric(object):
         else:
             assert self.confusion_matrix.shape == conf.shape
             self.confusion_matrix += conf
+        self.count += 1
 
     def __iadd__(self, otherMetric):
         if self.confusion_matrix is None and otherMetric.confusion_matrix is None:
@@ -32,6 +34,7 @@ class SemSegMetric(object):
             pass
         else:
             self.confusion_matrix += otherMetric.confusion_matrix
+        self.count += len(otherMetric)
         return self
 
     def acc(self):
@@ -101,6 +104,10 @@ class SemSegMetric(object):
 
     def reset(self):
         self.confusion_matrix = None
+        self.count = 0
+
+    def __len__(self):
+        return self.count
 
     @staticmethod
     def get_confusion_matrix(scores, labels):

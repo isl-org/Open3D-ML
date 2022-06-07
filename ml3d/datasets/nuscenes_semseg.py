@@ -82,25 +82,14 @@ class NuScenesSemSeg(BaseDataset):
             A dict where keys are label numbers and
             values are the corresponding names.
         """
-        label_to_names = {
-            0: 'ignore',
-            1: 'barrier',
-            2: 'bicycle',
-            3: 'bus',
-            4: 'car',
-            5: 'construction_vehicle',
-            6: 'motorcycle',
-            7: 'pedestrian',
-            8: 'traffic_cone',
-            9: 'trailer',
-            10: 'truck',
-            11: 'driveable_surface',
-            12: 'other_flat',
-            13: 'sidewalk',
-            14: 'terrain',
-            15: 'manmade',
-            16: 'vegetation'
-        }
+
+        classes = "noise, Car, Truck, Bendy Bus, Rigid Bus, Construction Vehicle, Motorcycle, Bicycle, Bicycle Rack, Trailer, Police Vehicle, Ambulance, Adult Pedestrian, Child Pedestrian, Construction Worker, Stroller, Wheelchair, Portable Personal Mobility Vehicle, Police Officer, Animal, Traffic Cone, Temporary Traffic Barrier, Pushable Pullable Object, Debris, Drivable Surface, Sidewalk, Terrain, Flat Other, Manmade, Vegetation, Static Other, Vechicle Ego"
+
+        classes = classes.replace(', ', ',').split(',')
+        label_to_names = {}
+        for i in range(len(classes)):
+            label_to_names[i] = classes[i]
+
         return label_to_names
 
     @staticmethod

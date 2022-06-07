@@ -1,0 +1,6 @@
+name: WaymoSemSeg
+dataset_path: /export/share/datasets/Waymo_1.3/processed/
+cache_dir: ./logs/cache
+class_weights: []
+ignored_label_inds: [0]
+use_cache: False

@@ -476,7 +476,7 @@ class SparseConvUnetMegaModelBatch:
 
         if len(set(dataset_idx)) != 1:
             raise ValueError(
-                "Multiple datasets in a single batch is not supported."
+                "Multiple datasets in a single batch is not supported. "
                 "Make sure to pass same batch size to dataset and pipeline")
 
         self.point = pc

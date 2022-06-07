@@ -32,10 +32,10 @@ class SparseConvUnetMegaModel(BaseModel):
             name="SparseConvUnetMegaModel",
             device="cuda",
             num_heads=1,  # number of segmentation heads.
-            multiplier=4,  # Proportional to number of neurons in each layer.
-            voxel_size=0.1,
+            multiplier=16,  # Proportional to number of neurons in each layer.
+            voxel_size=0.05,
             conv_block_reps=1,  # Conv block repetitions.
-            residual_blocks=False,
+            residual_blocks=True,
             in_channels=3,
             num_classes=[20],
             grid_size=4096,
@@ -126,7 +126,7 @@ class SparseConvUnetMegaModel(BaseModel):
 
         feat = np.array(data['feat'], dtype=np.float32)
         if feat.shape[1] < 3:
-            feat = np.concatenate([feat, np.ones([feat.shape[0], 1])], 1)
+            feat = np.concatenate([points, feat[:, 0:1]], 1)
 
         # Scale to voxel size.
         points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
@@ -215,7 +215,7 @@ class SparseConvUnetMegaModel(BaseModel):
             Returns loss, labels and scores.
         """
         cfg = self.cfg
-        labels = torch.cat(inputs['data'].label, 0).to(torch.LongTensor())
+        labels = torch.cat(inputs['data'].label, 0).to(torch.LongTensor()).to(results.device)
 
         loss = Loss.weighted_CrossEntropyLoss[inputs['data'].dataset_idx](
             results, labels)
@@ -337,12 +337,8 @@ class InputLayer(nn.Module):
                                      count.cpu().numpy()).astype(np.int32)
 
         features_avg = in_positions.clone()
-        features_avg[:, 0] = reduce_subarrays_sum(features[:, 0],
-                                                  v.voxel_point_row_splits)
-        features_avg[:, 1] = reduce_subarrays_sum(features[:, 1],
-                                                  v.voxel_point_row_splits)
-        features_avg[:, 2] = reduce_subarrays_sum(features[:, 2],
-                                                  v.voxel_point_row_splits)
+        for i in range(features_avg.shape[1]):
+            features_avg[:, i] = reduce_subarrays_sum(features[:, i], v.voxel_point_row_splits)
 
         features_avg = features_avg / count.unsqueeze(1)
 
