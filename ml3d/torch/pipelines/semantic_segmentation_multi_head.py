@@ -365,9 +365,9 @@ class SemanticSegmentationMultiHead(BasePipeline):
                 raise NotImplementedError(
                     "Distributed training with sampler is not supported yet!")
             train_sampler = torch.utils.data.distributed.DistributedSampler(
-                train_split)
+                train_split, shuffle=False)
             valid_sampler = torch.utils.data.distributed.DistributedSampler(
-                valid_split)
+                valid_split, shuffle=False)
 
         train_loader = DataLoader(
             train_split,
@@ -417,7 +417,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
         # wrap model for multiple GPU
         if self.distributed:
             model = torch.nn.parallel.DistributedDataParallel(
-                model, device_ids=[self.device])
+                model, device_ids=[self.device], find_unused_parameters=True)
             model.get_loss = model.module.get_loss
             model.cfg = model.module.cfg
 
@@ -512,14 +512,19 @@ class SemanticSegmentationMultiHead(BasePipeline):
                             results, inputs['data'], epoch)
 
             if self.distributed:
-                metric_gather = [None for _ in range(dist.get_world_size())]
-                dist.gather_object(self.metric_val,
-                                   metric_gather if rank == 0 else None,
+                gather_arr = [None for _ in range(dist.get_world_size())]
+                dist.gather_object((self.metric_train, self.metric_val,
+                                    self.losses, self.valid_losses),
+                                   gather_arr if rank == 0 else None,
                                    dst=0)
-                if rank == 0:
-                    for m in metric_gather[1:]:
-                        self.metric_val += m
 
+                if rank == 0:
+                    for m1, m2, l1, l2 in gather_arr[1:]:
+                        for i in range(num_heads):
+                            self.metric_train[i] += m1[i]
+                            self.metric_val[i] += m2[i]
+                            self.losses[i] += l1[i]
+                            self.valid_losses[i] += l2[i]
                 dist.barrier()
 
             if rank == 0:
@@ -705,11 +710,13 @@ class SemanticSegmentationMultiHead(BasePipeline):
         } for iou, val_iou in zip(train_ious, val_ious)]
 
         for key, val in loss_dict.items():
-            writer.add_scalar(key, val, epoch)
+            writer.add_scalar(str(dataset_idx) + " : " + key, val, epoch)
         for key, val in acc_dicts[-1].items():
-            writer.add_scalar("{}/ Overall".format(key), val, epoch)
+            writer.add_scalar("{} : {}/ Overall".format(dataset_idx, key), val,
+                              epoch)
         for key, val in iou_dicts[-1].items():
-            writer.add_scalar("{}/ Overall".format(key), val, epoch)
+            writer.add_scalar("{} : {}/ Overall".format(dataset_idx, key), val,
+                              epoch)
 
         log.info(f"Dataset Index : {dataset_idx}")
         log.info(f"Loss train: {loss_dict['Training loss']:.3f} "

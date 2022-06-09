@@ -30,6 +30,7 @@ class SemSegMetric(object):
             pass
         elif self.confusion_matrix is None:
             self.confusion_matrix = otherMetric.confusion_matrix
+            self.num_classes = otherMetric.num_classes
         elif otherMetric.confusion_matrix is None:
             pass
         else:

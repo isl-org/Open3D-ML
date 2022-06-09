@@ -70,6 +70,6 @@ class SemSegLossV2(object):
         for i in range(num_heads):
             weights = torch.ones(num_classes[i])
             weights[ignored_labels[i]] = 0
-            weights = torch.tensor(weights, dtype=torch.float).to(device)
+            weights = weights.to(torch.float).to(device)
             self.weighted_CrossEntropyLoss.append(
                 nn.CrossEntropyLoss(weight=weights))

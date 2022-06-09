@@ -34,6 +34,7 @@ class SparseConvUnetMegaModel(BaseModel):
             num_heads=1,  # number of segmentation heads.
             multiplier=16,  # Proportional to number of neurons in each layer.
             voxel_size=0.05,
+            varying_input_layers=False,
             conv_block_reps=1,  # Conv block repetitions.
             residual_blocks=True,
             in_channels=3,
@@ -49,6 +50,7 @@ class SparseConvUnetMegaModel(BaseModel):
                              num_heads=num_heads,
                              multiplier=multiplier,
                              voxel_size=voxel_size,
+                             varying_input_layers=varying_input_layers,
                              conv_block_reps=conv_block_reps,
                              residual_blocks=residual_blocks,
                              in_channels=in_channels,
@@ -63,10 +65,21 @@ class SparseConvUnetMegaModel(BaseModel):
         self.augmenter = SemsegAugmentation(cfg.augment, seed=self.rng)
         self.multiplier = cfg.multiplier
         self.num_heads = num_heads
+        self.varying_input_layers = varying_input_layers
         self.input_layer = InputLayer()
-        self.sub_sparse_conv = SubmanifoldSparseConv(in_channels=in_channels,
-                                                     filters=multiplier,
-                                                     kernel_size=[3, 3, 3])
+        if self.varying_input_layers:
+            self.sub_sparse_conv = [
+                SubmanifoldSparseConv(in_channels=in_channels,
+                                      filters=multiplier,
+                                      kernel_size=[3, 3, 3])
+                for i in range(num_heads)
+            ]
+            self.sub_sparse_conv = nn.ModuleList(self.sub_sparse_conv)
+        else:
+            self.sub_sparse_conv = SubmanifoldSparseConv(
+                in_channels=in_channels,
+                filters=multiplier,
+                kernel_size=[3, 3, 3])
         self.unet = UNet(conv_block_reps, [
             multiplier, 2 * multiplier, 3 * multiplier, 4 * multiplier,
             5 * multiplier, 6 * multiplier, 7 * multiplier
@@ -93,7 +106,14 @@ class SparseConvUnetMegaModel(BaseModel):
             feat_list.append(feat)
             index_map_list.append(index_map)
 
-        feat_list = self.sub_sparse_conv(feat_list, pos_list, voxel_size=1.0)
+        if self.varying_input_layers:
+            feat_list = self.sub_sparse_conv[inputs.dataset_idx](feat_list,
+                                                                 pos_list,
+                                                                 voxel_size=1.0)
+        else:
+            feat_list = self.sub_sparse_conv(feat_list,
+                                             pos_list,
+                                             voxel_size=1.0)
         feat_list = self.unet(pos_list, feat_list)
         feat_list = self.batch_norm(feat_list)
         feat_list = self.relu(feat_list)
@@ -337,7 +357,8 @@ class InputLayer(nn.Module):
         reverse_map_sort = np.repeat(np.arange(count.shape[0]),
                                      count.cpu().numpy()).astype(np.int32)
 
-        features_avg = in_positions.clone()
+        features_avg = torch.zeros(in_positions.shape[0],
+                                   features.shape[1]).to(features.device)
         for i in range(features_avg.shape[1]):
             features_avg[:, i] = reduce_subarrays_sum(features[:, i],
                                                       v.voxel_point_row_splits)
