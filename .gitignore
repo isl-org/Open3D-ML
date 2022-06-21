@@ -3,26 +3,4 @@
 __pycache__
 # Distribution / packaging
 .Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-**/lib/
-**/build/
-**/lib64/
-*.egg-info
-.installed.cfg
-*.egg
-*linux-gnu.so
-*darwin.so
-*.so
-#
-logs/
-test/
-test_kpconv/
-kernels/
-**/.fuse*
-train_log/
+

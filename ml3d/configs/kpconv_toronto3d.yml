@@ -48,7 +48,7 @@ model:
   - true
   - false
   - false
-  batch_limit: 10000
+  batch_limit: 10000 # how many balls to sample
   batch_norm_momentum: 0.98
   batcher: ConcatBatcher
   conv_radius: 2.5

@@ -11,7 +11,7 @@ from ...datasets.augment import SemsegAugmentation
 from ...datasets.utils import DataProcessing
 from ..utils.pointnet.pointnet2_utils import furthest_point_sample_v2
 
-tf.no_gradient("Open3DKnnSearch")
+# tf.no_gradient("Open3DKnnSearch")#
 
 
 class PointTransformer(BaseModel):

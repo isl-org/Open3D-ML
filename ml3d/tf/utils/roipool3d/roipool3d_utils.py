@@ -49,4 +49,4 @@ def roipool3d_gpu(pts,
     return pooled_features, pooled_empty_flag
 
 
-ops.NoGradient('Open3DRoiPool')
+# ops.NoGradient('Open3DRoiPool')

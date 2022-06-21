@@ -22,7 +22,7 @@ def furthest_point_sample(xyz, npoint):
     return output
 
 
-ops.NoGradient('Open3DFurthestPointSampling')
+# ops.NoGradient('Open3DFurthestPointSampling')
 
 
 def furthest_point_sample_v2(xyz, row_splits, new_row_splits):
@@ -68,7 +68,7 @@ def three_nn_gpu(query_pts, data_pts):
     return tf.sqrt(dist2), idx
 
 
-ops.NoGradient("Open3DTreeNN")
+# ops.NoGradient("Open3DTreeNN")
 
 
 def three_interpolate_gpu(features, idx, weight):
@@ -87,7 +87,7 @@ def three_interpolate_gpu(features, idx, weight):
     return output
 
 
-@tf.RegisterGradient("Open3DThreeInterpolate")
+# @tf.RegisterGradient("Open3DThreeInterpolate")
 def _tree_interpolate_gradient(op, grad_out):
     if not open3d.core.cuda.device_count() > 0:
         raise NotImplementedError
@@ -118,7 +118,7 @@ def ball_query_gpu(radius, nsample, xyz, new_xyz):
     return idx
 
 
-ops.NoGradient("Open3DBallQuery")
+# ops.NoGradient("Open3DBallQuery")
 
 
 class QueryAndGroup(tf.keras.layers.Layer):
