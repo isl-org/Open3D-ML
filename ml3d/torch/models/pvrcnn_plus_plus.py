@@ -5,6 +5,7 @@ from torch.nn.modules.utils import _pair
 from .base_model_objdet import BaseModel
 import open3d.ml.torch as ml3d
 from open3d.ml.torch.ops import voxelize, ragged_to_dense, reduce_subarrays_sum
+from open3d.ml.torch.layers import SparseConv
 
 
 
@@ -199,6 +200,53 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
     def roi_grid_pooling(self, roi, points, point_coords, point_feats, keypoint_weights):
         pass
 
+class SubmanifoldSparseConv(nn.Module):
 
+    def __init__(self,
+                 in_channels,
+                 filters,
+                 kernel_size,
+                 use_bias=False,
+                 offset=None,
+                 normalize=False):
+        super(SubmanifoldSparseConv, self).__init__()
+
+        offset = torch.full((3,), offset, dtype=torch.float32)
+        self.net = SparseConv(in_channels=in_channels,
+                              filters=filters,
+                              kernel_size=kernel_size,
+                              use_bias=use_bias,
+                              offset=offset,
+                              normalize=normalize)
+
+    def forward(self,
+                features_list,
+                in_positions_list,
+                out_positions_list=None,
+                voxel_size=1.0):
+        if out_positions_list is None:
+            out_positions_list = in_positions_list
+
+        out_feat = []
+        for feat, in_pos, out_pos in zip(features_list, in_positions_list,
+                                         out_positions_list):
+            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
+
+        return out_feat
+
+    def __name__(self):
+        return "SubmanifoldSparseConv"
+
+def calculate_grid(in_positions):
+    filter = torch.Tensor([[-1, -1, -1], [-1, -1, 0], [-1, 0, -1], [-1, 0, 0],
+                           [0, -1, -1], [0, -1, 0], [0, 0, -1],
+                           [0, 0, 0]]).to(in_positions.device)
+
+    out_pos = in_positions.long().repeat(1, filter.shape[0]).reshape(-1, 3)
+    filter = filter.repeat(in_positions.shape[0], 1)
+
+    out_pos = out_pos + filter
+    out_pos = out_pos[out_pos.min(1).values >= 0]
+    out_pos = torch.unique(out_pos, dim=0)
 
         
