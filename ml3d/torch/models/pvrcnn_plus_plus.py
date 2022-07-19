@@ -21,6 +21,7 @@ class PVRCNNPlusPlus(BaseModel):
                  classes=['car'],
                  voxelize={},
                  voxel_encoder={},
+                 backbone_2d = {},
                  **kwargs):
         super().__init__(name=name,
                          point_cloud_range=point_cloud_range,
@@ -32,6 +33,8 @@ class PVRCNNPlusPlus(BaseModel):
         self.to(device)
         self.voxel_layer = PVRCNNPlusPlusVoxelization(point_cloud_range=point_cloud_range, **voxelize)
         self.sparseconvbackbone = PVRCNNPlusPlusBackbone3D(point_cloud_range=point_cloud_range, **voxel_encoder)
+        self.backbone_2d = PVRCNNPlusPlusBackbone2D(**backbone_2d)
+
 
     @torch.no_grad()
     def voxelize(self, points):
@@ -60,7 +63,7 @@ class PVRCNNPlusPlus(BaseModel):
     def convert_open3d_voxel_to_dense(self, x_open3d, x_pos_open3d, voxel_size = 1.0):
         x_sparse = []
         dense_shape = ((self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(voxel_size)).tolist()
-        dense_shape = dense_shape.append(x.shape[1])
+        dense_shape = dense_shape.append(x_open3d.shape[1])
         for x, x_pos in zip(x_open3d, x_pos_open3d):
             x_sparse_temp = torch.sparse_coo_tensor(torch.tensor(x_pos).t(), x, dense_shape)
             x_sparse.append(x_sparse_temp)
@@ -70,17 +73,13 @@ class PVRCNNPlusPlus(BaseModel):
         voxels, voxel_features, num_points, coors = self.voxelize(points)
         x_intermediate_layers, x, x_pos = self.sparseconvbackbone(voxel_features, coors)  
         return x, x_intermediate_layers, x_pos
-    
-    def backbone_2d(self, input_channels, layer_nums, layer_strides, num_filters, num_upsample_filters, upsample_strides):
-        
-
-
 
     def forward(self, inputs):
         inputs = inputs.point
         x_dense_bev, x, x_intermediate_layers, x_pos = self.backbone_3d(inputs)
         x_sparse = self.convert_open3d_voxel_to_dense(x, x_pos)
         x_dense_bev = self.bev_module(x_sparse)
+        x_bev_2d = self.backbone_2d(x_dense_bev)
 
 
 
@@ -244,6 +243,7 @@ class PVRCNNPlusPlusBEVModule(nn.Module):
     def __init__(self, point_cloud_range, method = "HeightCompression"):
         super().__init__()
         self.method = method
+        self.point_cloud_range = point_cloud_range
     
     def forward(self, sparse_tensor_list):
         x_dense_list = []
