@@ -3,6 +3,7 @@ import torch
 from torch import nn
 from torch.nn.modules.utils import _pair
 from torch.nn import functional as F
+from torch.nn.init import kaiming_normal_
 from functools import partial
 import numpy as np
 
@@ -10,6 +11,7 @@ from .base_model_objdet import BaseModel
 import open3d.ml.torch as ml3d
 from open3d.ml.torch.ops import voxelize, ragged_to_dense, reduce_subarrays_sum
 from open3d.ml.torch.layers import SparseConv
+from ..utils.objdet_helper import multiclass_nms
 
 
 
@@ -192,20 +194,20 @@ class PVRCNNPlusPlusBackbone3D(nn.Module):
         
         self.conv2 = nn.Sequential(
             SparseConvBlock(16, 32, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
-            SparseConvBlock(32, 32, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn),
-            SparseConvBlock(32, 32, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn),
+            SubmanifoldSparseConvBlock(32, 32, 3, norm_fn=norm_fn),
+            SubmanifoldSparseConvBlock(32, 32, 3, norm_fn=norm_fn),
         )
 
         self.conv3 = nn.Sequential(
             SparseConvBlock(32, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
-            SparseConvBlock(64, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn),
-            SparseConvBlock(64, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn),
+            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
+            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
         )
 
         self.conv4 = nn.Sequential(
             SparseConvBlock(64, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2, padding = (0, 1, 1)
-            SparseConvBlock(64, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn),
-            SparseConvBlock(64, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn),
+            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
+            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
         )
 
         self.conv_out = SparseConvBlock(64, 128, 3, poincloud_range, voxel_size, padding = 0, norm_fn = norm_fn) #stride = (2, 1, 1)
@@ -332,6 +334,28 @@ class PVRCNNPlusPlusBackbone2D(nn.Module):
 
         return x
 
+class RPNHead(nn.Module):
+    def __init__(self, shared_conv_channels, output_channels, num_head_conv):
+        super().__init__()
+        conv_list = []
+        for k in range(num_head_conv - 1):
+            conv_list.append(nn.Sequential(
+                nn.Conv2d(shared_conv_channels, shared_conv_channels, kernel_size=3, stride=1, padding=1, bias=True),
+                nn.BatchNorm2d(shared_conv_channels),
+                nn.ReLU()
+            ))
+        conv_list.append(nn.Conv2d(shared_conv_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=True))
+        conv_head = nn.Sequential(*conv_list)
+
+        for m in conv_head.modules():
+            if isinstance(m, nn.Conv2d):
+                kaiming_normal_(m.weight.data)
+                if hasattr(m, "bias") and m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        return self.conv_head(x)
+
 """
 Proposes and classifies 3D Bounding Boxes
 one head for the following : center - 2, center_z - 1, dim - 3, rot - 2 and class
@@ -339,11 +363,255 @@ Applies NMS here as well
 Outputs rois, roi_scores, roi_labels, has_class_labels
 """
 class RPNModule(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, input_channels, shared_conv_channels, num_head_conv, num_class, class_names, point_cloud_range, voxel_size, feature_map_stride, nms_pre, score_thr, post_center_limit_range):
         super().__init__()
+        self.num_class = num_class
+        self.point_cloud_range = point_cloud_range
+        self.voxel_size = voxel_size
+        self.feature_map_stride = feature_map_stride
+        self.class_names = class_names
+        self.num_head_conv = num_head_conv
+        self.nms_pre = nms_pre
+        self.score_thr = score_thr
+        self.post_center_limit_range = post_center_limit_range
+
+        self.class_id_mapping = torch.from_numpy(np.array(
+            [self.class_names.index(x) for x in class_names]
+        )).cuda()
+        
+        total_classes = len(self.class_names)
+
+        self.shared_conv = nn.Sequential(
+            nn.Conv2d(
+                input_channels, shared_conv_channels, 3, stride=1, padding=1,
+                bias=True
+            ),
+            nn.BatchNorm2d(shared_conv_channels),
+            nn.ReLU(),
+        )
+        self.heads_dict = nn.ModuleList()
+        #Creating seperate heads for Center, Center_z, Dim, Rot, classification
+        #Center - self.heads_list[0]
+        conv_head = RPNHead(shared_conv_channels, 2, num_head_conv)
+        self.heads_dict.append(conv_head)
+
+        #Center_z - self.heads_list[1]
+        conv_head = RPNHead(shared_conv_channels, 1, num_head_conv)
+        self.heads_dict.append(conv_head)
+        
+        #Dim - self.heads_list[2]
+        conv_head = RPNHead(shared_conv_channels, 3, num_head_conv)
+        self.heads_dict.append(conv_head)
+        
+        #Rot - self.heads_list[3]
+        conv_head = RPNHead(shared_conv_channels, 2, num_head_conv)
+        self.heads_dict.append(conv_head)
+        
+        #classification - self.head_list[4]
+        conv_head = RPNHead(shared_conv_channels, total_classes, num_head_conv)
+        self.heads_dict.append(conv_head)
     
     def forward(self, bev_feats):
-        pass
+        x = self.shared_conv(bev_feats)
+        preds = []
+        for head in self.heads_list:
+            preds.append(head(x))
+        
+        batch_size = preds[4].size()[0]
+
+        bboxes, scores, labels = self.generate_predicted_boxes(batch_size, preds)
+        rois, roi_scores, roi_labels = self.reorder_rois_for_refining(batch_size, bboxes, scores, labels)
+
+        return rois, roi_scores, roi_labels
+
+    
+    def center_to_edge_bbox(self, bboxes):
+        bboxes[:,:2] = bboxes[:,:2] - (bboxes[:,2:5]/2)
+        return bboxes 
+        
+
+    
+    def generate_predicted_boxes(self, batch_size, preds):
+        bboxes, scores, labels = [], [], []
+        batch_center = preds[0]
+        batch_center_z = preds[1]
+        batch_dim = preds[2].exp()
+        batch_rot_cos = preds[3][:, 0].unsqueeze(dim=1)
+        batch_rot_sin = preds[3][:, 1].unsqueeze(dim=1)
+        batch_hm = preds[4].sigmoid()
+        final_pred_dicts = self.decode_bbox_from_heatmap(
+            heatmap=batch_hm, rot_cos=batch_rot_cos, rot_sin=batch_rot_sin,
+            center=batch_center, center_z=batch_center_z, dim=batch_dim, vel=None,
+            point_cloud_range=self.point_cloud_range, voxel_size=self.voxel_size,
+            feature_map_stride=self.feature_map_stride,
+            K=self.nms_pre,
+            score_thresh=self.score_thr,
+            post_center_limit_range=self.post_center_limit_range
+            )
+
+        for k, final_dict in enumerate(final_pred_dicts):
+            bbox_pred = self.center_to_edge_bbox(final_dict["pred_boxes"])
+            score_pred = final_dict["pred_scores"].view(-1).sigmoid()
+            idxs = multiclass_nms(bbox_pred, score_pred, self.score_thr)
+            idxs = torch.cat(idxs)
+            final_dict["pred_boxes"] = final_dict["pred_boxes"][idxs]
+            final_dict["pred_labels"] = final_dict["pred_labels"][idxs]
+            final_dict["pred_scores"] = final_dict["pred_scores"][idxs]
+            bboxes.append(final_dict["pred_boxes"])
+            labels.append(final_dict["pred_labels"])
+            scores.append(final_dict["pred_scores"])
+        
+        return bboxes, scores, labels
+
+    def gaussian_radius(self, height, width, min_overlap=0.5):
+        """
+        Args:
+            height: (N)
+            width: (N)
+            min_overlap:
+        Returns:
+        """
+        a1 = 1
+        b1 = (height + width)
+        c1 = width * height * (1 - min_overlap) / (1 + min_overlap)
+        sq1 = (b1 ** 2 - 4 * a1 * c1).sqrt()
+        r1 = (b1 + sq1) / 2
+
+        a2 = 4
+        b2 = 2 * (height + width)
+        c2 = (1 - min_overlap) * width * height
+        sq2 = (b2 ** 2 - 4 * a2 * c2).sqrt()
+        r2 = (b2 + sq2) / 2
+
+        a3 = 4 * min_overlap
+        b3 = -2 * min_overlap * (height + width)
+        c3 = (min_overlap - 1) * width * height
+        sq3 = (b3 ** 2 - 4 * a3 * c3).sqrt()
+        r3 = (b3 + sq3) / 2
+        ret = torch.min(torch.min(r1, r2), r3)
+        return ret
+
+    def gaussian2D(self, shape, sigma=1):
+        m, n = [(ss - 1.) / 2. for ss in shape]
+        y, x = np.ogrid[-m:m + 1, -n:n + 1]
+
+        h = np.exp(-(x * x + y * y) / (2 * sigma * sigma))
+        h[h < np.finfo(h.dtype).eps * h.max()] = 0
+        return h
+    
+    def draw_gaussian_to_heatmap(self, heatmap, center, radius, k=1, valid_mask=None):
+        diameter = 2 * radius + 1
+        gaussian = self.gaussian2D((diameter, diameter), sigma=diameter / 6)
+
+        x, y = int(center[0]), int(center[1])
+
+        height, width = heatmap.shape[0:2]
+
+        left, right = min(x, radius), min(width - x, radius + 1)
+        top, bottom = min(y, radius), min(height - y, radius + 1)
+
+        masked_heatmap = heatmap[y - top:y + bottom, x - left:x + right]
+        masked_gaussian = torch.from_numpy(
+            gaussian[radius - top:radius + bottom, radius - left:radius + right]
+        ).to(heatmap.device).float()
+
+        if min(masked_gaussian.shape) > 0 and min(masked_heatmap.shape) > 0:  # TODO debug
+            if valid_mask is not None:
+                cur_valid_mask = valid_mask[y - top:y + bottom, x - left:x + right]
+                masked_gaussian = masked_gaussian * cur_valid_mask.float()
+
+            torch.max(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
+        return heatmap
+    
+    def _nms(self, heat, kernel=3):
+        pad = (kernel - 1) // 2
+
+        hmax = F.max_pool2d(heat, (kernel, kernel), stride=1, padding=pad)
+        keep = (hmax == heat).float()
+        return heat * keep
+    
+    def _gather_feat(self, feat, ind, mask=None):
+        dim = feat.size(2)
+        ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
+        feat = feat.gather(1, ind)
+        if mask is not None:
+            mask = mask.unsqueeze(2).expand_as(feat)
+            feat = feat[mask]
+            feat = feat.view(-1, dim)
+        return feat
+    
+    def _transpose_and_gather_feat(self, feat, ind):
+        feat = feat.permute(0, 2, 3, 1).contiguous()
+        feat = feat.view(feat.size(0), -1, feat.size(3))
+        feat = self._gather_feat(feat, ind)
+        return feat
+
+    def decode_bbox_from_heatmap(self, heatmap, rot_cos, rot_sin, center, center_z, dim,
+                             point_cloud_range=None, voxel_size=None, feature_map_stride=None, vel=None, K=100, 
+                             score_thresh=None, post_center_limit_range=None):
+        batch_size, num_class, _, _ = heatmap.size()
+
+        scores, inds, class_ids, ys, xs = self._topk(heatmap, K=K)
+        center = self._transpose_and_gather_feat(center, inds).view(batch_size, K, 2)
+        rot_sin = self._transpose_and_gather_feat(rot_sin, inds).view(batch_size, K, 1)
+        rot_cos = self._transpose_and_gather_feat(rot_cos, inds).view(batch_size, K, 1)
+        center_z = self._transpose_and_gather_feat(center_z, inds).view(batch_size, K, 1)
+        dim = self._transpose_and_gather_feat(dim, inds).view(batch_size, K, 3)
+
+        angle = torch.atan2(rot_sin, rot_cos)
+        xs = xs.view(batch_size, K, 1) + center[:, :, 0:1]
+        ys = ys.view(batch_size, K, 1) + center[:, :, 1:2]
+
+        xs = xs * feature_map_stride * voxel_size[0] + point_cloud_range[0]
+        ys = ys * feature_map_stride * voxel_size[1] + point_cloud_range[1]
+
+        box_part_list = [xs, ys, center_z, dim, angle]
+        if vel is not None:
+            vel = self._transpose_and_gather_feat(vel, inds).view(batch_size, K, 2)
+            box_part_list.append(vel)
+
+        final_box_preds = torch.cat((box_part_list), dim=-1)
+        final_scores = scores.view(batch_size, K)
+        final_class_ids = class_ids.view(batch_size, K)
+
+        assert post_center_limit_range is not None
+        mask = (final_box_preds[..., :3] >= post_center_limit_range[:3]).all(2)
+        mask &= (final_box_preds[..., :3] <= post_center_limit_range[3:]).all(2)
+
+        if score_thresh is not None:
+            mask &= (final_scores > score_thresh)
+
+        ret_pred_dicts = []
+        for k in range(batch_size):
+            cur_mask = mask[k]
+            cur_boxes = final_box_preds[k, cur_mask]
+            cur_scores = final_scores[k, cur_mask]
+            cur_labels = final_class_ids[k, cur_mask]
+
+            ret_pred_dicts.append({
+                'pred_boxes': cur_boxes,
+                'pred_scores': cur_scores,
+                'pred_labels': cur_labels
+            })
+        return ret_pred_dicts
+    
+    @staticmethod
+    def reorder_rois_for_refining(batch_size, bboxes, scores, labels):
+        num_max_rois = max([len(bbox) for bbox in bboxes])
+        num_max_rois = max(1, num_max_rois)  # at least one faked rois to avoid error
+        pred_boxes = bboxes[0]
+
+        rois = pred_boxes.new_zeros((batch_size, num_max_rois, pred_boxes.shape[-1]))
+        roi_scores = pred_boxes.new_zeros((batch_size, num_max_rois))
+        roi_labels = pred_boxes.new_zeros((batch_size, num_max_rois)).long()
+
+        for bs_idx in range(batch_size):
+            num_boxes = len(bboxes[bs_idx])
+
+            rois[bs_idx, :num_boxes, :] = bboxes[bs_idx]
+            roi_scores[bs_idx, :num_boxes] = scores[bs_idx]
+            roi_labels[bs_idx, :num_boxes] = labels[bs_idx]
+        return rois, roi_scores, roi_labels
 
 """
 Used inside PVRSCNNPlusPlusVoxelSetabstraction
