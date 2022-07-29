@@ -426,7 +426,7 @@ class RPNModule(nn.Module):
 
     
     def center_to_edge_bbox(self, bboxes):
-        bboxes[:,:2] = bboxes[:,:2] - (bboxes[:,2:5]/2)
+        bboxes[:,:3] = bboxes[:,:3] - (bboxes[:,3:6]/2)
         return bboxes 
         
 
