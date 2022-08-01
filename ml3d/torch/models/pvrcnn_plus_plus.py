@@ -1,3 +1,4 @@
+from matplotlib.transforms import BboxBase
 from numpy import pad
 import torch
 from torch import nn
@@ -6,24 +7,32 @@ from torch.nn import functional as F
 from torch.nn.init import kaiming_normal_
 from functools import partial
 import numpy as np
+import math
+
+from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_utils as pointnet2_stack_utils
+from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_modules as pointnet2_stack_modules
+from pcdet.config import *
 
 from .base_model_objdet import BaseModel
 import open3d.ml.torch as ml3d
-from open3d.ml.torch.ops import voxelize, ragged_to_dense, reduce_subarrays_sum
+from open3d.ml.torch.ops import voxelize, ragged_to_dense, reduce_subarrays_sum, nms
 from open3d.ml.torch.layers import SparseConv
-from ..utils.objdet_helper import multiclass_nms
+from ..utils.objdet_helper import multiclass_nms, box3d_to_bev, xywhr_to_xyxyr
+from ...utils import MODEL
 
 
 
 class PVRCNNPlusPlus(BaseModel):
     def __init__(self, 
-                 name = "PVRCNN++",
+                 name = "PVRCNNPlusPlus",
                  device="cuda",
                  point_cloud_range=[0, -40.0, -3, 70.0, 40.0, 1],
                  classes=['car'],
                  voxelize={},
                  voxel_encoder={},
                  backbone_2d = {},
+                 rpn_module = {},
+                 voxel_set_abstraction = {},
                  **kwargs):
         super().__init__(name=name,
                          point_cloud_range=point_cloud_range,
@@ -35,8 +44,12 @@ class PVRCNNPlusPlus(BaseModel):
         self.to(device)
         self.voxel_layer = PVRCNNPlusPlusVoxelization(point_cloud_range=point_cloud_range, **voxelize)
         self.sparseconvbackbone = PVRCNNPlusPlusBackbone3D(point_cloud_range=point_cloud_range, **voxel_encoder)
-        self.backbone_2d = PVRCNNPlusPlusBackbone2D(**backbone_2d)
-
+        self.bev_module = PVRCNNPlusPlusBEVModule(point_cloud_range=point_cloud_range)
+        self.backbone_2d = PVRCNNPlusPlusBackbone2D(128, **backbone_2d)
+        self.rpn_module = RPNModule(input_channels=512, device = device, point_cloud_range=point_cloud_range, **rpn_module)
+        self.voxel_set_abstraction = PVRCNNPlusPlusVoxelSetAbstraction(point_cloud_range=point_cloud_range, **voxel_set_abstraction)
+        self.device = device
+        self.to(device)
 
     @torch.no_grad()
     def voxelize(self, points):
@@ -60,33 +73,37 @@ class PVRCNNPlusPlus(BaseModel):
             coors_batch.append(coor_pad)
         # coors_batch = torch.cat(coors_batch, dim=0)
 
-        return voxels, voxel_features, num_points, coors_batch
+        return voxels, voxel_features, num_points, coors, coors_batch
     
     def convert_open3d_voxel_to_dense(self, x_open3d, x_pos_open3d, voxel_size = 1.0):
         x_sparse = []
-        dense_shape = ((self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(voxel_size)).tolist()
-        dense_shape = dense_shape.append(x_open3d.shape[1])
+        self.point_cloud_range = np.array(self.point_cloud_range)
         for x, x_pos in zip(x_open3d, x_pos_open3d):
+            dense_shape = ((self.point_cloud_range[3:6] - self.point_cloud_range[0:3]) / np.array(voxel_size)).astype(int)[::-1].tolist()
+            print("dene shape", dense_shape, x.shape[1])
+            dense_shape.append(x.shape[1])
+            print("dene shape", dense_shape)
             x_sparse_temp = torch.sparse_coo_tensor(torch.tensor(x_pos).t(), x, dense_shape)
             x_sparse.append(x_sparse_temp)
         return x_sparse
 
     def backbone_3d(self, points):
-        voxels, voxel_features, num_points, coors = self.voxelize(points)
-        x_intermediate_layers, x, x_pos = self.sparseconvbackbone(voxel_features, coors)  
+        voxels, voxel_features, num_points, coors, coors_batch = self.voxelize(points)
+        x_intermediate_layers, x, x_pos = self.sparseconvbackbone(voxel_features, coors)
+        print(x_intermediate_layers, x, x_pos)
         return x, x_intermediate_layers, x_pos
 
     def forward(self, inputs):
         inputs = inputs.point
-        x_dense_bev, x, x_intermediate_layers, x_pos = self.backbone_3d(inputs)
-        x_sparse = self.convert_open3d_voxel_to_dense(x, x_pos)
+        print(inputs[0].shape)
+        x, x_intermediate_layers, x_pos = self.backbone_3d(inputs)
+        x_sparse = self.convert_open3d_voxel_to_dense(x, x_pos, self.voxel_layer.voxel_size)
         x_dense_bev = self.bev_module(x_sparse)
         x_bev_2d = self.backbone_2d(x_dense_bev)
-
-
-
-
-
+        rois, roi_scores, roi_labels = self.rpn_module(x_bev_2d)
+        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(inputs, rois, x_bev_2d, x_intermediate_layers) 
+        print(point_features.shape)
+        return x, x_intermediate_layers, x_pos
     
     def get_optimizer(self, cfg):
         pass
@@ -95,13 +112,65 @@ class PVRCNNPlusPlus(BaseModel):
         pass
 
     def preprocess(self, data, attr):
-        pass
+        # If num_workers > 0, use new RNG with unique seed for each thread.
+        # Else, use default RNG.
+        if torch.utils.data.get_worker_info():
+            seedseq = np.random.SeedSequence(
+                torch.utils.data.get_worker_info().seed +
+                torch.utils.data.get_worker_info().id)
+            rng = np.random.default_rng(seedseq.spawn(1)[0])
+        else:
+            rng = self.rng
+
+        points = np.array(data['point'][:, 0:4], dtype=np.float32)
+
+        min_val = np.array(self.point_cloud_range[:3])
+        max_val = np.array(self.point_cloud_range[3:])
+
+        points = points[np.where(
+            np.all(np.logical_and(points[:, :3] >= min_val,
+                                  points[:, :3] < max_val),
+                   axis=-1))]
+
+        data['point'] = points
+
+        new_data = {'point': data['point'], 'calib': data['calib']}
+
+        if attr['split'] not in ['test', 'testing']:
+            new_data['bbox_objs'] = data['bounding_boxes']
+
+        if 'full_point' in data:
+            points = np.array(data['full_point'][:, 0:4], dtype=np.float32)
+
+            min_val = np.array(self.point_cloud_range[:3])
+            max_val = np.array(self.point_cloud_range[3:])
+
+            points = points[np.where(
+                np.all(np.logical_and(points[:, :3] >= min_val,
+                                      points[:, :3] < max_val),
+                       axis=-1))]
+
+            new_data['full_point'] = points
+
+        return new_data
 
     def transform(self, data, attr):
-        pass
+        t_data = {'point': data['point'], 'calib': data['calib']}
+
+        if attr['split'] not in ['test', 'testing']:
+            t_data['bbox_objs'] = data['bbox_objs']
+            t_data['labels'] = np.array([
+                self.name2lbl.get(bb.label_class, len(self.classes))
+                for bb in data['bbox_objs']
+            ],
+                                        dtype=np.int64)
+            t_data['bboxes'] = np.array(
+                [bb.to_xyzwhlr() for bb in data['bbox_objs']], dtype=np.float32)
+
+        return t_data
 
     def inference_end(self, results, inputs):
-        pass
+        return results
 
 """
 Voxelization Layer
@@ -177,40 +246,57 @@ class PVRCNNPlusPlusVoxelization(nn.Module):
         
         return out_voxels, out_coords, out_num_points
 
+class SequentialSparseConv(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, point_cloud_range, voxel_size, padding, norm_fn):
+        super().__init__()
+        self.conv1 = SparseConvBlock(in_channels, out_channels, kernel_size, point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn)
+        self.conv2 = SubmanifoldSparseConvBlock(out_channels, out_channels, kernel_size, norm_fn=norm_fn)
+        self.conv3 = SubmanifoldSparseConvBlock(out_channels, out_channels, kernel_size, norm_fn=norm_fn)
+    
+    def forward(self, features_list, in_positions_list):
+        x_conv1, x_conv1_pos = self.conv1(features_list, in_positions_list)
+        x_conv2, x_conv2_pos = self.conv2(x_conv1, x_conv1_pos)
+        x_conv3, x_conv3_pos = self.conv3(x_conv2, x_conv2_pos)
+
+        return x_conv3, x_conv3_pos
+
 """
 Layer to obtain outputs from different layers of 3D Sparse Convolution Network
 Will also need to store the intermediate layer outputs
 """
 class PVRCNNPlusPlusBackbone3D(nn.Module):
-    def __init__(self, in_channels, poincloud_range, voxel_size):
+    def __init__(self, in_channels, point_cloud_range, voxel_size):
         super().__init__()
-        self.point_cloud_range = poincloud_range
+        self.point_cloud_range = point_cloud_range
         self.voxel_size = voxel_size
         norm_fn = norm_fn = partial(BatchNormBlock, eps=1e-3, momentum=0.01)
 
-        self.conv_input = SubmanifoldSparseConvBlock(in_channels, 16, 3, norm_fn = norm_fn)
+        self.conv_input = SubmanifoldSparseConvBlock(in_channels, 16, [3,3,3], norm_fn = norm_fn)
 
-        self.conv1 = SparseConvBlock(16, 16, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn)
+        self.conv1 = SparseConvBlock(16, 16, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn)
         
-        self.conv2 = nn.Sequential(
-            SparseConvBlock(16, 32, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
-            SubmanifoldSparseConvBlock(32, 32, 3, norm_fn=norm_fn),
-            SubmanifoldSparseConvBlock(32, 32, 3, norm_fn=norm_fn),
-        )
+        # self.conv2 = nn.Sequential(
+        #     SparseConvBlock(16, 32, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
+        #     SubmanifoldSparseConvBlock(32, 32, [3,3,3], norm_fn=norm_fn),
+        #     SubmanifoldSparseConvBlock(32, 32, [3,3,3], norm_fn=norm_fn),
+        # )
+        self.conv2 = SequentialSparseConv(16, 32, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn)
 
-        self.conv3 = nn.Sequential(
-            SparseConvBlock(32, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
-            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
-            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
-        )
+        # self.conv3 = nn.Sequential(
+        #     SparseConvBlock(32, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
+        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
+        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
+        # )
+        self.conv3 = SequentialSparseConv(32, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn)
 
-        self.conv4 = nn.Sequential(
-            SparseConvBlock(64, 64, 3, poincloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2, padding = (0, 1, 1)
-            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
-            SubmanifoldSparseConvBlock(64, 64, 3, norm_fn=norm_fn),
-        )
+        # self.conv4 = nn.Sequential(
+        #     SparseConvBlock(64, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2, padding = (0, 1, 1)
+        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
+        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
+        # )
+        self.conv4 = SequentialSparseConv(64, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn)
 
-        self.conv_out = SparseConvBlock(64, 128, 3, poincloud_range, voxel_size, padding = 0, norm_fn = norm_fn) #stride = (2, 1, 1)
+        self.conv_out = SparseConvBlock(64, 128, [3,3,3], point_cloud_range, voxel_size, padding = 0, norm_fn = norm_fn) #stride = (2, 1, 1)
 
 
     def forward(self, voxel_features, coors):
@@ -250,11 +336,15 @@ class PVRCNNPlusPlusBEVModule(nn.Module):
     def forward(self, sparse_tensor_list):
         x_dense_list = []
         for x_sparse in sparse_tensor_list:
-            spatial_features = x_sparse.dense().permute(3, 0, 1, 2)
+            spatial_features = x_sparse.to_dense().permute(3, 0, 1, 2)
             C, D, H, W= spatial_features.shape
             spatial_features = spatial_features.view(C * D, H, W)
             x_dense_list.append(spatial_features)
-        x_dense = torch.cat(x_dense_list, dim=0)
+        if len(x_dense_list) > 1:
+            x_dense = torch.cat(x_dense_list, dim=0)
+        else:
+            x_dense = torch.cat(x_dense_list, dim=0).unsqueeze(dim = 0)
+        print(x_dense.shape)
         return x_dense
 
 class PVRCNNPlusPlusBackbone2D(nn.Module):
@@ -345,9 +435,9 @@ class RPNHead(nn.Module):
                 nn.ReLU()
             ))
         conv_list.append(nn.Conv2d(shared_conv_channels, output_channels, kernel_size=3, stride=1, padding=1, bias=True))
-        conv_head = nn.Sequential(*conv_list)
+        self.conv_head = nn.Sequential(*conv_list)
 
-        for m in conv_head.modules():
+        for m in self.conv_head.modules():
             if isinstance(m, nn.Conv2d):
                 kaiming_normal_(m.weight.data)
                 if hasattr(m, "bias") and m.bias is not None:
@@ -363,9 +453,8 @@ Applies NMS here as well
 Outputs rois, roi_scores, roi_labels, has_class_labels
 """
 class RPNModule(nn.Module):
-    def __init__(self, input_channels, shared_conv_channels, num_head_conv, num_class, class_names, point_cloud_range, voxel_size, feature_map_stride, nms_pre, score_thr, post_center_limit_range):
+    def __init__(self, input_channels, device, shared_conv_channels, num_head_conv, class_names, point_cloud_range, voxel_size, feature_map_stride, nms_pre, score_thr, post_center_limit_range):
         super().__init__()
-        self.num_class = num_class
         self.point_cloud_range = point_cloud_range
         self.voxel_size = voxel_size
         self.feature_map_stride = feature_map_stride
@@ -373,7 +462,7 @@ class RPNModule(nn.Module):
         self.num_head_conv = num_head_conv
         self.nms_pre = nms_pre
         self.score_thr = score_thr
-        self.post_center_limit_range = post_center_limit_range
+        self.post_center_limit_range = torch.tensor(post_center_limit_range).to(device)
 
         self.class_id_mapping = torch.from_numpy(np.array(
             [self.class_names.index(x) for x in class_names]
@@ -412,9 +501,10 @@ class RPNModule(nn.Module):
         self.heads_dict.append(conv_head)
     
     def forward(self, bev_feats):
+        print(bev_feats.shape)
         x = self.shared_conv(bev_feats)
         preds = []
-        for head in self.heads_list:
+        for head in self.heads_dict:
             preds.append(head(x))
         
         batch_size = preds[4].size()[0]
@@ -452,7 +542,8 @@ class RPNModule(nn.Module):
         for k, final_dict in enumerate(final_pred_dicts):
             bbox_pred = self.center_to_edge_bbox(final_dict["pred_boxes"])
             score_pred = final_dict["pred_scores"].view(-1).sigmoid()
-            idxs = multiclass_nms(bbox_pred, score_pred, self.score_thr)
+            label_pred = final_dict["pred_labels"]
+            idxs = self.multiclass_nms(bbox_pred, score_pred, label_pred, self.score_thr)
             idxs = torch.cat(idxs)
             final_dict["pred_boxes"] = final_dict["pred_boxes"][idxs]
             final_dict["pred_labels"] = final_dict["pred_labels"][idxs]
@@ -539,12 +630,47 @@ class RPNModule(nn.Module):
             feat = feat[mask]
             feat = feat.view(-1, dim)
         return feat
+
+    def _topk(self, scores, K=40):
+        batch, num_class, height, width = scores.size()
+
+        topk_scores, topk_inds = torch.topk(scores.flatten(2, 3), K)
+
+        topk_inds = topk_inds % (height * width)
+        topk_ys = (topk_inds // width).float()
+        topk_xs = (topk_inds % width).int().float()
+
+        topk_score, topk_ind = torch.topk(topk_scores.view(batch, -1), K)
+        topk_classes = (topk_ind // K).int()
+        topk_inds = self._gather_feat(topk_inds.view(batch, -1, 1), topk_ind).view(batch, K)
+        topk_ys = self._gather_feat(topk_ys.view(batch, -1, 1), topk_ind).view(batch, K)
+        topk_xs = self._gather_feat(topk_xs.view(batch, -1, 1), topk_ind).view(batch, K)
+    
+        return topk_score, topk_inds, topk_classes, topk_ys, topk_xs
     
     def _transpose_and_gather_feat(self, feat, ind):
         feat = feat.permute(0, 2, 3, 1).contiguous()
         feat = feat.view(feat.size(0), -1, feat.size(3))
         feat = self._gather_feat(feat, ind)
         return feat
+    
+    def multiclass_nms(self, boxes, scores, class_ids, score_thr):
+        #class based nms
+        idxs = []
+        for i in range(class_ids.max()):
+            class_mask = class_ids==i
+            orig_idx = torch.arange(class_mask.shape[0],
+                                device=class_mask.device,
+                                dtype=torch.long)[class_mask]
+            _scores = scores[class_mask]
+            _boxes = boxes[class_mask, :]
+            _bev = xywhr_to_xyxyr(box3d_to_bev(_boxes))
+            idx = nms(_bev, _scores, 0.01)
+            idxs.append(orig_idx[idx])
+        
+        return idxs
+
+
 
     def decode_bbox_from_heatmap(self, heatmap, rot_cos, rot_sin, center, center_z, dim,
                              point_cloud_range=None, voxel_size=None, feature_map_stride=None, vel=None, K=100, 
@@ -572,14 +698,16 @@ class RPNModule(nn.Module):
 
         final_box_preds = torch.cat((box_part_list), dim=-1)
         final_scores = scores.view(batch_size, K)
+        print(final_scores)
         final_class_ids = class_ids.view(batch_size, K)
+        print(final_class_ids)
 
-        assert post_center_limit_range is not None
-        mask = (final_box_preds[..., :3] >= post_center_limit_range[:3]).all(2)
-        mask &= (final_box_preds[..., :3] <= post_center_limit_range[3:]).all(2)
+        # assert post_center_limit_range is not None
+        # mask = (final_box_preds[..., :3] >= post_center_limit_range[:3]).all(2)
+        # mask &= (final_box_preds[..., :3] <= post_center_limit_range[3:]).all(2)
 
         if score_thresh is not None:
-            mask &= (final_scores > score_thresh)
+            mask = (final_scores > score_thresh)
 
         ret_pred_dicts = []
         for k in range(batch_size):
@@ -587,6 +715,7 @@ class RPNModule(nn.Module):
             cur_boxes = final_box_preds[k, cur_mask]
             cur_scores = final_scores[k, cur_mask]
             cur_labels = final_class_ids[k, cur_mask]
+            print(cur_labels)
 
             ret_pred_dicts.append({
                 'pred_boxes': cur_boxes,
@@ -627,14 +756,277 @@ class PVRCNNPlusPlusVectorPoolAggregationModule(nn.Module):
 Returns points_features_before_fusion and point_features and point_coords and uses the VectorPoolAgregation module
 """
 class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
-    def __init__(self) -> None:
+    def __init__(self, voxel_size, point_cloud_range, num_bev_features, num_raw_features, num_keypoints, sample_radius_with_roi, num_sectors, **kwargs):
         super().__init__()
+        self.point_cloud_range = point_cloud_range
+        self.voxel_size = voxel_size
+        self.num_keypoints = num_keypoints
+        self.sample_radius_with_roi = sample_radius_with_roi
+        self.num_sectors = num_sectors
+        c_in = 0
 
-    def get_keypoints(self, boxes, points):
-        pass
+        config = cfg_from_yaml_file("/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml", cfg)
+        self.model_cfg = cfg.MODEL.PFE
+        SA_cfg = self.model_cfg.SA_LAYER
+        self.SA_layers = nn.ModuleList()
+        self.SA_layer_names = []
 
-    def forward(self, points, boxes, multiscale_feats, bev_feats):
-        pass
+        #Raw Points
+        self.SA_rawpoints, cur_num_c_out = pointnet2_stack_modules.build_local_aggregation_module(
+            input_channels=num_raw_features - 3, config=SA_cfg['raw_points']
+        )
+        c_in += cur_num_c_out
+
+        #BEV
+        c_bev = num_bev_features
+        c_in += c_bev
+
+        #x_conv_3
+        src_name = "x_conv3"
+        input_channels = 64
+        cur_layer, cur_num_c_out = pointnet2_stack_modules.build_local_aggregation_module(
+            input_channels=input_channels, config=SA_cfg[src_name]
+        )
+        self.SA_layers.append(cur_layer)
+        self.SA_layer_names.append(src_name)
+        # c_in += cur_num_c_out
+
+        # #x_conv_4
+        # src_name = "x_conv_4"
+        # input_channels = 64
+        # cur_layer, cur_num_c_out = pointnet2_stack_modules.build_local_aggregation_module(
+        #     input_channels=input_channels, config=SA_cfg[src_name]
+        # )
+        # self.SA_layers.append(cur_layer)
+        # self.SA_layer_names.append(src_name)
+        # c_in += cur_num_c_out
+
+        self.vsa_point_feature_fusion = nn.Sequential(
+            nn.Linear(c_in, self.model_cfg.NUM_OUTPUT_FEATURES, bias=False),
+            nn.BatchNorm1d(self.model_cfg.NUM_OUTPUT_FEATURES),
+            nn.ReLU(),
+        )
+
+        self.num_point_features = self.model_cfg.NUM_OUTPUT_FEATURES
+        self.num_point_features_before_fusion = c_in
+
+    def sample_points_with_roi(self, rois, points, sample_radius_with_roi, num_max_points_of_part=200000):
+        print(rois.shape, points.shape)
+        if points.shape[0] < num_max_points_of_part:
+            distance = (points[:, None, :] - rois[None, :, 0:3]).norm(dim=-1)
+            min_dis, min_dis_roi_idx = distance.min(dim=-1)
+            roi_max_dim = (rois[min_dis_roi_idx, 3:6] / 2).norm(dim=-1)
+            point_mask = min_dis < roi_max_dim + sample_radius_with_roi
+        else:
+            start_idx = 0
+            point_mask_list = []
+            while start_idx < points.shape[0]:
+                distance = (points[start_idx:start_idx + num_max_points_of_part, None, :] - rois[None, :, 0:3]).norm(dim=-1)
+                min_dis, min_dis_roi_idx = distance.min(dim=-1)
+                roi_max_dim = (rois[min_dis_roi_idx, 3:6] / 2).norm(dim=-1)
+                cur_point_mask = min_dis < roi_max_dim + sample_radius_with_roi
+                point_mask_list.append(cur_point_mask)
+                start_idx += num_max_points_of_part
+            point_mask = torch.cat(point_mask_list, dim=0)
+
+        sampled_points = points[:1] if point_mask.sum() == 0 else points[point_mask, :]
+
+        return sampled_points, point_mask
+
+    def sector_fps(self, points, num_sampled_points, num_sectors):
+        sector_size = np.pi * 2 / num_sectors
+        point_angles = torch.atan2(points[:, 1], points[:, 0]) + np.pi
+        sector_idx = (point_angles / sector_size).floor().clamp(min=0, max=num_sectors)
+        xyz_points_list = []
+        xyz_batch_cnt = []
+        num_sampled_points_list = []
+        for k in range(num_sectors):
+            mask = (sector_idx == k)
+            cur_num_points = mask.sum().item()
+            if cur_num_points > 0:
+                xyz_points_list.append(points[mask])
+                xyz_batch_cnt.append(cur_num_points)
+                ratio = cur_num_points / points.shape[0]
+                num_sampled_points_list.append(
+                    min(cur_num_points, math.ceil(ratio * num_sampled_points))
+                )
+
+        if len(xyz_batch_cnt) == 0:
+            xyz_points_list.append(points)
+            xyz_batch_cnt.append(len(points))
+            num_sampled_points_list.append(num_sampled_points)
+            print(f'Warning: empty sector points detected in SectorFPS: points.shape={points.shape}')
+
+        xyz = torch.cat(xyz_points_list, dim=0)
+        xyz_batch_cnt = torch.tensor(xyz_batch_cnt, device=points.device).int()
+        sampled_points_batch_cnt = torch.tensor(num_sampled_points_list, device=points.device).int()
+
+        sampled_pt_idxs = pointnet2_stack_utils.stack_farthest_point_sample(
+            xyz.contiguous(), xyz_batch_cnt, sampled_points_batch_cnt
+        ).long()
+
+        sampled_points = xyz[sampled_pt_idxs]
+
+        return sampled_points
+
+    def sectorized_proposal_centric_sampling(self, roi_boxes, points):
+        sampled_points, _ = self.sample_points_with_roi(
+            rois=roi_boxes, points=points,
+            sample_radius_with_roi=self.sample_radius_with_roi
+        )
+        sampled_points = self.sector_fps(
+            points=sampled_points, num_sampled_points=self.num_keypoints,
+            num_sectors=self.num_sectors
+        )
+        return sampled_points
+
+    def get_keypoints(self, points, bboxes, batch_size):
+        keypoints_list = []
+        for bs_idx in range(batch_size):
+            sampled_points = points[bs_idx][:, :3].view(1,-1,3)
+            cur_keypoints = self.sectorized_proposal_centric_sampling(
+                    roi_boxes=bboxes[bs_idx], points=sampled_points[0]
+                )
+            bs_idxs = cur_keypoints.new_ones(cur_keypoints.shape[0]) * bs_idx
+            keypoints = torch.cat((bs_idxs[:, None], cur_keypoints), dim=1)
+            keypoints_list.append(keypoints)
+        
+        keypoints = torch.cat(keypoints_list, dim=0)
+        return keypoints
+    
+    def bilinear_interpolate_torch(self, im, x, y):
+        x0 = torch.floor(x).long()
+        x1 = x0 + 1
+
+        y0 = torch.floor(y).long()
+        y1 = y0 + 1
+
+        x0 = torch.clamp(x0, 0, im.shape[1] - 1)
+        x1 = torch.clamp(x1, 0, im.shape[1] - 1)
+        y0 = torch.clamp(y0, 0, im.shape[0] - 1)
+        y1 = torch.clamp(y1, 0, im.shape[0] - 1)
+
+        Ia = im[y0, x0]
+        Ib = im[y1, x0]
+        Ic = im[y0, x1]
+        Id = im[y1, x1]
+
+        wa = (x1.type_as(x) - x) * (y1.type_as(y) - y)
+        wb = (x1.type_as(x) - x) * (y - y0.type_as(y))
+        wc = (x - x0.type_as(x)) * (y1.type_as(y) - y)
+        wd = (x - x0.type_as(x)) * (y - y0.type_as(y))
+        ans = torch.t((torch.t(Ia) * wa)) + torch.t(torch.t(Ib) * wb) + torch.t(torch.t(Ic) * wc) + torch.t(torch.t(Id) * wd)
+        return ans
+    
+    def interpolate_from_bev_features(self, keypoints, bev_features, batch_size, bev_stride):
+        x_idxs = (keypoints[:, 1] - self.point_cloud_range[0]) / self.voxel_size[0]
+        y_idxs = (keypoints[:, 2] - self.point_cloud_range[1]) / self.voxel_size[1]
+
+        x_idxs = x_idxs / bev_stride
+        y_idxs = y_idxs / bev_stride
+
+        point_bev_features_list = []
+        for k in range(batch_size):
+            bs_mask = (keypoints[:, 0] == k)
+
+            cur_x_idxs = x_idxs[bs_mask]
+            cur_y_idxs = y_idxs[bs_mask]
+            cur_bev_features = bev_features[k].permute(1, 2, 0)  # (H, W, C)
+            point_bev_features = self.bilinear_interpolate_torch(cur_bev_features, cur_x_idxs, cur_y_idxs)
+            point_bev_features_list.append(point_bev_features)
+
+        point_bev_features = torch.cat(point_bev_features_list, dim=0)  # (N1 + N2 + ..., C)
+        return point_bev_features
+    
+    def aggregate_keypoint_features_from_one_source(self, batch_size, aggregate_func, points, new_points, new_points_batch_cnt, filter_neighbors_with_roi = False, radius_of_neighbor=None, num_max_points_of_part=200000, rois=None):
+        xyz = None
+        xyz_features = None
+        xyz_batch_cnt = torch.zeros(batch_size).int().to(points[0].device)
+        if filter_neighbors_with_roi:
+            point_features_list = []
+            for bs_idx in range(batch_size):
+                xyz = points[bs_idx][:, :3].view(1,-1,3)
+                xyz_features = points[bs_idx][:, 3:].view(1, points[bs_idx].shape[0], points[bs_idx].shape[1]-3)
+                _, valid_mask = self.sample_points_with_roi(
+                    rois=rois[bs_idx], points=xyz[0],
+                    sample_radius_with_roi=radius_of_neighbor, num_max_points_of_part=num_max_points_of_part,
+                )
+                point_features_list.append(points[bs_idx][valid_mask])
+                xyz_batch_cnt[bs_idx] = valid_mask.sum()
+            valid_point_features = torch.cat(point_features_list, dim=0)
+            xyz = valid_point_features[:, 0:3]
+            xyz_features = valid_point_features[:, 3:]
+        pooled_points, pooled_features = aggregate_func(
+            xyz=xyz.contiguous(),
+            xyz_batch_cnt=xyz_batch_cnt,
+            new_xyz=new_points,
+            new_xyz_batch_cnt=new_points_batch_cnt,
+            features=xyz_features.contiguous(),
+        )
+
+        return pooled_features
+
+    def forward(self, points, bboxes, spatial_features, multiscale_feats = None): #multiscale_feats
+        batch_size = bboxes.shape[0]
+        keypoints = self.get_keypoints(points, bboxes, batch_size)
+
+        point_features_list = []
+
+        #BEV processing
+        point_bev_features = self.interpolate_from_bev_features(
+            keypoints, spatial_features , batch_size,
+                bev_stride= 8
+        )
+
+        point_features_list.append(point_bev_features)
+        
+        new_xyz = keypoints[:, 1:4].contiguous()
+        new_xyz_batch_cnt = new_xyz.new_zeros(batch_size).int()
+        for k in range(batch_size):
+            new_xyz_batch_cnt[k] = (keypoints[:, 0] == k).sum()
+        
+        #Raw point processing
+        pooled_features = self.aggregate_keypoint_features_from_one_source(
+            batch_size=batch_size, aggregate_func=self.SA_rawpoints,
+            points=points,
+            new_points=new_xyz, new_points_batch_cnt=new_xyz_batch_cnt,
+            filter_neighbors_with_roi=True,
+            radius_of_neighbor=2.4,
+            rois=bboxes
+        )
+        point_features_list.append(pooled_features)
+
+        #x_conv_3
+        print(multiscale_feats)
+        cur_coords = multiscale_feats["multi_scale_3d_features"]["x_conv3_pos"]
+        cur_features = multiscale_feats["multi_scale_3d_features"]["x_conv3"]
+
+        # combined_feats = []
+
+        # for i in range(len(cur_coords)):
+        #     coords = cur_coords[i]
+        #     feats = cur_features[i]
+        #     combined = torch.cat([coords, feats], dim = -1)
+        #     combined_feats.append(combined)
+
+        # pooled_features = self.aggregate_keypoint_features_from_one_source(
+        #     batch_size=batch_size, aggregate_func=self.SA_layers[0],
+        #     points=combined_feats,
+        #     new_points=new_xyz, new_points_batch_cnt=new_xyz_batch_cnt,
+        #     filter_neighbors_with_roi=True,
+        #     radius_of_neighbor=4.0,
+        #     rois=bboxes
+        # )
+        # point_features_list.append(pooled_features)
+
+        point_features = torch.cat(point_features_list, dim=-1)
+
+        point_features_before_fusion = point_features.view(-1, point_features.shape[-1])
+        point_features = self.vsa_point_feature_fusion(point_features.view(-1, point_features.shape[-1]))
+
+        point_features = point_features  # (BxN, C)
+        point_coords = keypoints  # (BxN, 4)
+        return point_features, point_coords, point_features_before_fusion
 
 """
 Does ROI grid pooling and final refinement step 
@@ -646,7 +1038,6 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
     def roi_grid_pooling(self, roi, points, point_coords, point_feats, keypoint_weights):
         pass
 
-
 class SubmanifoldSparseConv(nn.Module):
 
     def __init__(self,
@@ -654,11 +1045,10 @@ class SubmanifoldSparseConv(nn.Module):
                  filters,
                  kernel_size,
                  use_bias=False,
-                 offset=None,
+                 offset=0.0,
                  normalize=False):
         super(SubmanifoldSparseConv, self).__init__()
-
-        offset = torch.full((3,), offset, dtype=torch.float32)
+        offset = torch.full((3,), 0.0, dtype=torch.float32)
         self.net = SparseConv(in_channels=in_channels,
                               filters=filters,
                               kernel_size=kernel_size,
@@ -677,7 +1067,7 @@ class SubmanifoldSparseConv(nn.Module):
         out_feat = []
         for feat, in_pos, out_pos in zip(features_list, in_positions_list,
                                          out_positions_list):
-            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
+            out_feat.append(self.net(feat, in_pos.float(), out_pos.float(), voxel_size))
 
         return out_feat
 
@@ -697,8 +1087,9 @@ def calculate_grid(in_positions, point_cloud_range, voxel_size, padding):
 
     out_pos = out_pos + filter
     out_pos = out_pos[out_pos.min(1).values >= 0]
-    out_pos = out_pos[out_pos.max(1).values < ((point_cloud_range.max() - point_cloud_range.min())/voxel_size)]
+    # out_pos = out_pos[out_pos.max(1).values < ((point_cloud_range.max() - point_cloud_range.min())/voxel_size)]
     out_pos = torch.unique(out_pos, dim=0)
+    return out_pos
 
 class Convolution(nn.Module):
     """
@@ -718,22 +1109,22 @@ class Convolution(nn.Module):
         self.point_cloud_range = point_cloud_range
         self.voxel_size = voxel_size
         self.padding = padding
+        offset = torch.full((3,), 0.0, dtype=torch.float32)
         self.net = SparseConv(in_channels=in_channels,
                               filters=filters,
                               kernel_size=kernel_size,
                               use_bias=use_bias,
-                              #offset=offset,
+                              offset=offset,
                               normalize=normalize)
 
     def forward(self, features_list, in_positions_list, voxel_size=1.0):
         out_positions_list = []
         for in_positions in in_positions_list:
-            out_positions_list.append(calculate_grid(in_positions, self.point_cloud_range, self.voxel_size, self.padding))
-
+            out_positions_list.append(calculate_grid(in_positions, torch.tensor(self.point_cloud_range), voxel_size, self.padding))
         out_feat = []
         for feat, in_pos, out_pos in zip(features_list, in_positions_list,
                                          out_positions_list):
-            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
+            out_feat.append(self.net(feat, in_pos.float(), out_pos.float(), voxel_size))
 
         # out_positions_list = [out / 2 for out in out_positions_list]
 
@@ -789,13 +1180,12 @@ class SparseConvBlock(nn.Module):
         self.norm_fn = norm_fn(out_channels)
         self.relu = ReLUBlock()
     
-    def forward(self, inputs):
-        features_list, in_positions_list, voxel_size = inputs
-        out_feat, out_positions_list = self.conv(features_list, in_positions_list, voxel_size)
+    def forward(self, features_list, in_positions_list, voxel_size = 1.0):
+        out_feat, out_positions_list = self.conv(features_list, in_positions_list, voxel_size = voxel_size)
         out_feat = self.norm_fn(out_feat)
         out_feat = self.relu(out_feat)
 
-        return (out_feat, out_positions_list, voxel_size)
+        return out_feat, out_positions_list
 
 class SubmanifoldSparseConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, norm_fn = None):
@@ -805,9 +1195,11 @@ class SubmanifoldSparseConvBlock(nn.Module):
         self.relu = ReLUBlock()
     
     def forward(self, features_list, in_positions_list, voxel_size=1.0):
-        out_feat = self.conv(features_list, in_positions_list, voxel_size)
+        out_feat = self.conv(features_list, in_positions_list, voxel_size = voxel_size)
         out_feat = self.norm_fn(out_feat)
         out_feat = self.relu(out_feat)
 
-        return (out_feat, in_positions_list, voxel_size)
-        
+        return out_feat, in_positions_list
+
+
+MODEL._register_module(PVRCNNPlusPlus, 'torch')
