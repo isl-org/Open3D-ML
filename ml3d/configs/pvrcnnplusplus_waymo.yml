@@ -25,10 +25,10 @@ model:
       loss_weight: 0.2
 
   voxelize:
-    max_num_points: 20
+    max_num_points: 5
     voxel_size: &vsize
-      [0.32, 0.32, 6]
-    max_voxels: [32000, 32000]
+      [0.1, 0.1, 0.15]
+    max_voxels: [150000, 150000]
 
   voxel_encoder:
     in_channels: 4
@@ -48,7 +48,7 @@ model:
     class_names: [ 'Vehicle', 'Pedestrian', 'Cyclist' ]
     voxel_size: *vsize
     feature_map_stride: 8
-    nms_pre: 100
+    nms_pre: 4096
     score_thr: 0.50
     post_center_limit_range: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
 
@@ -56,7 +56,7 @@ model:
     voxel_size: *vsize
     num_bev_features: 512
     num_raw_features: 4
-    num_keypoints: 100
+    num_keypoints: 4096
     sample_radius_with_roi: 1.6
     num_sectors: 6
 
