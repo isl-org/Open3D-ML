@@ -48,7 +48,7 @@ model:
     class_names: [ 'Vehicle', 'Pedestrian', 'Cyclist' ]
     voxel_size: *vsize
     feature_map_stride: 8
-    nms_pre: 4096
+    nms_pre: 2048
     score_thr: 0.50
     post_center_limit_range: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
 

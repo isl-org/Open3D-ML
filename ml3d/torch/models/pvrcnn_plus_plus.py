@@ -651,8 +651,9 @@ class RPNModule(nn.Module):
     
     def multiclass_nms(self, boxes, scores, class_ids, score_thr):
         #class based nms
+        print("INSIDE MULTICLASS NMS")
         idxs = []
-        for i in range(class_ids.max()):
+        for i in range(class_ids.max()+1):
             class_mask = class_ids==i
             orig_idx = torch.arange(class_mask.shape[0],
                                 device=class_mask.device,
@@ -661,6 +662,7 @@ class RPNModule(nn.Module):
             _boxes = boxes[class_mask, :]
             _bev = xywhr_to_xyxyr(box3d_to_bev(_boxes))
             idx = nms(_bev, _scores, 0.01)
+            print(idx)
             idxs.append(orig_idx[idx])
         
         return idxs
@@ -699,15 +701,15 @@ class RPNModule(nn.Module):
         # mask = (final_box_preds[..., :3] >= post_center_limit_range[:3]).all(2)
         # mask &= (final_box_preds[..., :3] <= post_center_limit_range[3:]).all(2)
 
-        if score_thresh is not None:
-            mask = (final_scores > score_thresh)
+        # if score_thresh is not None:
+        #     mask = (final_scores > score_thresh)
 
         ret_pred_dicts = []
         for k in range(batch_size):
-            cur_mask = mask[k]
-            cur_boxes = final_box_preds[k, cur_mask]
-            cur_scores = final_scores[k, cur_mask]
-            cur_labels = final_class_ids[k, cur_mask]
+            # cur_mask = mask[k]
+            cur_boxes = final_box_preds[k]#, cur_mask]
+            cur_scores = final_scores[k]#, cur_mask]
+            cur_labels = final_class_ids[k]#, cur_mask]
 
             ret_pred_dicts.append({
                 'pred_boxes': cur_boxes,
@@ -801,6 +803,24 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
         self.num_point_features = self.model_cfg.NUM_OUTPUT_FEATURES
         self.num_point_features_before_fusion = c_in
+
+    def get_voxel_centers(self, voxel_coords, downsample_times, voxel_size, point_cloud_range):
+        """
+        Args:
+            voxel_coords: (N, 3)
+            downsample_times:
+            voxel_size:
+            point_cloud_range:
+
+        Returns:
+
+        """
+        assert voxel_coords.shape[1] == 3
+        voxel_centers = voxel_coords[:, [2, 1, 0]].float()  # (xyz)
+        voxel_size = torch.tensor(voxel_size, device=voxel_centers.device).float() * downsample_times
+        pc_range = torch.tensor(point_cloud_range[0:3], device=voxel_centers.device).float()
+        voxel_centers = (voxel_centers + 0.5) * voxel_size + pc_range
+        return voxel_centers
 
     def sample_points_with_roi(self, rois, points, sample_radius_with_roi, num_max_points_of_part=200000):
         if points.shape[0] < num_max_points_of_part:
@@ -942,6 +962,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
                     rois=rois[bs_idx], points=xyz[0],
                     sample_radius_with_roi=radius_of_neighbor, num_max_points_of_part=num_max_points_of_part,
                 )
+                print(valid_mask.sum())
                 point_features_list.append(points[bs_idx][valid_mask])
                 xyz_batch_cnt[bs_idx] = valid_mask.sum()
             valid_point_features = torch.cat(point_features_list, dim=0)
@@ -959,6 +980,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
     def forward(self, points, bboxes, spatial_features, multiscale_feats = None): #multiscale_feats
         batch_size = bboxes.shape[0]
+        print("Bounding box shape", bboxes.shape)
         keypoints = self.get_keypoints(points, bboxes, batch_size)
 
         point_features_list = []
@@ -995,6 +1017,9 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
         for i in range(len(cur_coords)):
             coords = cur_coords[i]
+            print("Coords before voxel centers", coords.shape)
+            coords = self.get_voxel_centers(coords, 4, self.voxel_size, self.point_cloud_range)
+            print("coords after voxel center", coords.shape)
             feats = cur_features[i]
             combined = torch.cat([coords, feats], dim = -1)
             print(combined.shape)
@@ -1005,7 +1030,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
             points=combined_feats,
             new_points=new_xyz, new_points_batch_cnt=new_xyz_batch_cnt,
             filter_neighbors_with_roi=True,
-            radius_of_neighbor=10000.0,
+            radius_of_neighbor=4.0,
             rois=bboxes
         )
         point_features_list.append(pooled_features)
