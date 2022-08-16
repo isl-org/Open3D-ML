@@ -55,10 +55,17 @@ model:
   voxel_set_abstraction:
     voxel_size: *vsize
     num_bev_features: 512
-    num_raw_features: 4
+    num_raw_features: 5
     num_keypoints: 4096
     sample_radius_with_roi: 1.6
     num_sectors: 6
+  
+  keypoint_weights:
+    cls_fc: [256, 256]
+    gt_extra_width: [0.2, 0.2, 0.2]
+  
+  roi_grid_pool:
+
 
 
 
