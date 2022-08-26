@@ -1,4 +1,5 @@
 from turtle import down, shape
+from typing import Dict
 from matplotlib.transforms import BboxBase
 from numpy import pad
 import torch
@@ -15,7 +16,8 @@ from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_modules as pointnet2_s
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
 from pcdet.config import *
 
-# from OpenPCDet.pcdet.utils.box_utils import enlarge_box3d
+from ..utils.objdet_helper import BBoxCoder
+from ...datasets.utils import BEVBox3D
 
 from .base_model_objdet import BaseModel
 import open3d.ml.torch as ml3d
@@ -23,6 +25,7 @@ from open3d.ml.torch.ops import voxelize, ragged_to_dense, reduce_subarrays_sum,
 from open3d.ml.torch.layers import SparseConv
 from ..utils.objdet_helper import multiclass_nms, box3d_to_bev, xywhr_to_xyxyr, bbox_overlaps
 from ...utils import MODEL
+from ...datasets.augment import ObjdetAugmentation
 
 
 
@@ -38,6 +41,7 @@ class PVRCNNPlusPlus(BaseModel):
                  rpn_module = {},
                  voxel_set_abstraction = {},
                  keypoint_weights = {},
+                 roi_grid_pool = {},
                  **kwargs):
         super().__init__(name=name,
                          point_cloud_range=point_cloud_range,
@@ -47,6 +51,8 @@ class PVRCNNPlusPlus(BaseModel):
         self.classes = classes
         self.device = device
         self.name2lbl = {n: i for i, n in enumerate(classes)}
+        self.lbl2name = {i: n for i, n in enumerate(classes)}
+        self.augmenter = ObjdetAugmentation(self.cfg.augment, seed=self.rng)
         self.to(device)
         self.voxel_layer = PVRCNNPlusPlusVoxelization(point_cloud_range=point_cloud_range, **voxelize)
         self.sparseconvbackbone = PVRCNNPlusPlusBackbone3D(point_cloud_range=point_cloud_range, **voxel_encoder)
@@ -54,8 +60,8 @@ class PVRCNNPlusPlus(BaseModel):
         self.backbone_2d = PVRCNNPlusPlusBackbone2D(640, **backbone_2d)
         self.rpn_module = RPNModule(input_channels=512, device = device, point_cloud_range=point_cloud_range, **rpn_module)
         self.voxel_set_abstraction = PVRCNNPlusPlusVoxelSetAbstraction(point_cloud_range=point_cloud_range, **voxel_set_abstraction)
-        self.keypoint_weight_computer = PVRCNNKeypointWeightComputer(num_class = len(self.classes), input_channels = 90, **keypoint_weights)#cls_fc, gt_extra_width)
-        self.box_refinement = PVRCNNPlusPlusBoxRefinement(num_class = len(self.classes), input_channels = 90, code_size = 7)
+        self.keypoint_weight_computer = PVRCNNKeypointWeightComputer(num_class = 1, input_channels = 90, **keypoint_weights)#cls_fc, gt_extra_width)
+        self.box_refinement = PVRCNNPlusPlusBoxRefinement(num_class = 1, input_channels = 90, code_size = 7, **roi_grid_pool)
         self.device = device
         self.to(device)
 
@@ -72,14 +78,11 @@ class PVRCNNPlusPlus(BaseModel):
             normalizer = torch.clamp_min(res_num_points.view(-1, 1), min=1.0).type_as(res_voxels)
             points_mean = points_mean / normalizer
             voxel_features.append(points_mean.contiguous())
-        # voxels = torch.cat(voxels, dim=0)
-        # voxel_features = torch.cat(voxels, dim=0)
-        # num_points = torch.cat(num_points, dim=0)
+        
         coors_batch = []
         for i, coor in enumerate(coors):
             coor_pad = F.pad(coor, (1, 0), mode='constant', value=i)
             coors_batch.append(coor_pad)
-        # coors_batch = torch.cat(coors_batch, dim=0)
 
         return voxels, voxel_features, num_points, coors, coors_batch
     
@@ -101,29 +104,52 @@ class PVRCNNPlusPlus(BaseModel):
     def forward(self, inputs):
         gt_boxes = inputs.bboxes
         gt_labels = inputs.labels
-        print(gt_boxes[0].shape, gt_labels[0].shape, torch.cat([gt_boxes[0], gt_labels[0].view(-1,1)], dim=1).shape)
         inputs = inputs.point
+        
         x, x_intermediate_layers, x_pos = self.backbone_3d(inputs)
+        
         x_sparse = self.convert_open3d_voxel_to_dense(x, x_pos, self.voxel_layer.voxel_size)
         x_dense_bev = self.bev_module(x_sparse)
-        print("Shape of downsampled output", x_dense_bev[0].shape)
+        del(x_sparse)
+        torch.cuda.empty_cache()
+        
         x_bev_2d = self.backbone_2d(x_dense_bev)
-        print("Shape of BEV-2D", x_bev_2d.shape)
-        rois, roi_scores, roi_labels = self.rpn_module(x_bev_2d)
-        print("Shape of ROIs", rois.shape)
+        del(x_dense_bev)
+        torch.cuda.empty_cache()
+        
+        rois, roi_scores, roi_labels = self.rpn_module(x_bev_2d, gt_boxes, gt_labels)
+        
+        targets_dict = self.box_refinement.assign_targets(len(gt_boxes), rois, scores=roi_scores, _gt_boxes=gt_boxes, _gt_labels = gt_labels, roi_labels=roi_labels)
+        rois = targets_dict['rois']
+        roi_labels = targets_dict['roi_labels']
+        roi_targets_dict = targets_dict 
+        
         point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(inputs, rois, x_bev_2d, x_intermediate_layers) 
-        print("Shape of point features", point_features.shape)
+        del(x_bev_2d)
+        torch.cuda.empty_cache()
+        
         keypoint_weights = self.keypoint_weight_computer(len(gt_boxes), point_features, point_coords, point_features_before_fusion, gt_boxes, gt_labels)
-        print("Shape of keypoint weights", keypoint_weights.shape)
-        outs = self.box_refinement(point_coords, point_features, rois, roi_scores, roi_labels, gt_boxes, gt_labels, keypoint_weights)
-        print(outs["rcnn_cls"].shape, outs["rcnn_reg"].shape)
-        return x, x_intermediate_layers, x_pos
+        
+        outs = self.box_refinement(point_coords, point_features, rois, roi_scores, roi_labels, keypoint_weights, roi_targets_dict, gt_boxes, gt_labels)
+        
+        return outs#(rois, roi_scores, roi_labels)
     
     def get_optimizer(self, cfg):
-        pass
+        optimizer = torch.optim.AdamW(self.parameters(), **cfg)
+        return optimizer, None
 
-    def get_loss(self, results, inputs):
-        pass
+    def get_loss(self, result, data):
+        loss_rpn, tb_dict = self.rpn_module.get_loss()
+        loss_point, tb_dict = self.keypoint_weight_computer.get_loss(tb_dict)
+        loss_rcnn, tb_dict = self.box_refinement.get_loss(tb_dict)
+        loss = loss_rpn + loss_point + loss_rcnn
+        loss_dict = {}
+        loss_dict["loss_rpn"] = loss_rpn
+        loss_dict["loss_point"] = loss_point
+        loss_dict["loss_rcnn"] = loss_rcnn
+
+        return loss_dict
+
 
     def preprocess(self, data, attr):
         # If num_workers > 0, use new RNG with unique seed for each thread.
@@ -147,6 +173,9 @@ class PVRCNNPlusPlus(BaseModel):
                    axis=-1))]
 
         data['point'] = points
+
+        if attr['split'] not in ['test', 'testing', 'val', 'validation']:
+            data = self.augmenter.augment(data, attr, seed=rng)
 
         new_data = {'point': data['point'], 'calib': data['calib']}
 
@@ -180,11 +209,134 @@ class PVRCNNPlusPlus(BaseModel):
                                         dtype=np.int64)
             t_data['bboxes'] = np.array(
                 [bb.to_xyzwhlr() for bb in data['bbox_objs']], dtype=np.float32)
+            
+            #remove invalid labels
+            cond = (t_data["labels"]>=0) & (t_data["labels"]<len(self.classes))
+            t_data['labels'] = t_data['labels'][cond]
+            t_data['bboxes'] = t_data['bboxes'][cond]
 
         return t_data
 
     def inference_end(self, results, inputs):
-        return results
+
+        
+        batch_cls_preds = results["batch_cls_preds"]
+        batch_box_preds = results["batch_box_preds"]
+        roi_labels = results["roi_labels"]
+        cls_preds_normalized = results["cls_preds_normalized"]
+        batch_size = batch_cls_preds.shape[0]
+
+        bboxes_b = []
+        scores_b = []
+        labels_b = []
+
+        for index in range(batch_size):
+            box_preds = batch_box_preds[index]
+            src_box_preds = box_preds
+            cls_preds = batch_cls_preds[index]
+
+            src_cls_preds = cls_preds
+            cls_preds = torch.sigmoid(cls_preds)
+
+            label_preds = roi_labels[index]
+
+            idxs = self.rpn_module.multiclass_nms(boxes=box_preds, scores=cls_preds,
+            class_ids=label_preds, score_thr=self.rpn_module.score_thr, overlap_thr=0.01
+            )
+
+            idxs = torch.cat(idxs)
+
+            cur_boxes = box_preds[idxs]
+            cur_scores = cls_preds[idxs]
+            cur_labels = label_preds[idxs]
+
+            bboxes_b.append(cur_boxes)
+            scores_b.append(cur_scores)
+            labels_b.append(cur_labels)
+
+        inference_result = []
+        for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
+                                                     scores_b, labels_b):
+            bboxes = _bboxes.cpu().detach().numpy()
+            scores = _scores.cpu().detach().numpy()
+            labels = _labels.cpu().detach().numpy()
+            inference_result.append([])
+
+            world_cam, cam_img = None, None
+            if _calib is not None:
+                world_cam = _calib.get('world_cam', None)
+                cam_img = _calib.get('cam_img', None)
+
+            for bbox, score, label in zip(bboxes, scores, labels):
+                dim = bbox[[3, 5, 4]]
+                pos = bbox[:3] + [0, 0, dim[1] / 2]
+                yaw = bbox[-1]
+                # print(dim, pos, yaw)
+                name = self.lbl2name.get(label, "ignore")
+                inference_result[-1].append(
+                    BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
+
+        ################################################################################
+        
+        # batch_cls_preds = results[1]
+        # batch_box_preds = results[0]
+        # roi_labels = results[2]
+        # #cls_preds_normalized = results["cls_preds_normalized"]
+        # batch_size = batch_cls_preds.shape[0]
+
+        # bboxes_b = []
+        # scores_b = []
+        # labels_b = []
+
+        # for index in range(batch_size):
+        #     box_preds = batch_box_preds[index]
+        #     # box_preds = self.rpn_module.center_to_edge_bbox(box_preds)
+        #     src_box_preds = box_preds
+        #     cls_preds = batch_cls_preds[index]
+
+        #     src_cls_preds = cls_preds
+        #     cls_preds = torch.sigmoid(cls_preds)
+
+        #     label_preds = roi_labels[index]
+
+        #     idxs = self.rpn_module.multiclass_nms(boxes=box_preds, scores=cls_preds,
+        #     class_ids=label_preds, score_thr=self.rpn_module.score_thr, overlap_thr=0.01
+        #     )
+
+        #     idxs = torch.cat(idxs)
+
+        #     cur_boxes = box_preds[idxs]
+        #     print(cur_boxes.shape)
+        #     cur_scores = cls_preds[idxs]
+        #     cur_labels = label_preds[idxs]
+
+        #     bboxes_b.append(cur_boxes)
+        #     scores_b.append(cur_scores)
+        #     labels_b.append(cur_labels)
+
+        # inference_result = []
+        # for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
+        #                                              scores_b, labels_b):
+        #     bboxes = _bboxes.cpu().detach().numpy()
+        #     scores = _scores.cpu().detach().numpy()
+        #     labels = _labels.cpu().detach().numpy()
+        #     inference_result.append([])
+
+        #     world_cam, cam_img = None, None
+        #     if _calib is not None:
+        #         world_cam = _calib.get('world_cam', None)
+        #         cam_img = _calib.get('cam_img', None)
+
+        #     for bbox, score, label in zip(bboxes, scores, labels):
+        #         dim = bbox[[3, 5, 4]]
+        #         pos = bbox[:3] + [0, 0, dim[1] / 2]
+        #         yaw = bbox[-1]
+        #         # print(dim, pos, yaw)
+        #         name = self.lbl2name.get(label, "ignore")
+        #         inference_result[-1].append(
+        #             BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
+        
+        return inference_result
 
 """
 Voxelization Layer
@@ -248,12 +400,15 @@ class PVRCNNPlusPlusVoxelization(nn.Module):
                        self.voxel_size, self.points_range_min,
                        self.points_range_max, self.max_num_points, max_voxels)
         
+        feats = torch.cat(
+            [torch.zeros_like(points_feats[0:1, :]), points_feats])
+        
         # create dense matrix of indices. index 0 maps to the zero vector.
         voxels_point_indices_dense = ragged_to_dense(
             ans.voxel_point_indices, ans.voxel_point_row_splits,
             self.max_num_points, torch.tensor(-1)) + 1
 
-        out_voxels = points_feats[voxels_point_indices_dense]
+        out_voxels = feats[voxels_point_indices_dense]
         out_coords = ans.voxel_coords[:, [2, 1, 0]].contiguous()
         out_num_points = ans.voxel_point_row_splits[
             1:] - ans.voxel_point_row_splits[:-1]
@@ -289,25 +444,10 @@ class PVRCNNPlusPlusBackbone3D(nn.Module):
 
         self.conv1 = SparseConvBlock(16, 16, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn)
         
-        # self.conv2 = nn.Sequential(
-        #     SparseConvBlock(16, 32, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
-        #     SubmanifoldSparseConvBlock(32, 32, [3,3,3], norm_fn=norm_fn),
-        #     SubmanifoldSparseConvBlock(32, 32, [3,3,3], norm_fn=norm_fn),
-        # )
         self.conv2 = SequentialSparseConv(16, 32, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn, downsample = True)
 
-        # self.conv3 = nn.Sequential(
-        #     SparseConvBlock(32, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2
-        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
-        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
-        # )
         self.conv3 = SequentialSparseConv(32, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn, downsample = True)
 
-        # self.conv4 = nn.Sequential(
-        #     SparseConvBlock(64, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn), #stride=2, padding = (0, 1, 1)
-        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
-        #     SubmanifoldSparseConvBlock(64, 64, [3,3,3], norm_fn=norm_fn),
-        # )
         self.conv4 = SequentialSparseConv(64, 64, [3,3,3], point_cloud_range, voxel_size, padding=1, norm_fn=norm_fn, downsample = True)
 
         self.conv_out = SparseConvBlock(64, 128, [3,3,3], point_cloud_range, voxel_size, padding = 0, norm_fn = norm_fn) #stride = (2, 1, 1)
@@ -352,12 +492,12 @@ class PVRCNNPlusPlusBEVModule(nn.Module):
         for x_sparse in sparse_tensor_list:
             spatial_features = x_sparse.to_dense().permute(3, 0, 1, 2)
             C, D, H, W= spatial_features.shape
-            spatial_features = spatial_features.contiguous().view(C * D, H, W)
+            spatial_features = spatial_features.contiguous().view(1, C * D, H, W)
             x_dense_list.append(spatial_features)
         if len(x_dense_list) > 1:
             x_dense = torch.cat(x_dense_list, dim=0)
         else:
-            x_dense = torch.cat(x_dense_list, dim=0).unsqueeze(dim = 0)
+            x_dense = torch.cat(x_dense_list, dim=0)
         return x_dense
 
 class PVRCNNPlusPlusBackbone2D(nn.Module):
@@ -466,7 +606,7 @@ Applies NMS here as well
 Outputs rois, roi_scores, roi_labels, has_class_labels
 """
 class RPNModule(nn.Module):
-    def __init__(self, input_channels, device, shared_conv_channels, num_head_conv, class_names, point_cloud_range, voxel_size, feature_map_stride, nms_pre, score_thr, post_center_limit_range):
+    def __init__(self, input_channels, device, shared_conv_channels, num_head_conv, class_names, point_cloud_range, voxel_size, feature_map_stride, nms_pre, score_thr, post_center_limit_range, num_max_objs, gaussian_overlap, min_radius, code_weights, cls_weight, loc_weight):
         super().__init__()
         self.point_cloud_range = point_cloud_range
         self.voxel_size = voxel_size
@@ -475,6 +615,12 @@ class RPNModule(nn.Module):
         self.num_head_conv = num_head_conv
         self.nms_pre = nms_pre
         self.score_thr = score_thr
+        self.num_max_objs = num_max_objs
+        self.gaussian_overlap = gaussian_overlap
+        self.min_radius = min_radius
+        self.cls_weight = cls_weight
+        self.code_weights = code_weights
+        self.loc_weight = loc_weight
         self.post_center_limit_range = torch.tensor(post_center_limit_range).to(device)
 
         self.class_id_mapping = torch.from_numpy(np.array(
@@ -512,8 +658,11 @@ class RPNModule(nn.Module):
         #classification - self.head_list[4]
         conv_head = RPNHead(shared_conv_channels, total_classes, num_head_conv)
         self.heads_dict.append(conv_head)
+
+        self.hm_loss_func = FocalLossCenterNet()
+        self.reg_loss_func = RegLossCenterNet()
     
-    def forward(self, bev_feats):
+    def forward(self, bev_feats, _gt_boxes = None, _gt_labels = None):
         x = self.shared_conv(bev_feats)
         preds = []
         for head in self.heads_dict:
@@ -521,14 +670,162 @@ class RPNModule(nn.Module):
         
         batch_size = preds[4].size()[0]
 
+        if True:#self.training:
+            gt_boxes = []
+            for i in range(batch_size):
+                gt_boxes.append(torch.cat([_gt_boxes[i], _gt_labels[i].view(-1,1)], dim = 1))
+            targets_dict = self.assign_targets(
+                gt_boxes, feature_map_size=bev_feats.size()[2:]
+            )
+
+            self.targets_dict = targets_dict
+        
+        self.preds = preds
+
         bboxes, scores, labels = self.generate_predicted_boxes(batch_size, preds)
         rois, roi_scores, roi_labels = self.reorder_rois_for_refining(batch_size, bboxes, scores, labels)
 
         return rois, roi_scores, roi_labels
 
-    def center_to_edge_bbox(self, bboxes):
-        bboxes[:,:3] = bboxes[:,:3] - (bboxes[:,3:6]/2)
-        return bboxes 
+    # def center_to_edge_bbox(self, bboxes):
+    #     bboxes[:,:3] = bboxes[:,:3] - (bboxes[:,3:6]/2)
+    #     return bboxes
+    
+    # def edge_to_center_bbox(self, bboxes):
+    #     bboxes[:,:3] = bboxes[:,:3] + (bboxes[:,3:6]/2)
+    #     return bboxes
+    
+    def sigmoid(self, x):
+        y = torch.clamp(x.sigmoid(), min=1e-4, max=1 - 1e-4)
+        return y
+    
+    def get_loss(self):
+        preds = self.preds
+        targets_dict = self.targets_dict
+
+        tb_dict = {}
+        loss = 0
+
+        heatmap = self.sigmoid(preds[4])
+        hm_loss = self.hm_loss_func(heatmap, targets_dict['heatmaps'][0])
+        hm_loss *= self.cls_weight
+
+        target_boxes = targets_dict['target_boxes'][0]
+        
+        pred_boxes = torch.cat([preds[head_num] for head_num in range(len(preds) - 1)], dim=1)
+        reg_loss = self.reg_loss_func(
+            pred_boxes, targets_dict['masks'][0], targets_dict['inds'][0], target_boxes
+        )
+
+        loc_loss = (reg_loss * reg_loss.new_tensor(self.code_weights)).sum()
+        loc_loss = loc_loss * self.loc_weight
+
+        loss += hm_loss + loc_loss
+
+        #tb_dict['rpn_loss'] = loss#.item()
+        tb_dict['hm_loss'] = hm_loss#.item()
+        tb_dict['loc_loss'] = loc_loss#.item()
+
+        return loss, tb_dict
+
+    def assign_target_of_single_head(
+            self, num_classes, gt_boxes, feature_map_size, feature_map_stride, num_max_objs=500,
+            gaussian_overlap=0.1, min_radius=2
+    ):
+        heatmap = gt_boxes.new_zeros(num_classes, feature_map_size[1], feature_map_size[0])
+        ret_boxes = gt_boxes.new_zeros((num_max_objs, gt_boxes.shape[-1] - 1 + 1))
+        inds = gt_boxes.new_zeros(num_max_objs).long()
+        mask = gt_boxes.new_zeros(num_max_objs).long()
+
+        x, y, z = gt_boxes[:, 0], gt_boxes[:, 1], gt_boxes[:, 2]
+        coord_x = (x - self.point_cloud_range[0]) / self.voxel_size[0] / feature_map_stride
+        coord_y = (y - self.point_cloud_range[1]) / self.voxel_size[1] / feature_map_stride
+        coord_x = torch.clamp(coord_x, min=0, max=feature_map_size[0] - 0.5)  # bugfixed: 1e-6 does not work for center.int()
+        coord_y = torch.clamp(coord_y, min=0, max=feature_map_size[1] - 0.5)  #
+        center = torch.cat((coord_x[:, None], coord_y[:, None]), dim=-1)
+        center_int = center.int()
+        center_int_float = center_int.float()
+
+        dx, dy, dz = gt_boxes[:, 3], gt_boxes[:, 4], gt_boxes[:, 5]
+        dx = dx / self.voxel_size[0] / feature_map_stride
+        dy = dy / self.voxel_size[1] / feature_map_stride
+
+        radius = self.gaussian_radius(dx, dy, min_overlap=gaussian_overlap)
+        radius = torch.clamp_min(radius.int(), min=min_radius)
+
+        for k in range(min(num_max_objs, gt_boxes.shape[0])):
+            if dx[k] <= 0 or dy[k] <= 0:
+                continue
+
+            if not (0 <= center_int[k][0] <= feature_map_size[0] and 0 <= center_int[k][1] <= feature_map_size[1]):
+                continue
+
+            cur_class_id = (gt_boxes[k, -1] - 1).long()
+            self.draw_gaussian_to_heatmap(heatmap[cur_class_id], center[k], radius[k].item())
+
+            inds[k] = center_int[k, 1] * feature_map_size[0] + center_int[k, 0]
+            mask[k] = 1
+
+            ret_boxes[k, 0:2] = center[k] - center_int_float[k].float()
+            ret_boxes[k, 2] = z[k]
+            ret_boxes[k, 3:6] = gt_boxes[k, 3:6].log()
+            ret_boxes[k, 6] = torch.cos(gt_boxes[k, 6])
+            ret_boxes[k, 7] = torch.sin(gt_boxes[k, 6])
+            if gt_boxes.shape[1] > 8:
+                ret_boxes[k, 8:] = gt_boxes[k, 7:-1]
+
+        return heatmap, ret_boxes, inds, mask
+
+    
+    def assign_targets(self, gt_boxes, feature_map_size):
+        batch_size = len(gt_boxes)
+        feature_map_size = feature_map_size[::-1]
+        all_names = np.array(['bg', *self.class_names])
+
+        ret_dict = {
+            'heatmaps': [],
+            'target_boxes': [],
+            'inds': [],
+            'masks': [],
+            'heatmap_masks': []
+        }
+
+        heatmap_list, target_boxes_list, inds_list, masks_list = [], [], [], []
+        for bs_idx in range(batch_size):
+            cur_gt_boxes = gt_boxes[bs_idx]
+            # cur_gt_boxes = self.edge_to_center_bbox(cur_gt_boxes)
+            gt_class_names = np.array(self.class_names)[cur_gt_boxes[:, -1].cpu().long().numpy()]
+            gt_boxes_single_head = []
+
+            for idx, name in enumerate(gt_class_names):
+                temp_box = cur_gt_boxes[idx]
+                temp_box[-1] = self.class_names.index(name) + 1
+                gt_boxes_single_head.append(temp_box[None, :])
+            
+            if len(gt_boxes_single_head) == 0:
+                gt_boxes_single_head = cur_gt_boxes[:0, :]
+            else:
+                gt_boxes_single_head = torch.cat(gt_boxes_single_head, dim=0)
+            
+            
+            heatmap, ret_boxes, inds, mask = self.assign_target_of_single_head(
+                num_classes=len(self.class_names), gt_boxes=gt_boxes_single_head.cpu(),
+                feature_map_size=feature_map_size, feature_map_stride=self.feature_map_stride,
+                num_max_objs=self.num_max_objs,
+                gaussian_overlap=self.gaussian_overlap,
+                min_radius=self.min_radius,
+            )
+
+            heatmap_list.append(heatmap.to(gt_boxes_single_head.device))
+            target_boxes_list.append(ret_boxes.to(gt_boxes_single_head.device))
+            inds_list.append(inds.to(gt_boxes_single_head.device))
+            masks_list.append(mask.to(gt_boxes_single_head.device))
+        
+        ret_dict['heatmaps'].append(torch.stack(heatmap_list, dim=0))
+        ret_dict['target_boxes'].append(torch.stack(target_boxes_list, dim=0))
+        ret_dict['inds'].append(torch.stack(inds_list, dim=0))
+        ret_dict['masks'].append(torch.stack(masks_list, dim=0))
+        return ret_dict
 
     def generate_predicted_boxes(self, batch_size, preds):
         bboxes, scores, labels = [], [], []
@@ -543,16 +840,16 @@ class RPNModule(nn.Module):
             center=batch_center, center_z=batch_center_z, dim=batch_dim, vel=None,
             point_cloud_range=self.point_cloud_range, voxel_size=self.voxel_size,
             feature_map_stride=self.feature_map_stride,
-            K=self.nms_pre,
+            K=self.num_max_objs,#self.nms_pre,
             score_thresh=self.score_thr,
             post_center_limit_range=self.post_center_limit_range
             )
 
         for k, final_dict in enumerate(final_pred_dicts):
-            bbox_pred = self.center_to_edge_bbox(final_dict["pred_boxes"])
+            bbox_pred = final_dict["pred_boxes"] #self.center_to_edge_bbox(final_dict["pred_boxes"])
             score_pred = final_dict["pred_scores"].view(-1).sigmoid()
             label_pred = final_dict["pred_labels"]
-            idxs = self.multiclass_nms(bbox_pred, score_pred, label_pred, self.score_thr)
+            idxs = self.multiclass_nms(bbox_pred, score_pred, label_pred, score_thr = None, overlap_thr = 0.7)
             idxs = torch.cat(idxs)
             final_dict["pred_boxes"] = final_dict["pred_boxes"][idxs]
             final_dict["pred_labels"] = final_dict["pred_labels"][idxs]
@@ -663,7 +960,7 @@ class RPNModule(nn.Module):
         feat = self._gather_feat(feat, ind)
         return feat
     
-    def multiclass_nms(self, boxes, scores, class_ids, score_thr):
+    def multiclass_nms(self, boxes, scores, class_ids, overlap_thr = None, score_thr = None):
         #class based nms
         idxs = []
         for i in range(class_ids.max()+1):
@@ -673,8 +970,14 @@ class RPNModule(nn.Module):
                                 dtype=torch.long)[class_mask]
             _scores = scores[class_mask]
             _boxes = boxes[class_mask, :]
+
+            if score_thr is not None:
+                scores_mask = (_scores >= score_thr).view(-1)
+                _boxes = _boxes[scores_mask]
+                _scores = _scores[scores_mask]
+
             _bev = xywhr_to_xyxyr(box3d_to_bev(_boxes))
-            idx = nms(_bev, _scores, 0.01)
+            idx = nms(_bev, _scores, overlap_thr)
             idxs.append(orig_idx[idx])
         
         return idxs
@@ -707,13 +1010,6 @@ class RPNModule(nn.Module):
         final_scores = scores.view(batch_size, K)
         final_class_ids = class_ids.view(batch_size, K)
 
-        # assert post_center_limit_range is not None
-        # mask = (final_box_preds[..., :3] >= post_center_limit_range[:3]).all(2)
-        # mask &= (final_box_preds[..., :3] <= post_center_limit_range[3:]).all(2)
-
-        # if score_thresh is not None:
-        #     mask = (final_scores > score_thresh)
-
         ret_pred_dicts = []
         for k in range(batch_size):
             # cur_mask = mask[k]
@@ -745,6 +1041,125 @@ class RPNModule(nn.Module):
             roi_scores[bs_idx, :num_boxes] = scores[bs_idx]
             roi_labels[bs_idx, :num_boxes] = labels[bs_idx]
         return rois, roi_scores, roi_labels
+
+class RegLossCenterNet(nn.Module):
+    """
+    Refer to https://github.com/tianweiy/CenterPoint
+    """
+
+    def __init__(self):
+        super(RegLossCenterNet, self).__init__()
+    
+    def _transpose_and_gather_feat(self, feat, ind):
+        feat = feat.permute(0, 2, 3, 1).contiguous()
+        feat = feat.view(feat.size(0), -1, feat.size(3))
+        feat = self._gather_feat(feat, ind)
+        return feat
+
+    def _gather_feat(self, feat, ind, mask=None):
+        dim = feat.size(2)
+        ind = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)
+        feat = feat.gather(1, ind)
+        if mask is not None:
+            mask = mask.unsqueeze(2).expand_as(feat)
+            feat = feat[mask]
+            feat = feat.view(-1, dim)
+        return feat
+
+    def forward(self, output, mask, ind=None, target=None):
+        """
+        Args:
+            output: (batch x dim x h x w) or (batch x max_objects)
+            mask: (batch x max_objects)
+            ind: (batch x max_objects)
+            target: (batch x max_objects x dim)
+        Returns:
+        """
+        if ind is None:
+            pred = output
+        else:
+            pred = self._transpose_and_gather_feat(output, ind)
+        loss = _reg_loss(pred, target, mask)
+        return loss
+
+def _reg_loss(regr, gt_regr, mask):
+    """
+    Refer to https://github.com/tianweiy/CenterPoint
+    L1 regression loss
+    Args:
+        regr (batch x max_objects x dim)
+        gt_regr (batch x max_objects x dim)
+        mask (batch x max_objects)
+    Returns:
+    """
+    num = mask.float().sum()
+    mask = mask.unsqueeze(2).expand_as(gt_regr).float()
+    isnotnan = (~ torch.isnan(gt_regr)).float()
+    mask *= isnotnan
+    regr = regr * mask
+    gt_regr = gt_regr * mask
+
+    loss = torch.abs(regr - gt_regr)
+    loss = loss.transpose(2, 0)
+
+    loss = torch.sum(loss, dim=2)
+    loss = torch.sum(loss, dim=1)
+    # else:
+    #  # D x M x B
+    #  loss = loss.reshape(loss.shape[0], -1)
+
+    # loss = loss / (num + 1e-4)
+    loss = loss / torch.clamp_min(num, min=1.0)
+    # import pdb; pdb.set_trace()
+    return loss    
+
+class FocalLossCenterNet(nn.Module):
+    """
+    Refer to https://github.com/tianweiy/CenterPoint
+    """
+    def __init__(self):
+        super(FocalLossCenterNet, self).__init__()
+        self.neg_loss = neg_loss_cornernet
+
+    def forward(self, out, target, mask=None):
+        return self.neg_loss(out, target, mask=mask)
+
+def neg_loss_cornernet(pred, gt, mask=None):
+    """
+    Refer to https://github.com/tianweiy/CenterPoint.
+    Modified focal loss. Exactly the same as CornerNet. Runs faster and costs a little bit more memory
+    Args:
+        pred: (batch x c x h x w)
+        gt: (batch x c x h x w)
+        mask: (batch x h x w)
+    Returns:
+    """
+    pos_inds = gt.eq(1).float()
+    neg_inds = gt.lt(1).float()
+
+    neg_weights = torch.pow(1 - gt, 4)
+
+    loss = 0
+
+    pos_loss = torch.log(pred) * torch.pow(1 - pred, 2) * pos_inds
+    neg_loss = torch.log(1 - pred) * torch.pow(pred, 2) * neg_weights * neg_inds
+
+    if mask is not None:
+        mask = mask[:, None, :, :].float()
+        pos_loss = pos_loss * mask
+        neg_loss = neg_loss * mask
+        num_pos = (pos_inds.float() * mask).sum()
+    else:
+        num_pos = pos_inds.float().sum()
+
+    pos_loss = pos_loss.sum()
+    neg_loss = neg_loss.sum()
+
+    if num_pos == 0:
+        loss = loss - neg_loss
+    else:
+        loss = loss - (pos_loss + neg_loss) / num_pos
+    return loss
 
 """
 Used inside PVRSCNNPlusPlusVoxelSetabstraction
@@ -988,10 +1403,10 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         return pooled_features
 
     def forward(self, points, bboxes, spatial_features, multiscale_feats = None): #multiscale_feats
-        print("##### Voxel Set Abstraction #####")
+        # print("##### Voxel Set Abstraction #####")
         batch_size = bboxes.shape[0]
         keypoints = self.get_keypoints(points, bboxes, batch_size)
-        print("Shape of Keypoints", keypoints.shape)
+        # print("Shape of Keypoints", keypoints.shape)
 
         point_features_list = []
 
@@ -1001,7 +1416,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
                 bev_stride= 8
         )
 
-        print("BEV features shape", point_bev_features.shape)
+        # print("BEV features shape", point_bev_features.shape)
 
         point_features_list.append(point_bev_features)
         
@@ -1021,7 +1436,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         )
         point_features_list.append(pooled_features)
 
-        print("Raw point feature shape", pooled_features.shape)
+        # print("Raw point feature shape", pooled_features.shape)
 
         #x_conv_3
         cur_coords = multiscale_feats["multi_scale_3d_features"]["x_conv3_pos"]
@@ -1046,11 +1461,11 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         )
         point_features_list.append(pooled_features)
 
-        print("x_conv3 features shape", pooled_features.shape)
+        # print("x_conv3 features shape", pooled_features.shape)
 
         point_features = torch.cat(point_features_list, dim=-1)
 
-        print("Concatenated feature shape", point_features.shape)
+        # print("Concatenated feature shape", point_features.shape)
 
         point_features_before_fusion = point_features.view(-1, point_features.shape[-1])
         point_features = self.vsa_point_feature_fusion(point_features.view(-1, point_features.shape[-1]))
@@ -1065,7 +1480,7 @@ def check_numpy_to_torch(x):
     return x, False
 
 class PVRCNNKeypointWeightComputer(nn.Module):
-    def __init__(self, num_class, input_channels, cls_fc, gt_extra_width):
+    def __init__(self, num_class, input_channels, cls_fc, gt_extra_width, point_cls_weight):
         super().__init__()
         self.num_class = num_class
         self.cls_fc = cls_fc
@@ -1075,6 +1490,8 @@ class PVRCNNKeypointWeightComputer(nn.Module):
             output_channels=num_class
         )
         self.gt_extra_width = gt_extra_width
+        self.cls_loss_func = SigmoidFocalClassificationLoss(alpha=0.25, gamma=2.0)
+        self.point_cls_weight = point_cls_weight
     
     def make_fc_layers(self, fc_cfg, input_channels, output_channels):
         fc_layers = []
@@ -1088,17 +1505,62 @@ class PVRCNNKeypointWeightComputer(nn.Module):
             c_in = fc_cfg[k]
         fc_layers.append(nn.Linear(c_in, output_channels, bias=True))
         return nn.Sequential(*fc_layers)
+    
+    # def center_to_edge_bbox(self, bboxes):
+    #     bboxes[:,:3] = bboxes[:,:3] - (bboxes[:,3:6]/2)
+    #     return bboxes
+    
+    # def edge_to_center_bbox(self, bboxes):
+    #     bboxes[:,:3] = bboxes[:,:3] + (bboxes[:,3:6]/2)
+    #     return bboxes
 
     def forward(self, batch_size, point_features, point_coords, point_features_before_fusion, gt_boxes = None, gt_labels = None):
-        features_to_use = point_features_before_fusion
-        point_cls_preds = self.cls_layers(point_features)
+        features_to_use = point_features
+        point_cls_preds = self.cls_layers(features_to_use)
         point_cls_scores = torch.sigmoid(point_cls_preds)
 
         point_cls_scores, _ = point_cls_scores.max(dim=-1)
 
+        self.preds = point_cls_preds
+
         targets_dict = self.assign_targets(batch_size, point_coords, gt_boxes, gt_labels)
+        self.targets_dict = targets_dict
 
         return point_cls_scores
+    
+    def get_loss(self, tb_dict = None):
+        tb_dict = {} if tb_dict is None else tb_dict
+        point_loss_cls, tb_dict_1 = self.get_cls_layer_loss()
+
+        point_loss = point_loss_cls
+        tb_dict.update(tb_dict_1)
+        return point_loss, tb_dict
+    
+    def get_cls_layer_loss(self, tb_dict=None):
+        point_cls_labels = self.targets_dict['point_cls_labels'].view(-1)
+        point_cls_preds = self.preds.view(-1, self.num_class)
+
+        positives = (point_cls_labels > 0)
+        negative_cls_weights = (point_cls_labels == 0) * 1.0
+        cls_weights = (negative_cls_weights + 1.0 * positives).float()
+        pos_normalizer = positives.sum(dim=0).float()
+        cls_weights /= torch.clamp(pos_normalizer, min=1.0)
+
+        one_hot_targets = point_cls_preds.new_zeros(*list(point_cls_labels.shape), self.num_class + 1)
+        one_hot_targets.scatter_(-1, (point_cls_labels * (point_cls_labels >= 0).long()).unsqueeze(dim=-1).long(), 1.0)
+        one_hot_targets = one_hot_targets[..., 1:]
+        cls_loss_src = self.cls_loss_func(point_cls_preds, one_hot_targets, weights=cls_weights)
+        point_loss_cls = cls_loss_src.sum()
+
+        # loss_weights_dict = self.model_cfg.LOSS_CONFIG.LOSS_WEIGHTS
+        point_loss_cls = point_loss_cls * self.point_cls_weight
+        if tb_dict is None:
+            tb_dict = {}
+        tb_dict.update({
+            'point_loss_cls': point_loss_cls.item(),
+            'point_pos_num': pos_normalizer.item()
+        })
+        return point_loss_cls, tb_dict
 
     def enlarge_box3d(self, gt_boxes, extra_width = (0, 0, 0)):
         extend_gt_boxes = []
@@ -1111,12 +1573,13 @@ class PVRCNNKeypointWeightComputer(nn.Module):
             extend_gt_boxes.append(large_boxes3d)
         return extend_gt_boxes
 
-
     def assign_targets(self, batch_size, points, _gt_boxes, _gt_labels):
         batch_size = len(_gt_boxes)
         gt_boxes = []
         for i in range(batch_size):
             gt_boxes.append(torch.cat([_gt_boxes[i], _gt_labels[i].view(-1,1)], dim = 1))
+            # gt_boxes[-1] = self.edge_to_center_bbox(gt_boxes[-1])
+
 
         extend_gt_boxes = self.enlarge_box3d(gt_boxes, self.gt_extra_width)
         point_cls_labels = points.new_zeros(points.shape[0]).long()
@@ -1124,7 +1587,6 @@ class PVRCNNKeypointWeightComputer(nn.Module):
         for bs_idx in range(batch_size):
             bs_mask = (bs_idx_point == bs_idx)
             xyz = points[bs_mask][:, 1:4]#points[bs_idx][:, :3].view(-1,3)
-            print(xyz.shape)
             point_cls_labels_single = xyz.new_zeros(xyz.shape[0]).long()
             box_idxs_of_pts = roiaware_pool3d_utils.points_in_boxes_gpu(
                 xyz.unsqueeze(dim=0), gt_boxes[bs_idx][:, 0:7].unsqueeze(dim=0).contiguous()
@@ -1146,6 +1608,70 @@ class PVRCNNKeypointWeightComputer(nn.Module):
 
         return targets_dict
 
+class SigmoidFocalClassificationLoss(nn.Module):
+    """
+    Sigmoid focal cross entropy loss.
+    """
+
+    def __init__(self, gamma: float = 2.0, alpha: float = 0.25):
+        """
+        Args:
+            gamma: Weighting parameter to balance loss for hard and easy examples.
+            alpha: Weighting parameter to balance loss for positive and negative examples.
+        """
+        super(SigmoidFocalClassificationLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+
+    @staticmethod
+    def sigmoid_cross_entropy_with_logits(input: torch.Tensor, target: torch.Tensor):
+        """ PyTorch Implementation for tf.nn.sigmoid_cross_entropy_with_logits:
+            max(x, 0) - x * z + log(1 + exp(-abs(x))) in
+            https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits
+
+        Args:
+            input: (B, #anchors, #classes) float tensor.
+                Predicted logits for each class
+            target: (B, #anchors, #classes) float tensor.
+                One-hot encoded classification targets
+
+        Returns:
+            loss: (B, #anchors, #classes) float tensor.
+                Sigmoid cross entropy loss without reduction
+        """
+        loss = torch.clamp(input, min=0) - input * target + \
+               torch.log1p(torch.exp(-torch.abs(input)))
+        return loss
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor, weights: torch.Tensor):
+        """
+        Args:
+            input: (B, #anchors, #classes) float tensor.
+                Predicted logits for each class
+            target: (B, #anchors, #classes) float tensor.
+                One-hot encoded classification targets
+            weights: (B, #anchors) float tensor.
+                Anchor-wise weights.
+
+        Returns:
+            weighted_loss: (B, #anchors, #classes) float tensor after weighting.
+        """
+        pred_sigmoid = torch.sigmoid(input)
+        alpha_weight = target * self.alpha + (1 - target) * (1 - self.alpha)
+        pt = target * (1.0 - pred_sigmoid) + (1.0 - target) * pred_sigmoid
+        focal_weight = alpha_weight * torch.pow(pt, self.gamma)
+
+        bce_loss = self.sigmoid_cross_entropy_with_logits(input, target)
+
+        loss = focal_weight * bce_loss
+
+        if weights.shape.__len__() == 2 or \
+                (weights.shape.__len__() == 1 and target.shape.__len__() == 2):
+            weights = weights.unsqueeze(-1)
+
+        assert weights.shape.__len__() == loss.shape.__len__()
+
+        return loss * weights
 
 class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
     #def __init__(self, roi_per_image, fg_ratio, cls_score_type, cls_fg_thresh, cls_bg_thresh, cls_bg_thresh_lo, hard_bg_ratio, reg_fg_thresh):
@@ -1166,7 +1692,7 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
         batch_rois, batch_gt_of_rois, batch_roi_ious, batch_roi_scores, batch_roi_labels = self.sample_rois_for_rcnn(
             batch_size, rois, scores, gt_boxes, roi_labels
         )
-
+        
         reg_valid_mask = (batch_roi_ious > self.reg_fg_thresh).long()
 
         iou_bg_thresh = self.cls_bg_thresh
@@ -1209,6 +1735,7 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
             )
 
             sampled_inds = self.subsample_rois(max_overlaps=max_overlaps)
+
 
             batch_rois[index] = cur_roi[sampled_inds]
             batch_roi_labels[index] = cur_roi_labels[sampled_inds]
@@ -1294,6 +1821,24 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
         sampled_inds = torch.cat((fg_inds, bg_inds), dim=0)
         return sampled_inds
 
+    def overlap_2d(self, bboxes1, bboxes2):
+        assert (bboxes1.size(-1) == 4 or bboxes1.size(0) == 0)
+        assert (bboxes2.size(-1) == 4 or bboxes2.size(0) == 0)
+
+        # Batch dim must be the same
+        # Batch dim: (B1, B2, ... Bn)
+        assert bboxes1.shape[:-2] == bboxes2.shape[:-2]
+
+        lt = torch.max(bboxes1[..., :, None, :2],
+                       bboxes2[..., None, :, :2])  # [B, rows, cols, 2]
+        rb = torch.min(bboxes1[..., :, None, 2:],
+                       bboxes2[..., None, :, 2:])  # [B, rows, cols, 2]
+
+        wh = (rb - lt).clamp(min=0)  # [B, rows, cols, 2]
+        overlap = wh[..., 0] * wh[..., 1]
+
+        return overlap
+
     def iou_3d_compute(self, boxes_a, boxes_b):
 
         # height overlap
@@ -1305,16 +1850,16 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
         boxes_xyxy_a = boxes_a[:,[0,1,3,4]]
         boxes_xyxy_a[:,:2] = boxes_xyxy_a[:,:2] - (boxes_xyxy_a[:,2:]/2)
         boxes_xyxy_a[:,2:] = boxes_xyxy_a[:,2:] + (boxes_xyxy_a[:,:2])
+        
         boxes_xyxy_b = boxes_b[:,[0,1,3,4]]
         boxes_xyxy_b[:,:2] = boxes_xyxy_b[:,:2] - (boxes_xyxy_b[:,2:]/2)
         boxes_xyxy_b[:,2:] = boxes_xyxy_b[:,2:] + (boxes_xyxy_b[:,:2])
 
-        overlaps_bev = bbox_overlaps(boxes_xyxy_a, boxes_xyxy_b)
-
+        overlaps_bev = self.overlap_2d(boxes_xyxy_a.unsqueeze(dim=0), boxes_xyxy_b.unsqueeze(dim=0))
+        
         max_of_min = torch.max(boxes_a_height_min, boxes_b_height_min)
         min_of_max = torch.min(boxes_a_height_max, boxes_b_height_max)
         overlaps_h = torch.clamp(min_of_max - max_of_min, min=0)
-
         # 3d iou
         overlaps_3d = overlaps_bev * overlaps_h
         vol_a = (boxes_a[:, 3] * boxes_a[:, 4] * boxes_a[:, 5]).view(-1, 1)
@@ -1353,25 +1898,28 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
                 original_gt_assignment = gt_mask.nonzero().view(-1)
 
                 iou3d = self.iou_3d_compute(cur_roi, cur_gt)  # (M, N)
-                cur_max_overlaps, cur_gt_assignment = torch.max(iou3d, dim=1)
+                cur_max_overlaps, cur_gt_assignment = torch.max(iou3d[0], dim=1)
                 max_overlaps[roi_mask] = cur_max_overlaps
                 gt_assignment[roi_mask] = original_gt_assignment[cur_gt_assignment]
 
         return max_overlaps, gt_assignment
-    
-
 
 """
 Does ROI grid pooling and final refinement step 
 """
 class PVRCNNPlusPlusBoxRefinement(nn.Module):
-    def __init__(self, input_channels, num_class, code_size) -> None:
+    def __init__(self, input_channels, num_class, code_size, rcnn_cls_weight, rcnn_reg_weight, rcnn_corner_weight, code_weights) -> None:
         super().__init__()
         config = cfg_from_yaml_file("/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml", cfg)
         self.model_cfg = cfg.MODEL.ROI_HEAD
         self.target_config = self.model_cfg.TARGET_CONFIG
         self.roi_grid_pool_config = self.model_cfg.ROI_GRID_POOL
         self.code_size = code_size
+        self.rcnn_cls_weight = rcnn_cls_weight
+        self.rcnn_reg_weight = rcnn_reg_weight
+        self.rcnn_corner_weight = rcnn_corner_weight
+        self.code_weights = code_weights
+        self.box_coder = BBoxCoder()
 
         self.num_class = num_class
         self.proposal_target_layer = PVRCNNPlusPlusProposalTargetLayer(roi_sampler_cfg=self.target_config)
@@ -1405,6 +1953,8 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
             fc_list=self.model_cfg.REG_FC
         )
         self.init_weights(weight_init='xavier')
+
+        self.reg_loss_func = WeightedSmoothL1Loss(code_weights = self.code_weights)
 
     def make_fc_layers(self, input_channels, output_channels, fc_list):
         fc_layers = []
@@ -1443,33 +1993,144 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
         nn.init.normal_(self.reg_layers[-1].weight, mean=0, std=0.001)
 
     
-    def forward(self, point_coords, point_features, rois, scores, roi_labels, _gt_boxes, _gt_labels, keypoint_weights):
+    def forward(self, point_coords, point_features, rois, scores, roi_labels, keypoint_weights, roi_target_dict=None, _gt_boxes = None, _gt_labels = None):
         batch_size = rois.shape[0]
-        gt_boxes = []
-        for i in range(batch_size):
-            gt_boxes.append(torch.cat([_gt_boxes[i], _gt_labels[i].view(-1,1)], dim = 1))
-        targets_dict = self.assign_targets(batch_size, rois, scores, gt_boxes, roi_labels)
-        rois = targets_dict["rois"]
-        roi_labels = targets_dict['roi_labels']
 
+        if roi_target_dict is None:
+            targets_dict = self.assign_targets(batch_size, rois, scores, _gt_boxes, _gt_labels, roi_labels)
+            rois = targets_dict["rois"]
+            roi_labels = targets_dict['roi_labels']
+        else:
+            targets_dict = roi_target_dict
+            rois = targets_dict["rois"]
+            roi_labels = targets_dict['roi_labels']
         pooled_features = self.roi_grid_pool(batch_size, rois, point_coords, point_features, keypoint_weights)
 
         grid_size = self.model_cfg.ROI_GRID_POOL.GRID_SIZE
         batch_size_rcnn = pooled_features.shape[0]
         pooled_features = pooled_features.permute(0, 2, 1).\
             contiguous().view(batch_size_rcnn, -1, grid_size, grid_size, grid_size)  # (BxN, C, 6, 6, 6)
-
         shared_features = self.shared_fc_layer(pooled_features.view(batch_size_rcnn, -1, 1))
         rcnn_cls = self.cls_layers(shared_features).transpose(1, 2).contiguous().squeeze(dim=1)  # (B, 1 or 2)
         rcnn_reg = self.reg_layers(shared_features).transpose(1, 2).contiguous().squeeze(dim=1)  # (B, C)
-
+        batch_cls_preds, batch_box_preds = self.generate_predicted_boxes(
+            batch_size=batch_size, rois=rois, cls_preds=rcnn_cls, box_preds=rcnn_reg
+        )
+        targets_dict['batch_cls_preds'] = batch_cls_preds
+        targets_dict['batch_box_preds'] = batch_box_preds
+        targets_dict['cls_preds_normalized'] = False
         targets_dict['rcnn_cls'] = rcnn_cls
         targets_dict['rcnn_reg'] = rcnn_reg
 
+        self.targets_dict = targets_dict
+
         return targets_dict
+    
+    def get_box_reg_layer_loss(self, forward_ret_dict):
+        code_size = forward_ret_dict['rois'].shape[-1]
+        reg_valid_mask = forward_ret_dict['reg_valid_mask'].view(-1)
+        gt_boxes3d_ct = forward_ret_dict['gt_of_rois'][..., 0:code_size]
+        gt_of_rois_src = forward_ret_dict['gt_of_rois_src'][..., 0:code_size].view(-1, code_size)
+        rcnn_reg = forward_ret_dict['rcnn_reg']  # (rcnn_batch_size, C)
+        roi_boxes3d = forward_ret_dict['rois']
+        rcnn_batch_size = gt_boxes3d_ct.view(-1, code_size).shape[0]
 
+        fg_mask = (reg_valid_mask > 0)
+        fg_sum = fg_mask.long().sum().item()
 
-    def assign_targets(self, batch_size, rois, scores, gt_boxes, roi_labels):
+        tb_dict = {}
+
+        rois_anchor = roi_boxes3d.clone().detach().view(-1, code_size)
+        rois_anchor[:, 0:3] = 0
+        rois_anchor[:, 6] = 0
+        reg_targets = self.box_coder.encode(
+            rois_anchor, gt_boxes3d_ct.view(rcnn_batch_size, code_size) 
+        )
+
+        rcnn_loss_reg = self.reg_loss_func(
+            rcnn_reg.view(rcnn_batch_size, -1).unsqueeze(dim=0),
+            reg_targets.unsqueeze(dim=0),
+        )  # [B, M, 7]
+        rcnn_loss_reg = (rcnn_loss_reg.view(rcnn_batch_size, -1) * fg_mask.unsqueeze(dim=-1).float()).sum() / max(fg_sum, 1)
+        rcnn_loss_reg = rcnn_loss_reg * self.rcnn_reg_weight
+        tb_dict['rcnn_loss_reg'] = rcnn_loss_reg.item()
+        if fg_sum > 0:
+            fg_rcnn_reg = rcnn_reg.view(rcnn_batch_size, -1)[fg_mask]
+            fg_roi_boxes3d = roi_boxes3d.view(-1, code_size)[fg_mask]
+
+            fg_roi_boxes3d = fg_roi_boxes3d.view(1, -1, code_size)
+            batch_anchors = fg_roi_boxes3d.clone().detach()
+            roi_ry = fg_roi_boxes3d[:, :, 6].view(-1)
+            roi_xyz = fg_roi_boxes3d[:, :, 0:3].view(-1, 3)
+            batch_anchors[:, :, 0:3] = 0
+            rcnn_boxes3d = self.box_coder.decode(
+                batch_anchors, fg_rcnn_reg.view(batch_anchors.shape[0], -1, code_size)
+            ).view(-1, code_size)
+
+            rcnn_boxes3d = self.rotate_points_along_z(
+                rcnn_boxes3d.unsqueeze(dim=1), roi_ry
+            ).squeeze(dim=1)
+            rcnn_boxes3d[:, 0:3] += roi_xyz
+
+            loss_corner = self.get_corner_loss_lidar(
+                rcnn_boxes3d[:, 0:7],
+                gt_of_rois_src[fg_mask][:, 0:7]
+            )
+            loss_corner = loss_corner.mean()
+            loss_corner = loss_corner * self.rcnn_corner_weight
+
+            rcnn_loss_reg += loss_corner
+            tb_dict['rcnn_loss_corner'] = loss_corner.item()
+        return rcnn_loss_reg, tb_dict
+
+    def get_box_cls_layer_loss(self, forward_ret_dict):
+        rcnn_cls = forward_ret_dict['rcnn_cls']
+        rcnn_cls_labels = forward_ret_dict['rcnn_cls_labels'].view(-1)
+
+        rcnn_cls_flat = rcnn_cls.view(-1)
+        batch_loss_cls = F.binary_cross_entropy(torch.sigmoid(rcnn_cls_flat), rcnn_cls_labels.float(), reduction='none')
+        cls_valid_mask = (rcnn_cls_labels >= 0).float()
+        rcnn_loss_cls = (batch_loss_cls * cls_valid_mask).sum() / torch.clamp(cls_valid_mask.sum(), min=1.0)
+
+        rcnn_loss_cls = rcnn_loss_cls * self.rcnn_cls_weight
+        tb_dict = {'rcnn_loss_cls': rcnn_loss_cls.item()}
+        return rcnn_loss_cls, tb_dict
+    
+    def get_loss(self, tb_dict=None):
+        tb_dict = {} if tb_dict is None else tb_dict
+        rcnn_loss = 0
+        rcnn_loss_cls, cls_tb_dict = self.get_box_cls_layer_loss(self.targets_dict)
+        rcnn_loss += rcnn_loss_cls
+        tb_dict.update(cls_tb_dict)
+
+        rcnn_loss_reg, reg_tb_dict = self.get_box_reg_layer_loss(self.targets_dict)
+        rcnn_loss += rcnn_loss_reg
+        tb_dict.update(reg_tb_dict)
+        tb_dict['rcnn_loss'] = rcnn_loss.item()
+        return rcnn_loss, tb_dict
+    
+    def generate_predicted_boxes(self, batch_size, rois, cls_preds, box_preds):
+        code_size = rois.shape[-1]
+        batch_cls_preds = cls_preds.view(batch_size, -1, cls_preds.shape[-1])
+        batch_box_preds = box_preds.view(batch_size, -1, code_size)
+        roi_ry = rois[:, :, 6].view(-1)
+        roi_xyz = rois[:, :, 0:3].view(-1, 3)
+        local_rois = rois.clone().detach()
+        local_rois[:, :, 0:3] = 0
+        batch_box_preds = self.box_coder.decode(local_rois, batch_box_preds).view(-1, code_size)
+        batch_box_preds = self.rotate_points_along_z(
+            batch_box_preds.unsqueeze(dim=1), roi_ry
+        ).squeeze(dim=1)
+
+        batch_box_preds[:, 0:3] += roi_xyz
+        batch_box_preds = batch_box_preds.view(batch_size, -1, code_size)
+        return batch_cls_preds, batch_box_preds
+
+    
+    def assign_targets(self, batch_size, rois, scores, _gt_boxes, _gt_labels, roi_labels):
+        gt_boxes = []
+        for i in range(batch_size):
+            gt_boxes.append(torch.cat([_gt_boxes[i], _gt_labels[i].view(-1,1)], dim = 1))
         with torch.no_grad():
             targets_dict = self.proposal_target_layer.forward(rois, scores, gt_boxes, roi_labels)
         
@@ -1574,6 +2235,121 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
         )
 
         return pooled_features
+
+    def boxes_to_corners_3d(self, boxes3d):
+        """
+            7 -------- 4
+        /|         /|
+        6 -------- 5 .
+        | |        | |
+        . 3 -------- 0
+        |/         |/
+        2 -------- 1
+        Args:
+            boxes3d:  (N, 7) [x, y, z, dx, dy, dz, heading], (x, y, z) is the box center
+
+        Returns:
+        """
+        boxes3d, is_numpy = check_numpy_to_torch(boxes3d)
+
+        template = boxes3d.new_tensor((
+            [1, 1, -1], [1, -1, -1], [-1, -1, -1], [-1, 1, -1],
+            [1, 1, 1], [1, -1, 1], [-1, -1, 1], [-1, 1, 1],
+        )) / 2
+
+        corners3d = boxes3d[:, None, 3:6].repeat(1, 8, 1) * template[None, :, :]
+        corners3d = self.rotate_points_along_z(corners3d.view(-1, 8, 3), boxes3d[:, 6]).view(-1, 8, 3)
+        corners3d += boxes3d[:, None, 0:3]
+
+        return corners3d.numpy() if is_numpy else corners3d
+
+    def get_corner_loss_lidar(self, pred_bbox3d: torch.Tensor, gt_bbox3d: torch.Tensor):
+        """
+        Args:
+            pred_bbox3d: (N, 7) float Tensor.
+            gt_bbox3d: (N, 7) float Tensor.
+
+        Returns:
+            corner_loss: (N) float Tensor.
+        """
+        assert pred_bbox3d.shape[0] == gt_bbox3d.shape[0]
+
+        pred_box_corners = self.boxes_to_corners_3d(pred_bbox3d)
+        gt_box_corners = self.boxes_to_corners_3d(gt_bbox3d)
+
+        gt_bbox3d_flip = gt_bbox3d.clone()
+        gt_bbox3d_flip[:, 6] += np.pi
+        gt_box_corners_flip = self.boxes_to_corners_3d(gt_bbox3d_flip)
+        # (N, 8)
+        corner_dist = torch.min(torch.norm(pred_box_corners - gt_box_corners, dim=2),
+                                torch.norm(pred_box_corners - gt_box_corners_flip, dim=2))
+        # (N, 8)
+        corner_loss = WeightedSmoothL1Loss.smooth_l1_loss(corner_dist, beta=1.0)
+
+        return corner_loss.mean(dim=1)
+
+class WeightedSmoothL1Loss(nn.Module):
+    """
+    Code-wise Weighted Smooth L1 Loss modified based on fvcore.nn.smooth_l1_loss
+    https://github.com/facebookresearch/fvcore/blob/master/fvcore/nn/smooth_l1_loss.py
+                  | 0.5 * x ** 2 / beta   if abs(x) < beta
+    smoothl1(x) = |
+                  | abs(x) - 0.5 * beta   otherwise,
+    where x = input - target.
+    """
+    def __init__(self, beta: float = 1.0 / 9.0, code_weights: list = None):
+        """
+        Args:
+            beta: Scalar float.
+                L1 to L2 change point.
+                For beta values < 1e-5, L1 loss is computed.
+            code_weights: (#codes) float list if not None.
+                Code-wise weights.
+        """
+        super(WeightedSmoothL1Loss, self).__init__()
+        self.beta = beta
+        if code_weights is not None:
+            self.code_weights = np.array(code_weights, dtype=np.float32)
+            self.code_weights = torch.from_numpy(self.code_weights).cuda()
+
+    @staticmethod
+    def smooth_l1_loss(diff, beta):
+        if beta < 1e-5:
+            loss = torch.abs(diff)
+        else:
+            n = torch.abs(diff)
+            loss = torch.where(n < beta, 0.5 * n ** 2 / beta, n - 0.5 * beta)
+
+        return loss
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor, weights: torch.Tensor = None):
+        """
+        Args:
+            input: (B, #anchors, #codes) float tensor.
+                Ecoded predicted locations of objects.
+            target: (B, #anchors, #codes) float tensor.
+                Regression targets.
+            weights: (B, #anchors) float tensor if not None.
+
+        Returns:
+            loss: (B, #anchors) float tensor.
+                Weighted smooth l1 loss without reduction.
+        """
+        target = torch.where(torch.isnan(target), input, target)  # ignore nan targets
+
+        diff = input - target
+        # code-wise weighting
+        if self.code_weights is not None:
+            diff = diff * self.code_weights.view(1, 1, -1)
+
+        loss = self.smooth_l1_loss(diff, self.beta)
+
+        # anchor-wise weighting
+        if weights is not None:
+            assert weights.shape[0] == loss.shape[0] and weights.shape[1] == loss.shape[1]
+            loss = loss * weights.unsqueeze(-1)
+
+        return loss
 
 class SubmanifoldSparseConv(nn.Module):
 
