@@ -69,7 +69,7 @@ model:
     voxel_size: *vsize
     num_bev_features: 512
     num_raw_features: 5
-    num_keypoints: 2048
+    num_keypoints: 4096
     sample_radius_with_roi: 1.6
     num_sectors: 6
   

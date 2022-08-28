@@ -21,9 +21,9 @@ from ...datasets.utils import BEVBox3D
 
 from .base_model_objdet import BaseModel
 import open3d.ml.torch as ml3d
-from open3d.ml.torch.ops import voxelize, ragged_to_dense, reduce_subarrays_sum, nms
+from open3d.ml.torch.ops import voxelize, ragged_to_dense, nms
 from open3d.ml.torch.layers import SparseConv
-from ..utils.objdet_helper import multiclass_nms, box3d_to_bev, xywhr_to_xyxyr, bbox_overlaps
+from ..utils.objdet_helper import box3d_to_bev, xywhr_to_xyxyr
 from ...utils import MODEL
 from ...datasets.augment import ObjdetAugmentation
 
@@ -63,6 +63,7 @@ class PVRCNNPlusPlus(BaseModel):
         self.keypoint_weight_computer = PVRCNNKeypointWeightComputer(num_class = 1, input_channels = 90, **keypoint_weights)#cls_fc, gt_extra_width)
         self.box_refinement = PVRCNNPlusPlusBoxRefinement(num_class = 1, input_channels = 90, code_size = 7, **roi_grid_pool)
         self.device = device
+        self.keypoints_not_found = False
         self.to(device)
 
     @torch.no_grad()
@@ -105,6 +106,8 @@ class PVRCNNPlusPlus(BaseModel):
         gt_boxes = inputs.bboxes
         gt_labels = inputs.labels
         inputs = inputs.point
+
+        self.keypoints_not_found = False
         
         x, x_intermediate_layers, x_pos = self.backbone_3d(inputs)
         
@@ -124,15 +127,20 @@ class PVRCNNPlusPlus(BaseModel):
         roi_labels = targets_dict['roi_labels']
         roi_targets_dict = targets_dict 
         
-        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(inputs, rois, x_bev_2d, x_intermediate_layers) 
+        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(inputs, rois, x_bev_2d, x_intermediate_layers)
         del(x_bev_2d)
         torch.cuda.empty_cache()
+
+        if point_features is None:
+            print("KEYPOINTS ARE ONLY 1")
+            self.keypoints_not_found = True
+            return (rois, roi_scores, roi_labels)
         
         keypoint_weights = self.keypoint_weight_computer(len(gt_boxes), point_features, point_coords, point_features_before_fusion, gt_boxes, gt_labels)
         
         outs = self.box_refinement(point_coords, point_features, rois, roi_scores, roi_labels, keypoint_weights, roi_targets_dict, gt_boxes, gt_labels)
         
-        return outs#(rois, roi_scores, roi_labels)
+        return outs
     
     def get_optimizer(self, cfg):
         optimizer = torch.optim.AdamW(self.parameters(), **cfg)
@@ -140,14 +148,14 @@ class PVRCNNPlusPlus(BaseModel):
 
     def get_loss(self, result, data):
         loss_rpn, tb_dict = self.rpn_module.get_loss()
-        loss_point, tb_dict = self.keypoint_weight_computer.get_loss(tb_dict)
-        loss_rcnn, tb_dict = self.box_refinement.get_loss(tb_dict)
-        loss = loss_rpn + loss_point + loss_rcnn
         loss_dict = {}
-        loss_dict["loss_rpn"] = loss_rpn
-        loss_dict["loss_point"] = loss_point
-        loss_dict["loss_rcnn"] = loss_rcnn
 
+        if not self.keypoints_not_found:
+            loss_point, tb_dict = self.keypoint_weight_computer.get_loss(tb_dict)
+            loss_rcnn, tb_dict = self.box_refinement.get_loss(tb_dict)
+            loss_dict["loss_point"] = loss_point
+            loss_dict["loss_rcnn"] = loss_rcnn
+        loss_dict["loss_rpn"] = loss_rpn
         return loss_dict
 
 
@@ -219,11 +227,15 @@ class PVRCNNPlusPlus(BaseModel):
 
     def inference_end(self, results, inputs):
 
-        
-        batch_cls_preds = results["batch_cls_preds"]
-        batch_box_preds = results["batch_box_preds"]
-        roi_labels = results["roi_labels"]
-        cls_preds_normalized = results["cls_preds_normalized"]
+        if not self.keypoints_not_found:
+            batch_cls_preds = results["batch_cls_preds"]
+            batch_box_preds = results["batch_box_preds"]
+            roi_labels = results["roi_labels"]
+        else:
+            batch_cls_preds = results[1]
+            batch_box_preds = results[0]
+            roi_labels = results[2]
+
         batch_size = batch_cls_preds.shape[0]
 
         bboxes_b = []
@@ -232,10 +244,8 @@ class PVRCNNPlusPlus(BaseModel):
 
         for index in range(batch_size):
             box_preds = batch_box_preds[index]
-            src_box_preds = box_preds
             cls_preds = batch_cls_preds[index]
 
-            src_cls_preds = cls_preds
             cls_preds = torch.sigmoid(cls_preds)
 
             label_preds = roi_labels[index]
@@ -271,70 +281,9 @@ class PVRCNNPlusPlus(BaseModel):
                 dim = bbox[[3, 5, 4]]
                 pos = bbox[:3] + [0, 0, dim[1] / 2]
                 yaw = bbox[-1]
-                # print(dim, pos, yaw)
                 name = self.lbl2name.get(label, "ignore")
                 inference_result[-1].append(
                     BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
-
-        ################################################################################
-        
-        # batch_cls_preds = results[1]
-        # batch_box_preds = results[0]
-        # roi_labels = results[2]
-        # #cls_preds_normalized = results["cls_preds_normalized"]
-        # batch_size = batch_cls_preds.shape[0]
-
-        # bboxes_b = []
-        # scores_b = []
-        # labels_b = []
-
-        # for index in range(batch_size):
-        #     box_preds = batch_box_preds[index]
-        #     # box_preds = self.rpn_module.center_to_edge_bbox(box_preds)
-        #     src_box_preds = box_preds
-        #     cls_preds = batch_cls_preds[index]
-
-        #     src_cls_preds = cls_preds
-        #     cls_preds = torch.sigmoid(cls_preds)
-
-        #     label_preds = roi_labels[index]
-
-        #     idxs = self.rpn_module.multiclass_nms(boxes=box_preds, scores=cls_preds,
-        #     class_ids=label_preds, score_thr=self.rpn_module.score_thr, overlap_thr=0.01
-        #     )
-
-        #     idxs = torch.cat(idxs)
-
-        #     cur_boxes = box_preds[idxs]
-        #     print(cur_boxes.shape)
-        #     cur_scores = cls_preds[idxs]
-        #     cur_labels = label_preds[idxs]
-
-        #     bboxes_b.append(cur_boxes)
-        #     scores_b.append(cur_scores)
-        #     labels_b.append(cur_labels)
-
-        # inference_result = []
-        # for _calib, _bboxes, _scores, _labels in zip(inputs.calib, bboxes_b,
-        #                                              scores_b, labels_b):
-        #     bboxes = _bboxes.cpu().detach().numpy()
-        #     scores = _scores.cpu().detach().numpy()
-        #     labels = _labels.cpu().detach().numpy()
-        #     inference_result.append([])
-
-        #     world_cam, cam_img = None, None
-        #     if _calib is not None:
-        #         world_cam = _calib.get('world_cam', None)
-        #         cam_img = _calib.get('cam_img', None)
-
-        #     for bbox, score, label in zip(bboxes, scores, labels):
-        #         dim = bbox[[3, 5, 4]]
-        #         pos = bbox[:3] + [0, 0, dim[1] / 2]
-        #         yaw = bbox[-1]
-        #         # print(dim, pos, yaw)
-        #         name = self.lbl2name.get(label, "ignore")
-        #         inference_result[-1].append(
-        #             BEVBox3D(pos, dim, yaw, name, score, world_cam, cam_img))
         
         return inference_result
 
@@ -686,14 +635,6 @@ class RPNModule(nn.Module):
         rois, roi_scores, roi_labels = self.reorder_rois_for_refining(batch_size, bboxes, scores, labels)
 
         return rois, roi_scores, roi_labels
-
-    # def center_to_edge_bbox(self, bboxes):
-    #     bboxes[:,:3] = bboxes[:,:3] - (bboxes[:,3:6]/2)
-    #     return bboxes
-    
-    # def edge_to_center_bbox(self, bboxes):
-    #     bboxes[:,:3] = bboxes[:,:3] + (bboxes[:,3:6]/2)
-    #     return bboxes
     
     def sigmoid(self, x):
         y = torch.clamp(x.sigmoid(), min=1e-4, max=1 - 1e-4)
@@ -722,9 +663,9 @@ class RPNModule(nn.Module):
 
         loss += hm_loss + loc_loss
 
-        #tb_dict['rpn_loss'] = loss#.item()
-        tb_dict['hm_loss'] = hm_loss#.item()
-        tb_dict['loc_loss'] = loc_loss#.item()
+        tb_dict['rpn_loss'] = loss.item()
+        tb_dict['hm_loss'] = hm_loss.item()
+        tb_dict['loc_loss'] = loc_loss.item()
 
         return loss, tb_dict
 
@@ -840,13 +781,13 @@ class RPNModule(nn.Module):
             center=batch_center, center_z=batch_center_z, dim=batch_dim, vel=None,
             point_cloud_range=self.point_cloud_range, voxel_size=self.voxel_size,
             feature_map_stride=self.feature_map_stride,
-            K=self.num_max_objs,#self.nms_pre,
+            K=self.num_max_objs,
             score_thresh=self.score_thr,
             post_center_limit_range=self.post_center_limit_range
             )
 
         for k, final_dict in enumerate(final_pred_dicts):
-            bbox_pred = final_dict["pred_boxes"] #self.center_to_edge_bbox(final_dict["pred_boxes"])
+            bbox_pred = final_dict["pred_boxes"]
             score_pred = final_dict["pred_scores"].view(-1).sigmoid()
             label_pred = final_dict["pred_labels"]
             idxs = self.multiclass_nms(bbox_pred, score_pred, label_pred, score_thr = None, overlap_thr = 0.7)
@@ -919,13 +860,6 @@ class RPNModule(nn.Module):
 
             torch.max(masked_heatmap, masked_gaussian * k, out=masked_heatmap)
         return heatmap
-    
-    def _nms(self, heat, kernel=3):
-        pad = (kernel - 1) // 2
-
-        hmax = F.max_pool2d(heat, (kernel, kernel), stride=1, padding=pad)
-        keep = (hmax == heat).float()
-        return heat * keep
     
     def _gather_feat(self, feat, ind, mask=None):
         dim = feat.size(2)
@@ -1012,10 +946,9 @@ class RPNModule(nn.Module):
 
         ret_pred_dicts = []
         for k in range(batch_size):
-            # cur_mask = mask[k]
-            cur_boxes = final_box_preds[k]#, cur_mask]
-            cur_scores = final_scores[k]#, cur_mask]
-            cur_labels = final_class_ids[k]#, cur_mask]
+            cur_boxes = final_box_preds[k]
+            cur_scores = final_scores[k]
+            cur_labels = final_class_ids[k]
 
             ret_pred_dicts.append({
                 'pred_boxes': cur_boxes,
@@ -1189,6 +1122,8 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         SA_cfg = self.model_cfg.SA_LAYER
         self.SA_layers = nn.ModuleList()
         self.SA_layer_names = []
+        self.feature_length = []
+        self.feature_index = 0
 
         #Raw Points
         self.SA_rawpoints, cur_num_c_out = pointnet2_stack_modules.build_local_aggregation_module(
@@ -1199,6 +1134,9 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         #BEV
         c_bev = num_bev_features
         c_in += c_bev
+        self.feature_length.append(c_bev)
+
+        self.feature_length.append(cur_num_c_out)
 
         #x_conv_3
         src_name = "x_conv3"
@@ -1209,16 +1147,18 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         self.SA_layers.append(cur_layer)
         self.SA_layer_names.append(src_name)
         c_in += cur_num_c_out
+        self.feature_length.append(cur_num_c_out)
 
-        # #x_conv_4
-        # src_name = "x_conv_4"
-        # input_channels = 64
-        # cur_layer, cur_num_c_out = pointnet2_stack_modules.build_local_aggregation_module(
-        #     input_channels=input_channels, config=SA_cfg[src_name]
-        # )
-        # self.SA_layers.append(cur_layer)
-        # self.SA_layer_names.append(src_name)
-        # c_in += cur_num_c_out
+        #x_conv_4
+        src_name = "x_conv4"
+        input_channels = 64
+        cur_layer, cur_num_c_out = pointnet2_stack_modules.build_local_aggregation_module(
+            input_channels=input_channels, config=SA_cfg[src_name]
+        )
+        self.SA_layers.append(cur_layer)
+        self.SA_layer_names.append(src_name)
+        c_in += cur_num_c_out
+        self.feature_length.append(cur_num_c_out)
 
         self.vsa_point_feature_fusion = nn.Sequential(
             nn.Linear(c_in, self.model_cfg.NUM_OUTPUT_FEATURES, bias=False),
@@ -1390,6 +1330,8 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
                 point_features_list.append(points[bs_idx][valid_mask])
                 xyz_batch_cnt[bs_idx] = valid_mask.sum()
             valid_point_features = torch.cat(point_features_list, dim=0)
+            if valid_point_features.shape[0] == 0:
+                return torch.zeros((new_points.shape[0],self.feature_length[self.feature_index])).to(points[bs_idx].device)
             xyz = valid_point_features[:, 0:3]
             xyz_features = valid_point_features[:, 3:]
         pooled_points, pooled_features = aggregate_func(
@@ -1403,11 +1345,11 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         return pooled_features
 
     def forward(self, points, bboxes, spatial_features, multiscale_feats = None): #multiscale_feats
-        # print("##### Voxel Set Abstraction #####")
         batch_size = bboxes.shape[0]
         keypoints = self.get_keypoints(points, bboxes, batch_size)
-        # print("Shape of Keypoints", keypoints.shape)
-
+        if keypoints.shape[0]==0 or keypoints.shape[0]==1:
+            return None, None, None
+        
         point_features_list = []
 
         #BEV processing
@@ -1415,10 +1357,9 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
             keypoints, spatial_features , batch_size,
                 bev_stride= 8
         )
-
-        # print("BEV features shape", point_bev_features.shape)
-
         point_features_list.append(point_bev_features)
+
+        self.feature_index = self.feature_index + 1
         
         new_xyz = keypoints[:, 1:4].contiguous()
         new_xyz_batch_cnt = new_xyz.new_zeros(batch_size).int()
@@ -1435,37 +1376,34 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
             rois=bboxes
         )
         point_features_list.append(pooled_features)
+        self.feature_index = self.feature_index + 1
 
-        # print("Raw point feature shape", pooled_features.shape)
+        #x_conv_3 and x_conv_4
+        for i in range(len(self.SA_layer_names)):
+            cur_coords = multiscale_feats["multi_scale_3d_features"][self.SA_layer_names[i] + "_pos"]
+            cur_features = multiscale_feats["multi_scale_3d_features"][self.SA_layer_names[i]]
 
-        #x_conv_3
-        cur_coords = multiscale_feats["multi_scale_3d_features"]["x_conv3_pos"]
-        cur_features = multiscale_feats["multi_scale_3d_features"]["x_conv3"]
+            combined_feats = []
 
-        combined_feats = []
+            for i in range(len(cur_coords)):
+                coords = cur_coords[i]
+                coords = self.get_voxel_centers(coords, 4, self.voxel_size, self.point_cloud_range)
+                feats = cur_features[i]
+                combined = torch.cat([coords, feats], dim = -1)
+                combined_feats.append(combined)
 
-        for i in range(len(cur_coords)):
-            coords = cur_coords[i]
-            coords = self.get_voxel_centers(coords, 4, self.voxel_size, self.point_cloud_range)
-            feats = cur_features[i]
-            combined = torch.cat([coords, feats], dim = -1)
-            combined_feats.append(combined)
-
-        pooled_features = self.aggregate_keypoint_features_from_one_source(
-            batch_size=batch_size, aggregate_func=self.SA_layers[0],
-            points=combined_feats,
-            new_points=new_xyz, new_points_batch_cnt=new_xyz_batch_cnt,
-            filter_neighbors_with_roi=True,
-            radius_of_neighbor=4.0,
-            rois=bboxes
-        )
-        point_features_list.append(pooled_features)
-
-        # print("x_conv3 features shape", pooled_features.shape)
-
+            pooled_features = self.aggregate_keypoint_features_from_one_source(
+                batch_size=batch_size, aggregate_func=self.SA_layers[i],
+                points=combined_feats,
+                new_points=new_xyz, new_points_batch_cnt=new_xyz_batch_cnt,
+                filter_neighbors_with_roi=True,
+                radius_of_neighbor=4.0,
+                rois=bboxes
+            )
+            point_features_list.append(pooled_features)
+            self.feature_index = self.feature_index + 1
+        self.feature_index = 0
         point_features = torch.cat(point_features_list, dim=-1)
-
-        # print("Concatenated feature shape", point_features.shape)
 
         point_features_before_fusion = point_features.view(-1, point_features.shape[-1])
         point_features = self.vsa_point_feature_fusion(point_features.view(-1, point_features.shape[-1]))
@@ -1505,14 +1443,6 @@ class PVRCNNKeypointWeightComputer(nn.Module):
             c_in = fc_cfg[k]
         fc_layers.append(nn.Linear(c_in, output_channels, bias=True))
         return nn.Sequential(*fc_layers)
-    
-    # def center_to_edge_bbox(self, bboxes):
-    #     bboxes[:,:3] = bboxes[:,:3] - (bboxes[:,3:6]/2)
-    #     return bboxes
-    
-    # def edge_to_center_bbox(self, bboxes):
-    #     bboxes[:,:3] = bboxes[:,:3] + (bboxes[:,3:6]/2)
-    #     return bboxes
 
     def forward(self, batch_size, point_features, point_coords, point_features_before_fusion, gt_boxes = None, gt_labels = None):
         features_to_use = point_features
