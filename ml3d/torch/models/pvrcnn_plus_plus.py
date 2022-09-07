@@ -124,6 +124,7 @@ class PVRCNNPlusPlus(BaseModel):
         
         targets_dict = self.box_refinement.assign_targets(len(gt_boxes), rois, scores=roi_scores, _gt_boxes=gt_boxes, _gt_labels = gt_labels, roi_labels=roi_labels)
         rois = targets_dict['rois']
+        roi_scores = targets_dict['roi_scores']
         roi_labels = targets_dict['roi_labels']
         roi_targets_dict = targets_dict 
         
@@ -1117,7 +1118,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         self.num_sectors = num_sectors
         c_in = 0
 
-        config = cfg_from_yaml_file("/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml", cfg)
+        config = cfg_from_yaml_file("/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml", cfg)
         self.model_cfg = cfg.MODEL.PFE
         SA_cfg = self.model_cfg.SA_LAYER
         self.SA_layers = nn.ModuleList()
@@ -1840,7 +1841,7 @@ Does ROI grid pooling and final refinement step
 class PVRCNNPlusPlusBoxRefinement(nn.Module):
     def __init__(self, input_channels, num_class, code_size, rcnn_cls_weight, rcnn_reg_weight, rcnn_corner_weight, code_weights) -> None:
         super().__init__()
-        config = cfg_from_yaml_file("/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml", cfg)
+        config = cfg_from_yaml_file("/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml", cfg)
         self.model_cfg = cfg.MODEL.ROI_HEAD
         self.target_config = self.model_cfg.TARGET_CONFIG
         self.roi_grid_pool_config = self.model_cfg.ROI_GRID_POOL
