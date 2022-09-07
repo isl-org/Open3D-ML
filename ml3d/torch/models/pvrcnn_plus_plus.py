@@ -127,7 +127,10 @@ class PVRCNNPlusPlus(BaseModel):
             rois = targets_dict['rois']
             roi_scores = targets_dict['roi_scores']
             roi_labels = targets_dict['roi_labels']
-            roi_targets_dict = targets_dict 
+            roi_targets_dict = targets_dict
+        else:
+            self.keypoints_not_found = True
+            return (rois, roi_scores, roi_labels) 
         
         point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(inputs, rois, x_bev_2d, x_intermediate_layers)
         del(x_bev_2d)
