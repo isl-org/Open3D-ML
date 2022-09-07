@@ -123,10 +123,11 @@ class PVRCNNPlusPlus(BaseModel):
         rois, roi_scores, roi_labels = self.rpn_module(x_bev_2d, gt_boxes, gt_labels)
         
         targets_dict = self.box_refinement.assign_targets(len(gt_boxes), rois, scores=roi_scores, _gt_boxes=gt_boxes, _gt_labels = gt_labels, roi_labels=roi_labels)
-        rois = targets_dict['rois']
-        roi_scores = targets_dict['roi_scores']
-        roi_labels = targets_dict['roi_labels']
-        roi_targets_dict = targets_dict 
+        if targets_dict is not None:
+            rois = targets_dict['rois']
+            roi_scores = targets_dict['roi_scores']
+            roi_labels = targets_dict['roi_labels']
+            roi_targets_dict = targets_dict 
         
         point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(inputs, rois, x_bev_2d, x_intermediate_layers)
         del(x_bev_2d)
@@ -1623,6 +1624,9 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
         batch_rois, batch_gt_of_rois, batch_roi_ious, batch_roi_scores, batch_roi_labels = self.sample_rois_for_rcnn(
             batch_size, rois, scores, gt_boxes, roi_labels
         )
+
+        if batch_rois is None:
+            return None
         
         reg_valid_mask = (batch_roi_ious > self.reg_fg_thresh).long()
 
@@ -1666,6 +1670,8 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
             )
 
             sampled_inds = self.subsample_rois(max_overlaps=max_overlaps)
+            if sampled_inds is None:
+                return None, None, None, None, None
 
 
             batch_rois[index] = cur_roi[sampled_inds]
@@ -1747,7 +1753,8 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
         else:
             print('maxoverlaps:(min=%f, max=%f)' % (max_overlaps.min().item(), max_overlaps.max().item()))
             print('ERROR: FG=%d, BG=%d' % (fg_num_rois, bg_num_rois))
-            raise NotImplementedError
+            return None
+            #raise NotImplementedError
 
         sampled_inds = torch.cat((fg_inds, bg_inds), dim=0)
         return sampled_inds
@@ -2064,6 +2071,8 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
             gt_boxes.append(torch.cat([_gt_boxes[i], _gt_labels[i].view(-1,1)], dim = 1))
         with torch.no_grad():
             targets_dict = self.proposal_target_layer.forward(rois, scores, gt_boxes, roi_labels)
+            if targets_dict is None:
+                return None
         
         rois = targets_dict['rois']  # (B, N, 7 + C)
         gt_of_rois = targets_dict['gt_of_rois']  # (B, N, 7 + C + 1)
