@@ -129,6 +129,7 @@ class PVRCNNPlusPlus(BaseModel):
             roi_labels = targets_dict['roi_labels']
             roi_targets_dict = targets_dict
         else:
+            print("TARGETS_DICT WAS NONE")
             self.keypoints_not_found = True
             return (rois, roi_scores, roi_labels) 
         
