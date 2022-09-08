@@ -159,8 +159,10 @@ class PVRCNNPlusPlus(BaseModel):
         if not self.keypoints_not_found:
             loss_point, tb_dict = self.keypoint_weight_computer.get_loss(tb_dict)
             loss_rcnn, tb_dict = self.box_refinement.get_loss(tb_dict)
-            loss_dict["loss_point"] = loss_point
-            loss_dict["loss_rcnn"] = loss_rcnn
+            if not torch.isnan(loss_rcnn).any():
+                loss_dict["loss_rcnn"] = loss_rcnn
+            if not torch.isnan(loss_point).any():
+                loss_dict["loss_point"] = loss_point
         loss_dict["loss_rpn"] = loss_rpn
         return loss_dict
 
