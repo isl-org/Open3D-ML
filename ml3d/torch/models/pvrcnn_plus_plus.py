@@ -1589,7 +1589,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
             current_sum = current_sum + xyz_batch_cnt[i]
             sampled_point_row_splits.append(current_sum_out + sampled_points_batch_cnt[i])
             current_sum_out = current_sum_out + sampled_points_batch_cnt[i]
-        sampled_pt_idxs = o3d_fps(xyz, torch.tensor(row_splits), torch.tensor(sampled_point_row_splits))
+        sampled_pt_idxs = o3d_fps(xyz, torch.tensor(row_splits), torch.tensor(sampled_point_row_splits)).to(torch.long)
 
         sampled_points = xyz[sampled_pt_idxs]
 
