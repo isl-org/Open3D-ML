@@ -1737,7 +1737,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
     def __init__(self, point_cloud_range, cfg, **kwargs):
         super().__init__()
-        self.point_cloud_range = cfg.point_cloud_range
+        self.point_cloud_range = point_cloud_range
         self.voxel_size = cfg.voxel_size
         self.num_keypoints = cfg.num_keypoints
         self.sample_radius_with_roi = cfg.sample_radius_with_roi
