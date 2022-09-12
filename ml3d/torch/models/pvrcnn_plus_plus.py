@@ -68,14 +68,14 @@ class PVRCNNPlusPlus(BaseModel):
                                     point_cloud_range=point_cloud_range,
                                     **rpn_module)
         self.voxel_set_abstraction = PVRCNNPlusPlusVoxelSetAbstraction(
-            point_cloud_range=point_cloud_range, self.cfg.voxel_set_abstraction)
+            point_cloud_range=point_cloud_range, **voxel_set_abstraction)
         self.keypoint_weight_computer = PVRCNNKeypointWeightComputer(
             num_class=1, input_channels=90,
             **keypoint_weights)  #cls_fc, gt_extra_width)
-        self.box_refinement = PVRCNNPlusPlusBoxRefinement(num_class=1,
+        self.box_refinement = PVRCNNPlusPlusBoxRefinement(#num_class=1,
                                                           input_channels=90,
-                                                          code_size=7,
-                                                          self.cfg.roi_grid_pool)
+                                                          #code_size=7,
+                                                          cfg = self.cfg.roi_grid_pool)
         self.device = device
         self.keypoints_not_found = False
         self.to(device)
