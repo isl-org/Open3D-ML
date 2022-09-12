@@ -15,7 +15,6 @@ from ml3d.torch.utils.pointnet.pointnet2_utils import three_nn_gpu as o3d_tnn
 from ml3d.torch.utils.pointnet.pointnet2_utils import three_interpolate_gpu as o3d_int
 from ml3d.torch.utils.pointnet.pointnet2_utils import furthest_point_sample_v2 as o3d_fps
 
-from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_utils as pointnet2_stack_utils
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
 from pcdet.config import *
 
