@@ -65,6 +65,39 @@ model:
     code_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
     code_size: 7
     num_class: 1
+    SHARED_FC: [256, 256]
+    CLS_FC: [256, 256]
+    REG_FC: [256, 256]
+    DP_RATIO: 0.3
+    TARGET_CONFIG:
+      BOX_CODER: ResidualCoder
+      ROI_PER_IMAGE: 128
+      FG_RATIO: 0.5
+      SAMPLE_ROI_BY_EACH_CLASS: True
+      CLS_SCORE_TYPE: roi_iou
+      CLS_FG_THRESH: 0.75
+      CLS_BG_THRESH: 0.25
+      CLS_BG_THRESH_LO: 0.1
+      HARD_BG_RATIO: 0.8
+      REG_FG_THRESH: 0.5
+    ROI_GRID_POOL:
+      GRID_SIZE: 6
+      NAME: VectorPoolAggregationModuleMSG
+      NUM_GROUPS: 2
+      LOCAL_AGGREGATION_TYPE: voxel_random_choice
+      NUM_REDUCED_CHANNELS: 30
+      NUM_CHANNELS_OF_LOCAL_AGGREGATION: 32
+      MSG_POST_MLPS: [ 128 ]
+      GROUP_CFG_0:
+        NUM_LOCAL_VOXEL: [ 3, 3, 3 ]
+        MAX_NEIGHBOR_DISTANCE: 0.8
+        NEIGHBOR_NSAMPLE: 32
+        POST_MLPS: [ 64, 64 ]
+      GROUP_CFG_1:
+        NUM_LOCAL_VOXEL: [ 3, 3, 3 ]
+        MAX_NEIGHBOR_DISTANCE: 1.6
+        NEIGHBOR_NSAMPLE: 32
+        POST_MLPS: [ 64, 64 ]
 
 
   voxel_set_abstraction:
