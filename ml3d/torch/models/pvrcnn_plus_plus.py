@@ -16,7 +16,6 @@ from ml3d.torch.utils.pointnet.pointnet2_utils import three_interpolate_gpu as o
 from ml3d.torch.utils.pointnet.pointnet2_utils import furthest_point_sample_v2 as o3d_fps
 
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
-from pcdet.config import *
 
 from ..utils.objdet_helper import BBoxCoder
 from ...datasets.utils import BEVBox3D
@@ -1744,9 +1743,6 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         self.num_sectors = cfg.num_sectors
         c_in = 0
 
-        # config = cfg_from_yaml_file(
-        #     "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
-        #     cfg)
         self.model_cfg = cfg
         SA_cfg = self.model_cfg.SA_LAYER
         self.SA_layers = nn.ModuleList()
@@ -2583,9 +2579,6 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
 
     def __init__(self, input_channels, cfg) -> None:
         super().__init__()
-        # config = cfg_from_yaml_file(
-        #     "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
-        #     pcdet_cfg)
         self.model_cfg = cfg
         self.target_config = self.model_cfg["TARGET_CONFIG"]
         self.roi_grid_pool_config = self.model_cfg["ROI_GRID_POOL"]
