@@ -43,7 +43,7 @@ class PVRCNNPlusPlus(BaseModel):
                  rpn_module={},
                  voxel_set_abstraction={},
                  keypoint_weights={},
-                 roi_grid_pool={},
+                #  roi_grid_pool={},
                  **kwargs):
         super().__init__(name=name,
                          point_cloud_range=point_cloud_range,
