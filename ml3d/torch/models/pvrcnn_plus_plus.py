@@ -15,7 +15,6 @@ from ml3d.torch.utils.pointnet.pointnet2_utils import three_nn_gpu as o3d_tnn
 from ml3d.torch.utils.pointnet.pointnet2_utils import three_interpolate_gpu as o3d_int
 
 from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_utils as pointnet2_stack_utils
-from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_modules as pointnet2_stack_modules
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
 from pcdet.config import *
 
@@ -1387,11 +1386,7 @@ class VectorPoolLocalInterpolateModule(nn.Module):
                 dist_o3d_temp, idx_o3d_temp = o3d_tnn(current_new_xyz_grid_centers.view(1, -1, 3), current_support_xyz.view(1, -1, 3))
                 dist_o3d.append(dist_o3d_temp.view(current_new_xyz_grid_centers.shape))
                 idx_o3d.append(idx_o3d_temp.view(current_new_xyz_grid_centers.shape))
-                dist, idx, num_avg_length_of_neighbor_idxs = pointnet2_stack_utils.three_nn_for_vector_pool_by_two_step(
-                    support_xyz, xyz_batch_cnt, new_xyz, new_xyz_grid_centers, new_xyz_batch_cnt,
-                    self.max_neighbour_distance, self.nsample, self.neighbor_type,
-                    self.num_avg_length_of_neighbor_idxs, self.num_total_grids, self.neighbor_distance_multiplier
-                )
+            
             dist_recip = 1.0 / (dist_o3d_temp + 1e-8)
             norm = torch.sum(dist_recip, dim=-1, keepdim=True)
             weight = dist_recip / torch.clamp_min(norm, min=1e-8)
@@ -1405,39 +1400,32 @@ class VectorPoolLocalInterpolateModule(nn.Module):
             # print("OPEN3D SHAPES ARE", dist_o3d[-1].view(new_xyz_grid_centers.shape).shape, idx_o3d[-1].view(new_xyz_grid_centers.shape).shape)
         if len(interpolated_feats_o3d_list)==1:
             interpolated_feats_o3d = interpolated_feats_o3d_list[0]
+            idx_o3d = idx_o3d[0]
         else:
             interpolated_feats_o3d = torch.cat(interpolated_feats_o3d_list, dim=0)
+            idx_o3d = torch.cat(idx_o3d, dim=0)
+
             # print("OUTPUT SHAPES")
             # print("dist", dist.shape)
             # print("idx", idx.shape)
             # print("num_avg_length_of_neighbor_idxs", num_avg_length_of_neighbor_idxs)
-        self.num_avg_length_of_neighbor_idxs = max(self.num_avg_length_of_neighbor_idxs, num_avg_length_of_neighbor_idxs.item())
 
-        dist_recip = 1.0 / (dist + 1e-8)
-        norm = torch.sum(dist_recip, dim=-1, keepdim=True)
-        weight = dist_recip / torch.clamp_min(norm, min=1e-8)
-
-        empty_mask = (idx.view(-1, 3)[:, 0] == -1)
-        idx.view(-1, 3)[empty_mask] = 0
         # print("idx shape after empty mask", idx.shape)
         # print("support feature", support_features.shape)
         # print("weight", weight.shape, norm.shape)
 
-        interpolated_feats = pointnet2_stack_utils.three_interpolate(support_features, idx.view(-1, 3), weight.view(-1, 3))
-        interpolated_feats = interpolated_feats_o3d
-        interpolated_feats = interpolated_feats.view(idx.shape[0], idx.shape[1], -1)  # (M1 + M2 ..., num_total_grids, C)
+        interpolated_feats = interpolated_feats_o3d # (M1 + M2 ..., num_total_grids, C)
         # print("SHAPE OF INTERPOLATED OPENPCDET", interpolated_feats.shape)
         # print("ARE FEATURES EQUAL", torch.eq(interpolated_feats, interpolated_feats_o3d).sum())
         if self.use_xyz:
-            near_known_xyz = support_xyz[idx.view(-1, 3).long()].view(-1, 3, 3)  # ( (M1 + M2 ...)*num_total_grids, 3)
-            local_xyz = (new_xyz_grid_centers.view(-1, 1, 3) - near_known_xyz).view(-1, idx.shape[1], 9)
+            near_known_xyz = support_xyz[idx_o3d.view(-1, 3).long()].view(-1, 3, 3)  # ( (M1 + M2 ...)*num_total_grids, 3)
+            local_xyz = (new_xyz_grid_centers.view(-1, 1, 3) - near_known_xyz).view(-1, idx_o3d.shape[1], 9)
             if self.xyz_encoding_type == 'concat':
                 interpolated_feats = torch.cat((interpolated_feats, local_xyz), dim=-1)  # ( M1 + M2 ..., num_total_grids, 9+C)
             else:
                 raise NotImplementedError
 
         new_features = interpolated_feats.view(-1, interpolated_feats.shape[-1])  # ((M1 + M2 ...) * num_total_grids, C)
-        new_features[empty_mask, :] = 0
         if self.mlp is not None:
             new_features = new_features.permute(1, 0)[None, :, :, None]  # (1, C, N1 + N2 ..., 1)
             new_features = self.mlp(new_features)
