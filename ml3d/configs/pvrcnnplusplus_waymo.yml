@@ -1,11 +1,11 @@
 dataset:
   name: Waymo
-  dataset_path: # path/to/your/dataset
+  dataset_path: # /export/share/Datasets/Waymo_1.3/waymo_preprocessed/  # path/to/your/dataset
   cache_dir: ./logs/cache
-  steps_per_epoch_train: 4000
+  # steps_per_epoch_train: 4000
 
 model:
-  name: PointPillars
+  name: PVRCNNPlusPlus
   ckpt_path: # path/to/your/checkpoint
 
   batcher: "ignore"
@@ -48,7 +48,7 @@ model:
     class_names: [ 'Vehicle', 'Pedestrian', 'Cyclist' ]
     voxel_size: *vsize
     feature_map_stride: 8
-    nms_pre: 1024
+    nms_pre: 4096
     score_thr: 0.1
     post_center_limit_range: [ -75.2, -75.2, -2, 75.2, 75.2, 4 ]
     num_max_objs: 500
@@ -97,9 +97,9 @@ model:
 pipeline:
   name: ObjectDetection
   test_compute_metric: true
-  batch_size: 1
-  val_batch_size: 1
-  test_batch_size: 1
+  batch_size: 2
+  val_batch_size: 2
+  test_batch_size: 2
   save_ckpt_freq: 5
   max_epoch: 200
   main_log_dir: ./logs
