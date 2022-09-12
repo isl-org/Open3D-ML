@@ -13,6 +13,7 @@ import math
 
 from ml3d.torch.utils.pointnet.pointnet2_utils import three_nn_gpu as o3d_tnn
 from ml3d.torch.utils.pointnet.pointnet2_utils import three_interpolate_gpu as o3d_int
+from ml3d.torch.utils.pointnet.pointnet2_utils import furthest_point_sample_v2 as o3d_fps
 
 from pcdet.ops.pointnet2.pointnet2_stack import pointnet2_utils as pointnet2_stack_utils
 from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
@@ -1577,9 +1578,18 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         xyz_batch_cnt = torch.tensor(xyz_batch_cnt, device=points.device).int()
         sampled_points_batch_cnt = torch.tensor(num_sampled_points_list, device=points.device).int()
 
-        sampled_pt_idxs = pointnet2_stack_utils.stack_farthest_point_sample(
-            xyz.contiguous(), xyz_batch_cnt, sampled_points_batch_cnt
-        ).long()
+        current_sum = 0
+        current_sum_out = 0
+        row_splits =  []
+        sampled_point_row_splits = []
+        row_splits.append(0)
+        sampled_point_row_splits.append(0)
+        for i in range(xyz_batch_cnt.shape[0]):
+            row_splits.append(current_sum + xyz_batch_cnt[i])
+            current_sum = current_sum + xyz_batch_cnt[i]
+            sampled_point_row_splits.append(current_sum_out + sampled_points_batch_cnt[i])
+            current_sum_out = current_sum_out + sampled_points_batch_cnt[i]
+        sampled_pt_idxs = o3d_fps(xyz, torch.tensor(row_splits), torch.tensor(sampled_point_row_splits))
 
         sampled_points = xyz[sampled_pt_idxs]
 
