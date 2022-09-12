@@ -68,14 +68,14 @@ class PVRCNNPlusPlus(BaseModel):
                                     point_cloud_range=point_cloud_range,
                                     **rpn_module)
         self.voxel_set_abstraction = PVRCNNPlusPlusVoxelSetAbstraction(
-            point_cloud_range=point_cloud_range, **voxel_set_abstraction)
+            point_cloud_range=point_cloud_range, self.cfg.voxel_set_abstraction)
         self.keypoint_weight_computer = PVRCNNKeypointWeightComputer(
             num_class=1, input_channels=90,
             **keypoint_weights)  #cls_fc, gt_extra_width)
         self.box_refinement = PVRCNNPlusPlusBoxRefinement(num_class=1,
                                                           input_channels=90,
                                                           code_size=7,
-                                                          **roi_grid_pool)
+                                                          self.cfg.roi_grid_pool)
         self.device = device
         self.keypoints_not_found = False
         self.to(device)
@@ -2317,14 +2317,14 @@ class PVRCNNPlusPlusProposalTargetLayer(nn.Module):
     def __init__(self, roi_sampler_cfg):
         super().__init__()
 
-        self.roi_per_image = roi_sampler_cfg.ROI_PER_IMAGE
-        self.fg_ratio = roi_sampler_cfg.FG_RATIO
-        self.cls_score_type = roi_sampler_cfg.CLS_SCORE_TYPE
-        self.cls_fg_thresh = roi_sampler_cfg.CLS_FG_THRESH
-        self.cls_bg_thresh = roi_sampler_cfg.CLS_BG_THRESH
-        self.cls_bg_thresh_lo = roi_sampler_cfg.CLS_BG_THRESH_LO
-        self.hard_bg_ratio = roi_sampler_cfg.HARD_BG_RATIO
-        self.reg_fg_thresh = roi_sampler_cfg.REG_FG_THRESH
+        self.roi_per_image = roi_sampler_cfg["ROI_PER_IMAGE"]
+        self.fg_ratio = roi_sampler_cfg["FG_RATIO"]
+        self.cls_score_type = roi_sampler_cfg["CLS_SCORE_TYPE"]
+        self.cls_fg_thresh = roi_sampler_cfg["CLS_FG_THRESH"]
+        self.cls_bg_thresh = roi_sampler_cfg["CLS_BG_THRESH"]
+        self.cls_bg_thresh_lo = roi_sampler_cfg["CLS_BG_THRESH_LO"]
+        self.hard_bg_ratio = roi_sampler_cfg["HARD_BG_RATIO"]
+        self.reg_fg_thresh = roi_sampler_cfg["REG_FG_THRESH"]
 
     def forward(self, rois, scores, gt_boxes, roi_labels):
         batch_size = rois.shape[0]
@@ -2583,56 +2583,55 @@ Does ROI grid pooling and final refinement step
 
 class PVRCNNPlusPlusBoxRefinement(nn.Module):
 
-    def __init__(self, input_channels, num_class, code_size, rcnn_cls_weight,
-                 rcnn_reg_weight, rcnn_corner_weight, code_weights) -> None:
+    def __init__(self, input_channels, cfg) -> None:
         super().__init__()
         config = cfg_from_yaml_file(
             "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
-            cfg)
-        self.model_cfg = cfg.MODEL.ROI_HEAD
-        self.target_config = self.model_cfg.TARGET_CONFIG
-        self.roi_grid_pool_config = self.model_cfg.ROI_GRID_POOL
-        self.code_size = code_size
-        self.rcnn_cls_weight = rcnn_cls_weight
-        self.rcnn_reg_weight = rcnn_reg_weight
-        self.rcnn_corner_weight = rcnn_corner_weight
-        self.code_weights = code_weights
+            pcdet_cfg)
+        self.model_cfg = cfg
+        self.target_config = self.model_cfg["TARGET_CONFIG"]
+        self.roi_grid_pool_config = self.model_cfg["ROI_GRID_POOL"]
+        self.code_size = cfg["code_size"]
+        self.rcnn_cls_weight = cfg["rcnn_cls_weight"]
+        self.rcnn_reg_weight = cfg["rcnn_reg_weight"]
+        self.rcnn_corner_weight = cfg["rcnn_corner_weight"]
+        self.code_weights = cfg["code_weights"]
         self.box_coder = BBoxCoder()
 
-        self.num_class = num_class
+        self.num_class = cfg["num_class"]
         self.proposal_target_layer = PVRCNNPlusPlusProposalTargetLayer(
             roi_sampler_cfg=self.target_config)
         self.roi_grid_pool_layer, num_c_out = build_local_aggregation_module(
-            input_channels=input_channels, config=self.model_cfg.ROI_GRID_POOL)
+            input_channels=input_channels, config=self.model_cfg["ROI_GRID_POOL"])
 
-        GRID_SIZE = self.model_cfg.ROI_GRID_POOL.GRID_SIZE
+        GRID_SIZE = self.model_cfg["ROI_GRID_POOL"]["GRID_SIZE"]
         pre_channel = GRID_SIZE * GRID_SIZE * GRID_SIZE * num_c_out
 
         shared_fc_list = []
-        for k in range(0, self.model_cfg.SHARED_FC.__len__()):
+        for k in range(0, self.model_cfg["SHARED_FC"].__len__()):
             shared_fc_list.extend([
                 nn.Conv1d(pre_channel,
-                          self.model_cfg.SHARED_FC[k],
+                          self.model_cfg["SHARED_FC"][k],
                           kernel_size=1,
                           bias=False),
-                nn.BatchNorm1d(self.model_cfg.SHARED_FC[k]),
+                nn.BatchNorm1d(self.model_cfg["SHARED_FC"][k]),
                 nn.ReLU()
             ])
-            pre_channel = self.model_cfg.SHARED_FC[k]
+            pre_channel = self.model_cfg["SHARED_FC"][k]
 
-            if k != self.model_cfg.SHARED_FC.__len__(
-            ) - 1 and self.model_cfg.DP_RATIO > 0:
-                shared_fc_list.append(nn.Dropout(self.model_cfg.DP_RATIO))
+            if k != self.model_cfg["SHARED_FC"].__len__(
+            ) - 1 and self.model_cfg["DP_RATIO"] > 0:
+                shared_fc_list.append(nn.Dropout(self.model_cfg["DP_RATIO"]))
 
         self.shared_fc_layer = nn.Sequential(*shared_fc_list)
 
         self.cls_layers = self.make_fc_layers(input_channels=pre_channel,
                                               output_channels=self.num_class,
-                                              fc_list=self.model_cfg.CLS_FC)
+                                              fc_list=self.model_cfg["CLS_FC"])
         self.reg_layers = self.make_fc_layers(input_channels=pre_channel,
                                               output_channels=self.code_size *
                                               self.num_class,
-                                              fc_list=self.model_cfg.REG_FC)
+                                              fc_list=self.model_cfg["REG_FC"])
         self.init_weights(weight_init='xavier')
 
         self.reg_loss_func = WeightedSmoothL1Loss(
@@ -2648,8 +2647,8 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
                 nn.ReLU()
             ])
             pre_channel = fc_list[k]
-            if self.model_cfg.DP_RATIO >= 0 and k == 0:
-                fc_layers.append(nn.Dropout(self.model_cfg.DP_RATIO))
+            if self.model_cfg["DP_RATIO"] >= 0 and k == 0:
+                fc_layers.append(nn.Dropout(self.model_cfg["DP_RATIO"]))
         fc_layers.append(
             nn.Conv1d(pre_channel, output_channels, kernel_size=1, bias=True))
         fc_layers = nn.Sequential(*fc_layers)
@@ -2700,7 +2699,7 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
         pooled_features = self.roi_grid_pool(batch_size, rois, point_coords,
                                              point_features, keypoint_weights)
 
-        grid_size = self.model_cfg.ROI_GRID_POOL.GRID_SIZE
+        grid_size = self.model_cfg["ROI_GRID_POOL"]["GRID_SIZE"]
         batch_size_rcnn = pooled_features.shape[0]
         pooled_features = pooled_features.permute(0, 2, 1).\
             contiguous().view(batch_size_rcnn, -1, grid_size, grid_size, grid_size)  # (BxN, C, 6, 6, 6)
@@ -2925,7 +2924,7 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
                       keypoint_weights):
         point_features = point_features * keypoint_weights.view(-1, 1)
         global_roi_grid_points, local_roi_grid_points = self.get_global_grid_points_of_roi(
-            rois, grid_size=self.roi_grid_pool_config.GRID_SIZE)
+            rois, grid_size=self.roi_grid_pool_config["GRID_SIZE"])
         global_roi_grid_points = global_roi_grid_points.view(batch_size, -1, 3)
         xyz = point_coords[:, 1:4]
         xyz_batch_cnt = xyz.new_zeros(batch_size).int()
@@ -2945,7 +2944,7 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
         )
 
         pooled_features = pooled_features.view(
-            -1, self.model_cfg.ROI_GRID_POOL.GRID_SIZE**3,
+            -1, self.model_cfg["ROI_GRID_POOL"]["GRID_SIZE"]**3,
             pooled_features.shape[-1])
 
         return pooled_features

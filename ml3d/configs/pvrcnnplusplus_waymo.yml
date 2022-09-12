@@ -63,6 +63,8 @@ model:
     rcnn_reg_weight: 1.0
     rcnn_corner_weight: 1.0
     code_weights: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+    code_size: 7
+    num_class: 1
 
 
   voxel_set_abstraction:
