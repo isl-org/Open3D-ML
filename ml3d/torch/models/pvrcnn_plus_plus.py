@@ -2585,9 +2585,9 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
 
     def __init__(self, input_channels, cfg) -> None:
         super().__init__()
-        config = cfg_from_yaml_file(
-            "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
-            pcdet_cfg)
+        # config = cfg_from_yaml_file(
+        #     "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
+        #     pcdet_cfg)
         self.model_cfg = cfg
         self.target_config = self.model_cfg["TARGET_CONFIG"]
         self.roi_grid_pool_config = self.model_cfg["ROI_GRID_POOL"]
