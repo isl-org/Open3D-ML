@@ -107,6 +107,77 @@ model:
     num_keypoints: 4096
     sample_radius_with_roi: 1.6
     num_sectors: 6
+    NUM_OUTPUT_FEATURES: 90
+    SA_LAYER:
+      raw_points:
+        NAME: VectorPoolAggregationModuleMSG
+        NUM_GROUPS: 2
+        LOCAL_AGGREGATION_TYPE: local_interpolation
+        NUM_REDUCED_CHANNELS: 1 #2
+        NUM_CHANNELS_OF_LOCAL_AGGREGATION: 32
+        MSG_POST_MLPS: [ 32 ]
+        FILTER_NEIGHBOR_WITH_ROI: True
+        RADIUS_OF_NEIGHBOR_WITH_ROI: 2.4
+
+        GROUP_CFG_0:
+          NUM_LOCAL_VOXEL: [ 2, 2, 2 ]
+          MAX_NEIGHBOR_DISTANCE: 0.2
+          NEIGHBOR_NSAMPLE: -1
+          POST_MLPS: [ 32, 32 ]
+        GROUP_CFG_1:
+          NUM_LOCAL_VOXEL: [ 3, 3, 3 ]
+          MAX_NEIGHBOR_DISTANCE: 0.4
+          NEIGHBOR_NSAMPLE: -1
+          POST_MLPS: [ 32, 32 ]
+
+      x_conv3:
+        DOWNSAMPLE_FACTOR: 4
+        INPUT_CHANNELS: 64
+
+        NAME: VectorPoolAggregationModuleMSG
+        NUM_GROUPS: 2
+        LOCAL_AGGREGATION_TYPE: local_interpolation
+        NUM_REDUCED_CHANNELS: 32
+        NUM_CHANNELS_OF_LOCAL_AGGREGATION: 32
+        MSG_POST_MLPS: [128]
+        FILTER_NEIGHBOR_WITH_ROI: True
+        RADIUS_OF_NEIGHBOR_WITH_ROI: 4.0
+
+        GROUP_CFG_0:
+          NUM_LOCAL_VOXEL: [3, 3, 3]
+          MAX_NEIGHBOR_DISTANCE: 1.2
+          NEIGHBOR_NSAMPLE: -1
+          POST_MLPS: [64, 64]
+        GROUP_CFG_1:
+          NUM_LOCAL_VOXEL: [ 3, 3, 3 ]
+          MAX_NEIGHBOR_DISTANCE: 2.4
+          NEIGHBOR_NSAMPLE: -1
+          POST_MLPS: [ 64, 64 ]
+
+      x_conv4:
+        DOWNSAMPLE_FACTOR: 8
+        INPUT_CHANNELS: 64
+
+        NAME: VectorPoolAggregationModuleMSG
+        NUM_GROUPS: 2
+        LOCAL_AGGREGATION_TYPE: local_interpolation
+        NUM_REDUCED_CHANNELS: 32
+        NUM_CHANNELS_OF_LOCAL_AGGREGATION: 32
+        MSG_POST_MLPS: [ 128 ]
+        FILTER_NEIGHBOR_WITH_ROI: True
+        RADIUS_OF_NEIGHBOR_WITH_ROI: 6.4
+
+        GROUP_CFG_0:
+          NUM_LOCAL_VOXEL: [ 3, 3, 3 ]
+          MAX_NEIGHBOR_DISTANCE: 2.4
+          NEIGHBOR_NSAMPLE: -1
+          POST_MLPS: [ 64, 64 ]
+        GROUP_CFG_1:
+          NUM_LOCAL_VOXEL: [ 3, 3, 3 ]
+          MAX_NEIGHBOR_DISTANCE: 4.8
+          NEIGHBOR_NSAMPLE: -1
+          POST_MLPS: [ 64, 64 ]
+
   
   keypoint_weights:
     cls_fc: [256, 256]

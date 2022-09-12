@@ -1735,21 +1735,19 @@ Returns points_features_before_fusion and point_features and point_coords and us
 
 class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
-    def __init__(self, voxel_size, point_cloud_range, num_bev_features,
-                 num_raw_features, num_keypoints, sample_radius_with_roi,
-                 num_sectors, **kwargs):
+    def __init__(self, point_cloud_range, cfg, **kwargs):
         super().__init__()
-        self.point_cloud_range = point_cloud_range
-        self.voxel_size = voxel_size
-        self.num_keypoints = num_keypoints
-        self.sample_radius_with_roi = sample_radius_with_roi
-        self.num_sectors = num_sectors
+        self.point_cloud_range = cfg.point_cloud_range
+        self.voxel_size = cfg.voxel_size
+        self.num_keypoints = cfg.num_keypoints
+        self.sample_radius_with_roi = cfg.sample_radius_with_roi
+        self.num_sectors = cfg.num_sectors
         c_in = 0
 
-        config = cfg_from_yaml_file(
-            "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
-            cfg)
-        self.model_cfg = cfg.MODEL.PFE
+        # config = cfg_from_yaml_file(
+        #     "/homes/naruarjun/gsoc/OpenPCDet/tools/cfgs/waymo_models/pv_rcnn_plusplus.yaml",
+        #     cfg)
+        self.model_cfg = cfg
         SA_cfg = self.model_cfg.SA_LAYER
         self.SA_layers = nn.ModuleList()
         self.SA_layer_names = []
@@ -1758,11 +1756,11 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
         #Raw Points
         self.SA_rawpoints, cur_num_c_out = build_local_aggregation_module(
-            input_channels=num_raw_features - 3, config=SA_cfg['raw_points'])
+            input_channels=cfg.num_raw_features - 3, config=SA_cfg['raw_points'])
         c_in += cur_num_c_out
 
         #BEV
-        c_bev = num_bev_features
+        c_bev = cfg.num_bev_features
         c_in += c_bev
         self.feature_length.append(c_bev)
 
