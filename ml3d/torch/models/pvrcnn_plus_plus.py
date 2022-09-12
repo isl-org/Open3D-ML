@@ -1357,17 +1357,18 @@ class VectorPoolLocalInterpolateModule(nn.Module):
             new_features: (N1 + N2 ..., C_out)
         """
         interpolated_feats_o3d_list = []
-            # print("support_xyz", support_xyz.shape)
-            # print("xyz_batch_cnt", xyz_batch_cnt)
-            # print("new_xyz", new_xyz.shape)
-            # print("new_xyz_grid_centers", new_xyz_grid_centers.shape)
-            # print("new_xyz_batch_cnt", new_xyz_batch_cnt)
-            # print("self.max_neighbour_distance", self.max_neighbour_distance)
-            # print("self.nsample", self.nsample)
-            # print("self.neighbor_type", self.neighbor_type)
-            # print("self.num_avg_length_of_neighbor_idxs", self.num_avg_length_of_neighbor_idxs)
-            # print("self.num_total_grids", self.num_total_grids)
-            # print("self.neighbor_distance_multiplier", self.neighbor_distance_multiplier)
+        print("support_xyz", support_xyz.shape)
+        print("support_features", support_features.shape)
+        print("xyz_batch_cnt", xyz_batch_cnt)
+        print("new_xyz", new_xyz.shape)
+        print("new_xyz_grid_centers", new_xyz_grid_centers.shape)
+        print("new_xyz_batch_cnt", new_xyz_batch_cnt)
+        print("self.max_neighbour_distance", self.max_neighbour_distance)
+        print("self.nsample", self.nsample)
+        print("self.neighbor_type", self.neighbor_type)
+        print("self.num_avg_length_of_neighbor_idxs", self.num_avg_length_of_neighbor_idxs)
+        print("self.num_total_grids", self.num_total_grids)
+        print("self.neighbor_distance_multiplier", self.neighbor_distance_multiplier)
         dist_o3d, idx_o3d = [], []
         current_sum = 0
         current_sum_new = 0
@@ -1672,14 +1673,20 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         if filter_neighbors_with_roi:
             point_features_list = []
             for bs_idx in range(batch_size):
+                print("SHAPE OF TEH POINTS", points[bs_idx].shape)
                 xyz = points[bs_idx][:, :3].view(1,-1,3)
                 xyz_features = points[bs_idx][:, 3:].view(1, points[bs_idx].shape[0], points[bs_idx].shape[1]-3)
                 _, valid_mask = self.sample_points_with_roi(
                     rois=rois[bs_idx], points=xyz[0],
                     sample_radius_with_roi=radius_of_neighbor, num_max_points_of_part=num_max_points_of_part,
                 )
-                point_features_list.append(points[bs_idx][valid_mask])
-                xyz_batch_cnt[bs_idx] = valid_mask.sum()
+                if points[bs_idx][valid_mask].shape[0] == 0:
+                #    return torch.zeros((new_points.shape[0],self.feature_length[self.feature_index])).to(points[bs_idx].device)
+                    point_features_list.append(torch.zeros((10, points[bs_idx].shape[1])).to(points[bs_idx].device))
+                    xyz_batch_cnt[bs_idx] = 10
+                else:
+                    point_features_list.append(points[bs_idx][valid_mask])
+                    xyz_batch_cnt[bs_idx] = valid_mask.sum()
             valid_point_features = torch.cat(point_features_list, dim=0)
             if valid_point_features.shape[0] == 0:
                 return torch.zeros((new_points.shape[0],self.feature_length[self.feature_index])).to(points[bs_idx].device)
