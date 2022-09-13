@@ -1,7 +1,5 @@
-https://s3.us-west-1.wasabisys.com/open3d-downloads/torch-1.8.2-cp36-cp36m-linux_x86_64.whl ; python_version == '3.6'
-https://s3.us-west-1.wasabisys.com/open3d-downloads/torch-1.8.2-cp37-cp37m-linux_x86_64.whl ; python_version == '3.7'
-https://s3.us-west-1.wasabisys.com/open3d-downloads/torch-1.8.2-cp38-cp38-linux_x86_64.whl ; python_version == '3.8'
-https://s3.us-west-1.wasabisys.com/open3d-downloads/torch-1.8.2-cp39-cp39-linux_x86_64.whl ; python_version == '3.9'
--f https://download.pytorch.org/whl/lts/1.8/torch_lts.html
-torchvision==0.9.2+cu111
-tensorboard
+-f https://download.pytorch.org/whl/torch/
+torch==1.12.0+cu116
+-f https://download.pytorch.org/whl/torchvision/
+torchvision==0.13.0+cu116
+tensorboard~=2.8.0
