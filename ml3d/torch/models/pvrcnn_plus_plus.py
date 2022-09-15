@@ -168,13 +168,11 @@ class PVRCNNPlusPlus(BaseModel):
             return_targets_dict['roi_labels'] = roi_labels
             return_targets_dict['cls_preds_normalized'] = False
             return return_targets_dict
-
-        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
-            inputs, rois_new, x_bev_2d, x_intermediate_layers)
-        # del (x_bev_2d)
-        # torch.cuda.empty_cache()
-
-        if point_features is None:
+        
+        with torch.no_grad():
+            keypoints = self.voxel_set_abstraction.get_keypoints(inputs, rois_new, len(gt_boxes))
+        
+        if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
             print("KEYPOINTS ARE ONLY 1")
             self.keypoints_not_found = True
             return_targets_dict = {}
@@ -183,6 +181,11 @@ class PVRCNNPlusPlus(BaseModel):
             return_targets_dict['roi_labels'] = roi_labels_new
             return_targets_dict['cls_preds_normalized'] = False
             return return_targets_dict
+
+        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
+            inputs, rois_new, x_bev_2d, x_intermediate_layers)
+        # del (x_bev_2d)
+        # torch.cuda.empty_cache()
 
         keypoint_weights = self.keypoint_weight_computer(
             len(gt_boxes), point_features, point_coords,
