@@ -160,7 +160,12 @@ class PVRCNNPlusPlus(BaseModel):
         else:
             print("TARGETS_DICT WAS NONE")
             self.keypoints_not_found = True
-            return (rois, roi_scores, roi_labels)
+            return_targets_dict = {}
+            return_targets_dict['batch_cls_preds'] = roi_scores
+            return_targets_dict['batch_box_preds'] = rois
+            return_targets_dict['roi_labels'] = roi_labels
+            return_targets_dict['cls_preds_normalized'] = False
+            return return_targets_dict
 
         point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
             inputs, rois, x_bev_2d, x_intermediate_layers)
@@ -170,7 +175,12 @@ class PVRCNNPlusPlus(BaseModel):
         if point_features is None:
             print("KEYPOINTS ARE ONLY 1")
             self.keypoints_not_found = True
-            return (rois, roi_scores, roi_labels)
+            return_targets_dict = {}
+            return_targets_dict['batch_cls_preds'] = roi_scores
+            return_targets_dict['batch_box_preds'] = rois
+            return_targets_dict['roi_labels'] = roi_labels
+            return_targets_dict['cls_preds_normalized'] = False
+            return return_targets_dict
 
         keypoint_weights = self.keypoint_weight_computer(
             len(gt_boxes), point_features, point_coords,
@@ -274,14 +284,9 @@ class PVRCNNPlusPlus(BaseModel):
 
     def inference_end(self, results, inputs):
 
-        if not self.keypoints_not_found:
-            batch_cls_preds = results["batch_cls_preds"]
-            batch_box_preds = results["batch_box_preds"]
-            roi_labels = results["roi_labels"]
-        else:
-            batch_cls_preds = results[1]
-            batch_box_preds = results[0]
-            roi_labels = results[2]
+        batch_cls_preds = results["batch_cls_preds"]
+        batch_box_preds = results["batch_box_preds"]
+        roi_labels = results["roi_labels"]
 
         batch_size = batch_cls_preds.shape[0]
 
