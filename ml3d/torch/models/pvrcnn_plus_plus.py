@@ -155,7 +155,7 @@ class PVRCNNPlusPlus(BaseModel):
         rois = targets_dict['rois']
         roi_scores = targets_dict['roi_scores']
         roi_labels = targets_dict['roi_labels']
-        keypoints = self.get_keypoints(inputs, rois, len(gt_boxes))
+        keypoints = self.voxel_set_abstraction.get_keypoints(inputs, rois, len(gt_boxes))
         # if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
         #     return None, None, None
         if False: # targets_dict is not None:
