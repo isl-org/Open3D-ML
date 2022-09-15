@@ -136,12 +136,12 @@ class PVRCNNPlusPlus(BaseModel):
         x_sparse = self.convert_open3d_voxel_to_dense(
             x, x_pos, self.voxel_layer.voxel_size)
         x_dense_bev = self.bev_module(x_sparse)
-        del (x_sparse)
-        torch.cuda.empty_cache()
+        # del (x_sparse)
+        # torch.cuda.empty_cache()
 
         x_bev_2d = self.backbone_2d(x_dense_bev)
-        del (x_dense_bev)
-        torch.cuda.empty_cache()
+        # del (x_dense_bev)
+        # torch.cuda.empty_cache()
 
         rois, roi_scores, roi_labels = self.rpn_module(x_bev_2d, gt_boxes,
                                                        gt_labels)
@@ -152,7 +152,7 @@ class PVRCNNPlusPlus(BaseModel):
                                                           _gt_boxes=gt_boxes,
                                                           _gt_labels=gt_labels,
                                                           roi_labels=roi_labels)
-        if targets_dict is not None:
+        if False: # targets_dict is not None:
             rois = targets_dict['rois']
             roi_scores = targets_dict['roi_scores']
             roi_labels = targets_dict['roi_labels']
@@ -169,8 +169,8 @@ class PVRCNNPlusPlus(BaseModel):
 
         point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
             inputs, rois, x_bev_2d, x_intermediate_layers)
-        del (x_bev_2d)
-        torch.cuda.empty_cache()
+        # del (x_bev_2d)
+        # torch.cuda.empty_cache()
 
         if point_features is None:
             print("KEYPOINTS ARE ONLY 1")
@@ -212,6 +212,9 @@ class PVRCNNPlusPlus(BaseModel):
                 loss_dict["loss_point"] = loss_point
             else:
                 loss_dict["loss_point"] = torch.zeros_like(loss_point)
+        else:
+            loss_dict["loss_point"] = torch.zeros_like(loss_rpn)
+            loss_dict["loss_rcnn"] = torch.zeros_like(loss_rpn)
         loss_dict["loss_rpn"] = loss_rpn
         return loss_dict
 
