@@ -196,8 +196,12 @@ class PVRCNNPlusPlus(BaseModel):
             loss_rcnn, tb_dict = self.box_refinement.get_loss(tb_dict)
             if not torch.isnan(loss_rcnn).any():
                 loss_dict["loss_rcnn"] = loss_rcnn
+            else:
+                loss_dict["loss_rcnn"] = torch.zeros_like(loss_rcnn)
             if not torch.isnan(loss_point).any():
                 loss_dict["loss_point"] = loss_point
+            else:
+                loss_dict["loss_point"] = torch.zeros_like(loss_point)
         loss_dict["loss_rpn"] = loss_rpn
         return loss_dict
 
