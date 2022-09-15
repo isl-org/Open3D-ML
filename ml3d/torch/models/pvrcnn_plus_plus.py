@@ -154,12 +154,17 @@ class PVRCNNPlusPlus(BaseModel):
                                                           roi_labels=roi_labels)
         # if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
         #     return None, None, None
+        flag = False
         if targets_dict is not None:
             rois_new = targets_dict['rois']
             roi_scores_new = targets_dict['roi_scores']
             roi_labels_new = targets_dict['roi_labels']
             roi_targets_dict = targets_dict
-        else:
+            with torch.no_grad():
+                keypoints = self.voxel_set_abstraction.get_keypoints(inputs, rois_new, len(gt_boxes))
+                if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
+                    flag = True
+        if targets_dict is None or flag==True:
             print("TARGETS_DICT WAS NONE")
             self.keypoints_not_found = True
             return_targets_dict = {}
@@ -169,18 +174,15 @@ class PVRCNNPlusPlus(BaseModel):
             return_targets_dict['cls_preds_normalized'] = False
             return return_targets_dict
         
-        with torch.no_grad():
-            keypoints = self.voxel_set_abstraction.get_keypoints(inputs, rois_new, len(gt_boxes))
-        
-        if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
-            print("KEYPOINTS ARE ONLY 1")
-            self.keypoints_not_found = True
-            return_targets_dict = {}
-            return_targets_dict['batch_cls_preds'] = roi_scores_new
-            return_targets_dict['batch_box_preds'] = rois_new
-            return_targets_dict['roi_labels'] = roi_labels_new
-            return_targets_dict['cls_preds_normalized'] = False
-            return return_targets_dict
+        # if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
+        #     print("KEYPOINTS ARE ONLY 1")
+        #     self.keypoints_not_found = True
+        #     return_targets_dict = {}
+        #     return_targets_dict['batch_cls_preds'] = roi_scores_new
+        #     return_targets_dict['batch_box_preds'] = rois_new
+        #     return_targets_dict['roi_labels'] = roi_labels_new
+        #     return_targets_dict['cls_preds_normalized'] = False
+        #     return return_targets_dict
 
         point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
             inputs, rois_new, x_bev_2d, x_intermediate_layers)
