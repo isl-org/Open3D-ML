@@ -152,6 +152,12 @@ class PVRCNNPlusPlus(BaseModel):
                                                           _gt_boxes=gt_boxes,
                                                           _gt_labels=gt_labels,
                                                           roi_labels=roi_labels)
+        rois = targets_dict['rois']
+        roi_scores = targets_dict['roi_scores']
+        roi_labels = targets_dict['roi_labels']
+        keypoints = self.get_keypoints(inputs, rois, len(gt_boxes))
+        # if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
+        #     return None, None, None
         if False: # targets_dict is not None:
             rois = targets_dict['rois']
             roi_scores = targets_dict['roi_scores']
