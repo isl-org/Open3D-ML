@@ -1609,20 +1609,6 @@ class VectorPoolLocalInterpolateModule(nn.Module):
             new_features: (N1 + N2 ..., C_out)
         """
         interpolated_feats_o3d_list = []
-        print("support_xyz", support_xyz.shape)
-        print("support_features", support_features.shape)
-        print("xyz_batch_cnt", xyz_batch_cnt)
-        print("new_xyz", new_xyz.shape)
-        print("new_xyz_grid_centers", new_xyz_grid_centers.shape)
-        print("new_xyz_batch_cnt", new_xyz_batch_cnt)
-        print("self.max_neighbour_distance", self.max_neighbour_distance)
-        print("self.nsample", self.nsample)
-        print("self.neighbor_type", self.neighbor_type)
-        print("self.num_avg_length_of_neighbor_idxs",
-              self.num_avg_length_of_neighbor_idxs)
-        print("self.num_total_grids", self.num_total_grids)
-        print("self.neighbor_distance_multiplier",
-              self.neighbor_distance_multiplier)
         dist_o3d, idx_o3d = [], []
         current_sum = 0
         current_sum_new = 0
@@ -1666,8 +1652,6 @@ class VectorPoolLocalInterpolateModule(nn.Module):
                 dim=0).permute((1, 2, 0))
             interpolated_feats_o3d_list.append(interpolated_feats_o3d)
 
-            # print("OPEN3D SHAPES ARE", dist_recip.shape, norm.shape, weight.shape,interpolated_feats_o3d.shape)
-            # print("OPEN3D SHAPES ARE", dist_o3d[-1].view(new_xyz_grid_centers.shape).shape, idx_o3d[-1].view(new_xyz_grid_centers.shape).shape)
         if len(interpolated_feats_o3d_list) == 1:
             interpolated_feats_o3d = interpolated_feats_o3d_list[0]
             idx_o3d = idx_o3d[0]
@@ -1676,18 +1660,7 @@ class VectorPoolLocalInterpolateModule(nn.Module):
                                                dim=0)
             idx_o3d = torch.cat(idx_o3d, dim=0)
 
-            # print("OUTPUT SHAPES")
-            # print("dist", dist.shape)
-            # print("idx", idx.shape)
-            # print("num_avg_length_of_neighbor_idxs", num_avg_length_of_neighbor_idxs)
-
-        # print("idx shape after empty mask", idx.shape)
-        # print("support feature", support_features.shape)
-        # print("weight", weight.shape, norm.shape)
-
         interpolated_feats = interpolated_feats_o3d  # (M1 + M2 ..., num_total_grids, C)
-        # print("SHAPE OF INTERPOLATED OPENPCDET", interpolated_feats.shape)
-        # print("ARE FEATURES EQUAL", torch.eq(interpolated_feats, interpolated_feats_o3d).sum())
         if self.use_xyz:
             near_known_xyz = support_xyz[idx_o3d.view(-1, 3).long()].view(
                 -1, 3, 3)  # ( (M1 + M2 ...)*num_total_grids, 3)
@@ -1981,7 +1954,6 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         if filter_neighbors_with_roi:
             point_features_list = []
             for bs_idx in range(batch_size):
-                print("SHAPE OF TEH POINTS", points[bs_idx].shape)
                 xyz = points[bs_idx][:, :3].view(1, -1, 3)
                 xyz_features = points[bs_idx][:, 3:].view(
                     1, points[bs_idx].shape[0], points[bs_idx].shape[1] - 3)
