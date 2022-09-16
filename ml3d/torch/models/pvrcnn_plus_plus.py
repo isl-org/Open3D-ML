@@ -2078,8 +2078,8 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         self.feature_index = 0
         point_features = torch.cat(point_features_list, dim=-1)
 
-        point_features_before_fusion = point_features.view(
-            -1, point_features.shape[-1])
+        # point_features_before_fusion = point_features.view(
+        #     -1, point_features.shape[-1])
         point_features = self.vsa_point_feature_fusion(
             point_features.view(-1, point_features.shape[-1]))
 
@@ -2705,7 +2705,7 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
 
         self.targets_dict = targets_dict
 
-        return targets_dict
+        return targets_dict['rois']
 
     def get_box_reg_layer_loss(self, forward_ret_dict):
         code_size = forward_ret_dict['rois'].shape[-1]
