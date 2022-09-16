@@ -225,7 +225,7 @@ class PVRCNNPlusPlus(BaseModel):
             loss_dict["loss_rcnn"] = torch.zeros_like(loss_rpn)
         loss_dict["loss_rpn"] = loss_rpn
         for param in self.parameters():
-            loss_dict["loss_rpn"] += param*0
+            loss_dict["loss_rpn"] += (param*0).mean()
         return loss_dict
 
     def preprocess(self, data, attr):
