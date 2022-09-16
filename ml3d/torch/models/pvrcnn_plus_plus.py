@@ -136,12 +136,8 @@ class PVRCNNPlusPlus(BaseModel):
         x_sparse = self.convert_open3d_voxel_to_dense(
             x, x_pos, self.voxel_layer.voxel_size)
         x_dense_bev = self.bev_module(x_sparse)
-        # del (x_sparse)
-        # torch.cuda.empty_cache()
 
         x_bev_2d = self.backbone_2d(x_dense_bev)
-        # del (x_dense_bev)
-        # torch.cuda.empty_cache()
 
         rois, roi_scores, roi_labels = self.rpn_module(x_bev_2d, gt_boxes,
                                                        gt_labels)
@@ -152,8 +148,6 @@ class PVRCNNPlusPlus(BaseModel):
                                                           _gt_boxes=gt_boxes,
                                                           _gt_labels=gt_labels,
                                                           roi_labels=roi_labels)
-        # if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
-        #     return None, None, None
         flag = False
         if targets_dict is not None:
             rois_new = targets_dict['rois']
@@ -173,25 +167,13 @@ class PVRCNNPlusPlus(BaseModel):
             return_targets_dict['roi_labels'] = roi_labels
             return_targets_dict['cls_preds_normalized'] = False
             return return_targets_dict
-        
-        # if keypoints.shape[0] == 0 or keypoints.shape[0] == 1:
-        #     print("KEYPOINTS ARE ONLY 1")
-        #     self.keypoints_not_found = True
-        #     return_targets_dict = {}
-        #     return_targets_dict['batch_cls_preds'] = roi_scores_new
-        #     return_targets_dict['batch_box_preds'] = rois_new
-        #     return_targets_dict['roi_labels'] = roi_labels_new
-        #     return_targets_dict['cls_preds_normalized'] = False
-        #     return return_targets_dict
 
-        point_features, point_coords = self.voxel_set_abstraction(
+        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
             inputs, rois_new, x_bev_2d, x_intermediate_layers)
-        # del (x_bev_2d)
-        # torch.cuda.empty_cache()
 
         keypoint_weights = self.keypoint_weight_computer(
             len(gt_boxes), point_features, point_coords,
-            #point_features_before_fusion, 
+            point_features_before_fusion, 
             gt_boxes, gt_labels)
 
         outs = self.box_refinement(point_coords, point_features, rois_new,
@@ -2080,14 +2062,14 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
         self.feature_index = 0
         point_features = torch.cat(point_features_list, dim=-1)
 
-        # point_features_before_fusion = point_features.view(
-        #     -1, point_features.shape[-1])
+        point_features_before_fusion = point_features.view(
+            -1, point_features.shape[-1])
         point_features = self.vsa_point_feature_fusion(
             point_features.view(-1, point_features.shape[-1]))
 
         point_features = point_features  # (BxN, C)
         point_coords = keypoints  # (BxN, 4)
-        return point_features, point_coords #, point_features_before_fusion
+        return point_features, point_coords, point_features_before_fusion
 
 
 def check_numpy_to_torch(x):
@@ -2128,7 +2110,7 @@ class PVRCNNKeypointWeightComputer(nn.Module):
                 batch_size,
                 point_features,
                 point_coords,
-                # point_features_before_fusion,
+                point_features_before_fusion,
                 gt_boxes=None,
                 gt_labels=None):
         features_to_use = point_features
@@ -2707,7 +2689,7 @@ class PVRCNNPlusPlusBoxRefinement(nn.Module):
 
         self.targets_dict = targets_dict
 
-        return targets_dict['rois']
+        return targets_dict
 
     def get_box_reg_layer_loss(self, forward_ret_dict):
         code_size = forward_ret_dict['rois'].shape[-1]
