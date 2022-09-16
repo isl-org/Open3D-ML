@@ -95,7 +95,7 @@ class SemanticSegmentation(BasePipeline):
             scheduler_gamma=0.95,
             momentum=0.98,
             main_log_dir='./logs/',
-            device='gpu',
+            device='cuda',
             split='train',
             train_sum_dir='train_log',
             **kwargs):

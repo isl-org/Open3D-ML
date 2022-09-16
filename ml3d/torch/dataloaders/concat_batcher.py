@@ -4,6 +4,7 @@ import numpy as np
 import pickle
 import torch
 import yaml
+import math
 from os import listdir
 from os.path import exists, join, isdir
 
@@ -434,6 +435,22 @@ class SparseConvUnetBatch:
         self.feat = [feat.to(device) for feat in self.feat]
         self.label = [label.to(device) for label in self.label]
 
+    @staticmethod
+    def scatter(batch, num_gpu):
+        batch_size = len(batch.batch_lengths)
+
+        new_batch_size = math.ceil(batch_size / num_gpu)
+        batches = [SparseConvUnetBatch([]) for _ in range(num_gpu)]
+        for i in range(num_gpu):
+            start = new_batch_size * i
+            end = min(new_batch_size * (i + 1), batch_size)
+            batches[i].point = batch.point[start:end]
+            batches[i].feat = batch.feat[start:end]
+            batches[i].label = batch.label[start:end]
+            batches[i].batch_lengths = batch.batch_lengths[start:end]
+
+        return [b for b in batches if len(b.point)]  # filter empty batch
+
 
 class PointTransformerBatch:
 
@@ -486,7 +503,6 @@ class ObjectDetectBatch:
         self.attr = []
 
         for batch in batches:
-            self.attr.append(batch['attr'])
             data = batch['data']
             self.point.append(torch.tensor(data['point'], dtype=torch.float32))
             self.labels.append(
@@ -518,6 +534,23 @@ class ObjectDetectBatch:
                 self.labels[i] = self.labels[i].to(device)
             if self.bboxes[i] is not None:
                 self.bboxes[i] = self.bboxes[i].to(device)
+
+    @staticmethod
+    def scatter(batch, num_gpu):
+        batch_size = len(batch.point)
+
+        new_batch_size = math.ceil(batch_size / num_gpu)
+        batches = [ObjectDetectBatch([]) for _ in range(num_gpu)]
+        for i in range(num_gpu):
+            start = new_batch_size * i
+            end = min(new_batch_size * (i + 1), batch_size)
+            batches[i].point = batch.point[start:end]
+            batches[i].labels = batch.labels[start:end]
+            batches[i].bboxes = batch.bboxes[start:end]
+            batches[i].bbox_objs = batch.bbox_objs[start:end]
+            batches[i].attr = batch.attr[start:end]
+
+        return [b for b in batches if len(b.point)]  # filter empty batch
 
 
 class ConcatBatcher(object):

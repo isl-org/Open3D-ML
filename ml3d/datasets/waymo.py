@@ -25,7 +25,6 @@ class Waymo(BaseDataset):
                  name='Waymo',
                  cache_dir='./logs/cache',
                  use_cache=False,
-                 val_split=3,
                  **kwargs):
         """Initialize the function by passing the dataset and other details.
 
@@ -34,7 +33,6 @@ class Waymo(BaseDataset):
             name: The name of the dataset (Waymo in this case).
             cache_dir: The directory where the cache is stored.
             use_cache: Indicates if the dataset should be cached.
-            val_split: The split value to get a set of images for training, validation, for testing.
 
         Returns:
             class: The corresponding class.
@@ -43,7 +41,6 @@ class Waymo(BaseDataset):
                          name=name,
                          cache_dir=cache_dir,
                          use_cache=use_cache,
-                         val_split=val_split,
                          **kwargs)
 
         cfg = self.cfg
@@ -52,22 +49,27 @@ class Waymo(BaseDataset):
         self.dataset_path = cfg.dataset_path
         self.num_classes = 4
         self.label_to_names = self.get_label_to_names()
+        self.shuffle = kwargs.get('shuffle', False)
 
         self.all_files = sorted(
             glob(join(cfg.dataset_path, 'velodyne', '*.bin')))
         self.train_files = []
         self.val_files = []
+        self.test_files = []
 
         for f in self.all_files:
-            idx = Path(f).name.replace('.bin', '')[:3]
-            idx = int(idx)
-            if idx < cfg.val_split:
+            if 'train' in f:
                 self.train_files.append(f)
-            else:
+            elif 'val' in f:
                 self.val_files.append(f)
-
-        self.test_files = glob(
-            join(cfg.dataset_path, 'testing', 'velodyne', '*.bin'))
+            elif 'test' in f:
+                self.test_files.append(f)
+            else:
+                log.warning(
+                    f"Skipping {f}, prefix must be one of train, test or val.")
+        if self.shuffle:
+            log.info("Shuffling training files...")
+            self.rng.shuffle(self.train_files)
 
     @staticmethod
     def get_label_to_names():
@@ -90,18 +92,21 @@ class Waymo(BaseDataset):
         """Reads lidar data from the path provided.
 
         Returns:
-            A data object with lidar information.
+            pc: pointcloud data with shape [N, 6], where
+                the format is xyzRGB.
         """
-        assert Path(path).exists()
-
         return np.fromfile(path, dtype=np.float32).reshape(-1, 6)
 
     @staticmethod
     def read_label(path, calib):
-        """Reads labels of bound boxes.
+        """Reads labels of bounding boxes.
+
+        Args:
+            path: The path to the label file.
+            calib: Calibration as returned by read_calib().
 
         Returns:
-            The data objects with bound boxes information.
+            The data objects with bounding boxes information.
         """
         if not Path(path).exists():
             return None
@@ -131,24 +136,22 @@ class Waymo(BaseDataset):
         Returns:
             The camera and the camera image used in calibration.
         """
-        assert Path(path).exists()
-
         with open(path, 'r') as f:
             lines = f.readlines()
         obj = lines[0].strip().split(' ')[1:]
-        P0 = np.array(obj, dtype=np.float32)
+        unused_P0 = np.array(obj, dtype=np.float32)
 
         obj = lines[1].strip().split(' ')[1:]
-        P1 = np.array(obj, dtype=np.float32)
+        unused_P1 = np.array(obj, dtype=np.float32)
 
         obj = lines[2].strip().split(' ')[1:]
         P2 = np.array(obj, dtype=np.float32)
 
         obj = lines[3].strip().split(' ')[1:]
-        P3 = np.array(obj, dtype=np.float32)
+        unused_P3 = np.array(obj, dtype=np.float32)
 
         obj = lines[4].strip().split(' ')[1:]
-        P4 = np.array(obj, dtype=np.float32)
+        unused_P4 = np.array(obj, dtype=np.float32)
 
         obj = lines[5].strip().split(' ')[1:]
         R0 = np.array(obj, dtype=np.float32).reshape(3, 3)
@@ -162,7 +165,7 @@ class Waymo(BaseDataset):
         Tr_velo_to_cam = Waymo._extend_matrix(Tr_velo_to_cam)
 
         world_cam = np.transpose(rect_4x4 @ Tr_velo_to_cam)
-        cam_img = np.transpose(P2)
+        cam_img = np.transpose(np.vstack((P2.reshape(3, 4), [0, 0, 0, 1])))
 
         return {'world_cam': world_cam, 'cam_img': cam_img}
 
@@ -209,7 +212,7 @@ class Waymo(BaseDataset):
         else:
             raise ValueError("Invalid split {}".format(split))
 
-    def is_tested():
+    def is_tested(attr):
         """Checks if a datum in the dataset has been tested.
 
         Args:
@@ -219,16 +222,16 @@ class Waymo(BaseDataset):
             If the datum attribute is tested, then return the path where the
                 attribute is stored; else, returns false.
         """
-        pass
+        raise NotImplementedError()
 
-    def save_test_result():
+    def save_test_result(results, attr):
         """Saves the output of a model.
 
         Args:
             results: The output of a model for the datum associated with the attribute passed.
             attr: The attributes that correspond to the outputs passed in results.
         """
-        pass
+        raise NotImplementedError()
 
 
 class WaymoSplit():
@@ -273,11 +276,9 @@ class WaymoSplit():
 
 
 class Object3d(BEVBox3D):
-    """The class stores details that are object-specific, such as bounding box
-    coordinates, occlusion and so on.
-    """
 
     def __init__(self, center, size, label, calib):
+        # ground truth files doesn't have confidence value.
         confidence = float(label[15]) if label.__len__() == 16 else -1.0
 
         world_cam = calib['world_cam']

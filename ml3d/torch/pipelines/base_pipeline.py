@@ -12,13 +12,19 @@ from ...utils import Config, make_dir
 class BasePipeline(ABC):
     """Base pipeline class."""
 
-    def __init__(self, model, dataset=None, device='gpu', **kwargs):
+    def __init__(self,
+                 model,
+                 dataset=None,
+                 device='cuda',
+                 distributed=False,
+                 **kwargs):
         """Initialize.
 
         Args:
             model: A network model.
             dataset: A dataset, or None for inference model.
-            device: 'gpu' or 'cpu'.
+            device: 'cuda' or 'cpu'.
+            distributed: Whether to use multiple gpus.
             kwargs:
 
         Returns:
@@ -34,18 +40,36 @@ class BasePipeline(ABC):
         self.dataset = dataset
         self.rng = np.random.default_rng(kwargs.get('seed', None))
 
-        make_dir(self.cfg.main_log_dir)
+        self.distributed = distributed
+        if self.distributed and self.name == "SemanticSegmentation":
+            raise NotImplementedError(
+                "Distributed training not implemented for SemanticSegmentation!"
+            )
+
+        self.rank = kwargs.get('rank', 0)
+
         dataset_name = dataset.name if dataset is not None else ''
         self.cfg.logs_dir = join(
             self.cfg.main_log_dir,
             model.__class__.__name__ + '_' + dataset_name + '_torch')
-        make_dir(self.cfg.logs_dir)
+
+        if self.rank == 0:
+            make_dir(self.cfg.main_log_dir)
+            make_dir(self.cfg.logs_dir)
 
         if device == 'cpu' or not torch.cuda.is_available():
+            if distributed:
+                raise NotImplementedError(
+                    "Distributed training for CPU is not supported yet.")
             self.device = torch.device('cpu')
         else:
-            self.device = torch.device('cuda' if len(device.split(':')) ==
-                                       1 else 'cuda:' + device.split(':')[1])
+            if distributed:
+                self.device = torch.device(device)
+                print(f"Rank : {self.rank} using device : {self.device}")
+                torch.cuda.set_device(self.device)
+            else:
+                self.device = torch.device('cuda')
+
         self.summary = {}
         self.cfg.setdefault('summary', {})
 

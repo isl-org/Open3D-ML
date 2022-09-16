@@ -1,12 +1,13 @@
 import logging
 import re
+import numpy as np
+import torch
+import torch.distributed as dist
+
 from datetime import datetime
 from os.path import exists, join
 from pathlib import Path
-
 from tqdm import tqdm
-import numpy as np
-import torch
 from torch.utils.data import DataLoader
 
 from .base_pipeline import BasePipeline
@@ -148,8 +149,9 @@ class ObjectDetection(BasePipeline):
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
+        if self.rank == 0:
+            log.info("Logging in file : {}".format(log_file_path))
+            log.addHandler(logging.FileHandler(log_file_path))
 
         batcher = ConcatBatcher(device, model.cfg.name)
 
@@ -161,16 +163,22 @@ class ObjectDetection(BasePipeline):
                                       shuffle=True,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
-        valid_loader = DataLoader(
-            valid_split,
-            batch_size=cfg.val_batch_size,
-            num_workers=cfg.get('num_workers', 4),
-            pin_memory=cfg.get('pin_memory', False),
-            collate_fn=batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
-                torch.utils.data.get_worker_info().seed)))
 
-        record_summary = 'valid' in cfg.get('summary').get('record_for', [])
+        if self.distributed:
+            valid_sampler = torch.utils.data.distributed.DistributedSampler(
+                valid_split)
+        else:
+            valid_sampler = None
+
+        valid_loader = DataLoader(valid_split,
+                                  batch_size=cfg.val_batch_size,
+                                  num_workers=cfg.get('num_workers', 0),
+                                  pin_memory=cfg.get('pin_memory', False),
+                                  collate_fn=batcher.collate_fn,
+                                  sampler=valid_sampler)
+
+        record_summary = self.rank == 0 and 'valid' in cfg.get('summary').get(
+            'record_for', [])
         log.info("Started validation")
 
         self.valid_losses = {}
@@ -181,7 +189,7 @@ class ObjectDetection(BasePipeline):
             for data in tqdm(valid_loader, desc='validation'):
                 data.to(device)
                 results = model(data)
-                loss = model.loss(results, data)
+                loss = model.get_loss(results, data)
                 for l, v in loss.items():
                     if l not in self.valid_losses:
                         self.valid_losses[l] = []
@@ -191,12 +199,12 @@ class ObjectDetection(BasePipeline):
                 boxes = model.inference_end(results, data)
                 pred.extend([BEVBox3D.to_dicts(b) for b in boxes])
                 gt.extend([BEVBox3D.to_dicts(b) for b in data.bbox_objs])
-                # Save only for the first batch
-                if record_summary and 'valid' not in self.summary:
+                if record_summary:
                     self.summary['valid'] = self.get_3d_summary(boxes,
                                                                 data,
                                                                 epoch,
                                                                 results=results)
+                record_summary = False  # Save only for the first batch
 
         sum_loss = 0
         desc = "validation - "
@@ -210,6 +218,22 @@ class ObjectDetection(BasePipeline):
         overlaps = cfg.get("overlaps", [0.5])
         similar_classes = cfg.get("similar_classes", {})
         difficulties = cfg.get("difficulties", [0])
+
+        if self.distributed:
+            gt_gather = [None for _ in range(dist.get_world_size())]
+            pred_gather = [None for _ in range(dist.get_world_size())]
+
+            dist.gather_object(gt, gt_gather if self.rank == 0 else None, dst=0)
+            dist.gather_object(pred,
+                               pred_gather if self.rank == 0 else None,
+                               dst=0)
+
+            if self.rank == 0:
+                gt = sum(gt_gather, [])
+                pred = sum(pred_gather, [])
+
+        if self.rank != 0:
+            return
 
         ap = mAP(pred,
                  gt,
@@ -249,18 +273,21 @@ class ObjectDetection(BasePipeline):
         """Run training with train data split."""
         torch.manual_seed(self.rng.integers(np.iinfo(
             np.int32).max))  # Random reproducible seed for torch
+        rank = self.rank  # Rank for distributed training
         model = self.model
         device = self.device
         dataset = self.dataset
 
         cfg = self.cfg
 
-        log.info("DEVICE : {}".format(device))
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        if rank == 0:
+            log.info("DEVICE : {}".format(device))
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
+            log_file_path = join(cfg.logs_dir,
+                                 'log_train_' + timestamp + '.txt')
+            log.info("Logging in file : {}".format(log_file_path))
+            log.addHandler(logging.FileHandler(log_file_path))
 
         batcher = ConcatBatcher(device, model.cfg.name)
 
@@ -271,12 +298,20 @@ class ObjectDetection(BasePipeline):
                                       use_cache=dataset.cfg.use_cache,
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
+
+        if self.distributed:
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                train_split)
+        else:
+            train_sampler = None
+
         train_loader = DataLoader(
             train_split,
             batch_size=cfg.batch_size,
-            num_workers=cfg.get('num_workers', 4),
+            num_workers=cfg.get('num_workers', 0),
             pin_memory=cfg.get('pin_memory', False),
             collate_fn=batcher.collate_fn,
+            sampler=train_sampler,
             worker_init_fn=lambda x: np.random.seed(x + np.uint32(
                 torch.utils.data.get_worker_info().seed))
         )  # numpy expects np.uint32, whereas torch returns np.uint64.
@@ -295,29 +330,52 @@ class ObjectDetection(BasePipeline):
                                     runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
-        self.save_config(writer)
-        log.info("Writing summary in {}.".format(self.tensorboard_dir))
-        record_summary = 'train' in cfg.get('summary').get('record_for', [])
+        if rank == 0:
+            self.save_config(writer)
+            log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
-        log.info("Started training")
+        # wrap model for multiple GPU
+        if self.distributed:
+            model.cuda(self.device)
+            model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[self.device])
+            model.get_loss = model.module.get_loss
+            model.cfg = model.module.cfg
+            model.inference_end = model.module.inference_end
+
+        record_summary = self.rank == 0 and 'train' in cfg.get('summary').get(
+            'record_for', [])
+
+        if rank == 0:
+            log.info("Started training")
+
         for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
-            model.train()
+            if self.distributed:
+                train_sampler.set_epoch(epoch)
 
+            model.train()
             self.losses = {}
 
             process_bar = tqdm(train_loader, desc='training')
             for data in process_bar:
                 data.to(device)
                 results = model(data)
-                loss = model.loss(results, data)
+                loss = model.get_loss(results, data)
                 loss_sum = sum(loss.values())
 
                 self.optimizer.zero_grad()
                 loss_sum.backward()
-                if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
+                if self.distributed:
+                    if model.module.cfg.get('grad_clip_norm', -1) > 0:
+                        torch.nn.utils.clip_grad_value_(
+                            model.module.parameters(),
+                            model.module.cfg.grad_clip_norm)
+                else:
+                    if model.cfg.get('grad_clip_norm', -1) > 0:
+                        torch.nn.utils.clip_grad_value_(
+                            model.parameters(), model.cfg.grad_clip_norm)
+
                 self.optimizer.step()
 
                 # Record visualization for the last iteration
@@ -337,17 +395,22 @@ class ObjectDetection(BasePipeline):
                 process_bar.set_description(desc)
                 process_bar.refresh()
 
+                if self.distributed:
+                    dist.barrier()
+
             if self.scheduler is not None:
                 self.scheduler.step()
 
             # --------------------- validation
-            if (epoch % cfg.get("validation_freq", 1)) == 0:
+            if epoch % cfg.get("validation_freq", 1) == 0:
                 self.run_valid()
+                if self.distributed:
+                    dist.barrier()
 
-            self.save_logs(writer, epoch)
-
-            if epoch % cfg.save_ckpt_freq == 0 or epoch == cfg.max_epoch:
-                self.save_ckpt(epoch)
+            if rank == 0:
+                self.save_logs(writer, epoch)
+                if epoch % cfg.save_ckpt_freq == 0 or epoch == cfg.max_epoch:
+                    self.save_ckpt(epoch)
 
     def get_3d_summary(self,
                        infer_bboxes_batch,
@@ -470,7 +533,10 @@ class ObjectDetection(BasePipeline):
 
     def load_ckpt(self, ckpt_path=None, is_resume=True):
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
-        make_dir(train_ckpt_dir)
+        if self.rank == 0:
+            make_dir(train_ckpt_dir)
+        if self.distributed:
+            dist.barrier()
 
         epoch = 0
         if ckpt_path is None:
