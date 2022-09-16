@@ -2040,11 +2040,11 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
             combined_feats = []
 
-            for i in range(len(cur_coords)):
-                coords = cur_coords[i]
+            for j in range(len(cur_coords)):
+                coords = cur_coords[j]
                 coords = self.get_voxel_centers(coords, 4, self.voxel_size,
                                                 self.point_cloud_range)
-                feats = cur_features[i]
+                feats = cur_features[j]
                 combined = torch.cat([coords, feats], dim=-1)
                 combined_feats.append(combined)
 
