@@ -184,14 +184,15 @@ class PVRCNNPlusPlus(BaseModel):
         #     return_targets_dict['cls_preds_normalized'] = False
         #     return return_targets_dict
 
-        point_features, point_coords, point_features_before_fusion = self.voxel_set_abstraction(
+        point_features, point_coords = self.voxel_set_abstraction(
             inputs, rois_new, x_bev_2d, x_intermediate_layers)
         # del (x_bev_2d)
         # torch.cuda.empty_cache()
 
         keypoint_weights = self.keypoint_weight_computer(
             len(gt_boxes), point_features, point_coords,
-            point_features_before_fusion, gt_boxes, gt_labels)
+            #point_features_before_fusion, 
+            gt_boxes, gt_labels)
 
         outs = self.box_refinement(point_coords, point_features, rois_new,
                                    roi_scores_new, roi_labels_new, keypoint_weights,
@@ -2084,7 +2085,7 @@ class PVRCNNPlusPlusVoxelSetAbstraction(nn.Module):
 
         point_features = point_features  # (BxN, C)
         point_coords = keypoints  # (BxN, 4)
-        return point_features, point_coords, point_features_before_fusion
+        return point_features, point_coords #, point_features_before_fusion
 
 
 def check_numpy_to_torch(x):
@@ -2125,7 +2126,7 @@ class PVRCNNKeypointWeightComputer(nn.Module):
                 batch_size,
                 point_features,
                 point_coords,
-                point_features_before_fusion,
+                # point_features_before_fusion,
                 gt_boxes=None,
                 gt_labels=None):
         features_to_use = point_features
