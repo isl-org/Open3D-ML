@@ -15,7 +15,7 @@ from ml3d.torch.utils.pointnet.pointnet2_utils import three_nn_gpu as o3d_tnn
 from ml3d.torch.utils.pointnet.pointnet2_utils import three_interpolate_gpu as o3d_int
 from ml3d.torch.utils.pointnet.pointnet2_utils import furthest_point_sample_v2 as o3d_fps
 
-from pcdet.ops.roiaware_pool3d import roiaware_pool3d_utils
+from ml3d.datasets.utils.operations import points_in_box
 
 from ..utils.objdet_helper import BBoxCoder
 from ...datasets.utils import BEVBox3D
@@ -2192,13 +2192,15 @@ class PVRCNNKeypointWeightComputer(nn.Module):
             bs_mask = (bs_idx_point == bs_idx)
             xyz = points[bs_mask][:, 1:4]  #points[bs_idx][:, :3].view(-1,3)
             point_cls_labels_single = xyz.new_zeros(xyz.shape[0]).long()
-            box_idxs_of_pts = roiaware_pool3d_utils.points_in_boxes_gpu(
-                xyz.unsqueeze(dim=0), gt_boxes[bs_idx][:, 0:7].unsqueeze(
-                    dim=0).contiguous()).long().squeeze(dim=0)
+            o3d_final_output = np.ones((xyz.shape[0]))*-1
+            o3d_output = points_in_box(xyz.cpu().numpy(), gt_boxes[bs_idx][:, 0:7].contiguous().cpu().numpy())
+            o3d_final_output[np.where(o3d_output)[0]] = np.where(o3d_output)[1]
+            box_idxs_of_pts = torch.from_numpy(o3d_final_output).to(long).to(xyz.device)
             box_fg_flag = (box_idxs_of_pts >= 0)
-            extend_box_idxs_of_pts = roiaware_pool3d_utils.points_in_boxes_gpu(
-                xyz.unsqueeze(dim=0), extend_gt_boxes[bs_idx][:, 0:7].unsqueeze(
-                    dim=0).contiguous()).long().squeeze(dim=0)
+            ext_o3d_final_output = np.ones((xyz.shape[0]))*-1
+            o3d_output = points_in_box(xyz.cpu().numpy(), extend_gt_boxes[bs_idx][:, 0:7].contiguous().cpu().numpy())
+            ext_o3d_final_output[np.where(o3d_output)[0]] = np.where(o3d_output)[1]
+            extend_box_idxs_of_pts = torch.from_numpy(ext_o3d_final_output).to(long).to(xyz.device)
             fg_flag = box_fg_flag
             ignore_flag = fg_flag ^ (extend_box_idxs_of_pts >= 0)
             point_cls_labels_single[ignore_flag] = -1
