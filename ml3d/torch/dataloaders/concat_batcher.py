@@ -451,51 +451,6 @@ class SparseConvUnetBatch:
 
         return [b for b in batches if len(b.point)]  # filter empty batch
 
-
-class SparseConvUnetMegaModelBatch:
-
-    def __init__(self, batches):
-        pc = []
-        feat = []
-        label = []
-        lengths = []
-        dataset_idx = []
-
-        for batch in batches:
-            data = batch['data']
-            pc.append(data['point'])
-            feat.append(data['feat'])
-            label.append(data['label'])
-            lengths.append(data['point'].shape[0])
-
-            attr = batch['attr']
-            if 'dataset_idx' not in attr:
-                attr['dataset_idx'] = -1
-            dataset_idx.append(attr['dataset_idx'])
-
-        if len(set(dataset_idx)) != 1:
-            raise ValueError(
-                "Multiple datasets in a single batch is not supported. "
-                "Make sure to pass same batch size to dataset and pipeline")
-
-        self.point = pc
-        self.feat = feat
-        self.label = label
-        self.batch_lengths = lengths
-        self.dataset_idx = dataset_idx[0]
-
-    def pin_memory(self):
-        self.point = [pc.pin_memory() for pc in self.point]
-        self.feat = [feat.pin_memory() for feat in self.feat]
-        self.label = [label.pin_memory() for label in self.label]
-        return self
-
-    def to(self, device):
-        self.point = [pc.to(device) for pc in self.point]
-        self.feat = [feat.to(device) for feat in self.feat]
-        self.label = [label.to(device) for label in self.label]
-
-
 class PointTransformerBatch:
 
     def __init__(self, batches):
@@ -629,9 +584,6 @@ class ConcatBatcher(object):
 
         elif self.model == "SparseConvUnet":
             return {'data': SparseConvUnetBatch(batches), 'attr': {}}
-
-        elif self.model == "SparseConvUnetMegaModel":
-            return {'data': SparseConvUnetMegaModelBatch(batches), 'attr': {}}
 
         elif self.model == "PointTransformer":
             return {'data': PointTransformerBatch(batches), 'attr': {}}

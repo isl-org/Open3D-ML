@@ -402,7 +402,6 @@ class ObjectDetection(BasePipeline):
                 self.scheduler.step()
 
             # --------------------- validation
-            # if rank == 0 and (epoch % cfg.get("validation_freq", 1)) == 0:
             if epoch % cfg.get("validation_freq", 1) == 0:
                 self.run_valid()
                 if self.distributed:
