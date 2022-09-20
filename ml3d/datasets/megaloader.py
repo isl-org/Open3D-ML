@@ -55,12 +55,15 @@ class MegaLoader():
         self.ignored_labels = np.array([])
 
         self.num_datasets = len(config_paths)
+
         self.configs = [
             Config.load_from_file(cfg_path) for cfg_path in config_paths
         ]
         self.datasets = [
             get_module('dataset', cfg.name)(**cfg) for cfg in self.configs
         ]
+        self.class_weights = [self.datasets[i].cfg.class_weights for i in range(self.num_datasets)]
+
 
     def get_split(self, split):
         """Returns a dataset split.
@@ -97,7 +100,7 @@ class MegaLoader():
         else:
             return False
 
-    def save_test_result(self, results, attr):
+    def save_test_result(self, results, name):
         """Saves the output of a model.
 
             Args:
@@ -105,15 +108,11 @@ class MegaLoader():
                 attr: The attributes that correspond to the outputs passed in results.
         """
         cfg = self.cfg
-        name = attr['name'].split('.')[0]
         path = cfg.test_result_folder
         make_dir(path)
 
         pred = results['predict_labels']
         pred = np.array(pred)
-
-        for ign in cfg.ignored_label_inds:
-            pred[pred >= ign] += 1
 
         store_path = join(path, self.name, name + '.npy')
         make_dir(Path(store_path).parent)
@@ -136,7 +135,7 @@ class MegaLoaderSplit():
         A dataset split object providing the requested subset of the data.
     """
 
-    def __init__(self, dataset, split='training'):
+    def __init__(self, dataset, split='training', test_dataset_idx=0):
         self.cfg = dataset.cfg
         self.split = split
         self.dataset = dataset
@@ -144,35 +143,36 @@ class MegaLoaderSplit():
             a.get_split(split) for a in self.dataset.datasets
         ]
         self.num_datasets = dataset.num_datasets
+        self.test_dataset_idx = test_dataset_idx
 
-        # log.info("Found {} pointclouds for {}".format(len(self.path_list),
-        #                                               split))
+        if 'test' in split:
+            sampler_cls = get_module('sampler', 'SemSegSpatiallyRegularSampler')
+            self.sampler = sampler_cls(self)
 
     def __len__(self):
+        if 'test' in self.split:
+            return len(self.dataset_splits[self.test_dataset_idx])
         lens = [len(a) for a in self.dataset_splits]
         return max(lens) * self.num_datasets
 
     def get_data(self, idx):
-        dataset_idx = (idx // self.dataset.batch_size) % self.num_datasets
-        idx = ((((idx // self.dataset.batch_size) // self.num_datasets) *
-                self.dataset.batch_size) + idx % self.dataset.batch_size) % len(
-                    self.dataset_splits[dataset_idx])
-
-        # dataset_idx = idx % self.num_datasets
-        # idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
+        if 'test' in self.split:
+            dataset_idx = self.test_dataset_idx
+        else:
+            dataset_idx = idx % self.num_datasets
+            idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
 
         data = self.dataset_splits[dataset_idx].get_data(idx)
 
         return data
 
     def get_attr(self, idx):
-        dataset_idx = (idx // self.dataset.batch_size) % self.num_datasets
-        idx = ((((idx // self.dataset.batch_size) // self.num_datasets) *
-                self.dataset.batch_size) + idx % self.dataset.batch_size) % len(
-                    self.dataset_splits[dataset_idx])
+        if 'test' in self.split:
+            dataset_idx = self.test_dataset_idx
+        else:
+            dataset_idx = idx % self.num_datasets
+            idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
 
-        # dataset_idx = idx % self.num_datasets
-        # idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
         attr = self.dataset_splits[dataset_idx].get_attr(idx)
         attr['dataset_idx'] = dataset_idx
 

@@ -160,6 +160,8 @@ class SemanticSegmentation(BasePipeline):
 
         with torch.no_grad():
             for unused_step, inputs in enumerate(infer_loader):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
                 results = model(inputs['data'])
                 self.update_tests(infer_sampler, inputs, results)
 
@@ -389,7 +391,7 @@ class SemanticSegmentation(BasePipeline):
                 torch.utils.data.get_worker_info().seed)))
 
         # Optimizer must be created after moving model to specific device.
-        model.cuda(self.device)
+        model.to(self.device)
         model.device = self.device
 
         self.optimizer, self.scheduler = model.get_optimizer(cfg)

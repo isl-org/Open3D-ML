@@ -470,8 +470,7 @@ class SparseConvUnetMegaModelBatch:
 
             attr = batch['attr']
             if 'dataset_idx' not in attr:
-                raise ValueError(
-                    "dataset_idx is missing. Please use MegaLoader.")
+                attr['dataset_idx'] = -1
             dataset_idx.append(attr['dataset_idx'])
 
         if len(set(dataset_idx)) != 1:

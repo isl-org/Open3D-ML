@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import logging
 
 from .base_model import BaseModel
 from ...utils import MODEL
@@ -9,6 +10,7 @@ from ...datasets.augment import SemsegAugmentation
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
+log = logging.getLogger(__name__)
 
 class SparseConvUnetMegaModel(BaseModel):
     """Semantic Segmentation model.
@@ -39,7 +41,7 @@ class SparseConvUnetMegaModel(BaseModel):
             residual_blocks=True,
             in_channels=3,
             num_classes=[20],
-            grid_size=4096,
+            grid_size=81920,
             batcher='ConcatBatcher',
             augment=None,
             ckpt_path=None,
@@ -67,6 +69,7 @@ class SparseConvUnetMegaModel(BaseModel):
         self.num_heads = num_heads
         self.varying_input_layers = varying_input_layers
         self.input_layer = InputLayer()
+
         if self.varying_input_layers:
             self.sub_sparse_conv = [
                 SubmanifoldSparseConv(in_channels=in_channels,
@@ -145,11 +148,9 @@ class SparseConvUnetMegaModel(BaseModel):
                 "SparseConvnet doesn't work without feature values.")
 
         feat = np.array(data['feat'], dtype=np.float32)
-        if feat.shape[1] < 3:
-            feat = np.concatenate([points, feat[:, 0:1]], 1)
 
-        # Scale to voxel size.
-        points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
+        # only use xyz
+        feat = points.copy()
 
         if attr['split'] in ['training', 'train']:
             points, feat, labels = self.augmenter.augment(points,
@@ -158,21 +159,20 @@ class SparseConvUnetMegaModel(BaseModel):
                                                           self.cfg.get(
                                                               'augment', None),
                                                           seed=rng)
+
+        # Scale to voxel size.
+        points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
+
         m = points.min(0)
         M = points.max(0)
 
         # Randomly place pointcloud in 4096 size grid.
         grid_size = self.cfg.grid_size
-        offset = -m + np.clip(grid_size - M + m - 0.001, 0, None) * rng.random(
-            3) + np.clip(grid_size - M + m + 0.001, None, 0) * rng.random(3)
+
+        # make everything positive
+        offset = -1 * points.min(0) + 500
 
         points += offset
-        idxs = (points.min(1) >= 0) * (points.max(1) < 4096)
-
-        points = points[idxs]
-        feat = feat[idxs]
-        labels = labels[idxs]
-
         points = (points.astype(np.int32) + 0.5).astype(
             np.float32)  # Move points to voxel center.
 
@@ -244,11 +244,6 @@ class SparseConvUnetMegaModel(BaseModel):
         return loss, labels, results
 
     def get_optimizer(self, cfg_pipeline):
-        # optimizer = torch.optim.Adam(self.parameters(),
-        #                              **cfg_pipeline.optimizer)
-        # scheduler = torch.optim.lr_scheduler.ExponentialLR(
-        #     optimizer, cfg_pipeline.scheduler_gamma)
-
         optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.99)
 
@@ -317,7 +312,14 @@ class LinearBlock(nn.Module):
     def forward(self, feat_list, dataset_idx):
         out_list = []
         for i, feat in enumerate(feat_list):
-            out_list.append(self.linear[dataset_idx](feat))
+            if dataset_idx == -1:
+                out = []
+                for j in range(len(self.num_classes)):
+                    out.append(self.linear[j](feat))
+                out = torch.cat(out, -1)
+                out_list.append(out)
+            else:
+                out_list.append(self.linear[dataset_idx](feat))
 
         return out_list
 
@@ -337,7 +339,7 @@ class InputLayer(nn.Module):
             torch.LongTensor([0,
                               in_positions.shape[0]]).to(in_positions.device),
             self.voxel_size, torch.Tensor([0, 0, 0]),
-            torch.Tensor([40960, 40960, 40960]))
+            torch.Tensor([81920, 81920, 81920]))
 
         # Contiguous repeating positions.
         in_positions = in_positions[v.voxel_point_indices]
