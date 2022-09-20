@@ -17,23 +17,6 @@ model:
   max_voxels: 50000
   ignored_label_inds: [-1]
   augment: {}
-    # rotate:
-    #   method: vertical
-    # scale:
-    #   min_s: 0.95
-    #   max_s: 1.05
-    # noise:
-    #   noise_std: 0.005
-    # ChromaticAutoContrast:
-    #   randomize_blend_factor: True
-    #   blend_factor: 0.2
-    # ChromaticTranslation:
-    #   trans_range_ratio: 0.05
-    # ChromaticJitter:
-    #   std: 0.01
-    # HueSaturationTranslation:
-    #   hue_max: 0.5
-    #   saturation_max: 0.2
 pipeline:
   name: SemanticSegmentation
   optimizer:

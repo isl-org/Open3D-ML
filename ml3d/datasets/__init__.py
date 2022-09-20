@@ -24,13 +24,11 @@ from .scannet import Scannet
 from .sunrgbd import SunRGBD
 from .matterport_objects import MatterportObjects
 from .kitti360 import KITTI360
-from .megaloader import MegaLoader
 
 __all__ = [
     'SemanticKITTI', 'S3DIS', 'Toronto3D', 'ParisLille3D', 'Semantic3D',
     'Custom3D', 'utils', 'augment', 'samplers', 'KITTI', 'Waymo', 'NuScenes',
     'Lyft', 'ShapeNet', 'SemSegRandomSampler', 'InferenceDummySplit',
     'SemSegSpatiallyRegularSampler', 'Argoverse', 'Scannet', 'SunRGBD',
-    'MatterportObjects', 'WaymoSemSeg', 'KITTI360', 'MegaLoader',
-    'NuScenesSemSeg'
+    'MatterportObjects', 'WaymoSemSeg', 'KITTI360', 'NuScenesSemSeg'
 ]

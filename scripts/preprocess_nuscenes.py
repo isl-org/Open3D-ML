@@ -64,11 +64,6 @@ class NuScenesProcess():
                              dataroot=dataset_path,
                              verbose=True)
 
-        ## Get semantic label stats
-        # nusc = self.nusc
-        # print(nusc.list_lidarseg_categories(sort_by='count'))
-        # print(nusc.lidarseg_idx2name_mapping)
-
         if version == 'v1.0-trainval':
             train_scenes = splits.train
             val_scenes = splits.val

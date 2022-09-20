@@ -1,0 +1,7 @@
+name: KITTI360
+dataset_path: /Users/sanskara/data/kitti360/
+cache_dir: ./logs/cache
+class_weights: []
+ignored_label_inds: []
+test_result_folder: ./test
+use_cache: False

@@ -470,7 +470,6 @@ class SemanticSegmentation(BasePipeline):
 
                 desc = "training - Epoch: %d, loss: %.3f" % (epoch,
                                                              loss.cpu().item())
-                # if rank == 0:
                 progress_bar.set_description(desc)
                 progress_bar.refresh()
 

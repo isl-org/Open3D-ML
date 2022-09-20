@@ -52,30 +52,3 @@ class SemSegLoss(object):
             self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss(weight=weights)
         else:
             self.weighted_CrossEntropyLoss = nn.CrossEntropyLoss()
-
-
-class SemSegLossV2(object):
-    """Loss functions for multi head semantic segmentation."""
-
-    def __init__(self,
-                 num_heads,
-                 num_classes,
-                 ignored_labels=[],
-                 device='cpu',
-                 weights=None):
-        super(SemSegLossV2, self).__init__()
-        # weighted_CrossEntropyLoss
-        self.weighted_CrossEntropyLoss = []
-
-        for i in range(num_heads):
-            if weights is not None and len(weights[i]) != 0:
-                wts = DataProcessing.get_class_weights(weights[i])[0]
-                assert len(wts) == num_classes[
-                    i], f"num_classes : {num_classes[i]} is not equal to number of class weights : {len(wts)}"
-                wts = torch.tensor(wts)
-            else:
-                wts = torch.ones(num_classes[i])
-            wts[ignored_labels[i]] = 0
-            wts = wts.to(torch.float).to(device)
-            self.weighted_CrossEntropyLoss.append(
-                nn.CrossEntropyLoss(weight=wts))

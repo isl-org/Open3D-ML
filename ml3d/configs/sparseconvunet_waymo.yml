@@ -19,24 +19,6 @@ model:
   grid_size: 4096
   ignored_label_inds: [0]
   augment: {}
-    # rotate:
-    #   method: vertical
-    # scale:
-    #   min_s: 0.9
-    #   max_s: 1.1
-    # noise:
-    #   noise_std: 0.01
-    # RandomDropout:
-    #   dropout_ratio: 0.2
-    # RandomHorizontalFlip:
-    #   axes: [0, 1]
-    # ChromaticAutoContrast:
-    #   randomize_blend_factor: True
-    #   blend_factor: 0.5
-    # ChromaticTranslation:
-    #   trans_range_ratio: 0.1
-    # ChromaticJitter:
-    #   std: 0.05
 pipeline:
   name: SemanticSegmentation
   optimizer:

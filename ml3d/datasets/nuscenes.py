@@ -109,17 +109,6 @@ class NuScenes(BaseDataset):
         return np.fromfile(path, dtype=np.float32).reshape(-1, 5)
 
     @staticmethod
-    def read_lidarseg(path):
-        """Reads semantic data from the path provided.
-
-        Returns:
-            A data object with semantic information.
-        """
-        assert Path(path).exists()
-
-        return np.fromfile(path, dtype=np.uint8).reshape(-1,).astype(np.int32)
-
-    @staticmethod
     def read_label(info, calib):
         """Reads labels of bound boxes.
 
@@ -267,7 +256,6 @@ class NuSceneSplit():
     def get_data(self, idx):
         info = self.infos[idx]
         lidar_path = info['lidar_path']
-        lidarseg_path = info['lidarseg_path']
 
         world_cam = np.eye(4)
         world_cam[:3, :3] = R.from_quat(info['lidar2ego_rot']).as_matrix()
@@ -276,14 +264,12 @@ class NuSceneSplit():
 
         pc = self.dataset.read_lidar(lidar_path)
         label = self.dataset.read_label(info, calib)
-        lidarseg = self.dataset.read_lidarseg(lidarseg_path)
 
         data = {
             'point': pc,
             'feat': None,
             'calib': calib,
             'bounding_boxes': label,
-            'label': lidarseg
         }
 
         if 'cams' in info:

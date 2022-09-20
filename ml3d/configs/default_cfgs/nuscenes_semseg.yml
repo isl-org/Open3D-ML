@@ -1,5 +1,5 @@
 name: NuScenesSemSeg
-dataset_path: /export/share/projects/open3d_ml/NuScenes/processed/
+dataset_path: # path/to/your/dataset 
 cache_dir: ./logs/cache
 class_weights: [282265, 7676, 120, 3754, 31974, 1321, 346, 1898, 624, 4537, 13282, 260911, 6588, 57567, 56670, 146511, 100633]
 ignored_label_inds: [0]

@@ -1,5 +1,5 @@
 name: SemanticKITTI 
-dataset_path: /export/share/datasets/SemanticKITTI/
+dataset_path: # path/to/your/dataset 
 cache_dir: ./logs/cache
 ignored_label_inds: [0]
 use_cache: false
