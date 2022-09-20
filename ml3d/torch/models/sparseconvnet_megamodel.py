@@ -12,6 +12,7 @@ from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 
 log = logging.getLogger(__name__)
 
+
 class SparseConvUnetMegaModel(BaseModel):
     """Semantic Segmentation model.
 

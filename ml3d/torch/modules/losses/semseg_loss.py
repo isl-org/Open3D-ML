@@ -70,7 +70,8 @@ class SemSegLossV2(object):
         for i in range(num_heads):
             if weights is not None and len(weights[i]) != 0:
                 wts = DataProcessing.get_class_weights(weights[i])[0]
-                assert len(wts) == num_classes[i], f"num_classes : {num_classes[i]} is not equal to number of class weights : {len(wts)}"
+                assert len(wts) == num_classes[
+                    i], f"num_classes : {num_classes[i]} is not equal to number of class weights : {len(wts)}"
                 wts = torch.tensor(wts)
             else:
                 wts = torch.ones(num_classes[i])

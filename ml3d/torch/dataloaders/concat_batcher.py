@@ -451,6 +451,7 @@ class SparseConvUnetBatch:
 
         return [b for b in batches if len(b.point)]  # filter empty batch
 
+
 class PointTransformerBatch:
 
     def __init__(self, batches):

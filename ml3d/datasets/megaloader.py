@@ -62,8 +62,9 @@ class MegaLoader():
         self.datasets = [
             get_module('dataset', cfg.name)(**cfg) for cfg in self.configs
         ]
-        self.class_weights = [self.datasets[i].cfg.class_weights for i in range(self.num_datasets)]
-
+        self.class_weights = [
+            self.datasets[i].cfg.class_weights for i in range(self.num_datasets)
+        ]
 
     def get_split(self, split):
         """Returns a dataset split.
@@ -160,7 +161,8 @@ class MegaLoaderSplit():
             dataset_idx = self.test_dataset_idx
         else:
             dataset_idx = idx % self.num_datasets
-            idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
+            idx = (idx // self.num_datasets) % len(
+                self.dataset_splits[dataset_idx])
 
         data = self.dataset_splits[dataset_idx].get_data(idx)
 
@@ -171,7 +173,8 @@ class MegaLoaderSplit():
             dataset_idx = self.test_dataset_idx
         else:
             dataset_idx = idx % self.num_datasets
-            idx = (idx // self.num_datasets) % len(self.dataset_splits[dataset_idx])
+            idx = (idx // self.num_datasets) % len(
+                self.dataset_splits[dataset_idx])
 
         attr = self.dataset_splits[dataset_idx].get_attr(idx)
         attr['dataset_idx'] = dataset_idx

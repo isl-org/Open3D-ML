@@ -201,6 +201,7 @@ def setup(rank, world_size, args):
 def cleanup():
     dist.destroy_process_group()
 
+
 def main_worker(local_rank, Dataset, Model, Pipeline, cfg_dict_dataset,
                 cfg_dict_model, cfg_dict_pipeline, args):
     rank = args.node_rank * len(args.device_ids) + local_rank

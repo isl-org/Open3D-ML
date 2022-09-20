@@ -109,8 +109,8 @@ class NuScenesSemSeg(BaseDataset):
             28: 15,
             30: 16
         }
-        self.label_mapping = np.array([mapping[i] for i in range(0, len(mapping))], dtype=np.int32)
-
+        self.label_mapping = np.array(
+            [mapping[i] for i in range(0, len(mapping))], dtype=np.int32)
 
     @staticmethod
     def get_label_to_names():
@@ -151,7 +151,6 @@ class NuScenesSemSeg(BaseDataset):
         labels = np.fromfile(path, dtype=np.uint8).reshape(-1,).astype(np.int32)
 
         return self.label_mapping[labels]
-
 
     def get_split(self, split):
         """Returns a dataset split.
