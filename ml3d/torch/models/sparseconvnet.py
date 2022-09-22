@@ -115,6 +115,8 @@ class SparseConvUnet(BaseModel):
                 "SparseConvnet doesn't work without feature values.")
 
         feat = np.array(data['feat'], dtype=np.float32)
+        if feat.shape[1] < 3:
+            feat = np.concatenate([feat, np.ones([feat.shape[0], 1])], 1)
 
         # Scale to voxel size.
         points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size

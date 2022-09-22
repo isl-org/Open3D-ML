@@ -41,10 +41,6 @@ class BasePipeline(ABC):
         self.rng = np.random.default_rng(kwargs.get('seed', None))
 
         self.distributed = distributed
-        if self.distributed and self.name == "SemanticSegmentation":
-            raise NotImplementedError(
-                "Distributed training not implemented for SemanticSegmentation!"
-            )
 
         self.rank = kwargs.get('rank', 0)
 

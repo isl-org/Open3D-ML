@@ -1,11 +1,12 @@
 import logging
+import numpy as np
+import torch
+import torch.distributed as dist
+
 from os.path import exists, join
 from pathlib import Path
 from datetime import datetime
-
-import numpy as np
 from tqdm import tqdm
-import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
@@ -159,6 +160,8 @@ class SemanticSegmentation(BasePipeline):
 
         with torch.no_grad():
             for unused_step, inputs in enumerate(infer_loader):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
                 results = model(inputs['data'])
                 self.update_tests(infer_sampler, inputs, results)
 
@@ -312,20 +315,20 @@ class SemanticSegmentation(BasePipeline):
     def run_train(self):
         torch.manual_seed(self.rng.integers(np.iinfo(
             np.int32).max))  # Random reproducible seed for torch
+        rank = self.rank  # Rank for distributed training
         model = self.model
         device = self.device
-        model.device = device
         dataset = self.dataset
 
         cfg = self.cfg
-        model.to(device)
+        if rank == 0:
+            log.info("DEVICE : {}".format(device))
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
 
-        log.info("DEVICE : {}".format(device))
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
-
-        log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
-        log.info("Logging in file : {}".format(log_file_path))
-        log.addHandler(logging.FileHandler(log_file_path))
+            log_file_path = join(cfg.logs_dir,
+                                 'log_train_' + timestamp + '.txt')
+            log.info("Logging in file : {}".format(log_file_path))
+            log.addHandler(logging.FileHandler(log_file_path))
 
         Loss = SemSegLoss(self, model, dataset, device)
         self.metric_train = SemSegMetric()
@@ -335,6 +338,10 @@ class SemanticSegmentation(BasePipeline):
 
         train_dataset = dataset.get_split('train')
         train_sampler = train_dataset.sampler
+
+        valid_dataset = dataset.get_split('validation')
+        valid_sampler = valid_dataset.sampler
+
         train_split = TorchDataloader(dataset=train_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
@@ -343,19 +350,6 @@ class SemanticSegmentation(BasePipeline):
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_train', None))
 
-        train_loader = DataLoader(
-            train_split,
-            batch_size=cfg.batch_size,
-            sampler=get_sampler(train_sampler),
-            num_workers=cfg.get('num_workers', 2),
-            pin_memory=cfg.get('pin_memory', True),
-            collate_fn=self.batcher.collate_fn,
-            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
-                torch.utils.data.get_worker_info().seed))
-        )  # numpy expects np.uint32, whereas torch returns np.uint64.
-
-        valid_dataset = dataset.get_split('validation')
-        valid_sampler = valid_dataset.sampler
         valid_split = TorchDataloader(dataset=valid_dataset,
                                       preprocess=model.preprocess,
                                       transform=model.transform,
@@ -364,20 +358,46 @@ class SemanticSegmentation(BasePipeline):
                                       steps_per_epoch=dataset.cfg.get(
                                           'steps_per_epoch_valid', None))
 
+        if self.distributed:
+            if train_sampler is not None or valid_sampler is not None:
+                raise NotImplementedError(
+                    "Distributed training with sampler is not supported yet!")
+            train_sampler = torch.utils.data.distributed.DistributedSampler(
+                train_split)
+            valid_sampler = torch.utils.data.distributed.DistributedSampler(
+                valid_split)
+
+        train_loader = DataLoader(
+            train_split,
+            batch_size=cfg.batch_size,
+            sampler=train_sampler
+            if self.distributed else get_sampler(train_sampler),
+            num_workers=cfg.get('num_workers', 0),
+            pin_memory=cfg.get('pin_memory', False),
+            collate_fn=self.batcher.collate_fn,
+            worker_init_fn=lambda x: np.random.seed(x + np.uint32(
+                torch.utils.data.get_worker_info().seed))
+        )  # numpy expects np.uint32, whereas torch returns np.uint64.
+
         valid_loader = DataLoader(
             valid_split,
             batch_size=cfg.val_batch_size,
-            sampler=get_sampler(valid_sampler),
-            num_workers=cfg.get('num_workers', 2),
+            sampler=valid_sampler
+            if self.distributed else get_sampler(valid_sampler),
+            num_workers=cfg.get('num_workers', 0),
             pin_memory=cfg.get('pin_memory', True),
             collate_fn=self.batcher.collate_fn,
             worker_init_fn=lambda x: np.random.seed(x + np.uint32(
                 torch.utils.data.get_worker_info().seed)))
 
+        # Optimizer must be created after moving model to specific device.
+        model.to(self.device)
+        model.device = self.device
+
         self.optimizer, self.scheduler = model.get_optimizer(cfg)
 
         is_resume = model.cfg.get('is_resume', True)
-        self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
+        start_ep = self.load_ckpt(model.cfg.ckpt_path, is_resume=is_resume)
 
         dataset_name = dataset.name if dataset is not None else ''
         tensorboard_dir = join(
@@ -388,22 +408,36 @@ class SemanticSegmentation(BasePipeline):
                                     runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
-        self.save_config(writer)
-        log.info("Writing summary in {}.".format(self.tensorboard_dir))
-        record_summary = cfg.get('summary').get('record_for', [])
+        if rank == 0:
+            self.save_config(writer)
+            log.info("Writing summary in {}.".format(self.tensorboard_dir))
 
-        log.info("Started training")
+        # wrap model for multiple GPU
+        if self.distributed:
+            model = torch.nn.parallel.DistributedDataParallel(
+                model, device_ids=[self.device])
+            model.get_loss = model.module.get_loss
+            model.cfg = model.module.cfg
 
-        for epoch in range(0, cfg.max_epoch + 1):
+        record_summary = cfg.get('summary').get('record_for',
+                                                []) if self.rank == 0 else []
 
+        if rank == 0:
+            log.info("Started training")
+
+        for epoch in range(start_ep, cfg.max_epoch + 1):
             log.info(f'=== EPOCH {epoch:d}/{cfg.max_epoch:d} ===')
+            if self.distributed:
+                train_sampler.set_epoch(epoch)
+
             model.train()
             self.metric_train.reset()
             self.metric_val.reset()
             self.losses = []
-            model.trans_point_sampler = train_sampler.get_point_sampler()
+            # model.trans_point_sampler = train_sampler.get_point_sampler()  # TODO: fix this for model with samplers.
 
-            for step, inputs in enumerate(tqdm(train_loader, desc='training')):
+            progress_bar = tqdm(train_loader, desc='training')
+            for inputs in progress_bar:
                 if hasattr(inputs['data'], 'to'):
                     inputs['data'].to(device)
                 self.optimizer.zero_grad()
@@ -416,24 +450,39 @@ class SemanticSegmentation(BasePipeline):
 
                 loss.backward()
                 if model.cfg.get('grad_clip_norm', -1) > 0:
-                    torch.nn.utils.clip_grad_value_(model.parameters(),
-                                                    model.cfg.grad_clip_norm)
+                    if self.distributed:
+                        torch.nn.utils.clip_grad_value_(
+                            model.module.parameters(), model.cfg.grad_clip_norm)
+                    else:
+                        torch.nn.utils.clip_grad_value_(
+                            model.parameters(), model.cfg.grad_clip_norm)
+
                 self.optimizer.step()
 
                 self.metric_train.update(predict_scores, gt_labels)
 
                 self.losses.append(loss.cpu().item())
+
                 # Save only for the first pcd in batch
-                if 'train' in record_summary and step == 0:
+                if 'train' in record_summary and progress_bar.n == 0:
                     self.summary['train'] = self.get_3d_summary(
                         results, inputs['data'], epoch)
 
-            self.scheduler.step()
+                desc = "training - Epoch: %d, loss: %.3f" % (epoch,
+                                                             loss.cpu().item())
+                progress_bar.set_description(desc)
+                progress_bar.refresh()
+
+                if self.distributed:
+                    dist.barrier()
+
+            if self.scheduler is not None:
+                self.scheduler.step()
 
             # --------------------- validation
             model.eval()
             self.valid_losses = []
-            model.trans_point_sampler = valid_sampler.get_point_sampler()
+            # model.trans_point_sampler = valid_sampler.get_point_sampler()
 
             with torch.no_grad():
                 for step, inputs in enumerate(
@@ -456,10 +505,21 @@ class SemanticSegmentation(BasePipeline):
                         self.summary['valid'] = self.get_3d_summary(
                             results, inputs['data'], epoch)
 
-            self.save_logs(writer, epoch)
+            if self.distributed:
+                metric_gather = [None for _ in range(dist.get_world_size())]
+                dist.gather_object(self.metric_val,
+                                   metric_gather if rank == 0 else None,
+                                   dst=0)
+                if rank == 0:
+                    for m in metric_gather[1:]:
+                        self.metric_val += m
 
-            if epoch % cfg.save_ckpt_freq == 0 or epoch == cfg.max_epoch:
-                self.save_ckpt(epoch)
+                dist.barrier()
+
+            if rank == 0:
+                self.save_logs(writer, epoch)
+                if epoch % cfg.save_ckpt_freq == 0 or epoch == cfg.max_epoch:
+                    self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):
         """Get the batcher to be used based on the device and split."""
@@ -661,28 +721,36 @@ class SemanticSegmentation(BasePipeline):
         want to resume.
         """
         train_ckpt_dir = join(self.cfg.logs_dir, 'checkpoint')
-        make_dir(train_ckpt_dir)
+        if self.rank == 0:
+            make_dir(train_ckpt_dir)
+        if self.distributed:
+            dist.barrier()
 
         if ckpt_path is None:
             ckpt_path = latest_torch_ckpt(train_ckpt_dir)
             if ckpt_path is not None and is_resume:
-                log.info('ckpt_path not given. Restore from the latest ckpt')
+                log.info("ckpt_path not given. Restore from the latest ckpt")
             else:
                 log.info('Initializing from scratch.')
-                return
+                return 0
 
         if not exists(ckpt_path):
             raise FileNotFoundError(f' ckpt {ckpt_path} not found')
 
         log.info(f'Loading checkpoint {ckpt_path}')
         ckpt = torch.load(ckpt_path, map_location=self.device)
+
         self.model.load_state_dict(ckpt['model_state_dict'])
         if 'optimizer_state_dict' in ckpt and hasattr(self, 'optimizer'):
-            log.info(f'Loading checkpoint optimizer_state_dict')
+            log.info('Loading checkpoint optimizer_state_dict')
             self.optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         if 'scheduler_state_dict' in ckpt and hasattr(self, 'scheduler'):
-            log.info(f'Loading checkpoint scheduler_state_dict')
+            log.info('Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+
+        epoch = 0 if 'epoch' not in ckpt else ckpt['epoch']
+
+        return epoch
 
     def save_ckpt(self, epoch):
         """Save a checkpoint at the passed epoch."""

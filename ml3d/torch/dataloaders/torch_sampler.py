@@ -15,4 +15,6 @@ class TorchSamplerWrapper(Sampler):
 
 
 def get_sampler(sampler):
+    if sampler is None:
+        return None
     return TorchSamplerWrapper(sampler)
