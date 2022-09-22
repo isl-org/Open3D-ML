@@ -155,7 +155,7 @@ class Waymo2KITTI():
 
         for img in frame.images:
             img_path = Path(self.image_save_dir + str(img.name - 1)) / (
-                self.prefix + str(file_idx).zfill(3) + str(frame_idx).zfill(3) +
+                self.prefix + str(file_idx).zfill(4) + str(frame_idx).zfill(4) +
                 '.npy')
             image = tf.io.decode_jpeg(img.image).numpy()
 
@@ -205,7 +205,7 @@ class Waymo2KITTI():
 
         with open(
                 f'{self.calib_save_dir}/{self.prefix}' +
-                f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt',
+                f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.txt',
                 'w+') as fp_calib:
             fp_calib.write(calib_context)
             fp_calib.close()
@@ -214,13 +214,13 @@ class Waymo2KITTI():
         pose = np.array(frame.pose.transform).reshape(4, 4)
         np.savetxt(
             join(f'{self.pose_save_dir}/{self.prefix}' +
-                 f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt'),
+                 f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.txt'),
             pose)
 
     def save_label(self, frame, file_idx, frame_idx):
         fp_label_all = open(
             f'{self.label_all_save_dir}/{self.prefix}' +
-            f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt', 'w+')
+            f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.txt', 'w+')
         id_to_bbox = dict()
         id_to_name = dict()
         for labels in frame.projected_lidar_labels:
@@ -295,7 +295,7 @@ class Waymo2KITTI():
 
             fp_label = open(
                 f'{self.label_save_dir}{name}/{self.prefix}' +
-                f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.txt', 'a')
+                f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.txt', 'a')
             fp_label.write(line)
             fp_label.close()
 
@@ -304,7 +304,7 @@ class Waymo2KITTI():
         fp_label_all.close()
 
     def save_lidar(self, frame, file_idx, frame_idx):
-        range_images, camera_projections, range_image_top_pose = parse_range_image_and_camera_projection(
+        range_images, camera_projections, _, range_image_top_pose = parse_range_image_and_camera_projection(
             frame)
 
         # First return
@@ -343,7 +343,7 @@ class Waymo2KITTI():
             (points, intensity, elongation, timestamp))
 
         pc_path = f'{self.point_cloud_save_dir}/{self.prefix}' + \
-            f'{str(file_idx).zfill(3)}{str(frame_idx).zfill(3)}.bin'
+            f'{str(file_idx).zfill(4)}{str(frame_idx).zfill(4)}.bin'
         point_cloud.astype(np.float32).tofile(pc_path)
 
     def convert_range_image_to_point_cloud(self,
