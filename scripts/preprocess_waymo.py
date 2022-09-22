@@ -7,16 +7,14 @@ except ImportError:
 
 import logging
 import numpy as np
-import os, sys, glob, pickle
+import glob
+import argparse
+import tensorflow as tf
+
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
 from os import makedirs
-import random
-import argparse
-import tensorflow as tf
-import matplotlib.image as mpimg
 from multiprocessing import Pool
-from tqdm import tqdm
 from waymo_open_dataset.utils import range_image_utils, transform_utils
 from waymo_open_dataset.utils.frame_utils import \
     parse_range_image_and_camera_projection

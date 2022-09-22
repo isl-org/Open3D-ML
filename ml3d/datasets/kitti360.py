@@ -1,16 +1,12 @@
 import numpy as np
-import pandas as pd
-import os, pickle
+import os
 import logging
 import open3d as o3d
 
 from pathlib import Path
-from os.path import join, exists, dirname, abspath, isdir
-from sklearn.neighbors import KDTree
-from tqdm import tqdm
+from os.path import join, exists
 from glob import glob
 
-from .utils import DataProcessing, get_min_bbox, BEVBox3D
 from .base_dataset import BaseDataset, BaseDatasetSplit
 from ..utils import make_dir, DATASET
 
@@ -56,8 +52,6 @@ class KITTI360(BaseDataset):
                          num_points=num_points,
                          ignored_label_inds=ignored_label_inds,
                          **kwargs)
-
-        cfg = self.cfg
 
         self.label_to_names = self.get_label_to_names()
         self.num_classes = len(self.label_to_names)

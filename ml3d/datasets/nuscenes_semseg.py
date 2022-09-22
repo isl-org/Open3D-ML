@@ -1,15 +1,13 @@
 import os
 import pickle
-from os.path import join
-from pathlib import Path
 import logging
 import numpy as np
-from scipy.spatial.transform import Rotation as R
+
+from os.path import join
+from pathlib import Path
 
 from .base_dataset import BaseDataset
 from ..utils import DATASET
-from .utils import BEVBox3D
-import open3d as o3d
 
 log = logging.getLogger(__name__)
 
@@ -187,7 +185,7 @@ class NuScenesSemSeg(BaseDataset):
 
         raise ValueError("Invalid split {}".format(split))
 
-    def is_tested():
+    def is_tested(self):
         """Checks if a datum in the dataset has been tested.
 
         Args:
@@ -200,7 +198,7 @@ class NuScenesSemSeg(BaseDataset):
         """
         pass
 
-    def save_test_result():
+    def save_test_result(self):
         """Saves the output of a model.
 
         Args:

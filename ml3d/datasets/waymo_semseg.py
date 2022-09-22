@@ -1,14 +1,12 @@
 import numpy as np
-import os, argparse, pickle, sys
-from os.path import exists, join, isfile, dirname, abspath, split
+import logging
+
+from os.path import join
 from pathlib import Path
 from glob import glob
-import logging
-import yaml
 
 from .base_dataset import BaseDataset, BaseDatasetSplit
-from ..utils import Config, make_dir, DATASET
-from .utils import BEVBox3D
+from ..utils import DATASET
 
 log = logging.getLogger(__name__)
 
@@ -125,12 +123,9 @@ class WaymoSemSeg(BaseDataset):
             'all'.
         """
         cfg = self.cfg
-        dataset_path = cfg.dataset_path
-        file_list = []
 
         if split in ['train', 'training']:
             return self.train_files
-            seq_list = cfg.training_split
         elif split in ['test', 'testing']:
             return self.test_files
         elif split in ['val', 'validation']:
@@ -140,7 +135,7 @@ class WaymoSemSeg(BaseDataset):
         else:
             raise ValueError("Invalid split {}".format(split))
 
-    def is_tested(attr):
+    def is_tested(self, attr):
         """Checks if a datum in the dataset has been tested.
 
         Args:
@@ -152,7 +147,7 @@ class WaymoSemSeg(BaseDataset):
         """
         raise NotImplementedError()
 
-    def save_test_result(results, attr):
+    def save_test_result(self, results, attr):
         """Saves the output of a model.
 
         Args:
