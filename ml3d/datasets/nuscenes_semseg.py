@@ -74,6 +74,44 @@ class NuScenesSemSeg(BaseDataset):
             self.test_info = pickle.load(
                 open(join(info_path, 'infos_test.pkl'), 'rb'))
 
+        # It comes with 32 classes, but the nuscenes challenge merge similar classes and remove rare classes.
+        mapping = {
+            1: 0,
+            5: 0,
+            7: 0,
+            8: 0,
+            10: 0,
+            11: 0,
+            13: 0,
+            19: 0,
+            20: 0,
+            0: 0,
+            29: 0,
+            31: 0,
+            9: 1,
+            14: 2,
+            15: 3,
+            16: 3,
+            17: 4,
+            18: 5,
+            21: 6,
+            2: 7,
+            3: 7,
+            4: 7,
+            6: 7,
+            12: 8,
+            22: 9,
+            23: 10,
+            24: 11,
+            25: 12,
+            26: 13,
+            27: 14,
+            28: 15,
+            30: 16
+        }
+        self.label_mapping = np.array(
+            [mapping[i] for i in range(0, len(mapping))], dtype=np.int32)
+
     @staticmethod
     def get_label_to_names():
         """Returns a label to names dictionary object.
@@ -83,8 +121,7 @@ class NuScenesSemSeg(BaseDataset):
             values are the corresponding names.
         """
 
-        classes = "noise, Car, Truck, Bendy Bus, Rigid Bus, Construction Vehicle, Motorcycle, Bicycle, Bicycle Rack, Trailer, Police Vehicle, Ambulance, Adult Pedestrian, Child Pedestrian, Construction Worker, Stroller, Wheelchair, Portable Personal Mobility Vehicle, Police Officer, Animal, Traffic Cone, Temporary Traffic Barrier, Pushable Pullable Object, Debris, Drivable Surface, Sidewalk, Terrain, Flat Other, Manmade, Vegetation, Static Other, Vechicle Ego"
-
+        classes = "ignore, barrier, bicycle, bus, car, construction_vehicle, motorcycle, pedestrian, traffic_cone, trailer, trucl, driveable_surface, other_flat, sidewalk, terrain, manmade, vegetation"
         classes = classes.replace(', ', ',').split(',')
         label_to_names = {}
         for i in range(len(classes)):
@@ -103,8 +140,7 @@ class NuScenesSemSeg(BaseDataset):
 
         return np.fromfile(path, dtype=np.float32).reshape(-1, 5)
 
-    @staticmethod
-    def read_lidarseg(path):
+    def read_lidarseg(self, path):
         """Reads semantic data from the path provided.
 
         Returns:
@@ -112,7 +148,9 @@ class NuScenesSemSeg(BaseDataset):
         """
         assert Path(path).exists()
 
-        return np.fromfile(path, dtype=np.uint8).reshape(-1,).astype(np.int32)
+        labels = np.fromfile(path, dtype=np.uint8).reshape(-1,).astype(np.int32)
+
+        return self.label_mapping[labels]
 
     def get_split(self, split):
         """Returns a dataset split.

@@ -54,7 +54,7 @@ def parse_args():
         default='localhost')
     parser.add_argument('--port',
                         help='port for distributed training, default: 12355',
-                        default='12355')
+                        default='12344')
     parser.add_argument(
         '--backend',
         help=

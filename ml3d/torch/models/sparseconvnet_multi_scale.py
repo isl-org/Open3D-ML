@@ -14,7 +14,7 @@ from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
 log = logging.getLogger(__name__)
 
 
-class SparseConvUnetMegaModel(BaseModel):
+class SparseConvUnetMultiScale(BaseModel):
     """Semantic Segmentation model.
 
     Uses UNet architecture replacing convolutions with Sparse Convolutions.
@@ -33,11 +33,11 @@ class SparseConvUnetMegaModel(BaseModel):
 
     def __init__(
             self,
-            name="SparseConvUnetMegaModel",
+            name="SparseConvUnetMultiScale",
             device="cuda",
             num_heads=1,  # number of segmentation heads.
             multiplier=16,  # Proportional to number of neurons in each layer.
-            voxel_size=0.05,
+            voxel_size=[0.1, 0.05, 0.01],
             varying_input_layers=False,
             conv_block_reps=1,  # Conv block repetitions.
             residual_blocks=True,
@@ -48,7 +48,7 @@ class SparseConvUnetMegaModel(BaseModel):
             augment=None,
             ckpt_path=None,
             **kwargs):
-        super(SparseConvUnetMegaModel,
+        super(SparseConvUnetMultiScale,
               self).__init__(name=name,
                              device=device,
                              num_heads=num_heads,
@@ -67,12 +67,13 @@ class SparseConvUnetMegaModel(BaseModel):
         cfg = self.cfg
         self.device = device
         self.augmenter = SemsegAugmentation(cfg.augment, seed=self.rng)
+
+        # assert len(voxel_size) == len(multiplier), "inconsistent voxel size and multiplier."
+
         self.multiplier = cfg.multiplier
         self.num_heads = num_heads
         self.varying_input_layers = varying_input_layers
         self.input_layer = InputLayer()
-
-        # self.input_feat_layer = LinearBlock(in_channels, [multiplier for i in range(num_heads)])
 
         if self.varying_input_layers:
             self.sub_sparse_conv = [
@@ -87,47 +88,86 @@ class SparseConvUnetMegaModel(BaseModel):
                 in_channels=in_channels,
                 filters=multiplier,
                 kernel_size=[3, 3, 3])
-        self.unet = UNet(conv_block_reps, [
-            multiplier, 2 * multiplier, 3 * multiplier, 4 * multiplier,
-            5 * multiplier, 6 * multiplier, 7 * multiplier
-        ], residual_blocks)
-        self.batch_norm = BatchNormBlock(multiplier)
+
+        self.unet = []
+        self.batch_norm = []
+
+        self.unet.append(
+            UNet(conv_block_reps, [
+                multiplier, 2 * multiplier, 4 * multiplier, 8 * multiplier,
+                16 * multiplier, 32 * multiplier, 64 * multiplier
+            ], residual_blocks))
+        self.batch_norm.append(BatchNormBlock(multiplier))
+
+        self.unet.append(
+            UNet(conv_block_reps, [
+                multiplier, 2 * multiplier, 3 * multiplier, 4 * multiplier,
+                5 * multiplier, 6 * multiplier, 7 * multiplier
+            ], residual_blocks))
+        self.batch_norm.append(BatchNormBlock(multiplier))
+
+        self.unet.append(
+            UNet(conv_block_reps, [
+                multiplier,
+                2 * multiplier,
+                4 * multiplier,
+                8 * multiplier,
+            ], residual_blocks))
+        self.batch_norm.append(BatchNormBlock(multiplier))
+
+        self.unet = nn.ModuleList(self.unet)
+        self.batch_norm = nn.ModuleList(self.batch_norm)
         self.relu = ReLUBlock()
 
         if len(num_classes) != num_heads:
             raise ValueError("Pass num_classes for each segmentation head.")
 
-        self.linear = LinearBlock(multiplier, num_classes)
+        # self.linear1 = LinearBlock(3 * multiplier, multiplier)
+        # self.linear2 = LinearBlock(multiplier, num_classes)
+        self.linear1 = nn.Linear(3 * multiplier, multiplier)
+        assert len(num_classes) == 1
+        self.linear2 = nn.Linear(multiplier, num_classes[0])
+
         self.output_layer = OutputLayer()
 
     def forward(self, inputs):
-        pos_list = []
-        feat_list = []
-        index_map_list = []
+        output = []
+        for idx, v_size in enumerate(self.cfg.voxel_size):
+            pos_list = []
+            feat_list = []
+            index_map_list = []
 
-        for i in range(len(inputs.batch_lengths)):
-            pos = inputs.point[i]
-            feat = inputs.feat[i]
-            feat, pos, index_map = self.input_layer(feat, pos)
-            pos_list.append(pos)
-            feat_list.append(feat)
-            index_map_list.append(index_map)
+            for i in range(len(inputs.batch_lengths)):
+                pos = inputs.point[i].clone()
+                feat = inputs.feat[i].clone()
 
-        # feat_list = self.input_feat_layer(feat_list, inputs.dataset_idx)
+                pos *= 1.0 / v_size  # Scale to voxel size
+                pos -= pos.min(0)[0]  # make everything positive
+                pos += 500  # add positive offset
+                pos = (pos.int() + 0.5).float()  # move points to voxel center
 
-        if self.varying_input_layers:
-            feat_list = self.sub_sparse_conv[inputs.dataset_idx](feat_list,
-                                                                 pos_list,
-                                                                 voxel_size=1.0)
-        else:
-            feat_list = self.sub_sparse_conv(feat_list,
-                                             pos_list,
-                                             voxel_size=1.0)
-        feat_list = self.unet(pos_list, feat_list)
-        feat_list = self.batch_norm(feat_list)
-        feat_list = self.relu(feat_list)
-        feat_list = self.linear(feat_list, inputs.dataset_idx)
-        output = self.output_layer(feat_list, index_map_list)
+                feat, pos, index_map = self.input_layer(feat, pos)
+
+                pos_list.append(pos)
+                feat_list.append(feat)
+                index_map_list.append(index_map)
+
+            if self.varying_input_layers:
+                feat_list = self.sub_sparse_conv[inputs.dataset_idx](
+                    feat_list, pos_list, voxel_size=1.0)
+            else:
+                feat_list = self.sub_sparse_conv(feat_list,
+                                                 pos_list,
+                                                 voxel_size=1.0)
+
+            feat_list = self.unet[idx](pos_list, feat_list)
+            feat_list = self.batch_norm[idx](feat_list)
+            feat_list = self.relu(feat_list)
+            output.append(self.output_layer(feat_list, index_map_list))
+
+        output = torch.cat(output, axis=1)
+        output = self.linear1(output)
+        output = self.linear2(output)
 
         return output
 
@@ -157,11 +197,13 @@ class SparseConvUnetMegaModel(BaseModel):
                 "SparseConvnet doesn't work without feature values.")
 
         feat = np.array(data['feat'], dtype=np.float32)
+        feat_xyz = points.copy()
+        feat_xyz -= feat_xyz.mean(0)
+        feat_xyz /= np.std(feat_xyz, 0)
+        feat = np.concatenate([feat, feat_xyz], axis=1)
 
-        points_norm = points.copy()
-
-        # only use xyz
-        feat = points_norm
+        # if feat.shape[1] < 3:
+        # feat = points.copy()
 
         if attr['split'] in ['training', 'train']:
             points, feat, labels = self.augmenter.augment(points,
@@ -171,30 +213,14 @@ class SparseConvUnetMegaModel(BaseModel):
                                                               'augment', None),
                                                           seed=rng)
 
-        # Scale to voxel size.
-        points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
+        # # Scale to voxel size.
+        # points *= 1. / self.cfg.voxel_size  # Scale = 1/voxel_size
 
-        m = points.min(0)
-        M = points.max(0)
+        # points -= points.min(0)  # make everything positive
+        # points += 500  # add positive offset to positions (we neglect negative positions in subsequent layers)
 
-        # Randomly place pointcloud in 4096 size grid.
-        grid_size = self.cfg.grid_size
-        offset = -m + np.clip(grid_size - M + m - 0.001, 0, None) * rng.random(
-            3) + np.clip(grid_size - M + m + 0.001, None, 0) * rng.random(3)
-
-        # make everything positive
-        offset = -1 * points.min(0)
-
-        points += offset
-        points += 800
-        # idxs = (points.min(1) >= 0) * (points.max(1) < grid_size)
-
-        # points = points[idxs]
-        # feat = feat[idxs]
-        # labels = labels[idxs]
-
-        points = (points.astype(np.int32) + 0.5).astype(
-            np.float32)  # Move points to voxel center.
+        # points = (points.astype(np.int32) + 0.5).astype(
+        #     np.float32)  # Move points to voxel center.
 
         data = {}
         data['point'] = points
@@ -276,7 +302,7 @@ class SparseConvUnetMegaModel(BaseModel):
         return optimizer, scheduler
 
 
-MODEL._register_module(SparseConvUnetMegaModel, 'torch')
+MODEL._register_module(SparseConvUnetMultiScale, 'torch')
 
 
 class BatchNormBlock(nn.Module):
@@ -332,23 +358,13 @@ class LinearBlock(nn.Module):
             linear.append(
                 nn.Sequential(nn.Linear(in_dim, 2 * in_dim),
                               nn.Linear(2 * in_dim, num_classes[i])))
-            # nn.Sequential(nn.Linear(in_dim, 2 * in_dim),
-            #               nn.Linear(2 * in_dim, in_dim),
-            #               nn.Linear(in_dim, num_classes[i])))
 
         self.linear = nn.ModuleList(linear)
 
     def forward(self, feat_list, dataset_idx):
         out_list = []
         for i, feat in enumerate(feat_list):
-            if dataset_idx == -1:
-                out = []
-                for j in range(len(self.num_classes)):
-                    out.append(self.linear[j](feat))
-                out = torch.cat(out, -1)
-                out_list.append(out)
-            else:
-                out_list.append(self.linear[dataset_idx](feat))
+            out_list.append(self.linear[dataset_idx](feat))
 
         return out_list
 

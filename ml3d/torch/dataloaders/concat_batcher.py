@@ -470,8 +470,9 @@ class SparseConvUnetMegaModelBatch:
 
             attr = batch['attr']
             if 'dataset_idx' not in attr:
-                raise ValueError(
-                    "dataset_idx is missing. Please use MegaLoader.")
+                attr['dataset_idx'] = -1
+                # raise ValueError(
+                #     "dataset_idx is missing. Please use MegaLoader.")
             dataset_idx.append(attr['dataset_idx'])
 
         if len(set(dataset_idx)) != 1:
@@ -631,7 +632,7 @@ class ConcatBatcher(object):
         elif self.model == "SparseConvUnet":
             return {'data': SparseConvUnetBatch(batches), 'attr': {}}
 
-        elif self.model == "SparseConvUnetMegaModel":
+        elif self.model == "SparseConvUnetMegaModel" or self.model == "SparseConvUnetMultiScale":
             return {'data': SparseConvUnetMegaModelBatch(batches), 'attr': {}}
 
         elif self.model == "PointTransformer":

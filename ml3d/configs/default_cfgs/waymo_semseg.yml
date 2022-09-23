@@ -1,6 +1,6 @@
 name: WaymoSemSeg
 dataset_path: /export/share/datasets/Waymo_1.3/processed/
 cache_dir: ./logs/cache
-class_weights: []
+class_weights: [513255, 341079, 39946, 28066, 17254, 104, 1169, 31335, 23359, 2924, 43680, 2149, 483, 639, 1394353, 858409, 90903, 52484, 884591, 24487, 21477, 322212, 229034]
 ignored_label_inds: [0]
 use_cache: False

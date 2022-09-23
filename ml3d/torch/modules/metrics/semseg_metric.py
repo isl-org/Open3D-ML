@@ -9,13 +9,62 @@ class SemSegMetric(object):
     computes accuracy and mean IoU.
     """
 
-    def __init__(self):
+    def __init__(self, ignored_labels=[]):
         super(SemSegMetric, self).__init__()
+        self.ignored_labels = ignored_labels
         self.confusion_matrix = None
         self.num_classes = None
         self.count = 0
 
+    def filter_valid_label(self, scores, labels):
+        """Computes the confusion matrix of one batch
+
+        Args:
+            scores (np.float32, shape (N, C):
+                raw scores for each class.
+            labels (np.int32, shape (N,)):
+                ground truth labels.
+            ignored_labels: List of label indices to ignore.
+
+        Returns:
+            Confusion matrix for current batch.
+        """
+        C = scores.size(-1)
+        scores = scores.detach().cpu().numpy().reshape(-1, C)
+        labels = labels.detach().cpu().numpy().reshape(-1,)
+
+        ignored = self.ignored_labels
+        if len(ignored) == 0:
+            return scores, labels
+
+        ignored.sort()
+        ## mapping to shift valid indices
+        mapping = np.ones((C,), np.int32)
+        mapping *= -1
+        map_to = 0
+        for i in range(C):
+            if i not in ignored:
+                mapping[i] = map_to
+                map_to += 1
+
+        ## valid indices
+        valid_idx = np.zeros_like(labels, np.bool)
+        for l in ignored:
+            valid_idx = np.logical_or(valid_idx, labels == l)
+        valid_idx = np.logical_not(valid_idx)
+
+        labels = labels[valid_idx]
+        scores = scores[valid_idx]
+        labels = mapping[labels]  # shift valid labels
+
+        # eliminate scores for ignored indices
+        valid_col = [True if i not in ignored else False for i in range(C)]
+        scores = scores[:, valid_col]
+
+        return scores, labels
+
     def update(self, scores, labels):
+        scores, labels = self.filter_valid_label(scores, labels)
         conf = self.get_confusion_matrix(scores, labels)
         if self.confusion_matrix is None:
             self.confusion_matrix = conf.copy()
@@ -115,19 +164,19 @@ class SemSegMetric(object):
         """Computes the confusion matrix of one batch
 
         Args:
-            scores (torch.FloatTensor, shape (B?, N, C):
+            scores (np.float32, shape (N, C):
                 raw scores for each class.
-            labels (torch.LongTensor, shape (B?, N)):
+            labels (np.int32, shape (N,)):
                 ground truth labels.
 
         Returns:
             Confusion matrix for current batch.
         """
-        C = scores.size(-1)
-        y_pred = scores.detach().cpu().numpy().reshape(-1, C)  # (N, C)
+        C = scores.shape[-1]
+        y_pred = scores.reshape(-1, C)  # (N, C)
         y_pred = np.argmax(y_pred, axis=1)  # (N,)
 
-        y_true = labels.detach().cpu().numpy().reshape(-1,)
+        y_true = labels.reshape(-1,)
 
         y = np.bincount(C * y_true + y_pred, minlength=C * C)
 

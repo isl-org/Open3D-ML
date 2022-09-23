@@ -3,4 +3,4 @@ dataset_path: /export/share/datasets/SemanticKITTI/
 cache_dir: ./logs/cache
 ignored_label_inds: [0]
 use_cache: false
-class_weights: []
+class_weights: [101665, 157022, 631, 1516, 5012, 7085, 1043, 457, 176, 693044, 53132, 494988, 12829, 459669, 236069, 924425, 22780, 255213, 9664, 2024]

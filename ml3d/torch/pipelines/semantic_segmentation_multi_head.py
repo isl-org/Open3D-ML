@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import math
 import torch
 import torch.distributed as dist
 
@@ -21,6 +22,69 @@ from ...utils import make_dir, PIPELINE, get_runid, code2md
 from ...datasets import InferenceDummySplit
 
 log = logging.getLogger(__name__)
+
+
+class CustomDistributedSampler(torch.utils.data.distributed.DistributedSampler):
+
+    def __init__(self,
+                 dataset,
+                 batch_size,
+                 num_heads=1,
+                 num_replicas=None,
+                 rank=None,
+                 shuffle=True,
+                 seed=0,
+                 drop_last=False):
+        super().__init__(dataset, num_replicas, rank, shuffle, seed, drop_last)
+        self.batch_size = batch_size
+        self.num_heads = num_heads
+
+        indices = list(range(len(dataset)))
+        assert len(
+            indices
+        ) % num_heads == 0, "Number of data elements should be a multiple of num_heads. Please check dataloader."
+
+        drop_count = (len(indices) // num_heads) % batch_size
+        if drop_count:
+            indices = indices[:-drop_count * num_heads]
+
+        indices_batched = [
+            np.array(indices[i::num_heads]).reshape(-1, batch_size)
+            for i in range(num_heads)
+        ]
+        self.indices_batched = np.concatenate(indices_batched, axis=0)
+
+        self.num_samples = math.ceil(
+            self.indices_batched.shape[0] / self.num_replicas) * batch_size
+        self.total_size = self.num_samples * self.num_replicas
+        # print(f"Rank : {self.rank}, num_samples = {self.num_samples}, total_size : {self.total_size}, data_len : {len(dataset)}, after drop : {len(indices)}, batched : {self.indices_batched.shape}")
+
+    def __iter__(self):
+        if self.shuffle:
+            g = torch.Generator()
+            g.manual_seed(self.seed + self.epoch)
+            indices = torch.randperm(self.indices_batched.shape[0],
+                                     generator=g).tolist()
+        else:
+            indices = list(range(self.indices_batched.shape[0]))
+
+        if len(indices) % self.num_replicas != 0:
+            padding_size = self.num_replicas - (len(indices) %
+                                                self.num_replicas)
+            indices = indices + indices[:padding_size]
+
+        assert len(indices) * self.batch_size == self.total_size
+
+        # subsample
+        indices = indices[self.rank::self.num_replicas]
+
+        indices = self.indices_batched[indices].flatten()
+
+        assert len(
+            indices
+        ) == self.num_samples, f"Mismatch rank : {self.rank}, indices : {len(indices)}"
+
+        return iter(indices)
 
 
 class SemanticSegmentationMultiHead(BasePipeline):
@@ -87,7 +151,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
             name='SemanticSegmentation',
             batch_size=4,
             val_batch_size=4,
-            test_batch_size=3,
+            test_batch_size=1,
             max_epoch=100,  # maximum epoch during training
             learning_rate=1e-2,  # initial learning rate
             lr_decays=0.95,
@@ -141,15 +205,17 @@ class SemanticSegmentationMultiHead(BasePipeline):
         infer_dataset = InferenceDummySplit(data)
         self.dataset_split = infer_dataset
         infer_sampler = infer_dataset.sampler
-        infer_split = TorchDataloader(dataset=infer_dataset,
-                                      preprocess=model.preprocess,
-                                      transform=model.transform,
-                                      sampler=infer_sampler,
-                                      use_cache=False)
-        infer_loader = DataLoader(infer_split,
-                                  batch_size=cfg.batch_size,
-                                  sampler=get_sampler(infer_sampler),
-                                  collate_fn=batcher.collate_fn)
+        infer_split = TorchDataloader(
+            dataset=infer_dataset,
+            preprocess=model.preprocess,
+            transform=model.transform,
+            #   sampler=infer_sampler,
+            use_cache=False)
+        infer_loader = DataLoader(
+            infer_split,
+            batch_size=cfg.test_batch_size,
+            #   sampler=get_sampler(infer_sampler),
+            collate_fn=batcher.collate_fn)
 
         model.trans_point_sampler = infer_sampler.get_point_sampler()
         self.curr_cloud_id = -1
@@ -160,7 +226,11 @@ class SemanticSegmentationMultiHead(BasePipeline):
 
         with torch.no_grad():
             for unused_step, inputs in enumerate(infer_loader):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
                 results = model(inputs['data'])
+                print(results.shape)
+                return results
                 self.update_tests(infer_sampler, inputs, results)
 
         inference_result = {
@@ -182,6 +252,57 @@ class SemanticSegmentationMultiHead(BasePipeline):
         return inference_result
 
     def run_test(self):
+        model = self.model
+        dataset = self.dataset
+        device = self.device
+        cfg = self.cfg
+        model.device = device
+        model.to(device)
+        model.eval()
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+
+        log.info("DEVICE : {}".format(device))
+        log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
+        log.info("Logging in file : {}".format(log_file_path))
+        log.addHandler(logging.FileHandler(log_file_path))
+
+        batcher = self.get_batcher(device)
+
+        test_dataset = dataset.get_split('test')
+        test_split = TorchDataloader(dataset=test_dataset,
+                                     preprocess=model.preprocess,
+                                     transform=model.transform,
+                                     use_cache=dataset.cfg.use_cache)
+        test_loader = DataLoader(test_split,
+                                 batch_size=cfg.test_batch_size,
+                                 collate_fn=batcher.collate_fn)
+
+        self.dataset_split = test_dataset
+
+        self.load_ckpt(model.cfg.ckpt_path)
+
+        record_summary = cfg.get('summary').get('record_for', [])
+        log.info("Started testing")
+
+        with torch.no_grad():
+            for step, inputs in enumerate(test_loader):
+                if hasattr(inputs['data'], 'to'):
+                    inputs['data'].to(device)
+                results = model(inputs['data'])
+                result = results.reshape(-1, results.shape[-1])
+                probs = torch.nn.functional.softmax(result,
+                                                    dim=-1).cpu().data.numpy()
+                labels = np.argmax(probs, 1)
+
+                inference_result = {
+                    'predict_labels': labels,
+                    'predict_scores': probs
+                }
+                dataset.save_test_result(inference_result, str(step))
+
+        log.info("Finished testing")
+
+    def run_test_1(self):
         """Run the test using the data passed."""
         model = self.model
         dataset = self.dataset
@@ -217,7 +338,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
 
         self.load_ckpt(model.cfg.ckpt_path)
 
-        model.trans_point_sampler = test_sampler.get_point_sampler()
+        # model.trans_point_sampler = test_sampler.get_point_sampler()
         self.curr_cloud_id = -1
         self.test_probs = []
         self.test_labels = []
@@ -332,9 +453,16 @@ class SemanticSegmentationMultiHead(BasePipeline):
         Loss = SemSegLossV2(model.num_heads,
                             model.cfg.num_classes,
                             model.cfg.ignored_label_inds,
-                            device=device)
-        self.metric_train = [SemSegMetric() for i in range(num_heads)]
-        self.metric_val = [SemSegMetric() for i in range(num_heads)]
+                            device=device,
+                            weights=dataset.class_weights)
+        self.metric_train = [
+            SemSegMetric(ignored_labels=model.cfg.ignored_label_inds[i])
+            for i in range(num_heads)
+        ]
+        self.metric_val = [
+            SemSegMetric(ignored_labels=model.cfg.ignored_label_inds[i])
+            for i in range(num_heads)
+        ]
 
         self.batcher = self.get_batcher(device)
 
@@ -364,10 +492,14 @@ class SemanticSegmentationMultiHead(BasePipeline):
             if train_sampler is not None or valid_sampler is not None:
                 raise NotImplementedError(
                     "Distributed training with sampler is not supported yet!")
-            train_sampler = torch.utils.data.distributed.DistributedSampler(
-                train_split, shuffle=False)
-            valid_sampler = torch.utils.data.distributed.DistributedSampler(
-                valid_split, shuffle=False)
+            train_sampler = CustomDistributedSampler(train_split,
+                                                     cfg.batch_size,
+                                                     num_heads=num_heads,
+                                                     shuffle=True)
+            valid_sampler = CustomDistributedSampler(valid_split,
+                                                     cfg.val_batch_size,
+                                                     num_heads=num_heads,
+                                                     shuffle=True)
 
         train_loader = DataLoader(
             train_split,
@@ -725,6 +857,8 @@ class SemanticSegmentationMultiHead(BasePipeline):
                  f" eval: {acc_dicts[-1]['Validation accuracy']:.3f}")
         log.info(f"Mean IoU train: {iou_dicts[-1]['Training IoU']:.3f} "
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
+        temp = [d['Validation IoU'] for d in iou_dicts]
+        log.info(f"Val IoU List : {temp}")
 
         for stage in self.summary:
             for key, summary_dict in self.summary[stage].items():
@@ -767,7 +901,7 @@ class SemanticSegmentationMultiHead(BasePipeline):
             log.info('Loading checkpoint scheduler_state_dict')
             self.scheduler.load_state_dict(ckpt['scheduler_state_dict'])
 
-        epoch = 0 if 'epoch' not in ckpt else ckpt['epoch']
+        epoch = 0 if 'epoch' not in ckpt else ckpt['epoch'] + 1
 
         return epoch
 

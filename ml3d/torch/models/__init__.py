@@ -8,10 +8,12 @@ from .point_rcnn import PointRCNN
 from .point_transformer import PointTransformer
 from .pvcnn import PVCNN
 from .sparseconvnet_megamodel import SparseConvUnetMegaModel
+from .sparseconvnet_multi_scale import SparseConvUnetMultiScale
 
 __all__ = [
     'RandLANet', 'KPFCNN', 'PointPillars', 'PointRCNN', 'SparseConvUnet',
-    'PointTransformer', 'PVCNN', 'SparseConvUnetMegaModel'
+    'PointTransformer', 'PVCNN', 'SparseConvUnetMegaModel',
+    'SparseConvUnetMultiScale'
 ]
 
 try:
