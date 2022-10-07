@@ -55,6 +55,7 @@ class Waymo(BaseDataset):
             glob(join(cfg.dataset_path, 'velodyne', '*.bin')))
         self.train_files = []
         self.val_files = []
+        self.test_files = []
 
         for f in self.all_files:
             if 'train' in f:
@@ -99,6 +100,10 @@ class Waymo(BaseDataset):
     @staticmethod
     def read_label(path, calib):
         """Reads labels of bounding boxes.
+
+        Args:
+            path: The path to the label file.
+            calib: Calibration as returned by read_calib().
 
         Returns:
             The data objects with bounding boxes information.
@@ -271,9 +276,6 @@ class WaymoSplit():
 
 
 class Object3d(BEVBox3D):
-    """The class stores details that are object-specific, such as bounding box
-    coordinates, occlusion and so on.
-    """
 
     def __init__(self, center, size, label, calib):
         # ground truth files doesn't have confidence value.

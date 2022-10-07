@@ -402,7 +402,6 @@ class ObjectDetection(BasePipeline):
                 self.scheduler.step()
 
             # --------------------- validation
-            # if rank == 0 and (epoch % cfg.get("validation_freq", 1)) == 0:
             if epoch % cfg.get("validation_freq", 1) == 0:
                 self.run_valid()
                 if self.distributed:
@@ -410,7 +409,7 @@ class ObjectDetection(BasePipeline):
 
             if rank == 0:
                 self.save_logs(writer, epoch)
-                if epoch % cfg.save_ckpt_freq == 0:
+                if epoch % cfg.save_ckpt_freq == 0 or epoch == cfg.max_epoch:
                     self.save_ckpt(epoch)
 
     def get_3d_summary(self,

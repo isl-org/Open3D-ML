@@ -170,15 +170,15 @@ class Config(object):
         # from mmcv mmcv/utils/config.py
         b = b.copy()
         for k, v in a.items():
-            if isinstance(v, dict) and k in b:
-                if not isinstance(b[k], dict):
+            if isinstance(v, dict):
+                if k in b and not isinstance(b[k], dict):
                     raise TypeError(
                         "{}={} in child config cannot inherit from base ".
                         format(k, v) +
                         "because {} is a dict in the child config but is of ".
                         format(k) +
                         "type {} in base config.  ".format(type(b[k])))
-                b[k] = Config._merge_a_into_b(v, b[k])
+                b[k] = Config._merge_a_into_b(v, b.get(k, ConfigDict()))
             else:
                 if v is None:
                     continue
