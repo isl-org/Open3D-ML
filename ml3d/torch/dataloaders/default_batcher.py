@@ -1,6 +1,5 @@
 import re
 import collections
-
 import torch
 
 container_abcs = collections.abc
@@ -20,11 +19,11 @@ def default_convert(data):
                 and np_str_obj_array_pattern.search(data.dtype.str) is not None:
             return data
         return torch.as_tensor(data)
-    elif isinstance(data, container_abcs.Mapping):
+    elif isinstance(data, collections.abc.Mapping):
         return {key: default_convert(data[key]) for key in data}
     elif isinstance(data, tuple) and hasattr(data, '_fields'):  # namedtuple
         return elem_type(*(default_convert(d) for d in data))
-    elif isinstance(data, container_abcs.Sequence) and not isinstance(
+    elif isinstance(data, collections.abc.Sequence) and not isinstance(
             data, string_classes):
         return [default_convert(d) for d in data]
     else:
@@ -66,11 +65,11 @@ def default_collate(batch):
         return torch.tensor(batch)
     elif isinstance(elem, string_classes):
         return batch
-    elif isinstance(elem, container_abcs.Mapping):
+    elif isinstance(elem, collections.abc.Mapping):
         return {key: default_collate([d[key] for d in batch]) for key in elem}
     elif isinstance(elem, tuple) and hasattr(elem, '_fields'):  # namedtuple
         return elem_type(*(default_collate(samples) for samples in zip(*batch)))
-    elif isinstance(elem, container_abcs.Sequence):
+    elif isinstance(elem, collections.abc.Sequence):
         # check to make sure that the elements in batch have consistent size
         it = iter(batch)
         elem_size = len(next(it))

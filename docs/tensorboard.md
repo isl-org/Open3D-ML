@@ -252,7 +252,7 @@ order.
 
 Now you can visualize the data in TensorBoard as before. The web interface
 allows showing and hiding points with different classes, changing their colors,
-and exploring predictions and intermediate network features.  Scalar network 
+and exploring predictions and intermediate network features.  Scalar network
 features can be visualized with custom user editable colormaps, and 3D features
 can be visualized as RGB colors. Here is a video showing the different ways in
 which semantic segmentation summary data can be visualized in TensorBoard.
@@ -376,3 +376,14 @@ for step in range(len(val_split)):  # one pointcloud per step
                   step,
                   label_to_names=dset.get_label_to_names())
 ```
+
+Troubleshooting
+---------------
+
+If you cannot interact with the 3D model, or use controls in the WebRTC widget,
+make sure that Allow Autoplay is enabled for the Tensorboard web site and reload.
+
+<img src=https://user-images.githubusercontent.com/41028320/180485249-5233b65e-11b1-44ff-bfc4-35f390ef51f2.png
+title="Allow Autoplay for correct behavior."
+alt="Allow Autoplay for correct behavior."
+style="width:80%;display:block;margin:auto"></img>

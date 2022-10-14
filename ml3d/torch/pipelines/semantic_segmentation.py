@@ -95,7 +95,7 @@ class SemanticSegmentation(BasePipeline):
             scheduler_gamma=0.95,
             momentum=0.98,
             main_log_dir='./logs/',
-            device='gpu',
+            device='cuda',
             split='train',
             train_sum_dir='train_log',
             **kwargs):
@@ -458,7 +458,7 @@ class SemanticSegmentation(BasePipeline):
 
             self.save_logs(writer, epoch)
 
-            if epoch % cfg.save_ckpt_freq == 0:
+            if epoch % cfg.save_ckpt_freq == 0 or epoch == cfg.max_epoch:
                 self.save_ckpt(epoch)
 
     def get_batcher(self, device, split='training'):

@@ -2,7 +2,7 @@ dataset:
   name: Waymo
   dataset_path: # path/to/your/dataset
   cache_dir: ./logs/cache
-  steps_per_epoch_train: 5000
+  steps_per_epoch_train: 4000
 
 model:
   name: PointPillars
@@ -31,7 +31,7 @@ model:
     max_voxels: [32000, 32000]
 
   voxel_encoder:
-    in_channels: 5
+    in_channels: 4
     feat_channels: [64]
     voxel_size: *vsize
 
@@ -43,7 +43,7 @@ model:
     in_channels: 64
     out_channels: [64, 128, 256]
     layer_nums: [3, 5, 5]
-    layer_strides: [2, 2, 2]
+    layer_strides: [1, 2, 2]
 
   neck:
     in_channels: [64, 128, 256]
@@ -62,9 +62,9 @@ model:
       [-74.88, -74.88, 0, 74.88, 74.88, 0],
     ]
     sizes: [
-      [2.08, 4.73, 1.77],  # car
-      [0.84, 1.81, 1.77],  # cyclist
-      [0.84, 0.91, 1.74]   # pedestrian
+      [2.08, 4.73, 1.77],  # VEHICLE
+      [0.84, 1.81, 1.77],  # CYCLIST
+      [0.84, 0.91, 1.74]   # PEDESTRIAN
     ]
     dir_offset: 0.7854
     rotations: [0, 1.57]
@@ -72,7 +72,8 @@ model:
 
   augment:
     PointShuffle: True
-    ObjectRangeFilter: True
+    ObjectRangeFilter:
+      point_cloud_range: [-74.88, -74.88, -2, 74.88, 74.88, 4]
     ObjectSample:
       min_points_dict:
         VEHICLE: 5
@@ -88,7 +89,7 @@ pipeline:
   name: ObjectDetection
   test_compute_metric: true
   batch_size: 6
-  val_batch_size: 1
+  val_batch_size: 6
   test_batch_size: 1
   save_ckpt_freq: 5
   max_epoch: 200
@@ -102,7 +103,7 @@ pipeline:
     weight_decay: 0.01
 
   # evaluation properties
-  overlaps: [0.5, 0.5, 0.7]
+  overlaps: [0.5, 0.5, 0.5]
   difficulties: [0, 1, 2]
   summary:
     record_for: []
