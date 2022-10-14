@@ -10,7 +10,6 @@ import numpy as np
 import os, sys, glob, pickle
 import argparse
 import tensorflow as tf
-import matplotlib.image as mpimg
 
 from pathlib import Path
 from os.path import join, exists, dirname, abspath
@@ -58,7 +57,7 @@ class Waymo2KITTI():
     """Waymo to KITTI converter.
 
     This class converts tfrecord files from Waymo dataset to KITTI format.
-    KITTI format : (type, truncated, occluded, alpha, bbox, dimensions(3), location(3), 
+    KITTI format : (type, truncated, occluded, alpha, bbox, dimensions(3), location(3),
                    rotation_y(1), score(1, optional))
         type (string): Describes the type of object.
         truncated (float): Ranges from 0(non-truncated) to 1(truncated).
@@ -70,7 +69,7 @@ class Waymo2KITTI():
         location (float): 3D object location: x,y,z in camera coordinates (in meters).
         rotation_y (float): rotation around Y-axis in camera coordinates [-pi..pi].
         score (float): Only for predictions, indicating confidence in detection.
-    
+
     Conversion writes following files:
         pointcloud(np.float32) : pointcloud data with shape [N, 6]. Consists of
                                  (x, y, z, intensity, elongation, timestamp).
