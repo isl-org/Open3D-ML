@@ -9,10 +9,6 @@ from .base_dataset import BaseDataset
 from ..utils import DATASET
 from .utils import BEVBox3D
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(levelname)s - %(asctime)s - %(module)s - %(message)s',
-)
 log = logging.getLogger(__name__)
 
 

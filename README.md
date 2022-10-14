@@ -137,8 +137,8 @@ pipeline = ml3d.pipelines.SemanticSegmentation(model, dataset=dataset, device="g
 # download the weights.
 ckpt_folder = "./logs/"
 os.makedirs(ckpt_folder, exist_ok=True)
-ckpt_path = ckpt_folder + "randlanet_semantickitti_202009090354utc.pth"
-randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+ckpt_path = ckpt_folder + "randlanet_semantickitti_202201071330utc.pth"
+randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202201071330utc.pth"
 if not os.path.exists(ckpt_path):
     cmd = "wget {} -O {}".format(randlanet_url, ckpt_path)
     os.system(cmd)

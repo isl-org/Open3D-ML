@@ -58,5 +58,5 @@ mv $BASE_DIR/station1_xyz_intensity_rgb.txt $BASE_DIR/neugasse_station1_xyz_inte
 
 # cleanup
 mkdir -p $BASE_DIR/zip_files
-mv *.7z $BASE_DIR/zip_files
+mv $BASE_DIR/*.7z $BASE_DIR/zip_files
 
