@@ -447,7 +447,7 @@ class RandLANet(BaseModel):
             test_probs: probabilities for whole pointcloud
 
         Returns:
-            updated probabilities and labels
+            updated probabilities
 
         """
         self.test_smooth = 0.95
