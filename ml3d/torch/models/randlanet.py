@@ -15,23 +15,26 @@ from ...utils import MODEL
 
 
 class RandLANet(BaseModel):
-    """Class defining RandLANet, a Semantic Segmentation model.
-    Based on the architecture
-    https://arxiv.org/abs/1911.11236#
+    """Class defining RandLANet, a Semantic Segmentation model.  Based on the
+    architecture from the paper `RandLA-Net: Efficient Semantic Segmentation of
+    Large-Scale Point Clouds <https://arxiv.org/abs/1911.11236>`__.
 
-    Reference Implementation - https://github.com/QingyongHu/RandLA-Net
+    RandLA-Net is an efficient and lightweight neural architecture which
+    directly infer per-point semantics for large-scale point clouds. The key
+    approach is to use random point sampling instead of more complex point
+    selection approaches.  Although remarkably computation and memory
+    efficient, random sampling can discard key features by chance. To overcome
+    this, we introduce a novel local feature aggregation module to
+    progressively increase the receptive field for each 3D point, thereby
+    effectively preserving geometric details.
 
-    RandLA-Net is an efficient and lightweight neural architecture which directly infer
-    per-point semantics for large-scale point clouds. The key approach is to use random
-    point sampling instead of more complex point selection approaches. Although
-    remarkably computation and memory efficient, random sampling can discard key features
-    by chance. To overcome this, we introduce a novel local feature aggregation module to
-    progressively increase the receptive field for each 3D point, thereby effectively
-    preserving geometric details.
+    **Architecture**
 
-    Architecture
     .. image:: https://user-images.githubusercontent.com/23613902/150006228-34fb9e04-76b6-4022-af08-c308da6dcaae.png
+        :width: 100%
 
+    References:
+        https://github.com/QingyongHu/RandLA-Net
     """
 
     def __init__(
