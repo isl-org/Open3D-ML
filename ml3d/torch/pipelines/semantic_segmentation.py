@@ -284,8 +284,10 @@ class SemanticSegmentation(BasePipeline):
         self.pbar_update = this_possiblility[
             this_possiblility > end_threshold].shape[0]
         self.test_probs[self.curr_cloud_id] = self.model.update_probs(
-                inputs, results, self.test_probs[self.curr_cloud_id],
-               )
+            inputs,
+            results,
+            self.test_probs[self.curr_cloud_id],
+        )
 
         if (split in ['test'] and
                 this_possiblility[this_possiblility > end_threshold].shape[0]
@@ -298,12 +300,12 @@ class SemanticSegmentation(BasePipeline):
             if proj_inds is None:
                 proj_inds = np.arange(
                     self.test_probs[self.curr_cloud_id].shape[0])
-            test_labels  = np.argmax(self.test_probs[self.curr_cloud_id][proj_inds],1)
+            test_labels = np.argmax(
+                self.test_probs[self.curr_cloud_id][proj_inds], 1)
 
             self.ori_test_probs.append(
                 self.test_probs[self.curr_cloud_id][proj_inds])
-            self.ori_test_labels.append(
-               test_labels)
+            self.ori_test_labels.append(test_labels)
             self.complete_infer = True
 
     def run_train(self):
