@@ -3,8 +3,8 @@
 # The following environment variables are required:
 # - NPROC
 #
-TENSORFLOW_VER="2.8.2"
-TORCH_GLNX_VER="1.12.0+cpu"
+TENSORFLOW_VER="2.11.0"
+TORCH_GLNX_VER="1.13.1+cpu"
 # OPENVINO_DEV_VER="2021.4.2"  # Numpy version conflict with TF 2.8.2
 PIP_VER="21.1.1"
 WHEEL_VER="0.37.1"
@@ -21,11 +21,11 @@ export PATH_TO_OPEN3D_ML=$(pwd)
 # the build system of the main repo expects a master branch. make sure master exists
 git checkout -b master || true
 python -m pip install -U pip==$PIP_VER \
-	wheel=="$WHEEL_VER" \
-	setuptools=="$STOOLS_VER" \
-	yapf=="$YAPF_VER" \
-	pytest=="$PYTEST_VER" \
-	pytest-randomly=="$PYTEST_RANDOMLY_VER"
+    wheel=="$WHEEL_VER" \
+    setuptools=="$STOOLS_VER" \
+    yapf=="$YAPF_VER" \
+    pytest=="$PYTEST_VER" \
+    pytest-randomly=="$PYTEST_RANDOMLY_VER"
 
 python -m pip install -r requirements.txt
 echo $PATH_TO_OPEN3D_ML
@@ -38,7 +38,7 @@ git clone --recursive --branch master https://github.com/isl-org/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -U tensorflow-cpu==$TENSORFLOW_VER \
-	torch==${TORCH_GLNX_VER} --extra-index-url https://download.pytorch.org/whl/cpu/
+    torch==${TORCH_GLNX_VER} --extra-index-url https://download.pytorch.org/whl/cpu/
 # openvino-dev=="$OPENVINO_DEV_VER"
 
 echo 3. Configure for bundling the Open3D-ML part
@@ -46,16 +46,16 @@ echo
 mkdir Open3D/build
 pushd Open3D/build
 cmake -DBUNDLE_OPEN3D_ML=ON \
-	-DOPEN3D_ML_ROOT=$PATH_TO_OPEN3D_ML \
-	-DGLIBCXX_USE_CXX11_ABI=OFF \
-	-DBUILD_TENSORFLOW_OPS=ON \
-	-DBUILD_PYTORCH_OPS=ON \
-	-DBUILD_GUI=OFF \
-	-DBUILD_RPC_INTERFACE=OFF \
-	-DBUILD_UNIT_TESTS=OFF \
-	-DBUILD_BENCHMARKS=OFF \
-	-DBUILD_EXAMPLES=OFF \
-	..
+    -DOPEN3D_ML_ROOT=$PATH_TO_OPEN3D_ML \
+    -DGLIBCXX_USE_CXX11_ABI=OFF \
+    -DBUILD_TENSORFLOW_OPS=ON \
+    -DBUILD_PYTORCH_OPS=ON \
+    -DBUILD_GUI=OFF \
+    -DBUILD_RPC_INTERFACE=OFF \
+    -DBUILD_UNIT_TESTS=OFF \
+    -DBUILD_BENCHMARKS=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    ..
 
 echo 4. Build and install wheel
 echo
