@@ -29,7 +29,7 @@ Second, we will construct the networks and pipelines, load the pretrained weight
     from ml3d.torch.models import RandLANet, KPFCNN
 
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
-    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202201071330utc.pth"
 
     ckpt_path = "./logs/vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path):
