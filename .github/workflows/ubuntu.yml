@@ -7,41 +7,38 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
+env:
+  NPROC: 2
+  PIP_VER: "21.1.1"
+  WHEEL_VER: "0.38.4"
+  PYTEST_VER: "7.1.2"
+  PYTEST_RANDOMLY_VER: "3.8.0"
+
 jobs:
   ubuntu:
     runs-on: ubuntu-18.04
     strategy:
       fail-fast: false
-    env:
-      NPROC: 2
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v2
-      - name: Setup cache
-        uses: actions/cache@v2
-        with:
-          # Ref: https://github.com/apache/incubator-mxnet/pull/18459/files
-          path: ~/.ccache
-          # We include the commit sha in the cache key, as new cache entries are
-          # only created if there is no existing entry for the key yet.
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          # Restore any ccache cache entry, if none for
-          # ${{ runner.os }}-ccache-${{ github.sha }} exists.
-          # Common prefix will be used so that ccache can be used across commits.
-          restore-keys: |
-            ${{ runner.os }}-ccache
+        uses: actions/checkout@v3
       - name: Set up Python version
         uses: actions/setup-python@v2
         with:
           python-version: "3.10"
-      # Pre-installed 18.04 packages: https://git.io/JfHmW
-      - name: Install ccache
+      - name: Install Open3D
         run: |
-          sudo apt-get --yes install ccache
-          ccache -M 2G  # GitHub's total cache limit is 5GB for all OSes.
-      - name: Config and build
+          echo Installing dependencies
+          set +x
+          pip install -U pip=="$PIP_VER" wheel="$WHEEL_VER" pytest=="$PYTEST_VER" \
+                         pytest-randomly=="$PYTEST_RANDOMLY_VER"
+          pip install -r requirements-tensorflow.txt -r requirements-torch.txt
+          echo Installing requirements
+          pip install open3d --trusted-host www.open3d.org -f http://www.open3d.org/docs/latest/getting_started.html
+
+      - name: Run examples/tests
         run: |
-          PATH=/usr/lib/ccache:$PATH
-          ccache -s
-          ./ci/run_ci.sh
-          ccache -s
+          set +x
+          source set_open3d_ml_root.sh
+          echo Add --randomly-seed=SEED to the test command to reproduce test order.
+          python -m pytest tests
