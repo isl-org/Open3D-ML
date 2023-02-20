@@ -557,7 +557,7 @@ class KPFCNN(BaseModel):
 
         return inputs
 
-    def update_probs(self, inputs, results, test_probs, test_labels):
+    def update_probs(self, inputs, results, test_probs):
         self.test_smooth = 0.95
         stk_probs = torch.nn.functional.softmax(results, dim=-1)
         stk_probs = stk_probs.cpu().data.numpy()
@@ -577,16 +577,14 @@ class KPFCNN(BaseModel):
         for b_i, length in enumerate(lengths):
             # Get prediction
             probs = stk_probs[i0:i0 + length]
-            labels = np.argmax(probs, 1)
 
             proj_inds = r_inds_list[b_i]
             proj_mask = r_mask_list[b_i]
             test_probs[proj_mask] = self.test_smooth * test_probs[proj_mask] + (
                 1 - self.test_smooth) * probs
-            test_labels[proj_mask] = labels
             i0 += length
 
-        return test_probs, test_labels
+        return test_probs
 
     def inference_end(self, inputs, results):
         m_softmax = torch.nn.Softmax(dim=-1)
