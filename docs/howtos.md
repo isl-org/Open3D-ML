@@ -255,22 +255,6 @@ Distributed training uses the PyTorch Distributed Data Parallel (DDP) module and
 - GPU: RTX 3090
 - Batch size: 4 per GPU
 
-![PointPillars training on Waymo per epoch training time with number of GPUs]()
+![PointPillars training on Waymo per epoch training time with number of GPUs](https://user-images.githubusercontent.com/41028320/220750523-57075575-8cc7-4e40-99b0-a4e79995f1ec.png)
 
-Here is a training command for distributed training on a single node. This uses the first 4 GPUs. The remaining configuration is read from the config file `pointpillars_waymo.yml`.
-```sh
-# Example training command for a single node
-python scripts/run_pipeline.py torch -c ml3d/config/pointpillars_waymo.yml \
-    --pipeline.num_workers 0 --pipeline.pin_memory False \
-    --pipeline.batch_size 4 --device_ids 0 1 2 3 \
-    --backend nccl
-```
-
-```sh
-# Multi-node training command
-srun -l python scripts/run_pipeline.py torch -c ml3d/config/pointpillars_waymo.yml \
-    --pipeline.num_workers 0 --pipeline.pin_memory False \
-    --pipeline.batch_size 4 --device_ids 0 1 2 3 4 5 6 7 --nodes $SLURM_JOB_NUM_NODES \
-    --node_rank -1 --host "$MASTER_ADDR" --port "$MASTER_PORT" \
-    --backend nccl
-```
+See [`scripts/train_scripts/pointpillars_waymo.sh`](../scripts/train_scripts/pointpillars_waymo.sh) for an example SLURM training script for distributed training on two nodes, using four GPUs on each node. The remaining configuration is read from the config file [`pointpillars_waymo.yml`](../ml3d/configs/pointpillars_waymo.yml).
