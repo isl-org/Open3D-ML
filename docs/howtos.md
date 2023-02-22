@@ -243,3 +243,34 @@ import open3d.ml.torch as ml3d
 model = ml3d.models.MyModel()
 dataset = ml3d.datasets.MyDataset()
 ```
+
+## Distributed training (preview)
+
+Open3D-ML currently supports distributed training with PyTorch for object detection on Waymo with the PointPillars model. More comprehensive support for semantic segmentation models will follow shortly.
+
+Distributed training uses the PyTorch Distributed Data Parallel (DDP) module and can be used to distribute training across multiple computer nodes, each with multiple GPUs. Here is a chart of per eopch runtime showing the speedup of sample runs with increasing number of GPUs. The training was run on a cluster containing 4 nodes with 8 RTX 3090 GPUs each.
+
+- Dataset: Waymo v1.3
+- Model: PointPillars
+- GPU: RTX 3090
+- Batch size: 4 per GPU
+
+![PointPillars training on Waymo per epoch training time with number of GPUs]()
+
+Here is a training command for distributed training on a single node. This uses the first 4 GPUs. The remaining configuration is read from the config file `pointpillars_waymo.yml`.
+```sh
+# Example training command for a single node
+python scripts/run_pipeline.py torch -c ml3d/config/pointpillars_waymo.yml \
+    --pipeline.num_workers 0 --pipeline.pin_memory False \
+    --pipeline.batch_size 4 --device_ids 0 1 2 3 \
+    --backend nccl
+```
+
+```sh
+# Multi-node training command
+srun -l python scripts/run_pipeline.py torch -c ml3d/config/pointpillars_waymo.yml \
+    --pipeline.num_workers 0 --pipeline.pin_memory False \
+    --pipeline.batch_size 4 --device_ids 0 1 2 3 4 5 6 7 --nodes $SLURM_JOB_NUM_NODES \
+    --node_rank -1 --host "$MASTER_ADDR" --port "$MASTER_PORT" \
+    --backend nccl
+```
