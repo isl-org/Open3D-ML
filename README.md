@@ -346,7 +346,7 @@ For the Waymo dataset, the models were trained on three classes (pedestrian, veh
 | Model / Dataset    | KITTI [BEV / 3D] @ 0.70| Waymo (BEV / 3D) @ 0.50 |
 |--------------------|------------------------|------------------|
 | PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) | - |
-| PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)  | avg: 61.01 / 48.30 \| [best: 61.47	/ 57.55]() [^wpp-train] |
+| PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)  | avg: 61.01 / 48.30 \| [best: 61.47	/ 57.55](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_waymo_202211200158utc_seed2_gpu16.pth) [^wpp-train] |
 | PointRCNN (tf)       | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.zip) | - |
 | PointRCNN (torch)    | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.pth) | - |
 
