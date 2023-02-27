@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1 
 
 if [ "$#" -ne 2 ]; then
-    echo "Please, provide the the training framework: torch/tf and dataset path"
+    echo "Please, provide the training framework: torch/tf and dataset path"
     exit 1
 fi
 
