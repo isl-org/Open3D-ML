@@ -1,14 +1,15 @@
-import numpy as np
+import os
 import argparse
 import logging
 import sys
-import yaml
+from pathlib import Path
 import pprint
-import os
+import yaml
+import numpy as np
 import torch.distributed as dist
 from torch import multiprocessing
 
-from pathlib import Path
+import open3d.ml as _ml3d
 
 
 def parse_args():
@@ -42,7 +43,14 @@ def parse_args():
     parser.add_argument('--batch_size', help='batch size', default=None)
     parser.add_argument('--main_log_dir',
                         help='the dir to save logs and models')
-    parser.add_argument('--seed', help='random seed', default=0)
+    parser.add_argument('--seed', help='random seed', default=0, type=int)
+    parser.add_argument('--nodes', help='number of nodes', default=1, type=int)
+    parser.add_argument('--node_rank',
+                        help='ranking within the nodes, default: 0. To get from'
+                        ' the environment, enter the name of an env var eg: '
+                        '"SLURM_NODEID".',
+                        default="0",
+                        type=str)
     parser.add_argument(
         '--host',
         help='Host for distributed training, default: localhost',
@@ -57,6 +65,10 @@ def parse_args():
         default='gloo')
 
     args, unknown = parser.parse_known_args()
+    try:
+        args.node_rank = int(args.node_rank)
+    except ValueError:  # str => get from environment
+        args.node_rank = int(os.environ[args.node_rank])
 
     parser_extra = argparse.ArgumentParser(description='Extra arguments')
     for arg in unknown:
@@ -71,9 +83,6 @@ def parse_args():
     print(yaml.dump(vars(args_extra)))
 
     return args, vars(args_extra)
-
-
-import open3d.ml as _ml3d
 
 
 def main():
@@ -103,6 +112,10 @@ def main():
                 if device == 'cpu':
                     tf.config.set_visible_devices([], 'GPU')
                 elif device == 'cuda':
+                    if len(args.device_ids) > 1:
+                        raise NotImplementedError(
+                            "Multi-GPU training with TensorFlow is not yet implemented."
+                        )
                     tf.config.set_visible_devices(gpus[0], 'GPU')
                 else:
                     idx = device.split(':')[1]
@@ -152,8 +165,8 @@ def main():
         cfg_dict_model['seed'] = rng
         cfg_dict_pipeline['seed'] = rng
 
-    with open(Path(__file__).parent / 'README.md', 'r') as f:
-        readme = f.read()
+    with open(Path(__file__).parent / 'README.md', 'r') as freadme:
+        readme = freadme.read()
 
     cfg_tb = {
         'readme': readme,
@@ -197,9 +210,10 @@ def cleanup():
     dist.destroy_process_group()
 
 
-def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
+def main_worker(local_rank, Dataset, Model, Pipeline, cfg_dict_dataset,
                 cfg_dict_model, cfg_dict_pipeline, args):
-    world_size = len(args.device_ids)
+    rank = args.node_rank * len(args.device_ids) + local_rank
+    world_size = args.nodes * len(args.device_ids)
     setup(rank, world_size, args)
 
     cfg_dict_dataset['rank'] = rank
@@ -211,8 +225,10 @@ def main_worker(rank, Dataset, Model, Pipeline, cfg_dict_dataset,
     cfg_dict_model['seed'] = rng
     cfg_dict_pipeline['seed'] = rng
 
-    device = f"cuda:{args.device_ids[rank]}"
-    print(f"rank = {rank}, world_size = {world_size}, gpu = {device}")
+    device = f"cuda:{args.device_ids[local_rank]}"
+    print(
+        f"local_rank = {local_rank}, rank = {rank}, world_size = {world_size},"
+        f" gpu = {device}")
 
     cfg_dict_model['device'] = device
     cfg_dict_pipeline['device'] = device
