@@ -77,7 +77,7 @@ def pred_custom_data(pc_names, pcs, pipeline_r, pipeline_k):
 
 def get_torch_ckpts():
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202009090354utc.pth"
-    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202009090354utc.pth"
+    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202201071330utc.pth"
 
     ckpt_path_r = example_dir + "/vis_weights_{}.pth".format('RandLANet')
     if not exists(ckpt_path_r):
@@ -95,7 +95,7 @@ def get_torch_ckpts():
 
 def get_tf_ckpts():
     kpconv_url = "https://storage.googleapis.com/open3d-releases/model-zoo/kpconv_semantickitti_202010021102utc.zip"
-    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202010091306.zip"
+    randlanet_url = "https://storage.googleapis.com/open3d-releases/model-zoo/randlanet_semantickitti_202201071330utc.zip"
 
     ckpt_path_dir = example_dir + "/vis_weights_{}".format('RandLANet')
     if not exists(ckpt_path_dir):

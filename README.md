@@ -46,7 +46,9 @@ respective requirements files:
 ```bash
 # To install a compatible version of TensorFlow
 pip install -r requirements-tensorflow.txt
-# To install a compatible version of PyTorch with CUDA
+# To install a compatible version of PyTorch
+pip install -r requirements-torch.txt
+# To install a compatible version of PyTorch with CUDA on Linux
 pip install -r requirements-torch-cuda.txt
 ```
 
@@ -338,15 +340,17 @@ The table shows the available models and datasets for the segmentation task and 
 For the task of object detection, we measure the performance of different methods using the mean average precision (mAP) for bird's eye view (BEV) and 3D.
 The table shows the available models and datasets for the object detection task and the respective scores. Each score links to the respective weight file.
 For the evaluation, the models were evaluated using the validation subset, according to KITTI's validation criteria. The models were trained for three classes (car, pedestrian and cyclist). The calculated values are the mean value over the mAP of all classes for all difficulty levels.
+For the Waymo dataset, the models were trained on three classes (pedestrian, vehicle, cyclist).
 
 
-| Model / Dataset    | KITTI [BEV / 3D] @ 0.70|
-|--------------------|---------------|
-| PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) |
-| PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)   |
-| PointRCNN (tf)       | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.zip) |
-| PointRCNN (torch)    | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.pth) |
+| Model / Dataset    | KITTI [BEV / 3D] @ 0.70| Waymo (BEV / 3D) @ 0.50 |
+|--------------------|------------------------|------------------|
+| PointPillars (tf)    | [61.6 / 55.2](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.zip) | - |
+| PointPillars (torch) | [61.2 / 52.8](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_kitti_202012221652utc.pth)  | avg: 61.01 / 48.30 \| [best: 61.47	/ 57.55](https://storage.googleapis.com/open3d-releases/model-zoo/pointpillars_waymo_202211200158utc_seed2_gpu16.pth) [^wpp-train] |
+| PointRCNN (tf)       | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.zip) | - |
+| PointRCNN (torch)    | [78.2 / 65.9](https://storage.googleapis.com/open3d-releases/model-zoo/pointrcnn_kitti_202105071146utc.pth) | - |
 
+[^wpp-train]: The avg. metrics are the average of three sets of training runs with 4, 8, 16 and 32 GPUs. Training was for halted after 30 epochs. Model checkpoint is available for the best training run.
 
 #### Training PointRCNN
 
@@ -402,6 +406,7 @@ For downloading these datasets visit the respective webpages and have a look at 
 * [Visualize custom data](docs/howtos.md#visualize-custom-data)
 * [Adding a new model](docs/howtos.md#adding-a-new-model)
 * [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
+* [Distributed training](docs/howtos.md#distributed-training)
 * [Visualize and compare input data, ground truth and results in TensorBoard](docs/tensorboard.md)
 * [Inference with Intel OpenVINO](docs/openvino.md)
 

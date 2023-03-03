@@ -122,7 +122,7 @@ class _PointnetSAModuleBase(nn.Module):
                 new_xyz=None) -> (torch.Tensor, torch.Tensor):
         r"""
         :param xyz: (B, N, 3) tensor of the xyz coordinates of the features
-        :param features: (B, N, C) tensor of the descriptors of the the features
+        :param features: (B, N, C) tensor of the descriptors of the features
         :param new_xyz:
         :return:
             new_xyz: (B, npoint, 3) tensor of the new features' xyz
