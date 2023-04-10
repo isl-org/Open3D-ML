@@ -235,13 +235,13 @@ class Semantic3DSplit(BaseDatasetSplit):
         feat = np.array(feat, dtype=np.float32)
         intensity = np.array(intensity, dtype=np.float32)
 
-        if (self.split != 'test'):
+        try:
             labels = pd.read_csv(pc_path.replace(".txt", ".labels"),
                                  header=None,
                                  delim_whitespace=True,
                                  dtype=np.int32).values
             labels = np.array(labels, dtype=np.int32).reshape((-1,))
-        else:
+        except FileNotFoundError:
             labels = np.zeros((points.shape[0],), dtype=np.int32)
 
         data = {
