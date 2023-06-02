@@ -387,7 +387,7 @@ class SemanticSegmentation(BasePipeline):
                                     runid + '_' + Path(tensorboard_dir).name)
 
         writer = SummaryWriter(self.tensorboard_dir)
-        self.save_config(writer)
+        # self.save_config(writer)
         log.info("Writing summary in {}.".format(self.tensorboard_dir))
         record_summary = cfg.get('summary').get('record_for', [])
 
