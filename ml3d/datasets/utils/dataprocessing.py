@@ -170,7 +170,7 @@ class DataProcessing:
         weight = num_per_class / float(sum(num_per_class))
         ce_label_weight = 1 / (weight + 0.02)
 
-        return np.expand_dims(ce_label_weight, axis=0)
+        return ce_label_weight
 
     @staticmethod
     def invT(T):
