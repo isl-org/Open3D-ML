@@ -1,7 +1,7 @@
 addict
 pillow>=9.3.0
 matplotlib>=3
-numpy>1.15
+numpy>1.18
 pandas>=1.0
 pyyaml>=5.4.1
 scikit-learn>=0.21
