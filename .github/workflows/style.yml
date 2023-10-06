@@ -9,20 +9,19 @@ on:
 
 jobs:
   style-check:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: true
       - name: Set up Python version
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: 3.6
       - name: Install dependencies
         run: |
-          sudo apt-get install --yes clang-format-10
-          python -m pip install -U yapf==0.30.0 nbformat pydocstyle==6.0.0
+          python -m pip install -U clang-format==10.0.1.1 yapf==0.30.0 nbformat pydocstyle==6.0.0
       - name: Run style check
         run: |
           python ci/check_style.py
