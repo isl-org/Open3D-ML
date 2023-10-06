@@ -250,7 +250,8 @@ class WaymoSplit():
 
     def get_data(self, idx):
         pc_path = self.path_list[idx]
-        label_path = ("label_all".join(pc_path.rsplit("velodyne", 1))).replace('.bin', '.txt')
+        label_path = ("label_all".join(pc_path.rsplit("velodyne", 1))).replace(
+            '.bin', '.txt')
         calib_path = "calib".join(label_path.rsplit("label_all", 1))
 
         pc = self.dataset.read_lidar(pc_path)
