@@ -153,7 +153,6 @@ class SemanticSegmentation(BasePipeline):
         model.trans_point_sampler = infer_sampler.get_point_sampler()
         self.curr_cloud_id = -1
         self.test_probs = []
-        self.test_labels = []
         self.ori_test_probs = []
         self.ori_test_labels = []
 
@@ -219,7 +218,6 @@ class SemanticSegmentation(BasePipeline):
         model.trans_point_sampler = test_sampler.get_point_sampler()
         self.curr_cloud_id = -1
         self.test_probs = []
-        self.test_labels = []
         self.ori_test_probs = []
         self.ori_test_labels = []
 
@@ -277,8 +275,6 @@ class SemanticSegmentation(BasePipeline):
             self.test_probs.append(
                 np.zeros(shape=[num_points, self.model.cfg.num_classes],
                          dtype=np.float16))
-            self.test_labels.append(np.zeros(shape=[num_points],
-                                             dtype=np.int16))
             self.complete_infer = False
 
         this_possiblility = sampler.possibilities[sampler.cloud_id]
@@ -287,10 +283,11 @@ class SemanticSegmentation(BasePipeline):
             self.pbar_update)
         self.pbar_update = this_possiblility[
             this_possiblility > end_threshold].shape[0]
-        self.test_probs[self.curr_cloud_id], self.test_labels[
-            self.curr_cloud_id] = self.model.update_probs(
-                inputs, results, self.test_probs[self.curr_cloud_id],
-                self.test_labels[self.curr_cloud_id])
+        self.test_probs[self.curr_cloud_id] = self.model.update_probs(
+            inputs,
+            results,
+            self.test_probs[self.curr_cloud_id],
+        )
 
         if (split in ['test'] and
                 this_possiblility[this_possiblility > end_threshold].shape[0]
@@ -303,10 +300,12 @@ class SemanticSegmentation(BasePipeline):
             if proj_inds is None:
                 proj_inds = np.arange(
                     self.test_probs[self.curr_cloud_id].shape[0])
+            test_labels = np.argmax(
+                self.test_probs[self.curr_cloud_id][proj_inds], 1)
+
             self.ori_test_probs.append(
                 self.test_probs[self.curr_cloud_id][proj_inds])
-            self.ori_test_labels.append(
-                self.test_labels[self.curr_cloud_id][proj_inds])
+            self.ori_test_labels.append(test_labels)
             self.complete_infer = True
 
     def run_train(self):
