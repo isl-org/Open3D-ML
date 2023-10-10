@@ -250,14 +250,13 @@ class PVCNN(BaseModel):
 
         return data
 
-    def update_probs(self, inputs, results, test_probs, test_labels):
+    def update_probs(self, inputs, results, test_probs):
         result = results.reshape(-1, self.cfg.num_classes)
         probs = torch.nn.functional.softmax(result, dim=-1).cpu().data.numpy()
-        labels = np.argmax(probs, 1)
 
         self.trans_point_sampler(patchwise=False)
 
-        return probs, labels
+        return probs
 
     def inference_begin(self, data):
         data = self.preprocess(data, {'split': 'test'})
