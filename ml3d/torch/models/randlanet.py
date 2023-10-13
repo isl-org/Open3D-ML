@@ -438,17 +438,16 @@ class RandLANet(BaseModel):
         else:
             return False
 
-    def update_probs(self, inputs, results, test_probs, test_labels):
+    def update_probs(self, inputs, results, test_probs):
         """Update test probabilities with probs from current tested patch.
 
         Args:
             inputs: input to the model.
             results: output of the model.
             test_probs: probabilities for whole pointcloud
-            test_labels: ground truth for whole pointcloud.
 
         Returns:
-            updated probabilities and labels
+            updated probabilities
 
         """
         self.test_smooth = 0.95
@@ -458,14 +457,12 @@ class RandLANet(BaseModel):
             result = torch.reshape(results[b], (-1, self.cfg.num_classes))
             probs = torch.nn.functional.softmax(result, dim=-1)
             probs = probs.cpu().data.numpy()
-            labels = np.argmax(probs, 1)
             inds = inputs['data']['point_inds'][b]
 
             test_probs[inds] = self.test_smooth * test_probs[inds] + (
                 1 - self.test_smooth) * probs
-            test_labels[inds] = labels
 
-        return test_probs, test_labels
+        return test_probs
 
 
 MODEL._register_module(RandLANet, 'torch')
