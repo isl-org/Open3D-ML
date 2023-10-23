@@ -62,7 +62,7 @@ class ObjectDetection(BasePipeline):
         dataset = self.dataset
         cfg = self.cfg
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
@@ -111,7 +111,7 @@ class ObjectDetection(BasePipeline):
         dataset = self.dataset
         cfg = self.cfg
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
@@ -212,7 +212,7 @@ class ObjectDetection(BasePipeline):
 
         cfg = self.cfg
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))
