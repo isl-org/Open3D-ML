@@ -1,5 +1,5 @@
 -f https://download.pytorch.org/whl/torch/
-torch==1.13.1+cu116
+torch==2.0.1+cu117
 -f https://download.pytorch.org/whl/torchvision/
-torchvision==0.14.1+cu116
+torchvision==0.15.2+cu117
 tensorboard
