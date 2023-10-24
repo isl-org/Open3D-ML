@@ -1,22 +1,28 @@
 import pytest
 import os
 import numpy as np
-import torch
-import tensorflow as tf
+import open3d as o3d
+try:
+    import torch
+except ImportError:
+    torch = None
 
 if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
     base = os.environ['PATH_TO_OPEN3D_ML']
 else:
     base = '.'
 
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    # Use first GPU and restrict memory growth.
-    try:
+try:
+    import tensorflow as tf
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        # Use first GPU and restrict memory growth.
         tf.config.experimental.set_visible_devices(gpus[0], 'GPU')
-        tf.config.set_memory_growth(gpu[0], True)
-    except RuntimeError as e:
-        print(e)
+        tf.config.set_memory_growth(gpus[0], True)
+except RuntimeError as e:
+    print(e)
+except ImportError:
+    tf = None
 
 try:
     from open3d.ml.torch.models import OpenVINOModel
@@ -25,6 +31,7 @@ except:
     openvino_available = False
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_PYTORCH_OPS']")
 def test_randlanet_torch():
     import open3d.ml.torch as ml3d
 
@@ -66,6 +73,7 @@ def test_randlanet_torch():
     assert out.shape == (1, 5000, 10)
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_TENSORFLOW_OPS']")
 def test_randlanet_tf():
     import open3d.ml.tf as ml3d
 
@@ -106,6 +114,7 @@ def test_randlanet_tf():
         assert np.max(np.abs(ov_out - out)) < 1e-6
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_PYTORCH_OPS']")
 def test_kpconv_torch():
     import open3d.ml.torch as ml3d
 
@@ -144,6 +153,7 @@ def test_kpconv_torch():
         assert np.max(np.abs(ov_out - out)) < 1e-7
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_TENSORFLOW_OPS']")
 def test_kpconv_tf():
     import open3d.ml.tf as ml3d
 
@@ -191,6 +201,7 @@ def test_kpconv_tf():
         assert np.max(np.abs(ov_out - out)) < 1e-5
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_PYTORCH_OPS']")
 def test_pointpillars_torch():
     import open3d.ml.torch as ml3d
     from open3d.ml.utils import Config
@@ -225,6 +236,7 @@ def test_pointpillars_torch():
             assert torch.max(torch.abs(out - ref)) < 1e-5
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_TENSORFLOW_OPS']")
 def test_pointpillars_tf():
     import open3d.ml.tf as ml3d
     from open3d.ml.utils import Config
