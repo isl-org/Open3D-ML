@@ -3,7 +3,7 @@ name: Ubuntu CI
 on:
   workflow_dispatch:
   push:
-    branches: [master, dev]
+    branches: [main, dev]
   pull_request:
     types: [opened, reopened, synchronize]
 

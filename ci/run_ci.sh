@@ -9,8 +9,8 @@ echo 1. Prepare the Open3D-ML repo and install dependencies
 echo
 export PATH_TO_OPEN3D_ML="$PWD"
 echo "$PATH_TO_OPEN3D_ML"
-# the build system of the main repo expects a master branch. make sure master exists
-git checkout -b master || true
+# the build system of the main repo expects a main branch. make sure main exists
+git checkout -b main || true
 python -m pip install -U pip==$PIP_VER
 python -m pip install -r requirements.txt \
     -r requirements-torch.txt
@@ -21,7 +21,7 @@ python -m pip install -U Cython
 
 echo 2. clone Open3D and install dependencies
 echo
-git clone --branch master https://github.com/isl-org/Open3D.git
+git clone --branch main https://github.com/isl-org/Open3D.git
 
 ./Open3D/util/install_deps_ubuntu.sh assume-yes
 python -m pip install -r Open3D/python/requirements.txt \
