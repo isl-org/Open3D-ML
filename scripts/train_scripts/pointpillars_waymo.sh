@@ -15,9 +15,9 @@ if [ "$#" -ne 2 ]; then
     exit 1
 fi
 
-# Use launch node as master, if not set
-export MASTER_ADDR=${MASTER_ADDR:-$SLURMD_NODENAME}
-export MASTER_PORT=${MASTER_PORT:-29500}
+# Use launch node as main, if not set
+export PRIMARY_ADDR=${PRIMARY_ADDR:-$SLURMD_NODENAME}
+export PRIMARY_PORT=${PRIMARY_PORT:-29500}
 # Use all available GPUs, if not set. Must be the same for ALL nodes.
 export DEVICE_IDS=${DEVICE_IDS:-$(nvidia-smi --list-gpus | cut -f2 -d' ' | tr ':\n' ' ')}
 export NODE_RANK=${NODE_RANK:-SLURM_NODEID} # Pass name of env var
@@ -32,7 +32,7 @@ srun -l python scripts/run_pipeline.py "$1" -c ml3d/configs/pointpillars_waymo.y
     --backend nccl \
     --nodes $SLURM_JOB_NUM_NODES \
     --node_rank "$NODE_RANK" \
-    --host "$MASTER_ADDR" --port "$MASTER_PORT"
+    --host "$PRIMARY_ADDR" --port "$PRIMARY_PORT"
 
 echo Completed at: $(date)
 popd
