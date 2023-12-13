@@ -24,7 +24,7 @@ jobs:
           python -m pip install -U clang-format==10.0.1.1 yapf==0.30.0 nbformat pydocstyle==6.0.0
       - name: Run style check
         run: |
-          python ci/check_style.py
+          python ci/check_style.py --verbose
       - name: Run docstring style check
         run: |
           pydocstyle --convention=google --add-ignore=D1,D205,D415,D212 .
