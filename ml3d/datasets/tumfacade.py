@@ -68,19 +68,19 @@ class TUMFacade(BaseDataset):
 
         Initialize the function by passing the dataset and other details.
 
-         Args:
-             dataset_path: The path to the dataset to use.
-             info_path: The path to the file that includes information about
-                 the dataset. This is default to dataset path if nothing is
-                 provided.
-             name: The name of the dataset (TUM_Facade in this case).
-             cache_dir: The directory where the cache is stored.
-             use_cache: Indicates if the dataset should be cached.
-             use_global: Inidcates if the dataset should be used in a local or
-                 the global CRS
+        Args:
+            dataset_path: The path to the dataset to use.
+            info_path: The path to the file that includes information about
+                the dataset. This is default to dataset path if nothing is
+                provided.
+            name: The name of the dataset (TUM_Facade in this case).
+            cache_dir: The directory where the cache is stored.
+            use_cache: Indicates if the dataset should be cached.
+            use_global: Inidcates if the dataset should be used in a local or
+                the global CRS
 
-         Returns:
-             class: The corresponding class.
+        Returns:
+            class: The corresponding class.
         """
         super().__init__(
             dataset_path=dataset_path,

@@ -84,6 +84,7 @@ class Pandaset(BaseDataset):
             cache_dir: The directory where the cache is stored.
             use_cache: Indicates if the dataset should be cached.
             ignored_label_inds: A list of labels that should be ignored in the dataset.
+
         Returns:
             class: The corresponding class.
         """
@@ -223,9 +224,9 @@ class Pandaset(BaseDataset):
 
         Args:
             results: The output of a model for the datum associated with the
-            attribute passed.
-            attrs: The attributes that correspond to the outputs passed in
-            results.
+                attribute passed.
+            attr: The attributes that correspond to the outputs passed in
+                results.
         """
         cfg = self.cfg
         pred = results['predict_labels']
