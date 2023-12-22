@@ -262,7 +262,8 @@ class MatterportObjectsSplit():
 
     def get_data(self, idx):
         pc_path = self.path_list[idx]
-        label_path = pc_path.replace('pc', 'boxes').replace('.bin', '.txt')
+        label_path = ("boxes".join(pc_path.rsplit("pc",
+                                                  1))).replace('.bin', '.txt')
 
         pc = self.dataset.read_lidar(pc_path)
         label = self.dataset.read_label(label_path)

@@ -147,7 +147,7 @@ class SemanticSegmentation(BasePipeline):
         cfg = self.cfg
 
         self.load_ckpt(model.cfg.ckpt_path)
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
@@ -192,7 +192,7 @@ class SemanticSegmentation(BasePipeline):
         cfg = self.cfg
 
         log.info(model)
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))
         log.addHandler(logging.FileHandler(log_file_path))

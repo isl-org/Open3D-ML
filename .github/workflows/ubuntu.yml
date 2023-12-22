@@ -3,7 +3,7 @@ name: Ubuntu CI
 on:
   workflow_dispatch:
   push:
-    branches: [master, dev]
+    branches: [main, dev]
   pull_request:
     types: [opened, reopened, synchronize]
 
@@ -16,7 +16,7 @@ jobs:
       NPROC: 2
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup cache
         uses: actions/cache@v3
         with:
@@ -33,7 +33,7 @@ jobs:
       - name: Set up Python version
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       # Pre-installed  packages: https://github.com/actions/runner-images/tree/main/images
       - name: Install ccache
         run: |

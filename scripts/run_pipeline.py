@@ -199,8 +199,8 @@ def main():
 
 
 def setup(rank, world_size, args):
-    os.environ['MASTER_ADDR'] = args.host
-    os.environ['MASTER_PORT'] = args.port
+    os.environ['PRIMARY_ADDR'] = args.host
+    os.environ['PRIMARY_PORT'] = args.port
 
     # initialize the process group
     dist.init_process_group(args.backend, rank=rank, world_size=world_size)
