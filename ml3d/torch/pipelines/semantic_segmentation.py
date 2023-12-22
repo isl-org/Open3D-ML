@@ -190,7 +190,7 @@ class SemanticSegmentation(BasePipeline):
         model.eval()
         self.metric_test = SemSegMetric()
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
@@ -320,7 +320,7 @@ class SemanticSegmentation(BasePipeline):
         model.to(device)
 
         log.info("DEVICE : {}".format(device))
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log_file_path = join(cfg.logs_dir, 'log_train_' + timestamp + '.txt')
         log.info("Logging in file : {}".format(log_file_path))

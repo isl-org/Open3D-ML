@@ -85,7 +85,7 @@ class ObjectDetection(BasePipeline):
 
         model.eval()
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_test_' + timestamp + '.txt')
@@ -145,7 +145,7 @@ class ObjectDetection(BasePipeline):
 
         model.eval()
 
-        timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
         log.info("DEVICE : {}".format(device))
         log_file_path = join(cfg.logs_dir, 'log_valid_' + timestamp + '.txt')
@@ -282,7 +282,7 @@ class ObjectDetection(BasePipeline):
 
         if rank == 0:
             log.info("DEVICE : {}".format(device))
-            timestamp = datetime.now().strftime('%Y-%m-%d_%H:%M:%S')
+            timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
             log_file_path = join(cfg.logs_dir,
                                  'log_train_' + timestamp + '.txt')

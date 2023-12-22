@@ -1,5 +1,6 @@
 import pytest
 import os
+import open3d as o3d
 
 if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
     base = os.environ['PATH_TO_OPEN3D_ML']
@@ -8,6 +9,7 @@ else:
     # base = '../Open3D-ML'
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_PYTORCH_OPS']")
 def test_integration_torch():
     import torch
     import open3d.ml.torch as ml3d
@@ -25,6 +27,7 @@ def test_integration_torch():
     print(model)
 
 
+@pytest.mark.skipif("not o3d._build_config['BUILD_TENSORFLOW_OPS']")
 def test_integration_tf():
     import tensorflow as tf
     import open3d.ml.tf as ml3d
@@ -45,15 +48,10 @@ def test_integration_tf():
 def test_integration_openvino():
     try:
         from openvino.inference_engine import IECore
-        openvino_available = True
-    except:
-        openvino_available = False
-
-    if not openvino_available:
+    except ImportError:
         return
 
-    from open3d.ml.torch.models import OpenVINOModel
-    from open3d.ml.tf.models import OpenVINOModel
-
-
-test_integration_torch()
+    if o3d._build_config['BUILD_TORCH_OPS']:
+        from open3d.ml.torch.models import OpenVINOModel
+    if o3d._build_config['BUILD_TENSORFLOW_OPS']:
+        from open3d.ml.tf.models import OpenVINOModel
