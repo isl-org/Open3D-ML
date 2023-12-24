@@ -245,7 +245,7 @@ class BoundingBox3D:
         if color is None:
             color = np.ones((line_indices.shape[0], line_indices.shape[1], 3))
         for i in range(num_rects):
-            corners = rect_corners[i].astype(np.int)
+            corners = rect_corners[i].astype(np.int32)
             # ignore boxes outside a certain threshold
             interesting_corners_scale = 3.0
             if min(corners[:, 0]
