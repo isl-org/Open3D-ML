@@ -408,6 +408,7 @@ The following is a list of datasets for which we provide dataset reader classes.
 -   nuScenes ([project-page](https://www.nuscenes.org/))
 -   Waymo ([project-page](https://waymo.com/open/))
 -   ScanNet([project-page](http://www.scan-net.org/))
+-   Pandaset ([project-page](https://pandaset.org/))
 -   TUM-FAÇADE ([project-page](https://github.com/OloOcki/tum-facade)) 
 
 For downloading these datasets visit the respective webpages and have a look at the scripts in [`scripts/download_datasets`](https://github.com/isl-org/Open3D-ML/tree/main/scripts/download_datasets).
