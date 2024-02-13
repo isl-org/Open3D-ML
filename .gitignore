@@ -26,3 +26,4 @@ test_kpconv/
 kernels/
 **/.fuse*
 train_log/
+*.ipynb_checkpoints
