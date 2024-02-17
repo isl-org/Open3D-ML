@@ -186,6 +186,26 @@ Similar as for inference, pipelines provide an interface for training a model on
 a dataset.
 
 ```python
+import ml3d
+from open3d import _ml3d
+from ml3d.torch import RandLANet, SemanticSegmentation
+
+dataset_path = "/media/nikste/SSD_030_06/semantic_kitti/"
+cfg_path = "ml3d/configs/randlanet_semantickitti.yml"
+# '/path/to/SemanticKITTI/'
+cfg = _ml3d.utils.Config.load_from_file(cfg_path)
+dataset = ml3d.datasets.SemanticKITTI(dataset_path=dataset_path, use_cache=True)
+
+# create the model with random initialization.
+model = RandLANet(**cfg.model)
+
+pipeline = SemanticSegmentation(model=model, dataset=dataset, **cfg.pipeline)
+
+# prints training progress in the console.
+pipeline.run_train()
+
+
+
 # use a cache for storing the results of the preprocessing (default path is './logs/cache')
 dataset = ml3d.datasets.SemanticKITTI(dataset_path='/path/to/SemanticKITTI/', use_cache=True)
 
