@@ -136,6 +136,11 @@ class SemanticSegmentation(BasePipeline):
         model.device = device
         model.eval()
 
+        preprocess_func = model.preprocess
+        processed_data = preprocess_func(data, {'split': 'test'})
+        def get_cache(attr):
+            return processed_data
+
         batcher = self.get_batcher(device)
         infer_dataset = InferenceDummySplit(data)
         self.dataset_split = infer_dataset
@@ -144,7 +149,8 @@ class SemanticSegmentation(BasePipeline):
                                       preprocess=model.preprocess,
                                       transform=model.transform,
                                       sampler=infer_sampler,
-                                      use_cache=False)
+                                      use_cache=False,                                    
+                                      cache_convert=get_cache)
         infer_loader = DataLoader(infer_split,
                                   batch_size=cfg.batch_size,
                                   sampler=get_sampler(infer_sampler),
