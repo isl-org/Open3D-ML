@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import threading
 import open3d as o3d
+# Allow Open3D import when visualizer is not built or used.
 if o3d._build_config["BUILD_GUI"]:
     from open3d.visualization import gui
     from open3d.visualization import rendering
