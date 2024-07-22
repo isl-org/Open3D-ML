@@ -1,5 +1,5 @@
-.las
-.ply
+*.las
+*.ply
 .vscode/
 .DS_Store
 __pycache__
