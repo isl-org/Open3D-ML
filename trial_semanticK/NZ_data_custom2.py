@@ -13,6 +13,9 @@ import os
 import torch
 from torch.utils.data import DataLoader, Dataset
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(device)
+
 # Custom Dataset class for your point cloud data
 class CustomPointCloudDataset(Dataset):
     def __init__(self, point, color):
