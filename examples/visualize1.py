@@ -53,8 +53,10 @@ kitti_labels = {
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Visualize Datasets')
-    parser.add_argument('dataset_name')  
-    parser.add_argument('dataset_path')  
+    parser.add_argument('dataset_name')  # Comma and variable after
+    parser.add_argument('dataset_path')  # Comma and variable after
+    # Follow the argument below, the path and name have to be set after the
+    # the initialisation of variables situated before the first comma
     parser.add_argument('--model', default='RandLANet')
 
     args = parser.parse_args()
@@ -134,6 +136,8 @@ from open3d.ml.torch.pipelines import SemanticSegmentation
 
 def main():
     args = parse_args()
+    # path and dataset can be found in ml3d/datasets 
+    # all of the datasets are available in the format of .py
     which = args.dataset_name.lower()
     path = args.dataset_path
 
