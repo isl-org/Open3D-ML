@@ -16,9 +16,9 @@ from torch.utils.data import DataLoader
 
 # Custom Dataset class for your point cloud data
 class CustomPointCloudDataset():
-    def __init__(self, point, color, label):
+    def __init__(self, point, label):#, color):
         self.point = point
-        self.color = color
+        #self.color = color
         self.label = label
 
     def __len__(self):
@@ -27,7 +27,7 @@ class CustomPointCloudDataset():
     def __getitem__(self, idx):
         return {
             'point': self.point[idx],
-            'color': self.color[idx],
+            #'color': self.color[idx],
             'label': self.label[idx]
         }
 
@@ -46,19 +46,22 @@ def main():
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
 
     #Setting up the visualization
+    kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names() #Using SemanticKITTI labels
     v = ml3d.vis.Visualizer()
     lut = ml3d.vis.LabelLUT()
+    for val in sorted(kitti_labels.keys()):
+        lut.add_label(kitti_labels[val], val)
     v.set_lut("labels", lut)
     v.set_lut("pred", lut)
 
-
     # Loading the point cloud into numpy array
     point = np.load(pc_path)[:, 0:3]
-    color = np.load(pc_path)[:, 3:] * 255
+    #color = np.load(pc_path)[:, 3:] * 255
     label = np.zeros(np.shape(point)[0], dtype = np.int32) 
 
     # Create custom dataset and dataloader
-    dataset = CustomPointCloudDataset(point, color, label)
+    #dataset = CustomPointCloudDataset(point, color, label)
+    dataset = CustomPointCloudDataset(point, label)
     dataloader = DataLoader(dataset, batch_size=batch_size)
 
     print('\nRunning...')
@@ -75,9 +78,10 @@ def main():
         print(f"\nIteration number: {i}")
         results_r = pipeline_r.run_inference(batch)
         print('Inference processed successfully...')
-        pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32)
+        print(f"\nResults_r: {results_r['predict_labels'][:13]}")
+        pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32) #Plus one?
         # Fill "unlabeled" value because predictions have no 0 values.
-        pred_label_r[0] = 0
+        #pred_label_r[0] = 0
         
         vis_d = {
             "name": name,
@@ -85,8 +89,11 @@ def main():
             "labels": batch["label"],
             "pred": pred_label_r,
                 }
-        vis_points.append(vis_d)    
         
+        pred_val = vis_d["pred"][:13]
+        print(f"\nPrediction values: {pred_val}")
+        vis_points.append(vis_d)    
+    
     v.visualize(vis_points)
         
 if __name__ == "__main__":
