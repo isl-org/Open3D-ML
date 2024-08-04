@@ -97,7 +97,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
         InLabel = label[np.all(Condition == True, axis=1)]
         label = label[np.any(Condition == False, axis=1)]
         
-        if len(InLimit) == 0:
+        if len(InLimit) < 10:
             pass
         
         else:
