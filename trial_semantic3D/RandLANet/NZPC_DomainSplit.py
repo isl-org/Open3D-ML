@@ -128,11 +128,11 @@ def main():
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
 
     #Setting up the visualization
-    kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names() #Using SemanticKITTI labels
+    Semantic3D_labels = ml3d.datasets.Semantic3D.get_label_to_names() #Using SemanticKITTI labels
     v = ml3d.vis.Visualizer()
     lut = ml3d.vis.LabelLUT()
-    for val in sorted(kitti_labels.keys()):
-        lut.add_label(kitti_labels[val], val)
+    for val in sorted(Semantic3D_labels.keys()):
+        lut.add_label(Semantic3D_labels[val], val)
     v.set_lut("labels", lut)
     v.set_lut("pred", lut)
 
@@ -151,9 +151,10 @@ def main():
         
     print('\n\nConfiguring model...')   
     model = ml3d.models.RandLANet(ckpt_path=ckpt_path)
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model)
+    print("\nModel Configured...")
+    pipeline_r = ml3d.pipelines.SemanticSegmentation(model)
     print(f"The device is currently running on: {pipeline_r.device}")
-    pipeline_r.load_ckpt(model.cfg.ckpt_path)
+    #pipeline_r.load_ckpt(model.cfg.ckpt_path)
     print('Running Inference...')
 
 

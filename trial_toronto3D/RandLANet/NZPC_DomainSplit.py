@@ -88,6 +88,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
     counter = 0
     clone_point = point
     label = label
+    #color = color
 
     for Class_limit in Class_limits:
         
@@ -96,6 +97,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
         clone_point = clone_point[np.any(Condition == False, axis=1)]
         InLabel = label[np.all(Condition == True, axis=1)]
         label = label[np.any(Condition == False, axis=1)]
+        #InColor = color[np.all(Condition == True, axis=1)]
+        #color = color[np.any(Condition == False, axis=1)]
         
         if len(InLimit) < 10:
             pass
@@ -107,7 +110,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
                 'limit': Class_limit,
                 'point': InLimit,
                 'label': InLabel,
-                'feat': None
+                #'feat': InColor
                 }
             
             print(f"\nPoint cloud - {data['name']} has been successfully loaded")
@@ -128,11 +131,11 @@ def main():
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
 
     #Setting up the visualization
-    kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names() #Using SemanticKITTI labels
+    toronto_labels = ml3d.datasets.Toronto3D.get_label_to_names() #Using Toronto labels
     v = ml3d.vis.Visualizer()
     lut = ml3d.vis.LabelLUT()
-    for val in sorted(kitti_labels.keys()):
-        lut.add_label(kitti_labels[val], val)
+    for val in sorted(toronto_labels.keys()):
+        lut.add_label(toronto_labels[val], val)
     v.set_lut("labels", lut)
     v.set_lut("pred", lut)
 
@@ -146,14 +149,16 @@ def main():
     Xsplit = 16 #Domain partitioning along X-axis
     Ysplit = 8  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
+    #batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label)
     
         
     print('\n\nConfiguring model...')   
     model = ml3d.models.RandLANet(ckpt_path=ckpt_path)
+    print("Model Configured...")
     pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model)
     print(f"The device is currently running on: {pipeline_r.device}")
-    pipeline_r.load_ckpt(model.cfg.ckpt_path)
+    #pipeline_r.load_ckpt(model.cfg.ckpt_path)
     print('Running Inference...')
 
 
@@ -163,7 +168,7 @@ def main():
         results_r = pipeline_r.run_inference(batch)
         print('Inference processed successfully...')
         print(f"\nResults_r: {results_r['predict_labels'][:13]}")
-        pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32) #Plus one?
+        pred_label_r = (results_r['predict_labels']+1).astype(np.int32) #Plus one?
         # Fill "unlabeled" value because predictions have no 0 values.
         #pred_label_r[0] = 0
         

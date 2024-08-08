@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jul 18 10:00:27 2024
@@ -10,9 +11,8 @@ import logging
 import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
 import numpy as np
 import os
-import torch
-from torch.utils.data import DataLoader
 import math
+import torch
 
 
 # Custom Dataset class for your point cloud data
@@ -117,6 +117,16 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
 
     return batches
     
+def custom_collate_fn(batch):
+    # Extract 'point' and 'label' from each item in the batch
+    points = np.vstack([item['point'] for item in batch])
+    labels = np.hstack([item['label'] for item in batch])
+    
+    # Convert numpy arrays to PyTorch tensors
+    points_tensor = torch.tensor(points, dtype=torch.float32)
+    labels_tensor = torch.tensor(labels, dtype=torch.long)
+    
+    return {'point': points_tensor, 'label': labels_tensor}
 
 def main():
     example_dir = os.path.dirname(os.path.realpath(__file__)) #Initializing the current directory
@@ -124,9 +134,10 @@ def main():
 
 
     # Assigning checkpoint and point cloud directory as variables
-    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet.pth")
-    pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
-
+    ckpt_path = example_dir + "/vis_weights_KPFCNN.pth"
+    pc_path = example_dir + "/BLOK_D_1.npy"
+     
+        
     #Setting up the visualization
     kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names() #Using SemanticKITTI labels
     v = ml3d.vis.Visualizer()
@@ -136,10 +147,11 @@ def main():
     v.set_lut("labels", lut)
     v.set_lut("pred", lut)
 
+
     # Loading the point cloud into numpy array
     point = np.load(pc_path)[:, 0:3]
     #color = np.load(pc_path)[:, 3:] * 255
-    label = np.zeros(np.shape(point)[0], dtype = np.int32) 
+    label = np.zeros(np.shape(point)[0], dtype = np.int32)
     
     
     # Splitting point cloud into batches based on regional area
@@ -148,22 +160,25 @@ def main():
     Zsplit = 2  #Domain partitioning along Z-axis
     batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label)
     
-        
+    
     print('\n\nConfiguring model...')   
-    model = ml3d.models.RandLANet(ckpt_path=ckpt_path)
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model)
-    print(f"The device is currently running on: {pipeline_r.device}")
-    pipeline_r.load_ckpt(model.cfg.ckpt_path)
+    model = ml3d.models.KPFCNN(ckpt_path=ckpt_path)#,batcher='DefaultBatcher')
+    pipeline_k = ml3d.pipelines.SemanticSegmentation(model=model)
+    print(f"The device is currently running on: {pipeline_k.device}")
+    pipeline_k.load_ckpt(model.cfg.ckpt_path)
     print('Running Inference...')
 
 
     for i,batch in enumerate(batches):
         i += 1
         print(f"\nIteration number: {i}")
-        results_r = pipeline_r.run_inference(batch)
+        
+       # Use custom collate function to preprocess the batch
+        #processed_batch = custom_collate_fn([batch])
+        results_k = pipeline_k.run_inference(batch)
         print('Inference processed successfully...')
-        print(f"\nResults_r: {results_r['predict_labels'][:13]}")
-        pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32) #Plus one?
+        print(f"\nResults_k: {results_k['predict_labels'][:13]}")
+        pred_label_k = (results_k['predict_labels'] + 1).astype(np.int32) #Plus one?
         # Fill "unlabeled" value because predictions have no 0 values.
         #pred_label_r[0] = 0
         
@@ -171,7 +186,7 @@ def main():
             "name": batch['name'],
             "points": batch['point'],
             "labels": batch['label'],
-            "pred": pred_label_r,
+            "pred": pred_label_k,
                 }
         
         pred_val = vis_d["pred"][:13]
