@@ -33,7 +33,7 @@ class CustomPointCloudDataset():
         }
 
 
-def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
+def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
     x_par = Xsplit
     y_par = Ysplit
     z_par = Zsplit
@@ -88,7 +88,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
     counter = 0
     clone_point = point
     label = label
-
+    color = color 
+    
     for Class_limit in Class_limits:
         
         Condition = clone_point < Class_limit
@@ -96,6 +97,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
         clone_point = clone_point[np.any(Condition == False, axis=1)]
         InLabel = label[np.all(Condition == True, axis=1)]
         label = label[np.any(Condition == False, axis=1)]
+        InColor = color[np.all(Condition == True, axis=1)]
+        color = color[np.any(Condition == False, axis=1)]
         
         if len(InLimit) < 10:
             pass
@@ -107,7 +110,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
                 'limit': Class_limit,
                 'point': InLimit,
                 'label': InLabel,
-                'feat': None
+                'feat': InColor
                 }
             
             print(f"\nPoint cloud - {data['name']} has been successfully loaded")
@@ -121,7 +124,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
 def main():
     example_dir = os.path.dirname(os.path.realpath(__file__)) #Initializing the current directory
     vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
-
+    in_channels = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
 
     # Assigning checkpoint and point cloud directory as variables
     ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet.pth")
@@ -138,7 +141,7 @@ def main():
 
     # Loading the point cloud into numpy array
     point = np.load(pc_path)[:, 0:3]
-    #color = np.load(pc_path)[:, 3:] * 255
+    color = np.load(pc_path)[:, 3:] * 255
     label = np.zeros(np.shape(point)[0], dtype = np.int32) 
     
     
@@ -146,13 +149,13 @@ def main():
     Xsplit = 16 #Domain partitioning along X-axis
     Ysplit = 8  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
-    batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label)
+    batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     
         
     print('\n\nConfiguring model...')   
-    model = ml3d.models.RandLANet(ckpt_path=ckpt_path)
+    model = ml3d.models.RandLANet(ckpt_path=ckpt_path, in_channels=in_channels)
     print("\nModel Configured...")
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model)
+    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model)
     print(f"The device is currently running on: {pipeline_r.device}")
     #pipeline_r.load_ckpt(model.cfg.ckpt_path)
     print('Running Inference...')
