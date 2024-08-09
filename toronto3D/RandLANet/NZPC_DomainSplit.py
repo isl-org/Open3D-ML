@@ -8,6 +8,7 @@ Created on Thu Jul 18 10:00:27 2024
 #!/usr/bin/env python
 import logging
 import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
+import open3d.ml as _ml3d
 import numpy as np
 import os
 import torch
@@ -122,14 +123,22 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
     
 
 def main():
-    example_dir = os.path.dirname(os.path.realpath(__file__)) #Initializing the current directory
-    vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
-    in_channels = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
-
-    # Assigning checkpoint and point cloud directory as variables
-    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet.pth")
+    #Initializing current directory and home directory
+    example_dir = os.path.dirname(os.path.realpath(__file__)) 
+    home_directory = os.path.expanduser( '~' )
+        
+    # Assigning checkpoint, point cloud & config files as variables
+    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet_toronto3D.pth")
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
-
+    cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
+    cfg_path = os.path.join(cfg_directory, "randlanet_toronto3d.yml")
+    cfg = _ml3d.utils.Config.load_from_file(cfg_path)
+    
+    #Setting up empty array and number of features used
+    vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
+    #in_channels = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
+    
+        
     #Setting up the visualization
     toronto_labels = ml3d.datasets.Toronto3D.get_label_to_names() #Using Toronto labels
     v = ml3d.vis.Visualizer()
@@ -144,24 +153,21 @@ def main():
     color = np.load(pc_path)[:, 3:] * 255
     label = np.zeros(np.shape(point)[0], dtype = np.int32) 
     
-    
+      
     # Splitting point cloud into batches based on regional area
     Xsplit = 16 #Domain partitioning along X-axis
     Ysplit = 8  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
-    #batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     
-        
     print('\n\nConfiguring model...')   
-    model = ml3d.models.RandLANet(ckpt_path=ckpt_path,in_channels=in_channels)
+    model = ml3d.models.RandLANet(**cfg.model)
     print("Model Configured...")
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model)
+    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
     print(f"The device is currently running on: {pipeline_r.device}")
-    #pipeline_r.load_ckpt(model.cfg.ckpt_path)
+    pipeline_r.load_ckpt(ckpt_path=ckpt_path)
     print('Running Inference...')
-
-
+            
     for i,batch in enumerate(batches):
         i += 1
         print(f"\nIteration number: {i}")
