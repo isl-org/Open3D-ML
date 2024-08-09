@@ -9,6 +9,7 @@ Created on Thu Jul 18 10:00:27 2024
 #!/usr/bin/env python
 import logging
 import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
+import open3d.ml as _ml3d
 import numpy as np
 import os
 import math
@@ -33,7 +34,7 @@ class CustomPointCloudDataset():
         }
 
 
-def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
+def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
     x_par = Xsplit
     y_par = Ysplit
     z_par = Zsplit
@@ -88,6 +89,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
     counter = 0
     clone_point = point
     label = label
+    color = color
 
     for Class_limit in Class_limits:
         
@@ -96,6 +98,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
         clone_point = clone_point[np.any(Condition == False, axis=1)]
         InLabel = label[np.all(Condition == True, axis=1)]
         label = label[np.any(Condition == False, axis=1)]
+        InColor = color[np.all(Condition == True, axis=1)]
+        color = color[np.any(Condition == False, axis=1)]
         
         if len(InLimit) < 10:
             pass
@@ -107,7 +111,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
                 'limit': Class_limit,
                 'point': InLimit,
                 'label': InLabel,
-                'feat': None
+                'feat': InColor
                 }
             
             print(f"\nPoint cloud - {data['name']} has been successfully loaded")
@@ -117,27 +121,23 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label):
 
     return batches
     
-def custom_collate_fn(batch):
-    # Extract 'point' and 'label' from each item in the batch
-    points = np.vstack([item['point'] for item in batch])
-    labels = np.hstack([item['label'] for item in batch])
-    
-    # Convert numpy arrays to PyTorch tensors
-    points_tensor = torch.tensor(points, dtype=torch.float32)
-    labels_tensor = torch.tensor(labels, dtype=torch.long)
-    
-    return {'point': points_tensor, 'label': labels_tensor}
 
 def main():
-    example_dir = os.path.dirname(os.path.realpath(__file__)) #Initializing the current directory
-    vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
-
-
-    # Assigning checkpoint and point cloud directory as variables
-    ckpt_path = example_dir + "/vis_weights_KPFCNN.pth"
-    pc_path = example_dir + "/BLOK_D_1.npy"
-     
+    #Initializing current directory and home directory
+    example_dir = os.path.dirname(os.path.realpath(__file__)) 
+    home_directory = os.path.expanduser( '~' )
         
+    # Assigning checkpoint, point cloud & config files as variables
+    ckpt_path = os.path.join(example_dir, "vis_weights_KPFCNN_semanticKITTI.pth")
+    pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
+    cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
+    cfg_path = os.path.join(cfg_directory, "kpconv_semantickitti.yml")
+    cfg = _ml3d.utils.Config.load_from_file(cfg_path)
+         
+    #Setting up empty array and number of features used
+    vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
+    #in_features_dim = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
+    
     #Setting up the visualization
     kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names() #Using SemanticKITTI labels
     v = ml3d.vis.Visualizer()
@@ -147,34 +147,31 @@ def main():
     v.set_lut("labels", lut)
     v.set_lut("pred", lut)
 
-
     # Loading the point cloud into numpy array
     point = np.load(pc_path)[:, 0:3]
-    #color = np.load(pc_path)[:, 3:] * 255
+    color = np.load(pc_path)[:, 3:] * 255
     label = np.zeros(np.shape(point)[0], dtype = np.int32)
-    
-    
+        
     # Splitting point cloud into batches based on regional area
     Xsplit = 16 #Domain partitioning along X-axis
     Ysplit = 8  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
-    batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label)
+    batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     
-    
-    print('\n\nConfiguring model...')   
-    model = ml3d.models.KPFCNN(ckpt_path=ckpt_path)#,batcher='DefaultBatcher')
-    pipeline_k = ml3d.pipelines.SemanticSegmentation(model=model)
+            
+    print('\nConfiguring model...')   
+    model = ml3d.models.KPFCNN(**cfg.model)
+    print("Model Configured...")
+    pipeline_k = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
     print(f"The device is currently running on: {pipeline_k.device}")
-    pipeline_k.load_ckpt(model.cfg.ckpt_path)
+    pipeline_k.load_ckpt(ckpt_path=ckpt_path)
     print('Running Inference...')
 
 
     for i,batch in enumerate(batches):
         i += 1
         print(f"\nIteration number: {i}")
-        
-       # Use custom collate function to preprocess the batch
-        #processed_batch = custom_collate_fn([batch])
+          
         results_k = pipeline_k.run_inference(batch)
         print('Inference processed successfully...')
         print(f"\nResults_k: {results_k['predict_labels'][:13]}")

@@ -8,6 +8,7 @@ Created on Thu Jul 18 10:00:27 2024
 #!/usr/bin/env python
 import logging
 import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
+import open3d.ml as _ml3d
 import numpy as np
 import os
 import torch
@@ -122,13 +123,20 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
     
 
 def main():
-    example_dir = os.path.dirname(os.path.realpath(__file__)) #Initializing the current directory
-    vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
-    in_channels = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
-
-    # Assigning checkpoint and point cloud directory as variables
-    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet.pth")
+    #Initializing current directory and home directory
+    example_dir = os.path.dirname(os.path.realpath(__file__)) 
+    home_directory = os.path.expanduser( '~' )
+        
+    # Assigning checkpoint, point cloud & config files as variables
+    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet_semantic3D.pth")
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
+    cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
+    cfg_path = os.path.join(cfg_directory, "randlanet_semantic3d.yml")
+    cfg = _ml3d.utils.Config.load_from_file(cfg_path)
+         
+    #Setting up empty array and number of features used
+    vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
+    #in_features_dim = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
 
     #Setting up the visualization
     Semantic3D_labels = ml3d.datasets.Semantic3D.get_label_to_names() #Using SemanticKITTI labels
@@ -153,11 +161,11 @@ def main():
     
         
     print('\n\nConfiguring model...')   
-    model = ml3d.models.RandLANet(ckpt_path=ckpt_path, in_channels=in_channels)
-    print("\nModel Configured...")
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model)
+    model = ml3d.models.RandLANet(**cfg.model)
+    print("Model Configured...")
+    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
     print(f"The device is currently running on: {pipeline_r.device}")
-    #pipeline_r.load_ckpt(model.cfg.ckpt_path)
+    pipeline_r.load_ckpt(ckpt_path=ckpt_path)
     print('Running Inference...')
 
 
@@ -167,7 +175,7 @@ def main():
         results_r = pipeline_r.run_inference(batch)
         print('Inference processed successfully...')
         print(f"\nResults_r: {results_r['predict_labels'][:13]}")
-        pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32) #Plus one?
+        pred_label_r = (results_r['predict_labels']).astype(np.int32) #Plus one?
         # Fill "unlabeled" value because predictions have no 0 values.
         #pred_label_r[0] = 0
         
