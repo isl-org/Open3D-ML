@@ -133,11 +133,11 @@ def main():
     cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
     cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
-         
+    cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
+        
     #Setting up empty array and number of features used
     vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
-    #in_channels = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
-
+    
     #Setting up the visualization
     Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() #Using SemanticKITTI labels
     v = ml3d.vis.Visualizer()
