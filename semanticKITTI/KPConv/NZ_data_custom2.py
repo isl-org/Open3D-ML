@@ -16,10 +16,9 @@ from torch.utils.data import DataLoader, Dataset
 
 # Custom Dataset class for your point cloud data
 class CustomPointCloudDataset(Dataset):
-    def __init__(self, point, color, label):
+    def __init__(self, point, color):
         self.point = point
         self.color = color
-        self.label = label
 
     def __len__(self):
         return len(self.point)
@@ -27,20 +26,17 @@ class CustomPointCloudDataset(Dataset):
     def __getitem__(self, idx):
         return {
             'point': self.point[idx],
-            'color': self.color[idx],
-            'label': self.label[idx]
+            'color': self.color[idx]
         }
 
 # Custom collate function
 def custom_collate_fn(batch):
     points = np.array([item['point'] for item in batch])
     colors = np.array([item['color'] for item in batch])
-    labels = np.array([item['label'] for item in batch])
     return {
         'point': points,
-        'color': colors,
-        'label': labels,
-        }
+        'color': colors
+    }
 
 #%% Using KPConv
 
@@ -48,52 +44,44 @@ def custom_collate_fn(batch):
 def main():
     # Initializing path to the current directory
     example_dir = os.path.dirname(os.path.realpath(__file__))
-    name = 'NZ Point Cloud'
     
     # Assigning checkpoint and point cloud directory as variables
-    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet.pth")
+    ckpt_path = os.path.join(example_dir, "vis_weights_KPFCNN.pth")
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
-    
-    #Setting up the visualization
-    v = ml3d.vis.Visualizer()
-    lut = ml3d.vis.LabelLUT()
-    v.set_lut("labels", lut)
-    v.set_lut("pred", lut)
     
     print('Running...')
     # Loading the point cloud into numpy array
     point = np.load(pc_path)[:, 0:3]
     color = np.load(pc_path)[:, 3:] * 255
-    label = np.zeros(np.shape(point)[0], dtype = np.int32)
     
     # Create custom dataset and dataloader
-    dataset = CustomPointCloudDataset(point, color, label)
-    dataloader = DataLoader(dataset, batch_size=256, 
-                            collate_fn=custom_collate_fn
-                            )
-       
-    model = ml3d.models.RandLANet(ckpt_path)
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model)
-    print(f"The device is currently running on: {pipeline_r.device}")
-    pipeline_r.load_ckpt(model.cfg.ckpt_path)
+    dataset = CustomPointCloudDataset(point, color)
+    dataloader = DataLoader(dataset, batch_size=2, collate_fn=custom_collate_fn)
+   
+   
+    data = {
+        'name': 'my_point_cloud',
+        'point': point,
+        'color': color,
+        'feat': None,
+        'label': None,
+     }
+    
+    model = ml3d.models.KPFCNN(ckpt_path)
+    pipeline_k = ml3d.pipelines.SemanticSegmentation(model)
+    print(f"The device is currently running on: {pipeline_k.device}")
+    pipeline_k.load_ckpt(model.cfg.ckpt_path)
     print('Running Inference')
     
     # Run inference
     for batch in dataloader:
-        results_r = pipeline_r.run_inference(batch)
-        print('Inference processed successfully...')
-        pred_label_r = (results_r['predict_labels'] + 1).astype(np.int32)
+        results_k = pipeline_k.run_inference(batch)
+        #print('Inference processed successfully...')
+        pred_label_k = (results_k['predict_labels'] + 1).astype(np.int32)
+        #print('Prediction...')
         # Fill "unlabeled" value because predictions have no 0 values.
-        pred_label_r[0] = 0
-        
-    vis_d = {
-        "name": name,
-        "points": point,
-        "labels": label,
-        "pred": pred_label_r,
-    }
-            
-    v.visualize(vis_d)
+        pred_label_k[0] = 0
+       # print('So far so good')
         
 if __name__ == "__main__":
 

@@ -17,8 +17,8 @@ def get_custom_data(pc_names, path):
 
     pc_data = []
     for i, name in enumerate(pc_names):
-        pc_path = join(path, 'points', name + '.npy')
-        label_path = join(path, 'labels', name + '.npy')
+        pc_path = join(path, 'SemanticKITTI', 'points', name + '.npy')
+        label_path = join(path,'SemanticKITTI','labels', name + '.npy')
         point = np.load(pc_path)[:, 0:3]
         label = np.squeeze(np.load(label_path))
 
