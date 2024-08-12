@@ -200,3 +200,13 @@ if __name__ == "__main__":
     )
 
     main()
+
+"""         0: 'unlabeled',
+            1: 'man-made terrain',
+            2: 'natural terrain',
+            3: 'high vegetation',
+            4: 'low vegetation',
+            5: 'buildings',
+            6: 'hard scape',
+            7: 'scanning artefacts',
+            8: 'cars'"""

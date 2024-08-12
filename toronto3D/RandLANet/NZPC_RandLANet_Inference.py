@@ -199,3 +199,13 @@ if __name__ == "__main__":
     )
 
     main()
+
+"""         0: 'Unclassified',
+            1: 'Ground',
+            2: 'Road_markings',
+            3: 'Natural',
+            4: 'Building',
+            5: 'Utility_line',
+            6: 'Pole',
+            7: 'Car',
+            8: 'Fence'"""

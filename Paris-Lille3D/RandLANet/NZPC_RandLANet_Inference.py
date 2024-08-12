@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jul 18 10:00:27 2024
@@ -12,8 +11,9 @@ import open3d.ml.torch as ml3d  # just switch to open3d.ml.tf for tf usage
 import open3d.ml as _ml3d
 import numpy as np
 import os
-import math
 import torch
+from torch.utils.data import DataLoader
+import math
 
 
 # Custom Dataset class for your point cloud data
@@ -89,8 +89,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
     counter = 0
     clone_point = point
     label = label
-    color = color
-
+    color = color 
+    
     for Class_limit in Class_limits:
         
         Condition = clone_point < Class_limit
@@ -98,8 +98,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
         clone_point = clone_point[np.any(Condition == False, axis=1)]
         InLabel = label[np.all(Condition == True, axis=1)]
         label = label[np.any(Condition == False, axis=1)]
-        InColor = color[np.all(Condition == True, axis=1)]
-        color = color[np.any(Condition == False, axis=1)]
+        #InColor = color[np.all(Condition == True, axis=1)]
+        #color = color[np.any(Condition == False, axis=1)]
         
         if len(InLimit) < 10:
             pass
@@ -111,7 +111,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
                 'limit': Class_limit,
                 'point': InLimit,
                 'label': InLabel,
-                'feat': InColor
+                #'feat': InColor
                 }
             
             print(f"\nPoint cloud - {data['name']} has been successfully loaded")
@@ -128,54 +128,54 @@ def main():
     home_directory = os.path.expanduser( '~' )
         
     # Assigning checkpoint, point cloud & config files as variables
-    ckpt_path = os.path.join(example_dir, "vis_weights_KPFCNN_semanticKITTI.pth")
+    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet_parislille3d.pth")
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
     cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
-    cfg_path = os.path.join(cfg_directory, "kpconv_semantickitti.yml")
+    cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
          
     #Setting up empty array and number of features used
     vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
-    #in_features_dim = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
-    
+    #in_channels = 6 # 3 (X,Y,Z) param + other features (i.e. 3 (R,G,B) color param)
+
     #Setting up the visualization
-    kitti_labels = ml3d.datasets.SemanticKITTI.get_label_to_names() #Using SemanticKITTI labels
+    Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() #Using SemanticKITTI labels
     v = ml3d.vis.Visualizer()
     lut = ml3d.vis.LabelLUT()
-    for val in sorted(kitti_labels.keys()):
-        lut.add_label(kitti_labels[val], val)
+    for val in sorted(Paris3D_labels.keys()):
+        lut.add_label(Paris3D_labels[val], val)
     v.set_lut("labels", lut)
     v.set_lut("pred", lut)
 
     # Loading the point cloud into numpy array
     point = np.load(pc_path)[:, 0:3]
     color = np.load(pc_path)[:, 3:] * 255
-    label = np.zeros(np.shape(point)[0], dtype = np.int32)
-        
+    label = np.zeros(np.shape(point)[0], dtype = np.int32) 
+    
+    
     # Splitting point cloud into batches based on regional area
     Xsplit = 16 #Domain partitioning along X-axis
     Ysplit = 8  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
     batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     
-            
+        
     print('\n\nConfiguring model...')   
-    model = ml3d.models.KPFCNN(**cfg.model)
+    model = ml3d.models.RandLANet(**cfg.model)
     print("Model Configured...")
-    pipeline_k = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
-    print(f"The device is currently running on: {pipeline_k.device}")
-    pipeline_k.load_ckpt(ckpt_path=ckpt_path)
+    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
+    print(f"The device is currently running on: {pipeline_r.device}")
+    pipeline_r.load_ckpt(ckpt_path=ckpt_path)
     print('Running Inference...')
 
 
     for i,batch in enumerate(batches):
         i += 1
         print(f"\nIteration number: {i}")
-          
-        results_k = pipeline_k.run_inference(batch)
+        results_r = pipeline_r.run_inference(batch)
         print('Inference processed successfully...')
-        print(f"\nResults_k: {results_k['predict_labels'][:13]}")
-        pred_label_k = (results_k['predict_labels'] + 1).astype(np.int32) #Plus one?
+        print(f"\nResults_r: {results_r['predict_labels'][:13]}")
+        pred_label_r = (results_r['predict_labels'] +1).astype(np.int32) #Plus one?
         # Fill "unlabeled" value because predictions have no 0 values.
         #pred_label_r[0] = 0
         
@@ -183,7 +183,7 @@ def main():
             "name": batch['name'],
             "points": batch['point'],
             "labels": batch['label'],
-            "pred": pred_label_k,
+            "pred": pred_label_r,
                 }
         
         pred_val = vis_d["pred"][:13]
@@ -200,24 +200,14 @@ if __name__ == "__main__":
     )
 
     main()
-    
-    """     0: 'unlabeled',
-            1: 'car',
-            2: 'bicycle',
-            3: 'motorcycle',
-            4: 'truck',
-            5: 'other-vehicle',
-            6: 'person',
-            7: 'bicyclist',
-            8: 'motorcyclist',
-            9: 'road',
-            10: 'parking',
-            11: 'sidewalk',
-            12: 'other-ground',
-            13: 'building',
-            14: 'fence',
-            15: 'vegetation',
-            16: 'trunk',
-            17: 'terrain',
-            18: 'pole',
-            19: 'traffic-sign'"""
+
+"""         0: 'unclassified',
+            1: 'ground',
+            2: 'building',
+            3: 'pole-road_sign-traffic_light',
+            4: 'bollard-small_pole',
+            5: 'trash_can',
+            6: 'barrier',
+            7: 'pedestrian',
+            8: 'car',
+            9: 'natural-vegetation'"""

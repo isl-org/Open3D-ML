@@ -191,3 +191,24 @@ if __name__ == "__main__":
     )
 
     main()
+    
+"""         0: 'unlabeled',
+            1: 'car',
+            2: 'bicycle',
+            3: 'motorcycle',
+            4: 'truck',
+            5: 'other-vehicle',
+            6: 'person',
+            7: 'bicyclist',
+            8: 'motorcyclist',
+            9: 'road',
+            10: 'parking',
+            11: 'sidewalk',
+            12: 'other-ground',
+            13: 'building',
+            14: 'fence',
+            15: 'vegetation',
+            16: 'trunk',
+            17: 'terrain',
+            18: 'pole',
+            19: 'traffic-sign'"""
