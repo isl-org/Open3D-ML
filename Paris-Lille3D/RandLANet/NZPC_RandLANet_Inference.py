@@ -130,7 +130,7 @@ def main():
     # Assigning checkpoint, point cloud & config files as variables
     ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet_parislille3d.pth")
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
-    cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
+    cfg_directory = os.path.join(home_directory, "Open3D-ML_PRISM/ml3d/configs")
     cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
     cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
@@ -154,7 +154,7 @@ def main():
     
     
     # Splitting point cloud into batches based on regional area
-    Xsplit = 16 #Domain partitioning along X-axis
+    Xsplit = 16  #Domain partitioning along X-axis
     Ysplit = 8  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
     batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
