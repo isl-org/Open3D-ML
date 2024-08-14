@@ -36,7 +36,7 @@ class CustomPointCloudDataset():
 def main():
     example_dir = os.path.dirname(os.path.realpath(__file__)) #Initializing the current directory
     code_name = "000" #Name assigned to each batch together with counter in looping
-    batch_size = 65536 #Arbitrary number
+    batch_size = int(1e6) #Arbitrary number
     i = 0 #Counter
     vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
 
