@@ -90,7 +90,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
     clone_point = point
     label = label
     color = color 
-      
+    
     for Class_limit in Class_limits:
         
         Condition = clone_point < Class_limit
@@ -98,8 +98,8 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
         clone_point = clone_point[np.any(Condition == False, axis=1)]
         InLabel = label[np.all(Condition == True, axis=1)]
         label = label[np.any(Condition == False, axis=1)]
-        InColor = color[np.all(Condition == True, axis=1)]
-        color = color[np.any(Condition == False, axis=1)]
+        #InColor = color[np.all(Condition == True, axis=1)]
+        #color = color[np.any(Condition == False, axis=1)]
         
         if len(InLimit) < 10:
             pass
@@ -111,7 +111,7 @@ def Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color):
                 'limit': Class_limit,
                 'point': InLimit,
                 'label': InLabel,
-                'feat': None
+                #'feat': InColor
                 }
             
             print(f"\nPoint cloud - {data['name']} has been successfully loaded")
@@ -128,12 +128,12 @@ def main():
     home_directory = os.path.expanduser( '~' )
         
     # Assigning checkpoint, point cloud & config files as variables
-    ckpt_path = os.path.join(example_dir, "vis_weights_RandLANet_parislille3d.pth")
+    ckpt_path = os.path.join(example_dir, "vis_weights_kpconv_parislille3d.pth")
     pc_path = os.path.join(example_dir, "BLOK_D_1.npy")
     cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
-    cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
+    cfg_path = os.path.join(cfg_directory, "kpconv_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
-    cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
+    cfg.model['in_features_dim'] = 1 
         
     #Setting up empty array and number of features used
     vis_points = [] # To compile 'vis_d' dictionary at each looping iteration
@@ -161,29 +161,29 @@ def main():
     
         
     print('\n\nConfiguring model...')   
-    model = ml3d.models.RandLANet(**cfg.model)
+    model = ml3d.models.KPFCNN(**cfg.model)
     print("Model Configured...")
-    pipeline_r = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
-    print(f"The device is currently running on: {pipeline_r.device}")
-    pipeline_r.load_ckpt(ckpt_path=ckpt_path)
+    pipeline_k = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
+    print(f"The device is currently running on: {pipeline_k.device}")
+    pipeline_k.load_ckpt(ckpt_path=ckpt_path)
     print('Running Inference...')
 
 
     for i,batch in enumerate(batches):
         i += 1
         print(f"\nIteration number: {i}")
-        results_r = pipeline_r.run_inference(batch)
+        results_k = pipeline_k.run_inference(batch)
         print('Inference processed successfully...')
-        print(f"\nResults_r: {results_r['predict_labels'][:13]}")
-        pred_label_r = (results_r['predict_labels'] +1).astype(np.int32) #Plus one?
+        print(f"\nResults_k: {results_k['predict_labels'][:13]}")
+        pred_label_k = (results_k['predict_labels'] +1).astype(np.int32) #Plus one?
         # Fill "unlabeled" value because predictions have no 0 values.
         #pred_label_r[0] = 0
         
         vis_d = {
             "name": batch['name'],
-            "points": batch['point'].astype(np.float32),
-            "labels": batch['label'].astype(np.float32),
-            "pred": pred_label_r,
+            "points": batch['point'],
+            "labels": batch['label'],
+            "pred": pred_label_k,
                 }
         
         pred_val = vis_d["pred"][:13]
