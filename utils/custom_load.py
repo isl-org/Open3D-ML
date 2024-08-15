@@ -1,4 +1,3 @@
-import open3d as o3d
 import laspy
 import numpy as np
 import os
@@ -14,6 +13,7 @@ class CustomDataLoader():
         self.folder = os.path.basename(self.dir) 
         self.file_path = os.path.join(self.dir, self.folder + "_Data.npy")
         self.las_path = las_path
+        self.v = ml3d.vis.Visualizer()
         
         if self.las_path != None:
             #Checking if the path to directory is correct
@@ -42,8 +42,7 @@ class CustomDataLoader():
             pass
     
     def VisualizingData(self,data_path = None):
-        vis = ml3d.vis.Visualizer()
-                  
+                          
         #Checking if the user has passed input for data_path
         if data_path == None:
             data_path = self.file_path
@@ -62,7 +61,7 @@ class CustomDataLoader():
                                   
                     ]
                 
-                vis.visualize(data)
+                self.v.visualize(data)
             
             except:
                 print(f"\nNo color found in data.\nRandomizing color for visualization...")
@@ -77,12 +76,12 @@ class CustomDataLoader():
                     
                 ]
                                 
-                vis.visualize(data)
+                self.v.visualize(data)
         except:
             print(f"\nError: {data_path} is not a valid numpy file\n")
         
     
-    def Domain_Split(self,Xsplit,Ysplit,Zsplit,feat = False, point_path = None,label_path = None,color_path = None):
+    def Domain_Split(self,Xsplit=int,Ysplit=int,Zsplit=int,feat = False, point_path = None,label_path = None,color_path = None):
         
         if point_path == None:
             try:
@@ -234,6 +233,67 @@ class CustomDataLoader():
                     counter += 1
 
         return batches
+    
+    def CustomConfig(self,cfg,ckpt_path = None):
+       
+        if ckpt_path == None:
+            print("\nFetching checkpoint model in the current directory")
+            try:
+                ckpts = glob.glob(os.path.join(self.dir, "*.pth"))
+                ckpt_path = ckpts[-1] #If there is more than one, select the last one in the list of array
+                print(f"Using checkpoint model {ckpt_path} to run inference")
+            except:
+                print("Error: No checkpoint model found in the current directory")
+                sys.exit()
+                
+                      
+        print('\nConfiguring model...')    
+        try: 
+            model = ml3d.models.RandLANet(**cfg.model)
+            print("RandLANet model configured...")
+        except:
+            model = ml3d.models.KPFCNN(**cfg.model)
+            print("KPConv model configured...")
+            
+           
+        pipeline = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
+        print(f"The device is currently running on: {pipeline.device}\n")
+        pipeline.load_ckpt(ckpt_path=ckpt_path)
+        
+        return pipeline
+    
+    def CustomInference(self,pipeline,batches):
+        Results = [] 
+                     
+        print('Running Inference...')
+
+        for i,batch in enumerate(batches):
+            i += 1
+            print(f"\nIteration number: {i}")
+            results = pipeline.run_inference(batch)
+            print('Inference processed successfully...')
+            print(f"\nInitial result: {results['predict_labels'][:13]}")
+            pred_label = (results['predict_labels'] +1).astype(np.int32) 
+            
+            
+            vis_d = {
+                "name": batch['name'],
+                "points": batch['point'].astype(np.float32),
+                "labels": batch['label'].astype(np.float32),
+                "pred": pred_label,
+                    }
+            
+            pred_val = vis_d["pred"][:13]
+            print(f"\nPrediction values: {pred_val}")
+            Results.append(vis_d)    
+
+        lut = ml3d.vis.LabelLUT()
+        self.v.set_lut("labels", lut)
+        self.v.set_lut("pred", lut)
+        self.v.visualize(Results)
+        
+        return Results
+        
         
     
 #file_path = glob.glob(os.path.join(directory, "*.npy"))
