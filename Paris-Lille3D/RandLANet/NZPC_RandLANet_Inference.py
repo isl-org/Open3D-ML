@@ -148,14 +148,13 @@ def main():
     v.set_lut("pred", lut)
 
     # Loading the point cloud into numpy array
-    point = np.load(pc_path)[:, 0:3]
+    point = np.load(pc_path)[:, 0:3].astype(np.float32)
     color = np.load(pc_path)[:, 3:] * 255
     label = np.zeros(np.shape(point)[0], dtype = np.int32) 
     
-    
     # Splitting point cloud into batches based on regional area
-    Xsplit = 16  #Domain partitioning along X-axis
-    Ysplit = 8  #Domain partitioning along Y-axis
+    Xsplit = 8  #Domain partitioning along X-axis
+    Ysplit = 6  #Domain partitioning along Y-axis
     Zsplit = 2  #Domain partitioning along Z-axis
     batches = Domain_Split(Xsplit,Ysplit,Zsplit,point,label,color)
     
@@ -176,9 +175,11 @@ def main():
         print('Inference processed successfully...')
         print(f"\nResults_r: {results_r['predict_labels'][:13]}")
         pred_label_r = (results_r['predict_labels'] +1).astype(np.int32) #Plus one?
+        print(f"\nBatch point type : {type(batch['point'])}")
         # Fill "unlabeled" value because predictions have no 0 values.
         #pred_label_r[0] = 0
         
+
         vis_d = {
             "name": batch['name'],
             "points": batch['point'],
