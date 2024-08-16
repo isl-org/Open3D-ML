@@ -1,10 +1,11 @@
+import open3d.ml.torch as ml3d #Must be first to import to fix bugs when running OpenGL
 import laspy
 import numpy as np
 import os
-import open3d.ml.torch as ml3d
 import glob
 import math
-import sys
+
+
 
 class CustomDataLoader():
     def __init__(self,las_path = None):
@@ -13,115 +14,91 @@ class CustomDataLoader():
         self.folder = os.path.basename(self.dir) 
         self.file_path = os.path.join(self.dir, self.folder + "_Data.npy")
         self.las_path = las_path
-        self.v = ml3d.vis.Visualizer()
+        
         
         if self.las_path != None:
             #Checking if the path to directory is correct
+            
+            abs_path = os.path.abspath(self.las_path)
+            las = laspy.read(abs_path)
+            points = np.vstack((las.x, las.y, las.z)).transpose()
+            
+            #Checking if the .las file has color data
             try:
-                abs_path = os.path.abspath(self.las_path)
-                las = laspy.read(abs_path)
-                points = np.vstack((las.x, las.y, las.z)).transpose()
-                
-                #Checking if the .las file has color data
-                try:
-                    red = las.red
-                    green = las.green
-                    blue = las.blue
-                    colors = np.vstack((red, green, blue)).transpose() / 65535.0 #Normalize to 1
-                    data = np.hstack((points,colors))
-                    np.save(self.file_path, data)
-                
-                except:
-                    data = points
-                    np.save(self.file_path, data)
-                    print("\nRGB data are not found. Data will only consist of points")
+                red = las.red
+                green = las.green
+                blue = las.blue
+                colors = np.vstack((red, green, blue)).transpose()/65535.0 #Normalize to 1
+                data = np.hstack((points,colors))
+                np.save(self.file_path, data)
+            
             except:
-                print("\nError: Path to directory is incorrect")
-                sys.exit()
+                data = points
+                np.save(self.file_path, data)
+                print("\nRGB data are not found. Data will only consist of points")
+            
         else:
             pass
     
     def VisualizingData(self,data_path = None):
-                          
+        
+        vis = ml3d.vis.Visualizer()
+                                                
         #Checking if the user has passed input for data_path
         if data_path == None:
             data_path = self.file_path
-                       
-        try:
-            points = np.load(data_path)[:,0:3]
-            try:
-                print(f"\nPreparing data for visualization...")
-                color = np.load(data_path)[:, 3:] 
-                data = [
-                    {
-                        'name'  : self.folder + str('_PC'),
-                        'points': points,
-                        'color' : color,
-                    }
-                                  
-                    ]
-                
-                self.v.visualize(data)
-            
-            except:
-                print(f"\nNo color found in data.\nRandomizing color for visualization...")
-                color = np.random.rand(*points.shape).astype(np.float32) 
-                data = [
-                    {
-                        'name'  : self.folder + str('_PC'),
-                        'points': points,
-                        'color' : color,
-                    
-                    }
-                    
-                ]
-                                
-                self.v.visualize(data)
-        except:
-            print(f"\nError: {data_path} is not a valid numpy file\n")
+                                         
         
+        points = np.load(data_path)[:,0:3]
+        print(f"\nPreparing data for visualization...")
+        try:
+                 
+            color = np.load(data_path)[:, 3:] 
+            data = [
+                    {
+                    'name'  : self.folder + str('_PC'),
+                    'points': points.astype(np.float32),
+                    'color' : color.astype(np.int32),
+                    }  
+                ]
+                                    
+            vis.visualize(data)
+            
+        except:
+            print(f"\nNo color found in data.\nRandomizing color for visualization...")
+            color = np.random.rand(*points.shape) 
+            data = [
+                    {
+                        'name'  : self.folder + str('_PC'),
+                        'points': points.astype(np.float32),
+                        'color' : color.astype(np.float32),
+                    }
+                ]
+                         
+            vis.visualize(data)
+                 
     
     def Domain_Split(self,Xsplit=int,Ysplit=int,Zsplit=int,feat = False, point_path = None,label_path = None,color_path = None):
         
         if point_path == None:
-            try:
-                point = np.load(self.file_path)[:,0:3]
-                print(f"\nUsing points from {self.file_path} directory")
-            except:
-                print(f"\nError: No data found in the directory. Please provide data for point")
-                sys.exit()
+            point = np.load(self.file_path)[:,0:3]
+            print(f"\nUsing points from {self.file_path} directory")
         else:
-            try:
-                point = np.load(point_path)
-            except:
-                print(f"\nError: Path to 'point' directory is incorrect")
-                sys.exit()
-                
+            point = np.load(point_path)
+                            
         
         if label_path == None:
             label = np.zeros(np.shape(point)[0], dtype = np.int32)
         else:
-            try:
-                label = np.load(label_path)
-            except:
-                print(f"\nError: Path to 'label' directory is incorrect")
-                sys.exit()
-                
-                
+            label = np.load(label_path)
+            
+                       
         if(color_path == None and feat == True):  
-            try:
-                color = np.load(self.file_path)[:,3:]
-                print(f"Using colors from {self.file_path} directory\n")
-            except:
-                print(f"\nError: No data found in the directory. Please provide data for color")
-                sys.exit()
+            color = np.load(self.file_path)[:,3:]
+            print(f"Using colors from {self.file_path} directory\n")
         elif(color_path != None and feat == True):
-            try:
-                color = np.load(color_path)
-            except:
-                print(f"\nError: Path to 'color' directory is incorrect")
-                sys.exit()
-           
+            color = np.load(color_path)
+                    
                  
         xmax = max(point[:,0])
         ymax = max(point[:,1])
@@ -235,18 +212,14 @@ class CustomDataLoader():
         return batches
     
     def CustomConfig(self,cfg,ckpt_path = None):
-       
+               
         if ckpt_path == None:
             print("\nFetching checkpoint model in the current directory")
-            try:
-                ckpts = glob.glob(os.path.join(self.dir, "*.pth"))
-                ckpt_path = ckpts[-1] #If there is more than one, select the last one in the list of array
-                print(f"Using checkpoint model {ckpt_path} to run inference")
-            except:
-                print("Error: No checkpoint model found in the current directory")
-                sys.exit()
-                
-                      
+            ckpts = glob.glob(os.path.join(self.dir, "*.pth"))
+            ckpt_path = ckpts[-1] #If there is more than one, select the last one in the list of array
+            print(f"Using checkpoint model {ckpt_path} to run inference")
+              
+                        
         print('\nConfiguring model...')    
         try: 
             model = ml3d.models.RandLANet(**cfg.model)
@@ -262,9 +235,10 @@ class CustomDataLoader():
         
         return pipeline
     
+    
     def CustomInference(self,pipeline,batches):
         Results = [] 
-                     
+                      
         print('Running Inference...')
 
         for i,batch in enumerate(batches):
@@ -286,20 +260,8 @@ class CustomDataLoader():
             pred_val = vis_d["pred"][:13]
             print(f"\nPrediction values: {pred_val}")
             Results.append(vis_d)    
-
-        lut = ml3d.vis.LabelLUT()
-        self.v.set_lut("labels", lut)
-        self.v.set_lut("pred", lut)
-        self.v.visualize(Results)
-        
+                        
         return Results
         
         
     
-#file_path = glob.glob(os.path.join(directory, "*.npy"))
-
-        
-        
-     
-       
- 

@@ -181,8 +181,8 @@ def main():
         
         vis_d = {
             "name": batch['name'],
-            "points": batch['point'],
-            "labels": batch['label'],
+            "points": batch['point'].astype(np.float32),
+            "labels": batch['label'].astype(np.float32),
             "pred": pred_label_k,
                 }
         

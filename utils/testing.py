@@ -1,10 +1,9 @@
 from custom_load import CustomDataLoader
-import numpy as np
 import os
-import glob
 import open3d.ml as _ml3d
 import open3d.ml.torch as ml3d
-import logging
+
+
 
 ####################################
 # BASIC INSTRUCTION:
@@ -52,38 +51,39 @@ import logging
 
 ####################################
 
-def main():   
+
+def main():
+    #Initializing directory paths
     home_directory = os.path.expanduser( '~' )
     cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
     cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
     cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
-
-    # Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() #Using SemanticKITTI labels
-    # v = ml3d.vis.Visualizer()
-    # lut = ml3d.vis.LabelLUT()
-    # for val in sorted(Paris3D_labels.keys()):
-    #     lut.add_label(Paris3D_labels[val], val)
-    # v.set_lut("labels", lut)
-    # v.set_lut("pred", lut)
-
-    #las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/Laser Scanning/BLOK_D_"
     las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/Laser Scanning/BLOK_D_1.las"
-    testing = CustomDataLoader() #Leave it empty after .npy has been loaded into the current directory
-    #testing.VisualizingData() #Pass in data path or leave it empty if you have the .npy in the current directory
-    Xsplit = 16
-    Ysplit = 8
-    Zsplit = 2
-    batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit) #feat is true if color is required to be included
-    pipeline = testing.CustomConfig(cfg)
-    results = testing.CustomInference(pipeline,batches)
-        
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s - %(asctime)s - %(module)s - %(message)s",
-    )
 
+    testing = CustomDataLoader() 
+    #testing.VisualizingData() #To visualize raw data prior to inference
+
+    #Running Inference
+    Xsplit = 12
+    Ysplit = 6
+    Zsplit = 2
+    batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
+    pipeline = testing.CustomConfig(cfg)
+    Results = testing.CustomInference(pipeline,batches)
+
+    #Visualization
+    Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() 
+    v = ml3d.vis.Visualizer()
+    lut = ml3d.vis.LabelLUT()
+    for val in sorted(Paris3D_labels.keys()):
+        lut.add_label(Paris3D_labels[val], val)
+    v.set_lut("labels", lut)
+    v.set_lut("pred", lut)
+    v.visualize(Results)
+
+    
+if __name__ == "__main__":
     main()
 
 """         0: 'unclassified',
