@@ -4,6 +4,7 @@ import numpy as np
 import os
 import glob
 import math
+import json
 
 
 
@@ -237,8 +238,8 @@ class CustomDataLoader():
     
     
     def CustomInference(self,pipeline,batches):
-        Results = [] 
-                      
+        Results = []
+                                      
         print('Running Inference...')
 
         for i,batch in enumerate(batches):
@@ -257,11 +258,58 @@ class CustomDataLoader():
                 "pred": pred_label,
                     }
             
+                   
             pred_val = vis_d["pred"][:13]
             print(f"\nPrediction values: {pred_val}")
-            Results.append(vis_d)    
-                        
+            Results.append(vis_d)      
+                
         return Results
         
-        
-    
+    def PytoJson(self,Predictions,interval = 400000):   #Predictions variable refers to Results
+        file_name = self.folder + str('_PredictedResults.json')
+        JsonData = []
+
+        #To bypass the RAM issue when converting .tolist all at once
+        for Prediction in Predictions:
+            if len(Prediction["points"]) < interval:
+                Prediction["points"] = (Prediction["points"]).tolist()
+                Prediction["labels"] = (Prediction["labels"]).tolist()
+                Prediction["pred"] = (Prediction["pred"]).tolist()
+                JsonData.append(Prediction)
+                print(f"\nPoint cloud - {Prediction['name']} has been converted to Json")
+            
+            else:
+                print(f"\nPoint cloud - {Prediction['name']} has exceeded {interval} points\nSplitting the batch...")
+                Range = list(range(0,len(Prediction["points"]),interval))
+                print(f"Limit: {Range}")
+                print(f"Last limit: {Range[-1]}")
+                for i, content in enumerate(Range):
+                    if content == Range[-1]:
+                        print(f"Content: {content}")
+                        split_name = Prediction["name"] + str('-') + str(i)
+                        split_points = Prediction["points"][content:, :]
+                        split_labels = Prediction["labels"][content:]
+                        split_pred = Prediction["pred"][content:]
+                    else:
+                        print(f"The range content: {content}")
+                        split_name = Prediction["name"] + str('-') + str(i)
+                        split_points = Prediction["points"][content:Range[i+1], :]
+                        split_labels = Prediction["labels"][content:Range[i+1]]
+                        split_pred = Prediction["pred"][content:Range[i+1]]
+
+                    JsonData.append({
+                        "name": split_name,
+                        "points": split_points.tolist(),
+                        "labels": split_labels.tolist(),
+                        "pred": split_pred.tolist(),
+                    })
+                    print(f"\nPoint cloud - {split_name} has been converted to Json")
+                        
+                        
+        if os.path.exists(file_name):
+                print(f"{file_name} already exists. No need to rewrite.")
+        else:
+                            
+                with open(file_name, "w") as file:
+                    json.dump(JsonData, file, indent=4)
+                print(f"{file_name} has been created and written.")
