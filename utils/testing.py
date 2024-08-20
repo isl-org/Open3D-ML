@@ -51,19 +51,19 @@ def main():
     cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
     cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
-    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/BLOKD1.las"
+    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
 
-    testing = CustomDataLoader() 
+    testing = CustomDataLoader(las_path=las_path) 
     #testing.VisualizingData() #To visualize raw data prior to inference
 
     #Running Inference
-    Xsplit = 18
-    Ysplit = 6
-    Zsplit = 2
+    Xsplit = 3
+    Ysplit = 3
+    Zsplit = 3
     batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
     pipeline = testing.CustomConfig(cfg)
     Results = testing.CustomInference(pipeline,batches)
-    testing.PytoJson(Results)
+    # testing.PytoJson(Results)
 
     #Visualization
     Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() 

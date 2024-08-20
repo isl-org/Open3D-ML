@@ -116,35 +116,40 @@ class CustomDataLoader():
         z_len = zmax - zmin
 
         #Partitioning global domain into smaller section
-        x_splitsize = int(x_len // Xsplit)
-        y_splitsize = int(y_len // Ysplit)
-        z_splitsize = int(z_len // Zsplit)
-        tot_splitsize = [x_splitsize, y_splitsize, z_splitsize]
+        # x_splitsize = int(x_len // Xsplit)
+        # y_splitsize = int(y_len // Ysplit)
+        # z_splitsize = int(z_len // Zsplit)
+        # tot_splitsize = [x_splitsize, y_splitsize, z_splitsize]
+        split = [Xsplit,Ysplit,Zsplit]
 
         #Create a boundary limit for each sectional domain using:
         dom_lim = []
-        for i in range(len(tot_splitsize)):
-            box = list(range(math.floor(dom_min[i]), 
-                                    math.floor(dom_max[i]) + tot_splitsize[i], 
-                                    tot_splitsize[i]))
+        for i in range(len(split)):
+            box = list(np.linspace(math.floor(dom_min[i]), 
+                                    math.floor(dom_max[i]), 
+                                    split[i]+1))
             
             if box[-1] < dom_max[i]:
                 box[-1] = int(math.ceil(dom_max[i] +1))
 
             dom_lim.append(box[1:])
 
-        Xlim,Ylim = np.meshgrid(dom_lim[0],dom_lim[1])
+        Xlim,Ylim,Zlim = np.meshgrid(dom_lim[0],dom_lim[1],dom_lim[-1])
         Xlim = Xlim.flatten()
         Ylim = Ylim.flatten()
-        two_Dlim = np.vstack((Xlim,Ylim)).T
+        Zlim = Zlim.flatten()
+        Class_limits = np.vstack((Xlim,Ylim,Zlim)).T
+        print(Class_limits)
 
-        z_val = []
-        for Zlim in dom_lim[-1]:
-            z_val.append(Zlim * np.ones(len(two_Dlim),dtype=int))
+        # two_Dlim = np.vstack((Xlim,Ylim)).T
 
-        z_val = np.hstack((z_val[0],z_val[1])).T
-        two_Dlim = np.vstack((two_Dlim,two_Dlim)) 
-        Class_limits = np.column_stack((two_Dlim,z_val))
+        # z_val = []
+        # for Zlim in dom_lim[-1]:
+        #     z_val.append(Zlim * np.ones(len(two_Dlim),dtype=int))
+
+        # z_val = np.hstack((z_val[0],z_val[1])).T
+        # two_Dlim = np.vstack((two_Dlim,two_Dlim)) 
+        # Class_limits = np.column_stack((two_Dlim,z_val))
 
         # Do a for loop which iterates through all of the point cloud (pcs)
         Code_name = "000"
@@ -162,23 +167,23 @@ class CustomDataLoader():
                 InLabel = label[np.all(Condition == True, axis=1)]
                 label = label[np.any(Condition == False, axis=1)]
                                 
-                if len(InLimit) < 10:
-                    pass
+                # if len(InLimit) < 10:
+                #     pass
                 
-                else:
-                    name = Code_name + str(counter)
-                    data = {
-                        'name': name,
-                        'limit': Class_limit,
-                        'point': InLimit,
-                        'label': InLabel,
-                        'feat': None
-                        }
-                    
-                    print(f"\nPoint cloud - {data['name']} has been successfully loaded")
-                    print(f"\nNumber of Point Cloud: {len(InLimit)}")
-                    batches.append(data)
-                    counter += 1
+                # else:
+                name = Code_name + str(counter)
+                data = {
+                    'name': name,
+                    'limit': Class_limit,
+                    'point': InLimit,
+                    'label': InLabel,
+                    'feat': None
+                    }
+                
+                print(f"\nPoint cloud - {data['name']} has been successfully loaded")
+                print(f"\nNumber of Point Cloud: {len(InLimit)}")
+                batches.append(data)
+                counter += 1
 
         else:
             
@@ -192,23 +197,24 @@ class CustomDataLoader():
                 InColor = color[np.all(Condition == True, axis=1)]
                 color = color[np.any(Condition == False, axis=1)]
                 
-                if len(InLimit) < 10:
-                    pass
+                # if len(InLimit) < 10:
+                #     # pass
+                #     a = 0
                 
-                else:
-                    name = Code_name + str(counter)
-                    data = {
-                        'name': name,
-                        'limit': Class_limit,
-                        'point': InLimit,
-                        'label': InLabel,
-                        'feat': InColor
-                        }
-                    
-                    print(f"\nPoint cloud - {data['name']} has been successfully loaded")
-                    print(f"\nNumber of Point Cloud: {len(InLimit)}")
-                    batches.append(data)
-                    counter += 1
+                # else:
+                name = Code_name + str(counter)
+                data = {
+                    'name': name,
+                    'limit': Class_limit,
+                    'point': InLimit,
+                    'label': InLabel,
+                    'feat': InColor
+                    }
+                
+                print(f"\nPoint cloud - {data['name']} has been successfully loaded")
+                print(f"\nNumber of Point Cloud: {len(InLimit)}")
+                batches.append(data)
+                counter += 1
 
         return batches
     
