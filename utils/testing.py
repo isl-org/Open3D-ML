@@ -55,11 +55,11 @@ import open3d.ml.torch as ml3d
 def main():
     #Initializing directory paths
     home_directory = os.path.expanduser( '~' )
-    cfg_directory = os.path.join(home_directory, "Open3D-ML/ml3d/configs")
+    cfg_directory = os.path.join(home_directory, "Open3D-ML_PRISM/ml3d/configs")
     cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
     cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
-    las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/Laser Scanning/BLOK_D_1.las"
+    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/BLOKD1.las"
 
     testing = CustomDataLoader() 
     #testing.VisualizingData() #To visualize raw data prior to inference
