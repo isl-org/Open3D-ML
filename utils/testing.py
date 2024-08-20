@@ -40,14 +40,6 @@ import open3d.ml.torch as ml3d
 #    can be obtained by using the CustomConfig function as stated in Point 4. This function
 #    will return the final results of the inference and will open up a visualization tab once
 #    inferences are done.
-   
-# 6. PROBLEM: Currently, I have a problem in getting the visualization up and running after 
-#             inferences are done in CustomInference function. It has something to do with 
-#             OpenGL again in which should no longer be a problem for me now since OpenGL
-#             can now be used to visualize the points of the codes are up and running in a
-#             single script (i.e. not compiled into a class)
-    
-
 
 ####################################
 
@@ -65,12 +57,13 @@ def main():
     #testing.VisualizingData() #To visualize raw data prior to inference
 
     #Running Inference
-    Xsplit = 12
+    Xsplit = 18
     Ysplit = 6
     Zsplit = 2
     batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
     pipeline = testing.CustomConfig(cfg)
     Results = testing.CustomInference(pipeline,batches)
+    testing.PytoJson(Results)
 
     #Visualization
     Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() 
