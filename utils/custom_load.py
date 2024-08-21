@@ -1,4 +1,5 @@
 import open3d.ml.torch as ml3d #Must be first to import to fix bugs when running OpenGL
+import open3d.ml as _ml3d
 import laspy
 import numpy as np
 import os
@@ -111,41 +112,27 @@ class CustomDataLoader():
         dom_max = [xmax, ymax, zmax]
         dom_min = [xmin, ymin, zmin]
 
-        x_len = xmax - xmin
-        y_len = ymax - ymin
-        z_len = zmax - zmin
-
-        #Partitioning global domain into smaller section
-        x_splitsize = int(x_len // Xsplit)
-        y_splitsize = int(y_len // Ysplit)
-        z_splitsize = int(z_len // Zsplit)
-        tot_splitsize = [x_splitsize, y_splitsize, z_splitsize]
+        split = [Xsplit,Ysplit,Zsplit]
 
         #Create a boundary limit for each sectional domain using:
         dom_lim = []
-        for i in range(len(tot_splitsize)):
-            box = list(range(math.floor(dom_min[i]), 
-                                    math.floor(dom_max[i]) + tot_splitsize[i], 
-                                    tot_splitsize[i]))
+        for i in range(len(split)):
+            box = list(np.linspace(math.floor(dom_min[i]), 
+                                    math.floor(dom_max[i]), 
+                                    split[i]+1))
             
             if box[-1] < dom_max[i]:
                 box[-1] = int(math.ceil(dom_max[i] +1))
 
             dom_lim.append(box[1:])
 
-        Xlim,Ylim = np.meshgrid(dom_lim[0],dom_lim[1])
+        Xlim,Ylim,Zlim = np.meshgrid(dom_lim[0],dom_lim[1],dom_lim[2])
         Xlim = Xlim.flatten()
         Ylim = Ylim.flatten()
-        two_Dlim = np.vstack((Xlim,Ylim)).T
+        Zlim = Zlim.flatten()
+        Class_limits = np.vstack((Xlim,Ylim,Zlim)).T
 
-        z_val = []
-        for Zlim in dom_lim[-1]:
-            z_val.append(Zlim * np.ones(len(two_Dlim),dtype=int))
-
-        z_val = np.hstack((z_val[0],z_val[1])).T
-        two_Dlim = np.vstack((two_Dlim,two_Dlim)) 
-        Class_limits = np.column_stack((two_Dlim,z_val))
-
+        
         # Do a for loop which iterates through all of the point cloud (pcs)
         Code_name = "000"
         batches = []
@@ -213,7 +200,9 @@ class CustomDataLoader():
         return batches
     
     def CustomConfig(self,cfg,ckpt_path = None):
-               
+        
+        self.cfg_name = cfg.dataset['name']
+        
         if ckpt_path == None:
             print("\nFetching checkpoint model in the current directory")
             ckpts = glob.glob(os.path.join(self.dir, "*.pth"))
@@ -239,59 +228,71 @@ class CustomDataLoader():
     
     def CustomInference(self,pipeline,batches):
         Results = []
-                                      
+                
+        print(f"Name of the dataset used: {self.cfg_name}") 
+        Liststr = f'ml3d.datasets.{self.cfg_name}.get_label_to_names()'
+        Listname = eval(Liststr)     
+        key_list = np.array(list(Listname.keys())) 
+        val_list = list(Listname.values())
+                                                      
         print('Running Inference...')
 
         for i,batch in enumerate(batches):
             i += 1
+            label = []
             print(f"\nIteration number: {i}")
             results = pipeline.run_inference(batch)
             print('Inference processed successfully...')
             print(f"\nInitial result: {results['predict_labels'][:13]}")
             pred_label = (results['predict_labels'] +1).astype(np.int32) 
             
+            for pred in pred_label:
+                ind = np.nonzero(pred == key_list)[0]
+                ind = ind[0]
+                label.append(val_list[ind])
+                
             
             vis_d = {
                 "name": batch['name'],
                 "points": batch['point'].astype(np.float32),
-                "labels": batch['label'].astype(np.float32),
+                "labels": label,
                 "pred": pred_label,
                     }
-            
-                   
+                               
             pred_val = vis_d["pred"][:13]
             print(f"\nPrediction values: {pred_val}")
             Results.append(vis_d)      
                 
         return Results
         
-    def PytoJson(self,Predictions,interval = 400000):   #Predictions variable refers to Results
-        file_name = self.folder + str('_PredictedResults.json')
+    def PytoJson(self,Predictions,interval = 300000,Dict_num = 19):   #Predictions variable refers to Results
+        
         JsonData = []
-
+        counter = 1
+                
         #To bypass the RAM issue when converting .tolist all at once
         for Prediction in Predictions:
             if len(Prediction["points"]) < interval:
+                save = 1
                 Prediction["points"] = (Prediction["points"]).tolist()
-                Prediction["labels"] = (Prediction["labels"]).tolist()
+                #Prediction["labels"] = (Prediction["labels"]).tolist()
                 Prediction["pred"] = (Prediction["pred"]).tolist()
                 JsonData.append(Prediction)
                 print(f"\nPoint cloud - {Prediction['name']} has been converted to Json")
+                print(f"Length of data: {len(JsonData)}")
             
             else:
                 print(f"\nPoint cloud - {Prediction['name']} has exceeded {interval} points\nSplitting the batch...")
                 Range = list(range(0,len(Prediction["points"]),interval))
-                print(f"Limit: {Range}")
-                print(f"Last limit: {Range[-1]}")
+                save = 0
+                
                 for i, content in enumerate(Range):
                     if content == Range[-1]:
-                        print(f"Content: {content}")
                         split_name = Prediction["name"] + str('-') + str(i)
                         split_points = Prediction["points"][content:, :]
                         split_labels = Prediction["labels"][content:]
                         split_pred = Prediction["pred"][content:]
                     else:
-                        print(f"The range content: {content}")
                         split_name = Prediction["name"] + str('-') + str(i)
                         split_points = Prediction["points"][content:Range[i+1], :]
                         split_labels = Prediction["labels"][content:Range[i+1]]
@@ -300,16 +301,27 @@ class CustomDataLoader():
                     JsonData.append({
                         "name": split_name,
                         "points": split_points.tolist(),
-                        "labels": split_labels.tolist(),
+                        "labels": split_labels,
                         "pred": split_pred.tolist(),
                     })
                     print(f"\nPoint cloud - {split_name} has been converted to Json")
-                        
-                        
-        if os.path.exists(file_name):
-                print(f"{file_name} already exists. No need to rewrite.")
-        else:
-                            
+                    print(f"Length of data: {len(JsonData)}")
+                    
+            save = 1
+            
+            if len(JsonData) > Dict_num and save == 1:
+                file_name = self.folder + '-' + str(counter) + '-Prediction.json'
                 with open(file_name, "w") as file:
                     json.dump(JsonData, file, indent=4)
                 print(f"{file_name} has been created and written.")
+                counter += 1
+                JsonData = []
+                            
+                        
+        # if os.path.exists(file_name):
+        #         print(f"{file_name} already exists. No need to rewrite.")
+        # else:
+                            
+        #         with open(file_name, "w") as file:
+        #             json.dump(JsonData, file, indent=4)
+        #         print(f"{file_name} has been created and written.")
