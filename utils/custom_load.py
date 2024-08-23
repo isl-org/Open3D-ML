@@ -6,6 +6,7 @@ import os
 import glob
 import math
 import json
+import pickle
 
 
 
@@ -199,6 +200,7 @@ class CustomDataLoader():
 
         return batches
     
+    
     def CustomConfig(self,cfg,ckpt_path = None):
         
         self.cfg_name = cfg.dataset['name']
@@ -227,6 +229,8 @@ class CustomDataLoader():
     
     
     def CustomInference(self,pipeline,batches):
+        #Labels is replaced with classification to avoid conflicts
+        
         Results = []
                 
         print(f"Name of the dataset used: {self.cfg_name}") 
@@ -239,7 +243,7 @@ class CustomDataLoader():
 
         for i,batch in enumerate(batches):
             i += 1
-            label = []
+            classification = []
             print(f"\nIteration number: {i}")
             results = pipeline.run_inference(batch)
             print('Inference processed successfully...')
@@ -249,13 +253,13 @@ class CustomDataLoader():
             for pred in pred_label:
                 ind = np.nonzero(pred == key_list)[0]
                 ind = ind[0]
-                label.append(val_list[ind])
+                classification.append(val_list[ind])
                 
             
             vis_d = {
                 "name": batch['name'],
                 "points": batch['point'].astype(np.float32),
-                "labels": label,
+                "classification": classification,
                 "pred": pred_label,
                     }
                                
@@ -265,21 +269,23 @@ class CustomDataLoader():
                 
         return Results
         
-    def PytoJson(self,Predictions,interval = 300000,Dict_num = 19):   #Predictions variable refers to Results
-        
-        JsonData = []
+    
+    def _Saveto(self,stat,Predictions,interval,Dict_num,maxpoints):
+        Data = []
         counter = 1
+        Num_point = 0
                 
-        #To bypass the RAM issue when converting .tolist all at once
         for Prediction in Predictions:
             if len(Prediction["points"]) < interval:
                 save = 1
                 Prediction["points"] = (Prediction["points"]).tolist()
-                #Prediction["labels"] = (Prediction["labels"]).tolist()
+                #Prediction["classfication"] = (Prediction["labels"]).tolist()
                 Prediction["pred"] = (Prediction["pred"]).tolist()
-                JsonData.append(Prediction)
-                print(f"\nPoint cloud - {Prediction['name']} has been converted to Json")
-                print(f"Length of data: {len(JsonData)}")
+                Num_point += len(Prediction["pred"])
+                Data.append(Prediction)
+                print(f"\nPoint cloud - {Prediction['name']} has been converted to {stat}")
+                print(f"Length of data: {len(Data)}")
+                print(f"Total number of points saved: {Num_point}")
             
             else:
                 print(f"\nPoint cloud - {Prediction['name']} has exceeded {interval} points\nSplitting the batch...")
@@ -290,38 +296,107 @@ class CustomDataLoader():
                     if content == Range[-1]:
                         split_name = Prediction["name"] + str('-') + str(i)
                         split_points = Prediction["points"][content:, :]
-                        split_labels = Prediction["labels"][content:]
+                        split_labels = Prediction["classification"][content:]
                         split_pred = Prediction["pred"][content:]
                     else:
                         split_name = Prediction["name"] + str('-') + str(i)
                         split_points = Prediction["points"][content:Range[i+1], :]
-                        split_labels = Prediction["labels"][content:Range[i+1]]
+                        split_labels = Prediction["classification"][content:Range[i+1]]
                         split_pred = Prediction["pred"][content:Range[i+1]]
 
-                    JsonData.append({
+                    Num_point += len(split_pred)
+                    Data.append({
                         "name": split_name,
                         "points": split_points.tolist(),
-                        "labels": split_labels,
+                        "classification": split_labels,
                         "pred": split_pred.tolist(),
                     })
-                    print(f"\nPoint cloud - {split_name} has been converted to Json")
-                    print(f"Length of data: {len(JsonData)}")
+                    print(f"\nPoint cloud - {split_name} has been converted to {stat}")
+                    print(f"Length of data: {len(Data)}")
+                    print(f"Total number of points saved: {Num_point}")
                     
             save = 1
             
-            if len(JsonData) > Dict_num and save == 1:
-                file_name = self.folder + '-' + str(counter) + '-Prediction.json'
-                with open(file_name, "w") as file:
-                    json.dump(JsonData, file, indent=4)
+            if (len(Data) > Dict_num and save == 1) or (Num_point > maxpoints and save == 1):
+                if stat == 'Json':
+                    file_name = self.folder + '-' + str(counter) + '-Prediction.json'
+                    with open(file_name, "w") as file:
+                        json.dump(Data, file, indent=4)
+                else:
+                    file_name = self.folder + '-' + str(counter) + '-Prediction.pkl'
+                    with open(file_name, "wb") as file:
+                        pickle.dump(Data, file)
+                        
                 print(f"{file_name} has been created and written.")
                 counter += 1
-                JsonData = []
+                Data = []
+                Num_point = 0
+        
+        
+    def SavetoJson(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1100000):   #Predictions variable refers to Results
+        stat = 'Json'
+        return self._Saveto(stat,Predictions,interval,Dict_num,maxpoints)
+                
                             
-                        
-        # if os.path.exists(file_name):
-        #         print(f"{file_name} already exists. No need to rewrite.")
-        # else:
+    def SavetoPkl(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1100000):   #Predictions variable refers to Results
+        stat = 'Pickle'
+        return self._Saveto(stat,Predictions,interval,Dict_num,maxpoints)
+    
+    
+    def _Visualizer(self,ext,cfg,dir_path = None): 
+                
+        cfg_name = cfg.dataset['name']
+        print(f"Name of the dataset used: {cfg_name}") 
+        Liststr = f'ml3d.datasets.{cfg_name}.get_label_to_names()'
+        Vis_label = eval(Liststr)
+        v = ml3d.vis.Visualizer()
+        lut = ml3d.vis.LabelLUT()
+        for val in sorted(Vis_label.keys()):
+            lut.add_label(Vis_label[val], val)
+        v.set_lut("labels", lut)
+        v.set_lut("pred", lut)
+                   
+        if dir_path == None:
+            Files = glob.glob(os.path.join(self.dir, f"*.{ext}"))
+            print(f"\nLoading .{ext} files in the current directory")
+        else:
+            Files = glob.glob(os.path.join(dir_path, f"*.{ext}"))
+            print(f"\nLoading .{ext} files from {dir_path}")
+        
+        
+        Data = []
+        print("Loading data for visualization...")
+        if ext == 'pkl':     
+            for Filename in Files:
                             
-        #         with open(file_name, "w") as file:
-        #             json.dump(JsonData, file, indent=4)
-        #         print(f"{file_name} has been created and written.")
+                with open(Filename, 'rb') as file:
+                    File = pickle.load(file)
+                                            
+                for Dicts in File:
+                    Dicts.pop("classification")
+                    Data.append(Dicts)
+        
+        else:
+                          
+            for Filename in Files:
+                            
+                with open(Filename, 'r') as file:
+                    File = json.load(file)
+                                            
+                for Dicts in File:
+                    Dicts.pop("classfication")
+                    Data.append(Dicts)
+         
+        v.visualize(Data)
+        
+    
+    def PklVisualizer(self,cfg,dir_path = None):
+        ext = 'pkl'
+        return self._Visualizer(ext,cfg,dir_path)
+    
+    
+    def JsonVisualizer(self,cfg,dir_path = None):
+        ext = 'json'
+        return self._Visualizer(ext,cfg,dir_path)
+            
+            

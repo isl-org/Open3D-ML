@@ -63,18 +63,11 @@ def main():
     batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
     pipeline = testing.CustomConfig(cfg)
     Results = testing.CustomInference(pipeline,batches)
-    testing.PytoJson(Results)
-
-    #Visualization
-    Paris3D_labels = ml3d.datasets.ParisLille3D.get_label_to_names() 
-    v = ml3d.vis.Visualizer()
-    lut = ml3d.vis.LabelLUT()
-    for val in sorted(Paris3D_labels.keys()):
-        lut.add_label(Paris3D_labels[val], val)
-    v.set_lut("labels", lut)
-    v.set_lut("pred", lut)
-    v.visualize(Results)
-
+    testing.SavetoPkl(Results,Dict_num=19)
+    
+    testing.PklVisualizer(cfg) # Use this to load saved data, provide directory to the saved files (optional)
+    #comment out the lines associated to running inference above when running the visualizer
+        
     
 if __name__ == "__main__":
     main()
@@ -89,3 +82,4 @@ if __name__ == "__main__":
             7: 'pedestrian',
             8: 'car',
             9: 'natural-vegetation'"""
+            
