@@ -48,21 +48,21 @@ def main():
     #Initializing directory paths
     home_directory = os.path.expanduser( '~' )
     cfg_directory = os.path.join(home_directory, "Open3D-ML_PRISM/ml3d/configs")
-    cfg_path = os.path.join(cfg_directory, "kpconv_parislille3d.yml")
+    cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
-    cfg.model['in_channels'] = 6 #3 for default :This model cant take colours
-    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
+    cfg.model['in_channels'] = 3 #3 for models without colours and 6 for models with colours
+    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/BLOKD1.las"
 
     testing = CustomDataLoader(las_path=las_path) 
     
     #testing.VisualizingData() #To visualize raw data prior to inference
 
     #Running Inference
-    Xsplit = 4
+    Xsplit = 8
     Ysplit = 4
     Zsplit = 1
-    batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit,feat=True)
-    pipeline = testing.CustomConfig(cfg,ckpt_path=r"/home/jeevin/Open3D-ML_PRISM/utils/kpconv_parislille3d_202011241550utc.pth")
+    batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit,feat=False)
+    pipeline = testing.CustomConfig(cfg,ckpt_path=r"/home/jeevin/Open3D-ML_PRISM/utils/vis_weights_RandLANet_parislille3d.pth")
     Results = testing.CustomInference(pipeline,batches)
     testing.SavetoPkl(Results,Dict_num=19)
     

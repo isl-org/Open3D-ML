@@ -7,6 +7,7 @@ import glob
 import math
 import json
 import pickle
+import shutil
 
 
 
@@ -255,6 +256,26 @@ class CustomDataLoader():
     def CustomInference(self,pipeline,batches):
         #Labels is replaced with classification to avoid conflicts
         
+        """
+        This function takes in a configured pipeline and a list of batches and runs
+        inference on the batches. The output is a list of dictionaries, where each
+        dictionary contains the name of the point cloud, the points, the prediction
+        as a classification name, and the prediction as a label number (model specific).
+
+        Parameters
+        ----------
+        pipeline : ml3d.pipeline.SemanticSegmentation
+            Configured pipeline to run inference with
+        batches : list
+            List of batches to run inference on
+
+        Returns
+        -------
+        list
+            List of dictionaries, where each dictionary contains the name of the
+            point cloud, the points, the prediction as a classification, and the
+            prediction as a label
+        """
         Results = []
                 
         print(f"Name of the dataset used: {self.cfg_name}") 
@@ -422,5 +443,30 @@ class CustomDataLoader():
     def JsonVisualizer(self,cfg,dir_path = None):
         ext = 'json'
         return self._Visualizer(ext,cfg,dir_path)
+    
+    def SavetoLas(self, cfg, dir_path = None): 
+        print("Saving point cloud in LAS format after segmentation...")
+        if dir_path is None:
+            dir_path = os.path.join(self.dir, "/las")
+            print(f"Folder {dir_path} created in current directory.")
+        elif not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+            print(f"Folder {dir_path} created.")
+        else:
+            print(f"Folder {dir_path} already exists. overwriting file inside...")
+            #delete all files inside the directory
+            for filename in os.listdir(dir_path):
+                file_path = os.path.join(dir_path, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+                    
             
+      
+        
             
