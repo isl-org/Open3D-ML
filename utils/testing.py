@@ -58,16 +58,19 @@ def main():
     #testing.VisualizingData() #To visualize raw data prior to inference
 
     #Running Inference
-    Xsplit = 8
-    Ysplit = 4
-    Zsplit = 1
-    batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit,feat=False)
-    pipeline = testing.CustomConfig(cfg,ckpt_path=r"/home/jeevin/Open3D-ML_PRISM/utils/vis_weights_RandLANet_parislille3d.pth")
-    Results = testing.CustomInference(pipeline,batches)
-    testing.SavetoPkl(Results,Dict_num=19)
+
+    # Xsplit = 18
+    # Ysplit = 6
+    # Zsplit = 2
+    # batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
+    # pipeline = testing.CustomConfig(cfg)
+    # Results = testing.CustomInference(pipeline,batches)
+    # testing.SavetoPkl(Results,Dict_num=19) #(Optional) Provide a threshold of the maximum number of points
+    #saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
+
     
-    testing.PklVisualizer(cfg) # Use this to load saved data, provide directory to the saved files (optional)
-    #comment out the lines associated to running inference above when running the visualizer
+    # testing.PklVisualizer(cfg) # Use this to load saved data. (Optional) Provide directory to the saved files.
+    #Comment out the lines associated to running inference above when running the visualizer
         
     
 if __name__ == "__main__":
