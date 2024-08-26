@@ -465,6 +465,9 @@ class CustomDataLoader():
                 except Exception as e:
                     print('Failed to delete %s. Reason: %s' % (file_path, e))
 
+        #convert the dictionaries with segmentations into separate las files
+        # f
+
                     
             
       
