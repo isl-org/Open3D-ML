@@ -6,7 +6,9 @@ import glob
 import math
 import json
 import pickle
+import shutil
 import sys
+
 
 
 class CustomDataLoader():
@@ -31,7 +33,7 @@ class CustomDataLoader():
                 red = las.red
                 green = las.green
                 blue = las.blue
-                colors = np.vstack((red, green, blue)).transpose()/65535.0 #Normalize to 1
+                colors = np.vstack((red, green, blue)).transpose()/65536 #Normalize to 1
                 data = np.hstack((points,colors))
                 np.save(self.file_path, data)
             
@@ -84,6 +86,28 @@ class CustomDataLoader():
     
     def Domain_Split(self,Xsplit=int,Ysplit=int,Zsplit=int,feat = False, point_path = None,label_path = None,color_path = None):
         
+        """
+        Domain_Split is a function which takes in parameters such as Xsplit,Ysplit,Zsplit to split the global
+        domain into multiple subdomain by dividing the corresponding axes based on 
+        the specified number given. These number must be in integer format. 'feat' has been 
+        set to False by default if 'color' parameter is not required to be included when running
+        inferences. Path to points and colors are optional to be passed in, however, if nothing is
+        set, the function will search for them in the current directory. Color is excluded if 'feat'
+        is set to False which is its default setting. Change it to True if color is needed when
+        running inferences.
+
+        Parameters:
+        Xsplit (int): Number of subdomains to be split in the x-axis
+        Ysplit (int): Number of subdomains to be split in the y-axis
+        Zsplit (int): Number of subdomains to be split in the z-axis
+        feat (bool): Whether or not to include color data in the point cloud
+        point_path (str): Path to the .npy file containing the point cloud
+        label_path (str): Path to the .npy file containing the labels
+        color_path (str): Path to the .npy file containing the color data
+
+        Returns:
+        batches (list): A list containing dictionaries of point cloud data
+        """
         if point_path == None:
             point = np.load(self.file_path)[:,0:3]
             print(f"\nUsing points from {self.file_path} directory")
@@ -133,6 +157,7 @@ class CustomDataLoader():
         Ylim = Ylim.flatten()
         Zlim = Zlim.flatten()
         Class_limits = np.vstack((Xlim,Ylim,Zlim)).T
+        print(Class_limits)
 
         
         # Do a for loop which iterates through all of the point cloud (pcs)
@@ -182,7 +207,8 @@ class CustomDataLoader():
                 color = color[np.any(Condition == False, axis=1)]
                 
                 if len(InLimit) < 10:
-                    pass
+                    # pass
+                    a = 0
                 
                 else:
                     name = Code_name + str(counter)
@@ -233,6 +259,26 @@ class CustomDataLoader():
         #Labels is replaced with classification to avoid conflicts
         #once training is considered.
         
+        """
+        This function takes in a configured pipeline and a list of batches and runs
+        inference on the batches. The output is a list of dictionaries, where each
+        dictionary contains the name of the point cloud, the points, the prediction
+        as a classification name, and the prediction as a label number (model specific).
+
+        Parameters
+        ----------
+        pipeline : ml3d.pipeline.SemanticSegmentation
+            Configured pipeline to run inference with
+        batches : list
+            List of batches to run inference on
+
+        Returns
+        -------
+        list
+            List of dictionaries, where each dictionary contains the name of the
+            point cloud, the points, the prediction as a classification, and the
+            prediction as a label
+        """
         Results = []
                 
         print(f"Name of the dataset used: {self.cfg_name}") 
@@ -400,5 +446,33 @@ class CustomDataLoader():
     def JsonVisualizer(self,cfg,dir_path = None):
         ext = 'json'
         return self._Visualizer(ext,cfg,dir_path)
+    
+    def SavetoLas(self, cfg, dir_path = None): 
+        print("Saving point cloud in LAS format after segmentation...")
+        if dir_path is None:
+            dir_path = os.path.join(self.dir, "/las")
+            print(f"Folder {dir_path} created in current directory.")
+        elif not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+            print(f"Folder {dir_path} created.")
+        else:
+            print(f"Folder {dir_path} already exists. overwriting file inside...")
+            #delete all files inside the directory
+            for filename in os.listdir(dir_path):
+                file_path = os.path.join(dir_path, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+        #convert the dictionaries with segmentations into separate las files
+        # f
+
+                    
             
+      
+        
             
