@@ -1,3 +1,7 @@
+*.las
+*.pth 
+*.ply
+*.npy
 .vscode/
 .DS_Store
 __pycache__
