@@ -1,5 +1,4 @@
 import open3d.ml.torch as ml3d #Must be first to import to fix bugs when running OpenGL
-import open3d.ml as _ml3d
 import laspy
 import numpy as np
 import os
@@ -7,18 +6,19 @@ import glob
 import math
 import json
 import pickle
-
+import sys
 
 
 class CustomDataLoader():
     def __init__(self,las_path = None):
         
-        self.dir = os.path.dirname(os.path.realpath(__file__))
+        main_path = os.path.abspath(sys.argv[0])
+        self.dir = os.path.dirname(os.path.abspath(main_path))
         self.folder = os.path.basename(self.dir) 
         self.file_path = os.path.join(self.dir, self.folder + "_Data.npy")
         self.las_path = las_path
         
-        
+                
         if self.las_path != None:
             #Checking if the path to directory is correct
             
@@ -42,6 +42,7 @@ class CustomDataLoader():
             
         else:
             pass
+            
     
     def VisualizingData(self,data_path = None):
         
@@ -230,6 +231,7 @@ class CustomDataLoader():
     
     def CustomInference(self,pipeline,batches):
         #Labels is replaced with classification to avoid conflicts
+        #once training is considered.
         
         Results = []
                 
@@ -333,12 +335,12 @@ class CustomDataLoader():
                 Num_point = 0
         
         
-    def SavetoJson(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1100000):   #Predictions variable refers to Results
+    def SavetoJson(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1200000):   #Predictions variable refers to Results
         stat = 'Json'
         return self._Saveto(stat,Predictions,interval,Dict_num,maxpoints)
                 
                             
-    def SavetoPkl(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1100000):   #Predictions variable refers to Results
+    def SavetoPkl(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1200000):   #Predictions variable refers to Results
         stat = 'Pickle'
         return self._Saveto(stat,Predictions,interval,Dict_num,maxpoints)
     
