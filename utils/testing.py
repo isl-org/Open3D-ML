@@ -50,9 +50,9 @@ def main():
     cfg_file = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_file)
     cfg.model['in_channels'] = 3 #3 for models without colours and 6 for models with colours
-    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
-
-    testing = CustomDataLoader(las_path=las_path, cfg = cfg) 
+    #las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
+    las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/LOT BUNGALOW/LOT_BUNGALOW.las"
+    testing = CustomDataLoader(cfg = cfg) 
 
    
     #testing.VisualizingData() #To visualize raw data prior to inference
@@ -69,21 +69,19 @@ def main():
     # saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
 
     results = testing.load_data(ext='pkl')
-
-    with open ('results.pkl', 'wb') as f:
-        pickle.dump(results, f)
+     
+    # with open ('results.pkl', 'wb') as f:
+    #     pickle.dump(results, f)
     
-    with open ('results.pkl', 'rb') as f:
-        results = pickle.load(f)
+    # with open ('results.pkl', 'rb') as f:
+    #     results = pickle.load(f)
 
-    testing.SavetoLas(results,dir_path="results/")
-
+    testing.SavetoLas(results)
     #testing.SavetoPkl(results,Dict_num=19)
-    #testing.SavetoLas(results,dir_path="results/")
+       
 
 
-
-    testing.PklVisualizer(dir_path=r"/home/jeevin/Open3D-ML_PRISM/utils/") # Use this to load saved data. (Optional) Provide directory to the saved files.
+    #testing.PklVisualizer() # Use this to load saved data. (Optional) Provide directory to the saved files.
     #Comment out the lines associated to running inference above when running the visualizer
         
     
