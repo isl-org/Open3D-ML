@@ -17,7 +17,7 @@ class CustomDataLoader():
         
         main_path = os.path.abspath(sys.argv[0])
         self.dir = os.path.dirname(os.path.abspath(main_path))
-        self.folder = os.path.basename(self.dir) 
+        self.folder = os.path.basename(self.dir)
         self.file_path = os.path.join(self.dir, self.folder + "_Data.npy")
         self.las_path = las_path
         self.cfg = cfg
@@ -159,7 +159,7 @@ class CustomDataLoader():
         Ylim = Ylim.flatten()
         Zlim = Zlim.flatten()
         Class_limits = np.vstack((Xlim,Ylim,Zlim)).T
-        print(Class_limits)
+        #print(Class_limits)
 
         
         # Do a for loop which iterates through all of the point cloud (pcs)
@@ -323,63 +323,81 @@ class CustomDataLoader():
         Data = []
         counter = 1
         Num_point = 0
+        try:       
+            for Prediction in Predictions:
+                catch_err = Prediction["points"][:2,:] #Dummy to catch error
                 
-        for Prediction in Predictions:
-            if len(Prediction["points"]) < interval:
-                save = 1
-                Prediction["points"] = (Prediction["points"]).tolist()
-                #Prediction["classfication"] = (Prediction["labels"]).tolist()
-                Prediction["pred"] = (Prediction["pred"]).tolist()
-                Num_point += len(Prediction["pred"])
-                Data.append(Prediction)
-                print(f"\nPoint cloud - {Prediction['name']} has been converted to {stat}")
-                print(f"Length of data: {len(Data)}")
-                print(f"Total number of points saved: {Num_point}")
-            
-            else:
-                print(f"\nPoint cloud - {Prediction['name']} has exceeded {interval} points\nSplitting the batch...")
-                Range = list(range(0,len(Prediction["points"]),interval))
-                save = 0
-                
-                for i, content in enumerate(Range):
-                    if content == Range[-1]:
-                        split_name = Prediction["name"] + str('-') + str(i)
-                        split_points = Prediction["points"][content:, :]
-                        split_labels = Prediction["classification"][content:]
-                        split_pred = Prediction["pred"][content:]
-                    else:
-                        split_name = Prediction["name"] + str('-') + str(i)
-                        split_points = Prediction["points"][content:Range[i+1], :]
-                        split_labels = Prediction["classification"][content:Range[i+1]]
-                        split_pred = Prediction["pred"][content:Range[i+1]]
-
-                    Num_point += len(split_pred)
-                    Data.append({
-                        "name": split_name,
-                        "points": split_points.tolist(),
-                        "classification": split_labels,
-                        "pred": split_pred.tolist(),
-                    })
-                    print(f"\nPoint cloud - {split_name} has been converted to {stat}")
+                if len(Prediction["points"]) < interval:
+                    save = 1
+                    Prediction["points"] = (Prediction["points"]).tolist()
+                    #Prediction["classfication"] = (Prediction["labels"]).tolist()
+                    Prediction["pred"] = (Prediction["pred"]).tolist()
+                    Num_point += len(Prediction["pred"])
+                    Data.append(Prediction)
+                    print(f"\nPoint cloud - {Prediction['name']} has been converted to {stat}")
                     print(f"Length of data: {len(Data)}")
                     print(f"Total number of points saved: {Num_point}")
-                    
-            save = 1
-            
-            if (len(Data) > Dict_num and save == 1) or (Num_point > maxpoints and save == 1):
-                if stat == 'Json':
-                    file_name = self.folder + '-' + str(counter) + '-Prediction.json'
-                    with open(file_name, "w") as file:
-                        json.dump(Data, file, indent=4)
+                
                 else:
-                    file_name = self.folder + '-' + str(counter) + '-Prediction.pkl'
-                    with open(file_name, "wb") as file:
-                        pickle.dump(Data, file)
+                    print(f"\nPoint cloud - {Prediction['name']} has exceeded {interval} points\nSplitting the batch...")
+                    Range = list(range(0,len(Prediction["points"]),interval))
+                    save = 0
+                    
+                    for i, content in enumerate(Range):
+                        if content == Range[-1]:
+                            split_name = Prediction["name"] + str('-') + str(i)
+                            split_points = Prediction["points"][content:, :]
+                            split_labels = Prediction["classification"][content:]
+                            split_pred = Prediction["pred"][content:]
+                        else:
+                            split_name = Prediction["name"] + str('-') + str(i)
+                            split_points = Prediction["points"][content:Range[i+1], :]
+                            split_labels = Prediction["classification"][content:Range[i+1]]
+                            split_pred = Prediction["pred"][content:Range[i+1]]
+
+                        Num_point += len(split_pred)
+                        Data.append({
+                            "name": split_name,
+                            "points": split_points.tolist(),
+                            "classification": split_labels,
+                            "pred": split_pred.tolist(),
+                        })
+                        print(f"\nPoint cloud - {split_name} has been converted to {stat}")
+                        print(f"Length of data: {len(Data)}")
+                        print(f"Total number of points saved: {Num_point}")
                         
-                print(f"{file_name} has been created and written.")
-                counter += 1
-                Data = []
-                Num_point = 0
+                save = 1
+                
+                if (len(Data) > Dict_num and save == 1) or (Num_point > maxpoints and save == 1):
+                    if stat == 'Json':
+                        file_name = self.folder + '-' + str(counter) + '-Prediction.json'
+                        file_path = os.path.join(self.dir, file_name)
+                        with open(file_path, "w") as file:
+                            json.dump(Data, file, indent=4)
+                    else:
+                        file_name = self.folder + '-' + str(counter) + '-Prediction.pkl'
+                        file_path = os.path.join(self.dir, file_name)
+                        with open(file_path, "wb") as file:
+                            pickle.dump(Data, file)
+                            
+                    print(f"{file_name} has been created and written.")
+                    counter += 1
+                    Data = []
+                    Num_point = 0
+        
+        except:
+            print('\nArray to list conversion is not required. Saving data to a single file...')
+            if stat == 'Json':
+                file_name = self.folder + '_' + str(counter) + '_Prediction.json'
+                file_path = os.path.join(self.dir, file_name)
+                with open(file_path, "w") as file:
+                    json.dump(Predictions, file, indent=4)
+            else:
+                file_name = self.folder + '_' + str(counter) + '_Prediction.pkl'
+                file_path = os.path.join(self.dir, file_name)
+                with open(file_path, "wb") as file:
+                    pickle.dump(Predictions, file)
+            
         
         
     def SavetoJson(self,Predictions,interval = 300000,Dict_num = 14,maxpoints = 1200000):   #Predictions variable refers to Results
@@ -414,8 +432,14 @@ class CustomDataLoader():
         """
         
         if dir_path == None:
+            
             Files = glob.glob(os.path.join(self.dir, f"*.{ext}"))
-            print(f"\nLoading .{ext} files in the current directory")
+            
+            if Files != None:
+                print(f"\nLoading .{ext} files in the current directory")
+            else:
+                print('Error: No related files found in the directory')
+                quit()
         else:
             Files = glob.glob(os.path.join(dir_path, f"*.{ext}"))
             print(f"\nLoading .{ext} files from {dir_path}")
@@ -430,7 +454,6 @@ class CustomDataLoader():
                     File = pickle.load(file)
                                             
                 for Dicts in File:
-                    Dicts.pop("classification")
                     Data.append(Dicts)
         
         else:
@@ -441,7 +464,6 @@ class CustomDataLoader():
                     File = json.load(file)
                                             
                 for Dicts in File:
-                    Dicts.pop("classfication")
                     Data.append(Dicts)
         return Data
 
@@ -459,7 +481,10 @@ class CustomDataLoader():
         v.set_lut("pred", lut)
                    
         Data = self.load_data(ext,dir_path)
-
+        
+        for a_Data in Data:
+            a_Data.pop("classification")
+            
         print('Visualising...') 
         v.visualize(Data)
         
@@ -473,13 +498,13 @@ class CustomDataLoader():
         ext = 'json'
         return self._Visualizer(ext,dir_path)
     
-    def SavetoLas(self, results, dir_path = "results/"): 
-
+    def SavetoLas(self, results, dir_path = None): 
+                
         print("Saving point cloud in LAS format with segementation results...")
         if dir_path is None:
-            dir_path = os.path.join(self.dir, "/las")
-            print(f"Folder {dir_path} created in current directory.")
-        elif not os.path.exists(dir_path):
+            dir_path = os.path.join(self.dir, "las")
+                                  
+        if not os.path.exists(dir_path):
             os.makedirs(dir_path)
             print(f"Folder {dir_path} created.")
         else:
