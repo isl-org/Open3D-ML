@@ -6,17 +6,21 @@ import glob
 import math
 import json
 import pickle
+import shutil
 import sys
+import pandas as pd
+
 
 
 class CustomDataLoader():
-    def __init__(self,las_path = None):
+    def __init__(self,cfg,las_path = None):
         
         main_path = os.path.abspath(sys.argv[0])
         self.dir = os.path.dirname(os.path.abspath(main_path))
         self.folder = os.path.basename(self.dir) 
         self.file_path = os.path.join(self.dir, self.folder + "_Data.npy")
         self.las_path = las_path
+        self.cfg = cfg
         
                 
         if self.las_path != None:
@@ -31,7 +35,7 @@ class CustomDataLoader():
                 red = las.red
                 green = las.green
                 blue = las.blue
-                colors = np.vstack((red, green, blue)).transpose()/65535.0 #Normalize to 1
+                colors = np.vstack((red, green, blue)).transpose()/65536 #Normalize to 1
                 data = np.hstack((points,colors))
                 np.save(self.file_path, data)
             
@@ -84,6 +88,28 @@ class CustomDataLoader():
     
     def Domain_Split(self,Xsplit=int,Ysplit=int,Zsplit=int,feat = False, point_path = None,label_path = None,color_path = None):
         
+        """
+        Domain_Split is a function which takes in parameters such as Xsplit,Ysplit,Zsplit to split the global
+        domain into multiple subdomain by dividing the corresponding axes based on 
+        the specified number given. These number must be in integer format. 'feat' has been 
+        set to False by default if 'color' parameter is not required to be included when running
+        inferences. Path to points and colors are optional to be passed in, however, if nothing is
+        set, the function will search for them in the current directory. Color is excluded if 'feat'
+        is set to False which is its default setting. Change it to True if color is needed when
+        running inferences.
+
+        Parameters:
+        Xsplit (int): Number of subdomains to be split in the x-axis
+        Ysplit (int): Number of subdomains to be split in the y-axis
+        Zsplit (int): Number of subdomains to be split in the z-axis
+        feat (bool): Whether or not to include color data in the point cloud
+        point_path (str): Path to the .npy file containing the point cloud
+        label_path (str): Path to the .npy file containing the labels
+        color_path (str): Path to the .npy file containing the color data
+
+        Returns:
+        batches (list): A list containing dictionaries of point cloud data
+        """
         if point_path == None:
             point = np.load(self.file_path)[:,0:3]
             print(f"\nUsing points from {self.file_path} directory")
@@ -133,6 +159,7 @@ class CustomDataLoader():
         Ylim = Ylim.flatten()
         Zlim = Zlim.flatten()
         Class_limits = np.vstack((Xlim,Ylim,Zlim)).T
+        print(Class_limits)
 
         
         # Do a for loop which iterates through all of the point cloud (pcs)
@@ -182,7 +209,8 @@ class CustomDataLoader():
                 color = color[np.any(Condition == False, axis=1)]
                 
                 if len(InLimit) < 10:
-                    pass
+                    # pass
+                    a = 0
                 
                 else:
                     name = Code_name + str(counter)
@@ -202,9 +230,7 @@ class CustomDataLoader():
         return batches
     
     
-    def CustomConfig(self,cfg,ckpt_path = None):
-        
-        self.cfg_name = cfg.dataset['name']
+    def CreatePipeline(self,ckpt_path = None):
         
         if ckpt_path == None:
             print("\nFetching checkpoint model in the current directory")
@@ -215,14 +241,14 @@ class CustomDataLoader():
                         
         print('\nConfiguring model...')    
         try: 
-            model = ml3d.models.RandLANet(**cfg.model)
+            model = ml3d.models.RandLANet(**self.cfg.model)
             print("RandLANet model configured...")
         except:
-            model = ml3d.models.KPFCNN(**cfg.model)
+            model = ml3d.models.KPFCNN(**self.cfg.model)
             print("KPConv model configured...")
             
            
-        pipeline = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **cfg.pipeline)
+        pipeline = ml3d.pipelines.SemanticSegmentation(model=model, device="gpu", **self.cfg.pipeline)
         print(f"The device is currently running on: {pipeline.device}\n")
         pipeline.load_ckpt(ckpt_path=ckpt_path)
         
@@ -233,10 +259,31 @@ class CustomDataLoader():
         #Labels is replaced with classification to avoid conflicts
         #once training is considered.
         
+        """
+        This function takes in a configured pipeline and a list of batches and runs
+        inference on the batches. The output is a list of dictionaries, where each
+        dictionary contains the name of the point cloud, the points, the prediction
+        as a classification name, and the prediction as a label number (model specific).
+
+        Parameters
+        ----------
+        pipeline : ml3d.pipeline.SemanticSegmentation
+            Configured pipeline to run inference with
+        batches : list
+            List of batches to run inference on
+
+        Returns
+        -------
+        list
+            List of dictionaries, where each dictionary contains the name of the
+            point cloud, the points, the prediction as a classification, and the
+            prediction as a label
+        """
         Results = []
-                
-        print(f"Name of the dataset used: {self.cfg_name}") 
-        Liststr = f'ml3d.datasets.{self.cfg_name}.get_label_to_names()'
+        cfg_name = self.cfg.dataset['name']
+
+        print(f"Name of the dataset used: {cfg_name}") 
+        Liststr = f'ml3d.datasets.{cfg_name}.get_label_to_names()'
         Listname = eval(Liststr)     
         key_list = np.array(list(Listname.keys())) 
         val_list = list(Listname.values())
@@ -345,19 +392,27 @@ class CustomDataLoader():
         return self._Saveto(stat,Predictions,interval,Dict_num,maxpoints)
     
     
-    def _Visualizer(self,ext,cfg,dir_path = None): 
-                
-        cfg_name = cfg.dataset['name']
-        print(f"Name of the dataset used: {cfg_name}") 
-        Liststr = f'ml3d.datasets.{cfg_name}.get_label_to_names()'
-        Vis_label = eval(Liststr)
-        v = ml3d.vis.Visualizer()
-        lut = ml3d.vis.LabelLUT()
-        for val in sorted(Vis_label.keys()):
-            lut.add_label(Vis_label[val], val)
-        v.set_lut("labels", lut)
-        v.set_lut("pred", lut)
-                   
+    def load_data (self,ext,dir_path = None):
+        """
+        Loads saved result files from a directory specified by the user. If no directory is specified, the function will search for files in the current directory. The function is able to read .pkl and .json files.
+
+        Parameters
+        ----------
+
+        ext : str
+            The extension of the file to be read
+
+        dir_path : str, optional
+            The path to the directory containing the files to be read
+
+        Returns
+        -------
+
+        Data : list
+            A list of dictionaries containing the point cloud data
+
+        """
+        
         if dir_path == None:
             Files = glob.glob(os.path.join(self.dir, f"*.{ext}"))
             print(f"\nLoading .{ext} files in the current directory")
@@ -367,7 +422,7 @@ class CustomDataLoader():
         
         
         Data = []
-        print("Loading data for visualization...")
+        print("Loading data...")
         if ext == 'pkl':     
             for Filename in Files:
                             
@@ -388,17 +443,91 @@ class CustomDataLoader():
                 for Dicts in File:
                     Dicts.pop("classfication")
                     Data.append(Dicts)
-         
+        return Data
+
+    def _Visualizer(self,ext,dir_path = None): 
+                
+        cfg_name = self.cfg.dataset['name']
+        print(f"Name of the dataset used: {cfg_name}") 
+        Liststr = f'ml3d.datasets.{cfg_name}.get_label_to_names()'
+        Vis_label = eval(Liststr)
+        v = ml3d.vis.Visualizer()
+        lut = ml3d.vis.LabelLUT()
+        for val in sorted(Vis_label.keys()):
+            lut.add_label(Vis_label[val], val)
+        v.set_lut("labels", lut)
+        v.set_lut("pred", lut)
+                   
+        Data = self.load_data(ext,dir_path)
+
+        print('Visualising...') 
         v.visualize(Data)
         
     
-    def PklVisualizer(self,cfg,dir_path = None):
+    def PklVisualizer(self,dir_path = None):
         ext = 'pkl'
-        return self._Visualizer(ext,cfg,dir_path)
+        return self._Visualizer(ext,dir_path)
     
     
-    def JsonVisualizer(self,cfg,dir_path = None):
+    def JsonVisualizer(self,dir_path = None):
         ext = 'json'
-        return self._Visualizer(ext,cfg,dir_path)
+        return self._Visualizer(ext,dir_path)
+    
+    def SavetoLas(self, results, dir_path = "results/"): 
+
+        print("Saving point cloud in LAS format with segementation results...")
+        if dir_path is None:
+            dir_path = os.path.join(self.dir, "/las")
+            print(f"Folder {dir_path} created in current directory.")
+        elif not os.path.exists(dir_path):
+            os.makedirs(dir_path)
+            print(f"Folder {dir_path} created.")
+        else:
+            print(f"Folder {dir_path} already exists. overwriting file inside...")
+            #delete all files inside the directory
+            for filename in os.listdir(dir_path):
+                file_path = os.path.join(dir_path, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+        #get the class names
+        cfg_name = self.cfg.dataset['name']
+        Liststr = f'ml3d.datasets.{cfg_name}.get_label_to_names()'
+        Listname = eval(Liststr)
+
+        #convert the dictionaries to one dataframe
+        df = pd.DataFrame()
+        for result in results:
+            temp_points = pd.DataFrame(result["points"], columns=["x", "y", "z"])
+            temp_pred = pd.DataFrame(result['pred'], columns=["pred"])
+            temp_df = pd.concat([temp_points, temp_pred], axis=1)
+            df = pd.concat([df, temp_df], ignore_index=True)
+
+            #group the points by pred value
+        groups = df.groupby("pred")
+        for name, group in groups:
+            # new_las = laspy.LasData(las.header)
+            # new_las.points[las.classification==1].copy()
+
+            header = laspy.LasHeader(point_format=0, version="1.4")
+            new_las = laspy.LasData(header)
+
+            np_arr = group.to_numpy()
+            new_las.x = np_arr[:,0]
+            new_las.y = np_arr[:,1]
+            new_las.z = np_arr[:,2]
+            filename = str(name) + '_' + Listname[name]+'.las'
             
+            new_las.write(os.path.join(dir_path,filename))
+        
+
+                    
+            
+      
+        
             
