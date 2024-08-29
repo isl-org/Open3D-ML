@@ -1,8 +1,10 @@
 from custom_load import CustomDataLoader
+from postprocess import PostProcess
 import os
 import open3d.ml as _ml3d
 import open3d.ml.torch as ml3d
 import pickle
+import numpy as np
 
 
 ####################################
@@ -46,13 +48,27 @@ import pickle
 
 def main():
     #Initializing directory paths
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    sliced_path = os.path.join(dir_path,"Sliced_points.npy")
+    file_path = os.path.join(dir_path,"utils_Data.npy")
+    
     cfg_directory = os.path.expanduser("~/Open3D-ML_PRISM/ml3d/configs/")
     cfg_file = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_file)
     cfg.model['in_channels'] = 3 #3 for models without colours and 6 for models with colours
     #las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
-    las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/LOT BUNGALOW/LOT_BUNGALOW.las"
-    testing = CustomDataLoader(cfg = cfg) 
+    #las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/LOT BUNGALOW/LOT_BUNGALOW.las"
+    
+    Start = [-5950,-7900.45,50.32]
+    End = [-5950.05,-7870,60.27]
+    tol = 0.05
+    
+    Data = np.load(file_path)
+    cross_sec = PostProcess()
+    cross_sec.pc_slice(Start,End,tol,Data,"XZ") #try to change the plane orientation XY,XZ,YZ
+       
+    testing = CustomDataLoader(cfg=cfg) 
+    testing.VisualizingData(sliced_path)
 
    
     #testing.VisualizingData() #To visualize raw data prior to inference
@@ -68,15 +84,8 @@ def main():
     # testing.SavetoPkl(Results,Dict_num=19) #(Optional) Provide a threshold of the maximum number of points
     # saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
 
-    results = testing.load_data(ext='pkl')
-     
-    # with open ('results.pkl', 'wb') as f:
-    #     pickle.dump(results, f)
-    
-    # with open ('results.pkl', 'rb') as f:
-    #     results = pickle.load(f)
-
-    testing.SavetoLas(results)
+    # results = testing.load_data(ext='pkl')
+    # testing.SavetoLas(results)
     #testing.SavetoPkl(results,Dict_num=19)
        
 
