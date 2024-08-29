@@ -16,6 +16,9 @@ class PostProcess():
         
         #change and res would refer to the manipulated and responding variables
         #which vary depending on the chosen plane
+        print(f"\nDomain range of X-axis: [{min(result[:,0])} {max(result[:,0])}]")
+        print(f"Domain range of Y-axis: [{min(result[:,1])} {max(result[:,1])}]")
+        print(f"Domain range of Z-axis: [{min(result[:,2])} {max(result[:,2])}]")
         
         change_ind, res_ind = self.planar_axes(plane)
         top_dif = End[res_ind] - Start[res_ind]
