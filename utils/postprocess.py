@@ -44,12 +44,16 @@ class PostProcess():
             sliced_points = result[index]
                         
             #Filtering the points based on the length of the drawn line
-            change_condition = np.logical_and(Start[change_ind] < sliced_points[:,change_ind],End[change_ind] > sliced_points[:,change_ind])
-            index_change = np.asarray(change_condition).nonzero()
-            change_lim_pc = sliced_points[index_change]
-            res_condition = np.logical_and(Start[res_ind] < change_lim_pc[:,res_ind],End[res_ind] > change_lim_pc[:,res_ind])
-            index_res = np.asarray(res_condition).nonzero()
-            sliced_points = change_lim_pc[index_res]
+            
+            if m < 100000: #threshold when the difference between changing values is approaching to 0
+                change_condition = np.logical_and(Start[change_ind] < sliced_points[:,change_ind],End[change_ind] > sliced_points[:,change_ind])
+                index_change = np.asarray(change_condition).nonzero()
+                sliced_points = sliced_points[index_change]
+            
+            if m > 0.11: #threshold when the difference between responding values is approaching to 0
+                res_condition = np.logical_and(Start[res_ind] < sliced_points[:,res_ind],End[res_ind] > sliced_points[:,res_ind])
+                index_res = np.asarray(res_condition).nonzero()
+                sliced_points = sliced_points[index_res]
         else:
             pass #gonna do it later    
         

@@ -59,13 +59,13 @@ def main():
     #las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
     #las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/LOT BUNGALOW/LOT_BUNGALOW.las"
     
-    Start = [-6000,-7900,50]
-    End = [-5800,-7800,60]
+    Start = [-6000.325,-7900.45,50.32]
+    End = [-5800.125,-7901,60.27]
     tol = 0.1 #Huge tolerance of 0.5m for each side of the line
     
     Data = np.load(file_path)
     cross_sec = PostProcess()
-    cross_sec.pc_slice(Start,End,tol,Data,"XZ") #try to change the plane orientation XY,XZ,YZ
+    cross_sec.pc_slice(Start,End,tol,Data,"XY") #try to change the plane orientation XY,XZ,YZ
     Xsec_data = np.load(sliced_path)
     print(f"Length of sliced data: {len(Xsec_data)}")
       
