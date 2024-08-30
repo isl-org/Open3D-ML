@@ -59,16 +59,14 @@ def main():
     #las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
     #las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/LOT BUNGALOW/LOT_BUNGALOW.las"
     
-    Start = [-6000.325,-7900.45,50.32]
-    End = [-5800.125,-7901,60.27]
-    tol = 0.1 #Huge tolerance of 0.5m for each side of the line
+    Start = [-5950,-7900.45,50.32]
+    End = [-5950.05,-7870,60.27]
+    tol = 0.05
     
     Data = np.load(file_path)
     cross_sec = PostProcess()
-    cross_sec.pc_slice(Start,End,tol,Data,"XY") #try to change the plane orientation XY,XZ,YZ
-    Xsec_data = np.load(sliced_path)
-    print(f"Length of sliced data: {len(Xsec_data)}")
-      
+    cross_sec.pc_slice(Start,End,tol,Data,"XZ") #try to change the plane orientation XY,XZ,YZ
+       
     testing = CustomDataLoader(cfg=cfg) 
     testing.VisualizingData(sliced_path)
 
@@ -87,13 +85,6 @@ def main():
     # saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
 
     # results = testing.load_data(ext='pkl')
-     
-    # with open ('results.pkl', 'wb') as f:
-    #     pickle.dump(results, f)
-    
-    # with open ('results.pkl', 'rb') as f:
-    #     results = pickle.load(f)
-
     # testing.SavetoLas(results)
     #testing.SavetoPkl(results,Dict_num=19)
        

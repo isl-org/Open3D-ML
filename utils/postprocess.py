@@ -25,7 +25,7 @@ class PostProcess():
         bottom_dif = End[change_ind] - Start[change_ind]
         sample_points = result[:,change_ind]
         
-        if bottom_dif == 0: #When straight line is vertical
+        if top_dif > 1000*bottom_dif: #by passsing divisional problem when m is approaching to infinity (vertical straight line)
             prop = [Start[change_ind]]
         else:
             m = top_dif/bottom_dif
@@ -36,7 +36,7 @@ class PostProcess():
         print(f"Benchmark value: {benchmark}") #should return a single value
         
         #when straight line is not vertical
-        if bottom_dif != 0:
+        if not top_dif > 1000*bottom_dif:
             
             res_points = self.create_line(m,c,sample_points)
             vertical_dif = abs(result[:,res_ind] - res_points)
@@ -44,20 +44,28 @@ class PostProcess():
             sliced_points = result[index]
                         
             #Filtering the points based on the length of the drawn line
+            change_condition = np.logical_and(Start[change_ind] < sliced_points[:,change_ind],End[change_ind] > sliced_points[:,change_ind])
+            index_change = np.asarray(change_condition).nonzero()
+            sliced_points = sliced_points[index_change]
             
-            if m < 100000: #threshold when the difference between changing values is approaching to 0
-                change_condition = np.logical_and(Start[change_ind] < sliced_points[:,change_ind],End[change_ind] > sliced_points[:,change_ind])
-                index_change = np.asarray(change_condition).nonzero()
-                sliced_points = sliced_points[index_change]
-            
-            if m > 0.11: #threshold when the difference between responding values is approaching to 0
+            if m > 0.11: #threshold when m is approaching to 0
                 res_condition = np.logical_and(Start[res_ind] < sliced_points[:,res_ind],End[res_ind] > sliced_points[:,res_ind])
                 index_res = np.asarray(res_condition).nonzero()
                 sliced_points = sliced_points[index_res]
+            
+            print(f"Length of sliced data: {len(sliced_points)}")
+            
         else:
-            pass #gonna do it later    
-        
-        
+                       
+            low_lim = prop[0]  - benchmark #Start[change_ind] - tolerance
+            high_lim = prop[0]  + benchmark #Start[change_ind] + tolerance
+            condition = np.logical_and(low_lim< result[:,change_ind], high_lim > result[:,change_ind])
+            index = np.asarray(condition).nonzero()
+            sliced_points = result[index]
+            
+            print(f"NOTE: Vertical line in {plane}-plane detected")
+            print(f"Length of sliced data: {len(sliced_points)}")
+                   
         return np.save(self.file_path,sliced_points)
         
     def tolerance_limit(self,prop,tolerance): 

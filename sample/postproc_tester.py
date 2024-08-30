@@ -10,7 +10,7 @@ import numpy as np
 
 def main():
     #play around with the start and end
-    Start = [-1,5,0.3]
+    Start = [-50,5,0.3]
     End = [100,40,2]
     tol = 0.1 #Huge tolerance of 0.5m for each side of the line
     
@@ -24,8 +24,7 @@ def main():
     Data = np.load(file_path)
     cross_sec = PostProcess()
     cross_sec.pc_slice(Start,End,tol,Data,"XY") #try to change the plane orientation XY,XZ,YZ
-    Xsec_data = np.load(sliced_path)
-    print(f"Length of sliced data: {len(Xsec_data)}")
+    
     
     Visualize = CustomDataLoader(cfg)
     Visualize.VisualizingData(sliced_path)
