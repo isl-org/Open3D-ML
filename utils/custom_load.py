@@ -13,7 +13,6 @@ import pandas as pd
 
 
 
-
 class CustomDataLoader():
     def __init__(self,cfg,las_path = None):
 
@@ -25,7 +24,7 @@ class CustomDataLoader():
         print(f"self.dir : {self.dir}") 
 
         #results path
-        results_dir_str = self.cfg.model['name'] + "_" + self.cfg.dataset['name']+ "-pc-" + str(Path(las_path).stem)  # results path based on the name of the config
+        results_dir_str = self.cfg.model['name'] + "_" + self.cfg.dataset['name']+ "_" + str(Path(self.dir).stem)  # results path based on the name of the config
         self.folder = Path.cwd() / "results" / results_dir_str    
         print(f"self.folder : {self.folder}")    
         self.file_path_npy = self.folder / "Data.npy"
@@ -91,7 +90,7 @@ class CustomDataLoader():
             color = np.random.rand(*points.shape) 
             data = [
                     {
-                        'name'  : self.folder + str('_PC'),
+                        'name'  : str(self.folder.stem) + str('_PC'),
                         'points': points.astype(np.float32),
                         'color' : color.astype(np.float32),
                     }
@@ -447,8 +446,8 @@ class CustomDataLoader():
         if dir_path == None:
             file_name = Path(str(self.folder.stem)+'_1'+f'_Prediction.{ext}')
             singleFile = self.folder / file_name
-            print(f"file_name : {str(file_name)}")
-            print(f"single File path : {str(singleFile)}")
+            #print(f"file_name : {str(file_name)}")
+            #print(f"single File path : {str(singleFile)}")
             if singleFile.exists():
                 print(f"\nLoading single .{ext} file from {str(singleFile)}")
                 Files = [singleFile]
@@ -524,7 +523,7 @@ class CustomDataLoader():
                 
         print("Saving point cloud in LAS format with segementation results...")
         if dir_path is None:
-            dir_path = self.folder / "las"
+            dir_path = self.folder / "lasClassified"
         else: 
             dir_path = Path(dir_path)
                                   
