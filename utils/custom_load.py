@@ -1,5 +1,6 @@
 import open3d.ml.torch as ml3d #Must be first to import to fix bugs when running OpenGL
 import laspy
+from pathlib import Path
 import numpy as np
 import os
 import glob
@@ -12,22 +13,35 @@ import pandas as pd
 
 
 
+
 class CustomDataLoader():
     def __init__(self,cfg,las_path = None):
-        
-        main_path = os.path.abspath(sys.argv[0])
-        self.dir = os.path.dirname(os.path.abspath(main_path))
-        self.folder = os.path.basename(self.dir)
-        self.file_path = os.path.join(self.dir, self.folder + "_Data.npy")
-        self.las_path = las_path
+
         self.cfg = cfg
+        ## paths ##
+        main_path = os.path.abspath(sys.argv[0])   
+        #file path where the module is called     
+        self.dir = Path(main_path).parent  
+        print(f"self.dir : {self.dir}") 
+
+        #results path
+        results_dir_str = self.cfg.model['name'] + "_" + self.cfg.dataset['name']+ "-pc-" + str(Path(las_path).stem)  # results path based on the name of the config
+        self.folder = Path.cwd() / "results" / results_dir_str    
+        print(f"self.folder : {self.folder}")    
+        self.file_path_npy = self.folder / "Data.npy"
         
+
+        #print(f"Path(.) : {str(sorted(Path(main_path).parent.glob('*.pth'))[-1])}")
+        if self.folder.exists():
+            print(f"Folder already exists, will overwrite files inside")
+        else:
+            self.folder.mkdir(parents=True, exist_ok=True)
+            print(f"Folder created at : {str(self.folder)}")
                 
-        if self.las_path != None:
+        if las_path is not None:
             #Checking if the path to directory is correct
-            
-            abs_path = os.path.abspath(self.las_path)
-            las = laspy.read(abs_path)
+            self.las_path = Path(las_path).resolve()
+            las = laspy.read(self.las_path)
             points = np.vstack((las.x, las.y, las.z)).transpose()
             
             #Checking if the .las file has color data
@@ -37,11 +51,11 @@ class CustomDataLoader():
                 blue = las.blue
                 colors = np.vstack((red, green, blue)).transpose()/65536 #Normalize to 1
                 data = np.hstack((points,colors))
-                np.save(self.file_path, data)
+                np.save(self.file_path_npy, data)
             
             except:
                 data = points
-                np.save(self.file_path, data)
+                np.save(self.file_path_npy, data)
                 print("\nRGB data are not found. Data will only consist of points")
             
         else:
@@ -54,7 +68,7 @@ class CustomDataLoader():
                                                 
         #Checking if the user has passed input for data_path
         if data_path == None:
-            data_path = self.file_path
+            data_path = self.file_path_npy
                                          
         
         points = np.load(data_path)[:,0:3]
@@ -111,8 +125,8 @@ class CustomDataLoader():
         batches (list): A list containing dictionaries of point cloud data
         """
         if point_path == None:
-            point = np.load(self.file_path)[:,0:3]
-            print(f"\nUsing points from {self.file_path} directory")
+            point = np.load(self.file_path_npy)[:,0:3]
+            print(f"\nUsing points from {self.file_path_npy} directory")
         else:
             point = np.load(point_path)
                             
@@ -124,8 +138,8 @@ class CustomDataLoader():
             
                        
         if(color_path == None and feat == True):  
-            color = np.load(self.file_path)[:,3:]
-            print(f"Using colors from {self.file_path} directory\n")
+            color = np.load(self.file_path_npy)[:,3:]
+            print(f"Using colors from {self.file_path_npy} directory\n")
         elif(color_path != None and feat == True):
             color = np.load(color_path)
                     
@@ -209,8 +223,7 @@ class CustomDataLoader():
                 color = color[np.any(Condition == False, axis=1)]
                 
                 if len(InLimit) < 10:
-                    # pass
-                    a = 0
+                    continue
                 
                 else:
                     name = Code_name + str(counter)
@@ -234,7 +247,7 @@ class CustomDataLoader():
         
         if ckpt_path == None:
             print("\nFetching checkpoint model in the current directory")
-            ckpts = glob.glob(os.path.join(self.dir, "*.pth"))
+            ckpts = sorted(self.dir.glob("*.pth"))
             ckpt_path = ckpts[-1] #If there is more than one, select the last one in the list of array
             print(f"Using checkpoint model {ckpt_path} to run inference")
               
@@ -370,13 +383,13 @@ class CustomDataLoader():
                 
                 if (len(Data) > Dict_num and save == 1) or (Num_point > maxpoints and save == 1):
                     if stat == 'Json':
-                        file_name = self.folder + '-' + str(counter) + '-Prediction.json'
-                        file_path = os.path.join(self.dir, file_name)
+                        file_name = str(self.folder.stem) + '-' + str(counter) + '-Prediction.json'
+                        file_path = self.folder / "split" / file_name
                         with open(file_path, "w") as file:
                             json.dump(Data, file, indent=4)
                     else:
-                        file_name = self.folder + '-' + str(counter) + '-Prediction.pkl'
-                        file_path = os.path.join(self.dir, file_name)
+                        file_name = str(self.folder.stem) + '-' + str(counter) + '-Prediction.pkl'
+                        file_path = self.folder / "split" / file_name
                         with open(file_path, "wb") as file:
                             pickle.dump(Data, file)
                             
@@ -388,14 +401,14 @@ class CustomDataLoader():
         except:
             print('\nArray to list conversion is not required. Saving data to a single file...')
             if stat == 'Json':
-                file_name = self.folder + '_' + str(counter) + '_Prediction.json'
-                file_path = os.path.join(self.dir, file_name)
-                with open(file_path, "w") as file:
+                file_name = str(self.folder.stem) + '_' + str(counter) + '_Prediction.json'
+                file_path = self.folder / file_name
+                with open(str(file_path), "w") as file:
                     json.dump(Predictions, file, indent=4)
             else:
-                file_name = self.folder + '_' + str(counter) + '_Prediction.pkl'
-                file_path = os.path.join(self.dir, file_name)
-                with open(file_path, "wb") as file:
+                file_name = str(self.folder.stem) + '_' + str(counter) + '_Prediction.pkl'
+                file_path = self.folder / file_name
+                with open(str(file_path), "wb") as file:
                     pickle.dump(Predictions, file)
             
         
@@ -432,16 +445,25 @@ class CustomDataLoader():
         """
         
         if dir_path == None:
-            
-            Files = glob.glob(os.path.join(self.dir, f"*.{ext}"))
-            
-            if Files != None:
-                print(f"\nLoading .{ext} files in the current directory")
+            file_name = Path(str(self.folder.stem)+'_1'+f'_Prediction.{ext}')
+            singleFile = self.folder / file_name
+            print(f"file_name : {str(file_name)}")
+            print(f"single File path : {str(singleFile)}")
+            if singleFile.exists():
+                print(f"\nLoading single .{ext} file from {str(singleFile)}")
+                Files = [singleFile]
             else:
-                print('Error: No related files found in the directory')
-                quit()
-        else:
-            Files = glob.glob(os.path.join(dir_path, f"*.{ext}"))
+                split_path = self.folder / "split"
+                Files = sorted(split_path.glob(f"*.{ext}"))
+        
+                if not Files == []:
+                    print(f"\nLoading .{ext} files from {split_path}")
+                else:
+                    print('Error: No related files found in the directory')
+                    quit()
+        else:            
+            Files = sorted(Path(dir_path).glob(f"*.{ext}"))
+
             print(f"\nLoading .{ext} files from {dir_path}")
         
         
@@ -502,16 +524,19 @@ class CustomDataLoader():
                 
         print("Saving point cloud in LAS format with segementation results...")
         if dir_path is None:
-            dir_path = os.path.join(self.dir, "las")
+            dir_path = self.folder / "las"
+        else: 
+            dir_path = Path(dir_path)
                                   
-        if not os.path.exists(dir_path):
+        if not dir_path.exists():
             os.makedirs(dir_path)
+            dir_path.mkdir(parents=True, exist_ok=True)
             print(f"Folder {dir_path} created.")
         else:
             print(f"Folder {dir_path} already exists. overwriting file inside...")
             #delete all files inside the directory
-            for filename in os.listdir(dir_path):
-                file_path = os.path.join(dir_path, filename)
+            for filename in dir_path.iterdir():
+                file_path = os.path.join(str(dir_path), filename)
                 try:
                     if os.path.isfile(file_path) or os.path.islink(file_path):
                         os.unlink(file_path)
@@ -548,7 +573,7 @@ class CustomDataLoader():
             new_las.z = np_arr[:,2]
             filename = str(name) + '_' + Listname[name]+'.las'
             
-            new_las.write(os.path.join(dir_path,filename))
+            new_las.write(dir_path/filename)
         
 
                     

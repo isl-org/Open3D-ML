@@ -1,11 +1,14 @@
-from custom_load import CustomDataLoader
-from postprocess import PostProcess
+import sys
+sys.path.append(r"/home/jeevin/Open3D-ML_PRISM/") #directory to the root project
+
+from utils import *
 import os
 import open3d.ml as _ml3d
 import open3d.ml.torch as ml3d
 import pickle
 import numpy as np
-
+import json
+import pprint
 
 ####################################
 # BASIC INSTRUCTION:
@@ -56,24 +59,24 @@ def main():
     cfg_file = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_file)
     cfg.model['in_channels'] = 3 #3 for models without colours and 6 for models with colours
-    #las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
+    las_path = r"sample/LOT_BUNGALOW.las"
     #las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/LOT BUNGALOW/LOT_BUNGALOW.las"
     
-    Start = [-5950,-7900.45,50.32]
-    End = [-5950.05,-7870,60.27]
-    tol = 0.05
+    # Start = [-5950,-7900.45,50.32]
+    # End = [-5950.05,-7870,60.27]
+    # tol = 0.05
     
-    Data = np.load(file_path)
-    cross_sec = PostProcess()
-    cross_sec.pc_slice(Start,End,tol,Data,"XZ") #try to change the plane orientation XY,XZ,YZ
+    # Data = np.load(file_path)
+    # cross_sec = PostProcess()
+    # cross_sec.pc_slice(Start,End,tol,Data,"XZ") #try to change the plane orientation XY,XZ,YZ
        
-    testing = CustomDataLoader(cfg=cfg) 
-    testing.VisualizingData(sliced_path)
+    testing = CustomDataLoader(cfg=cfg,las_path=las_path)
+    # testing.VisualizingData(sliced_path)
 
    
     #testing.VisualizingData() #To visualize raw data prior to inference
 
-    #Running Inference
+    # Running Inference
 
     # Xsplit = 6
     # Ysplit = 4
@@ -82,15 +85,27 @@ def main():
     # pipeline = testing.CreatePipeline()
     # Results = testing.CustomInference(pipeline,batches)
     # testing.SavetoPkl(Results,Dict_num=19) #(Optional) Provide a threshold of the maximum number of points
+    # testing.SavetoJson(Results, Dict_num=19)
     # saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
 
-    # results = testing.load_data(ext='pkl')
+    results = testing.load_data(ext='pkl')
+
+    results[0]['points'][:2,:]
+
+    print(f"results type : {type(results[0]['classification'])}")
+    pprint.pprint(results[0].keys())
+    print(f"results length : {len(results[0])}")
+    file_path = "test.json"
+    with open(str(file_path), "w") as file:
+                    json.dump(results, file, indent=4)
+    #results = testing.load_data(ext='json')
     # testing.SavetoLas(results)
-    #testing.SavetoPkl(results,Dict_num=19)
-       
+    # testing.SavetoPkl(results, Dict_num=19)
+    # results = testing.load_data(ext='pkl')
+    # # testing.SavetoJson(results, Dict_num=19)
+    # testing.PklVisualizer() # Use this to load saved data. (Optional) Provide directory to the saved files.
 
 
-    #testing.PklVisualizer() # Use this to load saved data. (Optional) Provide directory to the saved files.
     #Comment out the lines associated to running inference above when running the visualizer
         
     

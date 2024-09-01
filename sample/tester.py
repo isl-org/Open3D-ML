@@ -1,6 +1,6 @@
 #MUST BE INCLUDED TO WORK
 import sys
-sys.path.insert(0,r"/home/helmi/Open3D-ML_PRISM/") #directory to the root project
+sys.path.append(r"/home/jeevin/Open3D-ML_PRISM/") #directory to the root project
 
 from utils import CustomDataLoader 
 import os
@@ -14,23 +14,23 @@ def main():
     cfg_path = os.path.join(cfg_directory, "randlanet_parislille3d.yml")
     cfg = _ml3d.utils.Config.load_from_file(cfg_path)
     #cfg.model['in_channels'] = 3 #3 for default :This model cant take colours
-    las_path = r"/mnt/c/Users/zulhe/OneDrive/Documents/Laser Scanning/BLOK_D_1.las"
+    las_path = r"/home/jeevin/Open3D-ML_PRISM/utils/LOT_BUNGALOW.las"
 
     testing = CustomDataLoader(cfg,las_path) 
     #testing.VisualizingData() #To visualize raw data prior to inference
 
-    #Running Inference
-    Xsplit = 16
-    Ysplit = 6
-    Zsplit = 2
-    batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
-    pipeline = testing.CreatePipeline()
-    Results = testing.CustomInference(pipeline,batches)
-    testing.SavetoPkl(Results,Dict_num=19) #(Optional) Provide a threshold of the maximum number of points
-    #saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
+    # #Running Inference
+    # Xsplit = 16
+    # Ysplit = 6
+    # Zsplit = 2
+    # batches = testing.Domain_Split(Xsplit,Ysplit,Zsplit)
+    # pipeline = testing.CreatePipeline()
+    # Results = testing.CustomInference(pipeline,batches)
+    # testing.SavetoPkl(Results,Dict_num=19) #(Optional) Provide a threshold of the maximum number of points
+    # #saved per file. Currently set at 1,100,000 points per file or 19 batches per file.
     
-    testing.PklVisualizer() # Use this to load saved data. (Optional) Provide directory to the saved files.
-    # Comment out the lines associated to running inference above when running the visualizer
+    # testing.PklVisualizer() # Use this to load saved data. (Optional) Provide directory to the saved files.
+    # # Comment out the lines associated to running inference above when running the visualizer
     
     #results = testing.load_data(ext='pkl')
     
