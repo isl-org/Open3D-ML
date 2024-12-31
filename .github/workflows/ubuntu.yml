@@ -19,7 +19,7 @@ jobs:
   ubuntu:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
     steps:
