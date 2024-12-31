@@ -22,6 +22,7 @@ class TorchDataloader(Dataset):
                  sampler=None,
                  use_cache=True,
                  steps_per_epoch=None,
+                 cache_convert=None,
                  **kwargs):
         """Initialize.
 
@@ -38,6 +39,7 @@ class TorchDataloader(Dataset):
         self.dataset = dataset
         self.preprocess = preprocess
         self.steps_per_epoch = steps_per_epoch
+        self.cache_convert = cache_convert
 
         if preprocess is not None and use_cache:
             cache_dir = getattr(dataset.cfg, 'cache_dir')
@@ -59,10 +61,7 @@ class TorchDataloader(Dataset):
                         continue
                     data = dataset.get_data(idx)
                     # cache the data
-                    self.cache_convert(name, data, attr)
-
-        else:
-            self.cache_convert = None
+                    self.cache_convert(name, data, attr)            
 
         self.transform = transform
 
