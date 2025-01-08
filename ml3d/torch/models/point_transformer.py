@@ -34,6 +34,7 @@ class PointTransformer(BaseModel):
     """
 
     def __init__(self,
+                 device,
                  name="PointTransformer",
                  blocks=[2, 2, 2, 2, 2],
                  in_channels=6,
@@ -52,6 +53,7 @@ class PointTransformer(BaseModel):
                                                batcher=batcher,
                                                augment=augment,
                                                **kwargs)
+        self.device = torch.device(device)
         cfg = self.cfg
         self.in_channels = in_channels
         self.augmenter = SemsegAugmentation(cfg.augment)
@@ -108,12 +110,13 @@ class PointTransformer(BaseModel):
         """
         layers = []
         layers.append(
-            TransitionDown(self.in_planes, planes * block.expansion, stride,
+            TransitionDown(self.device, self.in_planes, planes * block.expansion, stride,
                            nsample))
         self.in_planes = planes * block.expansion
         for _ in range(1, blocks):
             layers.append(
-                block(self.in_planes,
+                block(self.device,
+                      self.in_planes,
                       self.in_planes,
                       share_planes,
                       nsample=nsample))
@@ -141,12 +144,14 @@ class PointTransformer(BaseModel):
         """
         layers = []
         layers.append(
-            TransitionUp(self.in_planes,
+            TransitionUp(self.device,
+                         self.in_planes,
                          None if is_head else planes * block.expansion))
         self.in_planes = planes * block.expansion
         for _ in range(1, blocks):
             layers.append(
-                block(self.in_planes,
+                block(self.device,
+                      self.in_planes,
                       self.in_planes,
                       share_planes,
                       nsample=nsample))
@@ -377,7 +382,7 @@ MODEL._register_module(PointTransformer, 'torch')
 class Transformer(nn.Module):
     """Transformer layer of the model, uses self attention."""
 
-    def __init__(self, in_planes, out_planes, share_planes=8, nsample=16):
+    def __init__(self, device, in_planes, out_planes, share_planes=8, nsample=16):
         """Constructor for Transformer Layer.
 
         Args:
@@ -388,6 +393,7 @@ class Transformer(nn.Module):
 
         """
         super().__init__()
+        self.device = device
         self.mid_planes = mid_planes = out_planes // 1
         self.out_planes = out_planes
         self.share_planes = share_planes
@@ -427,7 +433,8 @@ class Transformer(nn.Module):
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b)
         feat_q, feat_k, feat_v = self.linear_q(feat), self.linear_k(
             feat), self.linear_v(feat)  # (n, c)
-        feat_k = queryandgroup(self.nsample,
+        feat_k = queryandgroup(self.device,
+                               self.nsample,
                                point,
                                point,
                                feat_k,
@@ -435,7 +442,8 @@ class Transformer(nn.Module):
                                row_splits,
                                row_splits,
                                use_xyz=True)  # (n, nsample, 3+c)
-        feat_v = queryandgroup(self.nsample,
+        feat_v = queryandgroup(self.device,
+                               self.nsample,
                                point,
                                point,
                                feat_v,
@@ -473,7 +481,7 @@ class TransitionDown(nn.Module):
     Subsamples points and increase receptive field.
     """
 
-    def __init__(self, in_planes, out_planes, stride=1, nsample=16):
+    def __init__(self, device, in_planes, out_planes, stride=1, nsample=16):
         """Constructor for TransitionDown Layer.
 
         Args:
@@ -484,6 +492,7 @@ class TransitionDown(nn.Module):
 
         """
         super().__init__()
+        self.device = device
         self.stride, self.nsample = stride, nsample
         if stride != 1:
             self.linear = nn.Linear(3 + in_planes, out_planes, bias=False)
@@ -504,7 +513,13 @@ class TransitionDown(nn.Module):
             List of point, feat, row_splits.
 
         """
+        
         point, feat, row_splits = pxo  # (n, 3), (n, c), (b+1)
+        feat = torch.tensor(feat, device=self.device)
+        row_splits = torch.tensor(row_splits, device=self.device)
+        point = torch.tensor(point, device=self.device)
+        
+        
         if self.stride != 1:
             new_row_splits = [0]
             count = 0
@@ -513,12 +528,13 @@ class TransitionDown(nn.Module):
                           row_splits[i - 1].item()) // self.stride
                 new_row_splits.append(count)
 
-            new_row_splits = torch.LongTensor(new_row_splits).to(
-                row_splits.device)
+            new_row_splits = torch.LongTensor(new_row_splits).to(self.device)
+            #new_row_splits = torch.LongTensor(new_row_splits).to(row_splits.device)
             idx = furthest_point_sample_v2(point, row_splits,
                                            new_row_splits)  # (m)
             new_point = point[idx.long(), :]  # (m, 3)
-            feat = queryandgroup(self.nsample,
+            feat = queryandgroup(self.device,
+                                 self.nsample,
                                  point,
                                  new_point,
                                  feat,
@@ -532,7 +548,8 @@ class TransitionDown(nn.Module):
             feat = self.pool(feat).squeeze(-1)  # (m, c)
             point, row_splits = new_point, new_row_splits
         else:
-            feat = self.relu(self.bn(self.linear(feat)))  # (n, c)
+            feat = torch.tensor(feat, device=self.device)
+            feat = self.relu(self.bn(self.linear(feat)))  # (n, c)  
         return [point, feat, row_splits]
 
 
@@ -542,7 +559,7 @@ class TransitionUp(nn.Module):
     Interpolate points based on corresponding encoder layer.
     """
 
-    def __init__(self, in_planes, out_planes=None):
+    def __init__(self, device, in_planes, out_planes=None):
         """Constructor for TransitionUp Layer.
 
         Args:
@@ -551,6 +568,7 @@ class TransitionUp(nn.Module):
 
         """
         super().__init__()
+        self.device = device
         if out_planes is None:
             self.linear1 = nn.Sequential(nn.Linear(2 * in_planes, in_planes),
                                          nn.BatchNorm1d(in_planes),
@@ -595,7 +613,7 @@ class TransitionUp(nn.Module):
             point_1, feat_1, row_splits_1 = pxo1
             point_2, feat_2, row_splits_2 = pxo2
             feat = self.linear1(feat_1) + interpolation(
-                point_2, point_1, self.linear2(feat_2), row_splits_2,
+                self.device, point_2, point_1, self.linear2(feat_2), row_splits_2,
                 row_splits_1)
         return feat
 
@@ -607,7 +625,7 @@ class Bottleneck(nn.Module):
     """
     expansion = 1
 
-    def __init__(self, in_planes, planes, share_planes=8, nsample=16):
+    def __init__(self, device, in_planes, planes, share_planes=8, nsample=16):
         """Constructor for Bottleneck Layer.
 
         Args:
@@ -620,7 +638,7 @@ class Bottleneck(nn.Module):
         super(Bottleneck, self).__init__()
         self.linear1 = nn.Linear(in_planes, planes, bias=False)
         self.bn1 = nn.BatchNorm1d(planes)
-        self.transformer2 = Transformer(planes, planes, share_planes, nsample)
+        self.transformer2 = Transformer(device, planes, planes, share_planes, nsample)
         self.bn2 = nn.BatchNorm1d(planes)
         self.linear3 = nn.Linear(planes, planes * self.expansion, bias=False)
         self.bn3 = nn.BatchNorm1d(planes * self.expansion)
@@ -647,7 +665,8 @@ class Bottleneck(nn.Module):
         return [point, feat, row_splits]
 
 
-def queryandgroup(nsample,
+def queryandgroup(device,
+                  nsample,
                   points,
                   queries,
                   feat,
@@ -677,7 +696,8 @@ def queryandgroup(nsample,
     if queries is None:
         queries = points
     if idx is None:
-        idx = knn_batch(points,
+        idx = knn_batch(device,
+                        points,
                         queries,
                         k=nsample,
                         points_row_splits=points_row_splits,
@@ -697,7 +717,8 @@ def queryandgroup(nsample,
         return grouped_feat
 
 
-def knn_batch(points,
+def knn_batch(device,
+              points,
               queries,
               k,
               points_row_splits,
@@ -729,12 +750,13 @@ def knn_batch(points,
                      return_distances=True)
     if return_distances:
         return ans.neighbors_index.reshape(
-            -1, k).long().cuda(), ans.neighbors_distance.reshape(-1, k).cuda()
+            -1, k).long().to(device), ans.neighbors_distance.reshape(-1, k).to(device)
     else:
-        return ans.neighbors_index.reshape(-1, k).long().cuda()
+        return ans.neighbors_index.reshape(-1, k).long().to(device)
 
 
-def interpolation(points,
+def interpolation(device,
+                  points,
                   queries,
                   feat,
                   points_row_splits,
@@ -756,7 +778,8 @@ def interpolation(points,
     if not (points.is_contiguous and queries.is_contiguous() and
             feat.is_contiguous()):
         raise ValueError("Interpolation (points/queries/feat not contiguous)")
-    idx, dist = knn_batch(points,
+    idx, dist = knn_batch(device,
+                          points,
                           queries,
                           k=k,
                           points_row_splits=points_row_splits,
@@ -770,7 +793,7 @@ def interpolation(points,
     weight = dist_recip / norm  # (n, k)
 
     new_feat = torch.FloatTensor(queries.shape[0],
-                                 feat.shape[1]).zero_().to(feat.device)
+                                 feat.shape[1]).zero_().to(device)
     for i in range(k):
         new_feat += feat[idx[:, i].long(), :] * weight[:, i].unsqueeze(-1)
     return new_feat
