@@ -1,7 +1,7 @@
 .. _train_ss_model_using_tensorflow:
 
 Train a Semantic Segmentation Model Using TensorFlow
--------------------------------------------------
+----------------------------------------------------
 In this tutorial, we will learn how to train a semantic segmentation model using TensorFlow in a Jupyter Notebook. We assume that you are familiar with Jupyter Notebook and have created a folder `notebooks` in a folder that is relative to `ml3d`.
 
 Before you begin, ensure that you have TensorFlow installed. To install a compatible version of TensorFlow, use the requirement file:
