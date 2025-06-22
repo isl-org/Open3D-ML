@@ -1,3 +1,0 @@
---extra-index-url https://download.pytorch.org/whl/
-torch==2.2.2+cpu.cxx11.abi
-tensorboard
