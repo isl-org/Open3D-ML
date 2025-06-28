@@ -138,6 +138,7 @@ class SemanticSegmentation(BasePipeline):
 
         preprocess_func = model.preprocess
         processed_data = preprocess_func(data, {'split': 'test'})
+
         def get_cache(attr):
             return processed_data
 
@@ -149,7 +150,7 @@ class SemanticSegmentation(BasePipeline):
                                       preprocess=model.preprocess,
                                       transform=model.transform,
                                       sampler=infer_sampler,
-                                      use_cache=False,                                    
+                                      use_cache=False,
                                       cache_convert=get_cache)
         infer_loader = DataLoader(infer_split,
                                   batch_size=cfg.batch_size,
@@ -287,8 +288,8 @@ class SemanticSegmentation(BasePipeline):
         self.pbar.update(
             this_possiblility[this_possiblility > end_threshold].shape[0] -
             self.pbar_update)
-        self.pbar_update = this_possiblility[
-            this_possiblility > end_threshold].shape[0]
+        self.pbar_update = this_possiblility[this_possiblility >
+                                             end_threshold].shape[0]
         self.test_probs[self.curr_cloud_id] = self.model.update_probs(
             inputs,
             results,

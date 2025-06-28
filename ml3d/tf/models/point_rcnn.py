@@ -388,8 +388,8 @@ class PointRCNN(BaseModel):
                 for lab in labels:
                     max_lab = max(max_lab, lab.shape[0])
 
-                if 'labels' in batch[
-                        0] and labels[0].shape[0] != points.shape[1]:
+                if 'labels' in batch[0] and labels[0].shape[0] != points.shape[
+                        1]:
                     pad_labels = np.ones(
                         (len(labels), max_lab), dtype=np.int32) * (-1)
                     for j in range(len(labels)):
@@ -774,8 +774,8 @@ class RCNN(tf.keras.layers.Layer):
         self.SA_modules = []
         for i in range(len(SA_config["npoints"])):
             mlps = [in_channels] + SA_config["mlps"][i]
-            npoint = SA_config["npoints"][
-                i] if SA_config["npoints"][i] != -1 else None
+            npoint = SA_config["npoints"][i] if SA_config["npoints"][
+                i] != -1 else None
             self.SA_modules.append(
                 PointnetSAModule(npoint=npoint,
                                  radius=SA_config["radius"][i],

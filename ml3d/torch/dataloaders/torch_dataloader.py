@@ -61,7 +61,7 @@ class TorchDataloader(Dataset):
                         continue
                     data = dataset.get_data(idx)
                     # cache the data
-                    self.cache_convert(name, data, attr)            
+                    self.cache_convert(name, data, attr)
 
         self.transform = transform
 

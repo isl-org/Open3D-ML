@@ -773,8 +773,8 @@ class RCNN(nn.Module):
         self.SA_modules = nn.ModuleList()
         for i in range(len(SA_config["npoints"])):
             mlps = [in_channels] + SA_config["mlps"][i]
-            npoint = SA_config["npoints"][
-                i] if SA_config["npoints"][i] != -1 else None
+            npoint = SA_config["npoints"][i] if SA_config["npoints"][
+                i] != -1 else None
             self.SA_modules.append(
                 PointnetSAModule(npoint=npoint,
                                  radius=SA_config["radius"][i],
@@ -1435,8 +1435,8 @@ class ProposalTargetLayer(nn.Module):
             # TODO: this will mix the fg and bg when CLS_BG_THRESH_LO < iou < CLS_BG_THRESH
             # fg_inds = torch.cat((fg_inds, roi_assignment), dim=0)  # consider the roi which has max_iou with gt as fg
 
-            easy_bg_inds = torch.nonzero(
-                (max_overlaps < self.cls_bg_thresh_lo)).view(-1)
+            easy_bg_inds = torch.nonzero((max_overlaps
+                                          < self.cls_bg_thresh_lo)).view(-1)
             hard_bg_inds = torch.nonzero((max_overlaps < self.cls_bg_thresh) & (
                 max_overlaps >= self.cls_bg_thresh_lo)).view(-1)
 

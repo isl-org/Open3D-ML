@@ -58,8 +58,8 @@ class PythonFormatter:
                                                    style_config=style_config,
                                                    in_place=True)
 
-    def run(self, do_apply_style, no_parallel, verbose):
-        if do_apply_style:
+    def run(self, apply, no_parallel, verbose):
+        if apply:
             print("Applying Python style...")
         else:
             print("Checking Python style...")
@@ -84,7 +84,7 @@ class PythonFormatter:
         for is_valid, file_path in zip(is_valid_files, self.file_paths):
             if not is_valid:
                 changed_files.append(file_path)
-                if do_apply_style:
+                if apply:
                     self._apply_style(file_path, self.style_config)
         print("Formatting takes {:.2f}s".format(time.time() - start_time))
 
@@ -98,7 +98,7 @@ class JupyterFormatter:
         self.style_config = style_config
 
     @staticmethod
-    def _check_or_apply_style(file_path, style_config, do_apply_style):
+    def _check_or_apply_style(file_path, style_config, apply):
         """Returns true if style is valid.
 
         Since there are common code for check and apply style, the two functions
@@ -114,27 +114,39 @@ class JupyterFormatter:
             if cell["cell_type"] != "code":
                 continue
             src = cell["source"]
-            lines = src.split("\n")
-            if len(lines) <= 0 or "# noqa" in lines[0]:
+            if not src.strip():  # Ignore empty cells.
                 continue
+            lines = src.split("\n")
+            if "# noqa" in lines[0]:
+                continue
+            # Ignore cells starting with shell commands or jupyter magics.
+            # These are not valid python code and yapf will fail.
+            if src.lstrip().startswith(('!', '%')):
+                continue
+
             # yapf will puts a `\n` at the end of each cell, and if this is the
             # only change, cell_changed is still False.
-            formatted_src, cell_changed = yapf.yapflib.yapf_api.FormatCode(
-                src, style_config=style_config)
+            try:
+                formatted_src, cell_changed = yapf.yapflib.yapf_api.FormatCode(
+                    src, style_config=style_config)
+            except Exception:
+                # This may happen for cells with valid python and magics/shell
+                # commands mixed. We will just ignore formatting for these cells.
+                continue
             if formatted_src.endswith("\n"):
                 formatted_src = formatted_src[:-1]
             if cell_changed:
                 cell["source"] = formatted_src
                 changed = True
 
-        if do_apply_style:
+        if apply:
             with open(file_path, "w") as f:
                 nbformat.write(notebook, f, version=nbformat.NO_CONVERT)
 
         return not changed
 
-    def run(self, do_apply_style, no_parallel, verbose):
-        if do_apply_style:
+    def run(self, apply, no_parallel, verbose):
+        if apply:
             print("Applying Jupyter style...")
         else:
             print("Checking Jupyter style...")
@@ -149,22 +161,22 @@ class JupyterFormatter:
             is_valid_files = map(
                 partial(self._check_or_apply_style,
                         style_config=self.style_config,
-                        do_apply_style=False), self.file_paths)
+                        apply=False), self.file_paths)
         else:
             with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
                 is_valid_files = pool.map(
                     partial(self._check_or_apply_style,
                             style_config=self.style_config,
-                            do_apply_style=False), self.file_paths)
+                            apply=False), self.file_paths)
 
         changed_files = []
         for is_valid, file_path in zip(is_valid_files, self.file_paths):
             if not is_valid:
                 changed_files.append(file_path)
-                if do_apply_style:
+                if apply:
                     self._check_or_apply_style(file_path,
                                                style_config=self.style_config,
-                                               do_apply_style=True)
+                                               apply=True)
         print("Formatting takes {:.2f}s".format(time.time() - start_time))
 
         return changed_files
@@ -179,8 +191,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--do_apply_style",
-        dest="do_apply_style",
+        "--apply",
+        dest="apply",
         action="store_true",
         default=False,
         help="Apply style to files in-place.",
@@ -214,16 +226,16 @@ if __name__ == "__main__":
 
     changed_files = []
     changed_files.extend(
-        python_formatter.run(do_apply_style=args.do_apply_style,
+        python_formatter.run(apply=args.apply,
                              no_parallel=args.no_parallel,
                              verbose=args.verbose))
     changed_files.extend(
-        jupyter_formatter.run(do_apply_style=args.do_apply_style,
+        jupyter_formatter.run(apply=args.apply,
                               no_parallel=args.no_parallel,
                               verbose=args.verbose))
 
     if len(changed_files) != 0:
-        if args.do_apply_style:
+        if args.apply:
             print("Style applied to the following files:")
             print("\n".join(changed_files))
         else:

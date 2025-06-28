@@ -177,10 +177,10 @@ class PVCNN(BaseModel):
 
         feat = np.concatenate([x, y, z, feat, norm_x, norm_y, norm_z], axis=-1)
 
-        choices = np.random.choice(
-            points.shape[0],
-            self.cfg.num_points,
-            replace=(points.shape[0] < self.cfg.num_points))
+        choices = np.random.choice(points.shape[0],
+                                   self.cfg.num_points,
+                                   replace=(points.shape[0]
+                                            < self.cfg.num_points))
         points = points[choices]
         feat = feat[choices]
         labels = labels[choices]

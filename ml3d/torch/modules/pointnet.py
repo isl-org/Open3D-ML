@@ -73,8 +73,8 @@ class Pointnet2MSG(nn.Module):
         self.FP_modules = nn.ModuleList()
 
         for i in range(len(fp_mlps)):
-            pre_channel = fp_mlps[
-                i + 1][-1] if i + 1 < len(fp_mlps) else out_channels
+            pre_channel = fp_mlps[i + 1][-1] if i + 1 < len(
+                fp_mlps) else out_channels
             self.FP_modules.append(
                 PointnetFPModule(mlp=[pre_channel + skip_channel_list[i]] +
                                  fp_mlps[i],

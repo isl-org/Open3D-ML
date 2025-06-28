@@ -163,8 +163,8 @@ class PointPillars(BaseModel):
                                  avg_factor=avg_factor)
 
         # remove invalid labels
-        cond = (target_labels[pos_idx] >= 0) & (target_labels[pos_idx] <
-                                                self.bbox_head.num_classes)
+        cond = (target_labels[pos_idx] >= 0) & (target_labels[pos_idx]
+                                                < self.bbox_head.num_classes)
         pos_idx = pos_idx[cond]
         target_idx = target_idx[cond]
         target_bboxes = target_bboxes[cond]
@@ -221,8 +221,8 @@ class PointPillars(BaseModel):
         max_val = np.array(self.point_cloud_range[3:])
 
         points = points[np.where(
-            np.all(np.logical_and(points[:, :3] >= min_val,
-                                  points[:, :3] < max_val),
+            np.all(np.logical_and(points[:, :3] >= min_val, points[:, :3]
+                                  < max_val),
                    axis=-1))]
 
         data['point'] = points
@@ -243,8 +243,8 @@ class PointPillars(BaseModel):
             max_val = np.array(self.point_cloud_range[3:])
 
             points = points[np.where(
-                np.all(np.logical_and(points[:, :3] >= min_val,
-                                      points[:, :3] < max_val),
+                np.all(np.logical_and(points[:, :3] >= min_val, points[:, :3]
+                                      < max_val),
                        axis=-1))]
 
             new_data['full_point'] = points

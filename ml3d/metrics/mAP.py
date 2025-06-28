@@ -108,9 +108,9 @@ def precision_3d(pred,
                             axis=1).astype("float32")
 
                 # identify all matches (filtered preds vs filtered targets)
-                match_cond = np.any(
-                    overlap_label[pred_idx][:, target_idx] >= min_overlap[i],
-                    axis=-1)
+                match_cond = np.any(overlap_label[pred_idx][:, target_idx]
+                                    >= min_overlap[i],
+                                    axis=-1)
                 tp = np.zeros((len(pred_idx),))
 
                 # all matches first fp

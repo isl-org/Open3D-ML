@@ -234,10 +234,10 @@ class DataProcessing:
         pts_cam = DataProcessing.world2cam(points[:, :3], world_cam)
         pts_img, depth = DataProcessing.cam2img(pts_cam, cam_img)
 
-        val_flag_1 = np.logical_and(pts_img[:, 0] >= 0,
-                                    pts_img[:, 0] < image_shape[1])
-        val_flag_2 = np.logical_and(pts_img[:, 1] >= 0,
-                                    pts_img[:, 1] < image_shape[0])
+        val_flag_1 = np.logical_and(pts_img[:, 0] >= 0, pts_img[:, 0]
+                                    < image_shape[1])
+        val_flag_2 = np.logical_and(pts_img[:, 1] >= 0, pts_img[:, 1]
+                                    < image_shape[0])
         val_flag_merge = np.logical_and(val_flag_1, val_flag_2)
         valid = np.logical_and(val_flag_merge, depth >= 0)
 
