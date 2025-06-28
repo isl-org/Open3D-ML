@@ -6,39 +6,11 @@ import multiprocessing
 from functools import partial
 import time
 import sys
-
-# Yapf requires python 3.6+
-if not (sys.version_info.major == 3 and sys.version_info.minor >= 6):
-    raise RuntimeError(
-        "Requires Python 3.6+, currently using Python {}.{}.".format(
-            sys.version_info.major, sys.version_info.minor))
-
-# Check and import yapf
-# > not found: throw exception
-# > version mismatch: throw exception
-try:
-    import yapf
-except:
-    raise ImportError(
-        "yapf not found. Install with `pip install yapf==0.30.0`.")
-if yapf.__version__ != "0.30.0":
-    raise RuntimeError(
-        "yapf 0.30.0 required. Install with `pip install yapf==0.30.0`.")
-print("Using yapf version {}".format(yapf.__version__))
-
-# Check and import nbformat
-# > not found: throw exception
-try:
-    import nbformat
-except:
-    raise ImportError(
-        "nbformat not found. Install with `pip install nbformat`.")
-print("Using nbformat version {}".format(nbformat.__version__))
+import yapf
+import nbformat
 
 PYTHON_FORMAT_DIRS = ["."]
-
 JUPYTER_FORMAT_DIRS = ["."]
-
 # Note: also modify CPP_FORMAT_DIRS in check_cpp_style.cmake.
 CPP_FORMAT_DIRS = ["."]
 

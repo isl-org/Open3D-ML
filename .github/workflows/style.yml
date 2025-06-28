@@ -16,15 +16,13 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-        with:
-          submodules: true
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - name: Install dependencies
         run: |
-          python -m pip install -U clang-format==10.0.1.1 yapf==0.30.0 nbformat pydocstyle==6.0.0
+          python -m pip install -U clang-format==18.* yapf==0.43.* nbformat==5.10.* pydocstyle==6.0.0
       - name: Run style check
         run: |
           python ci/check_style.py --verbose
