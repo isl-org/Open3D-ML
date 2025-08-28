@@ -257,14 +257,14 @@ class SemanticSegmentation(BasePipeline):
                         self.metric_test.update(valid_scores, valid_labels)
                         log.info(f"Accuracy : {self.metric_test.acc()}")
                         log.info(f"IoU : {self.metric_test.iou()}")
+                        log.info(
+                            f"Overall Testing Accuracy : {self.metric_test.acc()[-1]}, mIoU : {self.metric_test.iou()[-1]}"
+                        )
                     dataset.save_test_result(inference_result, attr)
                     # Save only for the first batch
                     if 'test' in record_summary and 'test' not in self.summary:
                         self.summary['test'] = self.get_3d_summary(
                             results, inputs['data'], 0, save_gt=False)
-        log.info(
-            f"Overall Testing Accuracy : {self.metric_test.acc()[-1]}, mIoU : {self.metric_test.iou()[-1]}"
-        )
 
         log.info("Finished testing")
 
