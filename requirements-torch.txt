@@ -1,6 +1,6 @@
 --extra-index-url https://download.pytorch.org/whl/cpu/
-torch==2.9.1+cpu ; sys_platform != 'darwin'
-torchvision==0.24.1+cpu ; sys_platform != 'darwin'
-torch==2.9.1 ; sys_platform == 'darwin'
-torchvision==0.24.1 ; sys_platform == 'darwin'
+torch==2.10.0+cpu ; sys_platform != 'darwin'
+torchvision==0.25.0+cpu ; sys_platform != 'darwin'
+torch==2.10.0 ; sys_platform == 'darwin'
+torchvision==0.25.0 ; sys_platform == 'darwin'
 tensorboard
