@@ -851,20 +851,22 @@ class SECONDFPN(tf.keras.layers.Layer):
                     kernel_size=upsample_strides[i],
                     strides=upsample_strides[i],
                     use_bias=False,
-                    data_format='channels_first',
+                    data_format='channels_last',
                 )
             else:
                 stride = np.round(1 / stride).astype(np.int64)
-                upsample_layer = tf.keras.layers.Conv2D(  # TODO : convert to channels last.
+                upsample_layer = tf.keras.layers.Conv2D(
                     filters=out_channels[i],
                     kernel_size=stride,
-                    data_format='channels_first',
+                    data_format='channels_last',
                     use_bias=False,
                     strides=stride,
                     kernel_initializer='he_normal')
 
             deblock = tf.keras.Sequential()
+            deblock.add(tf.keras.layers.Permute((2, 3, 1)))  # NCHW -> NHWC
             deblock.add(upsample_layer)
+            deblock.add(tf.keras.layers.Permute((3, 1, 2)))  # NHWC -> NCHW
             deblock.add(
                 tf.keras.layers.BatchNormalization(axis=1,
                                                    epsilon=1e-3,
