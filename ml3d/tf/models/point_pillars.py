@@ -100,7 +100,7 @@ class PointPillars(BaseModel):
 
         x = self.middle_encoder(voxel_features,
                                 coors,
-                                batch_size,
+                                batch_size=batch_size,
                                 training=training)
         x = self.backbone(x, training=training)
         x = self.neck(x, training=training)
@@ -693,7 +693,7 @@ class PointPillarsScatter(tf.keras.layers.Layer):
         self.fp16_enabled = False
 
     #@auto_fp16(apply_to=('voxel_features', ))
-    def call(self, voxel_features, coors, batch_size, training=False):
+    def call(self, voxel_features, coors, *, batch_size, training=False):
         """Scatter features of single sample.
 
         Args:

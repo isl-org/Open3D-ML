@@ -432,7 +432,7 @@ class BatchNormBlock(tf.keras.layers.Layer):
 
     def call(self, x, training=False):
         if (self.use_bn):
-            return self.batch_norm(x, training)
+            return self.batch_norm(x, training=training)
         else:
             return x + self.bias
 
@@ -470,9 +470,9 @@ class UnaryBlock(tf.keras.layers.Layer):
         if not no_relu:
             self.leaky_relu = tf.keras.layers.LeakyReLU(l_relu)
 
-    def call(self, x, batch=None, training=False):
+    def call(self, x, *, batch=None, training=False):
         x = self.mlp(x)
-        x = self.batch_norm(x, training)
+        x = self.batch_norm(x, training=training)
         if not self.no_relu:
             x = self.leaky_relu(x)
         return x
@@ -517,7 +517,7 @@ class SimpleBlock(tf.keras.layers.Layer):
                                          self.bn_momentum)
         self.leaky_relu = tf.keras.layers.LeakyReLU(cfg.get('l_relu', 0.2))
 
-    def call(self, x, batch, training=False):
+    def call(self, x, *, batch, training=False):
 
         # TODO : check x, batch
         if 'strided' in self.block_name:
@@ -530,7 +530,7 @@ class SimpleBlock(tf.keras.layers.Layer):
             neighb_inds = batch['neighbors'][self.layer_ind]
 
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
-        x = self.batch_norm(x, training)
+        x = self.batch_norm(x, training=training)
         x = self.leaky_relu(x)
         return x
 
@@ -621,7 +621,7 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
 
         return
 
-    def call(self, features, batch, training=False):
+    def call(self, features, *, batch, training=False):
 
         if 'strided' in self.block_name:
             q_pts = batch['points'][self.layer_ind + 1]
@@ -633,21 +633,21 @@ class ResnetBottleneckBlock(tf.keras.layers.Layer):
             neighb_inds = batch['neighbors'][self.layer_ind]
 
         # First downscaling mlp
-        x = self.unary1(features, training)
+        x = self.unary1(features, training=training)
 
         # Convolution
         x = self.KPConv(q_pts, s_pts, neighb_inds, x)
-        x = self.leaky_relu(self.batch_norm_conv(x, training))
+        x = self.leaky_relu(self.batch_norm_conv(x, training=training))
 
         # Second upscaling mlp
-        x = self.unary2(x, training)
+        x = self.unary2(x, training=training)
 
         # Shortcut
         if 'strided' in self.block_name:
             shortcut = max_pool(features, neighb_inds)  # TODO : test max_pool
         else:
             shortcut = features
-        shortcut = self.unary_shortcut(shortcut, training)
+        shortcut = self.unary_shortcut(shortcut, training=training)
 
         return self.leaky_relu(x + shortcut)
 
@@ -664,7 +664,7 @@ class NearestUpsampleBlock(tf.keras.layers.Layer):
         self.layer_ind = layer_ind
         return
 
-    def call(self, x, batch):
+    def call(self, x, *, batch):
         return closest_pool(x, batch['upsamples'][self.layer_ind - 1])
 
     def __repr__(self):

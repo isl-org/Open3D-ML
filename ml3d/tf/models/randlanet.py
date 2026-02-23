@@ -536,7 +536,7 @@ class SharedMLP(tf.keras.layers.Layer):
             axis=-1, momentum=0.99, epsilon=1e-6) if bn else None
         self.activation_fn = activation_fn
 
-    def call(self, input, training):
+    def call(self, input, *, training=None):
         """Forward pass of the Module.
 
         Args:
@@ -593,7 +593,8 @@ class LocalSpatialEncoding(tf.keras.layers.Layer):
              coords,
              features,
              neighbor_indices,
-             training,
+             *,
+             training=None,
              relative_features=None):
         """Forward pass of the Module.
 
@@ -654,7 +655,7 @@ class AttentivePooling(tf.keras.layers.Layer):
                              out_channels,
                              activation_fn=tf.keras.layers.LeakyReLU(0.2))
 
-    def call(self, x, training):
+    def call(self, x, *, training=None):
         """Forward pass of the Module.
 
         Args:
@@ -700,7 +701,7 @@ class LocalFeatureAggregation(tf.keras.layers.Layer):
         self.shortcut = SharedMLP(d_in, 2 * d_out)
         self.lrelu = tf.keras.layers.LeakyReLU(0.2)
 
-    def call(self, coords, feat, neighbor_indices, training):
+    def call(self, coords, feat, neighbor_indices, *, training=None):
         """Forward pass of the Module.
 
         Args:

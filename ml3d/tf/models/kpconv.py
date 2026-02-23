@@ -293,15 +293,15 @@ class KPFCNN(BaseModel):
         for block_i, block_op in enumerate(self.encoder_blocks):
             if block_i in self.encoder_skips:
                 skip_conn.append(x)
-            x = block_op(x, inputs, training=training)
+            x = block_op(x, batch=inputs, training=training)
 
         for block_i, block_op in enumerate(self.decoder_blocks):
             if block_i in self.decoder_concats:
                 x = tf.concat([x, skip_conn.pop()], axis=1)
-            x = block_op(x, inputs, training=training)
+            x = block_op(x, batch=inputs, training=training)
 
-        x = self.head_mlp(x, inputs, training)
-        x = self.head_softmax(x, inputs, training)
+        x = self.head_mlp(x, batch=inputs, training=training)
+        x = self.head_softmax(x, batch=inputs, training=training)
 
         return x
 
