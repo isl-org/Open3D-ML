@@ -222,8 +222,8 @@ class KPConv(tf.keras.layers.Layer):
 
     def regular_loss(self):
 
-        fitting_loss = 0
-        repulsive_loss = 0
+        fitting_loss = tf.constant(0.0)
+        repulsive_loss = tf.constant(0.0)
 
         if self.deformable:
             KP_min_d2 = self.min_d2 / (self.KP_extent**2)

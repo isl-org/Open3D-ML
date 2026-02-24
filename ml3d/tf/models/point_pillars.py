@@ -96,7 +96,7 @@ class PointPillars(BaseModel):
                                             coors,
                                             training=training)
 
-        batch_size = int(coors[-1, 0].numpy()) + 1
+        batch_size = tf.cast(coors[-1, 0], tf.int32) + 1
 
         x = self.middle_encoder(voxel_features,
                                 coors,
@@ -700,12 +700,12 @@ class PointPillarsScatter(tf.keras.layers.Layer):
             voxel_features (tf.Tensor): Voxel features in shape (N, M, C).
             coors (tf.Tensor): Coordinates of each voxel in shape (N, 4).
                 The first column indicates the sample ID.
-            batch_size (int): Number of samples in the current batch.
+            batch_size (int or tf.Tensor): Number of samples in the current batch.
             training (bool): Whether we are training or not?
         """
         # batch_canvas will be the final output.
         batch_canvas = []
-        for batch_itt in range(batch_size):
+        for batch_itt in range(int(batch_size)):
             # Create the canvas for this sample
             canvas_shape = (self.nx * self.ny, self.in_channels)
 
