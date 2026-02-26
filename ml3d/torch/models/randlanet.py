@@ -191,7 +191,7 @@ class RandLANet(BaseModel):
         if 'normalize' in augment_cfg:
             val_augment_cfg['normalize'] = augment_cfg.pop('normalize')
 
-        self.augmenter.augment(pc, feat, label, val_augment_cfg, seed=rng)
+        pc, feat, label = self.augmenter.augment(pc, feat, label, val_augment_cfg, seed=rng)
 
         if attr['split'] in ['training', 'train']:
             pc, feat, label = self.augmenter.augment(pc,
