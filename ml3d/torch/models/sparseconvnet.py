@@ -54,17 +54,19 @@ class SparseConvUnet(BaseModel):
                                              augment=augment,
                                              **kwargs)
         cfg = self.cfg
-        self.device = device
+        self.device = torch.device(device)
+        print(f"this is running on device {self.device}")
         self.augmenter = SemsegAugmentation(cfg.augment, seed=self.rng)
         self.multiplier = cfg.multiplier
         self.input_layer = InputLayer()
-        self.sub_sparse_conv = SubmanifoldSparseConv(in_channels=in_channels,
+        self.sub_sparse_conv = SubmanifoldSparseConv(device=self.device,
+                                                     in_channels=in_channels,
                                                      filters=multiplier,
                                                      kernel_size=[3, 3, 3])
-        self.unet = UNet(conv_block_reps, [
+        self.unet = UNet(self.device, conv_block_reps, [
             multiplier, 2 * multiplier, 3 * multiplier, 4 * multiplier,
             5 * multiplier, 6 * multiplier, 7 * multiplier
-        ], residual_blocks)
+        ], residual_blocks, self.device)
         self.batch_norm = BatchNormBlock(multiplier)
         self.relu = ReLUBlock()
         self.linear = LinearBlock(multiplier, num_classes)
@@ -158,14 +160,14 @@ class SparseConvUnet(BaseModel):
 
         return data
 
-    def update_probs(self, inputs, results, test_probs, test_labels):
+    def update_probs(self, inputs, results, test_probs):
         result = results.reshape(-1, self.cfg.num_classes)
         probs = torch.nn.functional.softmax(result, dim=-1).cpu().data.numpy()
         labels = np.argmax(probs, 1)
 
         self.trans_point_sampler(patchwise=False)
 
-        return probs, labels
+        return probs
 
     def inference_begin(self, data):
         data = self.preprocess(data, {'split': 'test'})
@@ -344,6 +346,7 @@ class OutputLayer(nn.Module):
 class SubmanifoldSparseConv(nn.Module):
 
     def __init__(self,
+                 device,
                  in_channels,
                  filters,
                  kernel_size,
@@ -359,6 +362,7 @@ class SubmanifoldSparseConv(nn.Module):
                 offset = 0.5
 
         offset = torch.full((3,), offset, dtype=torch.float32)
+        self.device = device
         self.net = SparseConv(in_channels=in_channels,
                               filters=filters,
                               kernel_size=kernel_size,
@@ -377,7 +381,10 @@ class SubmanifoldSparseConv(nn.Module):
         out_feat = []
         for feat, in_pos, out_pos in zip(features_list, in_positions_list,
                                          out_positions_list):
-            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
+            out_feat.append(self.net(feat.to(self.device),
+                                     in_pos.to(self.device),
+                                     out_pos.to(self.device),
+                                     voxel_size))
 
         return out_feat
 
@@ -404,6 +411,7 @@ def calculate_grid(in_positions):
 class Convolution(nn.Module):
 
     def __init__(self,
+                 device,
                  in_channels,
                  filters,
                  kernel_size,
@@ -411,6 +419,7 @@ class Convolution(nn.Module):
                  offset=None,
                  normalize=False):
         super(Convolution, self).__init__()
+        self.device = device
 
         if offset is None:
             if kernel_size[0] % 2:
@@ -434,7 +443,9 @@ class Convolution(nn.Module):
         out_feat = []
         for feat, in_pos, out_pos in zip(features_list, in_positions_list,
                                          out_positions_list):
-            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
+            out_feat.append(self.net(feat.to(self.device),
+                                     in_pos.to(self.device),
+                                     out_pos.to(self.device), voxel_size))
 
         out_positions_list = [out / 2 for out in out_positions_list]
 
@@ -447,6 +458,7 @@ class Convolution(nn.Module):
 class DeConvolution(nn.Module):
 
     def __init__(self,
+                 device,
                  in_channels,
                  filters,
                  kernel_size,
@@ -454,6 +466,7 @@ class DeConvolution(nn.Module):
                  offset=None,
                  normalize=False):
         super(DeConvolution, self).__init__()
+        self.device = device
 
         if offset is None:
             if kernel_size[0] % 2:
@@ -477,7 +490,10 @@ class DeConvolution(nn.Module):
         out_feat = []
         for feat, in_pos, out_pos in zip(features_list, in_positions_list,
                                          out_positions_list):
-            out_feat.append(self.net(feat, in_pos, out_pos, voxel_size))
+            out_feat.append(self.net(feat.to(self.device),
+                                     in_pos.to(self.device),
+                                     out_pos.to(self.device),
+                                     voxel_size))
 
         return out_feat
 
@@ -532,20 +548,22 @@ class NetworkInNetwork(nn.Module):
 
 class ResidualBlock(nn.Module):
 
-    def __init__(self, nIn, nOut):
+    def __init__(self, device, nIn, nOut):
         super(ResidualBlock, self).__init__()
-
+        self.device = device
         self.lin = NetworkInNetwork(nIn, nOut)
 
         self.batch_norm1 = BatchNormBlock(nIn)
         self.relu1 = ReLUBlock()
-        self.sub_sparse_conv1 = SubmanifoldSparseConv(in_channels=nIn,
+        self.sub_sparse_conv1 = SubmanifoldSparseConv(device=device,
+                                                      in_channels=nIn,
                                                       filters=nOut,
                                                       kernel_size=[3, 3, 3])
 
         self.batch_norm2 = BatchNormBlock(nOut)
         self.relu2 = ReLUBlock()
-        self.sub_sparse_conv2 = SubmanifoldSparseConv(in_channels=nOut,
+        self.sub_sparse_conv2 = SubmanifoldSparseConv(device=device,
+                                                      in_channels=nOut,
                                                       filters=nOut,
                                                       kernel_size=[3, 3, 3])
 
@@ -567,20 +585,22 @@ class ResidualBlock(nn.Module):
 class UNet(nn.Module):
 
     def __init__(self,
+                 device,
                  conv_block_reps,
                  nPlanes,
                  residual_blocks=False,
                  downsample=[2, 2],
                  leakiness=0):
         super(UNet, self).__init__()
+        self.device = device
         self.net = nn.ModuleList(
-            self.get_UNet(nPlanes, residual_blocks, conv_block_reps))
+            self.get_UNet(device, nPlanes, residual_blocks, conv_block_reps))
         self.residual_blocks = residual_blocks
 
     @staticmethod
-    def block(layers, a, b, residual_blocks):
+    def block(device, layers, a, b, residual_blocks):
         if residual_blocks:
-            layers.append(ResidualBlock(a, b))
+            layers.append(ResidualBlock(device, a, b))
 
         else:
             layers.append(BatchNormBlock(a))
@@ -591,32 +611,34 @@ class UNet(nn.Module):
                                       kernel_size=[3, 3, 3]))
 
     @staticmethod
-    def get_UNet(nPlanes, residual_blocks, conv_block_reps):
+    def get_UNet(device, nPlanes, residual_blocks, conv_block_reps):
         layers = []
         for i in range(conv_block_reps):
-            UNet.block(layers, nPlanes[0], nPlanes[0], residual_blocks)
+            UNet.block(device, layers, nPlanes[0], nPlanes[0], residual_blocks)
 
         if len(nPlanes) > 1:
             layers.append(ConcatFeat())
             layers.append(BatchNormBlock(nPlanes[0]))
             layers.append(ReLUBlock())
             layers.append(
-                Convolution(in_channels=nPlanes[0],
+                Convolution(device=device,
+                            in_channels=nPlanes[0],
                             filters=nPlanes[1],
                             kernel_size=[2, 2, 2]))
-            layers = layers + UNet.get_UNet(nPlanes[1:], residual_blocks,
+            layers = layers + UNet.get_UNet(device, nPlanes[1:], residual_blocks,
                                             conv_block_reps)
             layers.append(BatchNormBlock(nPlanes[1]))
             layers.append(ReLUBlock())
             layers.append(
-                DeConvolution(in_channels=nPlanes[1],
+                DeConvolution(device=device,
+                              in_channels=nPlanes[1],
                               filters=nPlanes[0],
                               kernel_size=[2, 2, 2]))
 
             layers.append(JoinFeat())
 
             for i in range(conv_block_reps):
-                UNet.block(layers, nPlanes[0] * (2 if i == 0 else 1),
+                UNet.block(device, layers, nPlanes[0] * (2 if i == 0 else 1),
                            nPlanes[0], residual_blocks)
 
         return layers
