@@ -3,8 +3,8 @@
 <span style="font-size: 220%"><b>ML</b></span>
 </p>
 
-![Ubuntu CI](https://github.com/isl-org/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)
-![Style check](https://github.com/isl-org/Open3D-ML/workflows/Style%20check/badge.svg)
+[![Ubuntu CI](https://github.com/isl-org/Open3D-ML/workflows/Ubuntu%20CI/badge.svg)](https://github.com/isl-org/Open3D-ML/actions/workflows/ubuntu.yml)
+[![Style check](https://github.com/isl-org/Open3D-ML/workflows/Style%20check/badge.svg)](https://github.com/isl-org/Open3D-ML/actions/workflows/style.yml)
 ![PyTorch badge](https://img.shields.io/badge/PyTorch-supported-brightgreen?style=flat&logo=pytorch)
 ![TensorFlow badge](https://img.shields.io/badge/TensorFlow-supported-brightgreen?style=flat&logo=tensorflow)
 
