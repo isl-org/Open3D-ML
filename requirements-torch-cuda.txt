@@ -1,5 +1,6 @@
--f https://download.pytorch.org/whl/torch/
-torch==2.12.0+cu132
--f https://download.pytorch.org/whl/torchvision/
-torchvision==0.27.0+cu132
+--extra-index-url https://download.pytorch.org/whl/cu132
+--extra-index-url https://download.pytorch.org/whl/nightly/cu132
+--pre
+torch==2.12
+torchvision==0.22
 tensorboard
