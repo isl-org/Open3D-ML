@@ -461,3 +461,7 @@ Please cite our work ([pdf](https://arxiv.org/abs/1801.09847)) if you use Open3D
     year      = {2018},
 }
 ```
+
+---
+
+*[Mukller](https://github.com/Mukller)*
