@@ -9,11 +9,10 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
-# pylint: disable-next=unused-import
-from open3d.visualization.tensorboard_plugin import summary
 from .base_pipeline import BasePipeline
 from ..dataloaders import get_sampler, TorchDataloader, DefaultBatcher, ConcatBatcher
 from ..utils import latest_torch_ckpt
+from ...utils.tensorboard_o3d import ensure_tensorboard_plugin
 from ..modules.losses import SemSegLoss, filter_valid_label
 from ..modules.metrics import SemSegMetric
 from ...utils import make_dir, PIPELINE, get_runid, code2md
@@ -654,6 +653,7 @@ class SemanticSegmentation(BasePipeline):
                  f" eval: {iou_dicts[-1]['Validation IoU']:.3f}")
 
         for stage in self.summary:
+            ensure_tensorboard_plugin()
             for key, summary_dict in self.summary[stage].items():
                 label_to_names = summary_dict.pop('label_to_names', None)
                 writer.add_3d('/'.join((stage, key)),

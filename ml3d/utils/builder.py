@@ -15,12 +15,13 @@ def build_network(cfg):
 
 
 def convert_device_name(device_type, device_ids):
-    """Convert device to either cpu or cuda."""
+    """Convert device to cpu, cuda, or xpu."""
     gpu_names = ["gpu", "cuda"]
+    xpu_names = ["xpu", "sycl"]
     cpu_names = ["cpu"]
-    if device_type not in cpu_names + gpu_names:
-        raise KeyError("the device should either "
-                       "be cuda or cpu but got {}".format(device_type))
+    if device_type not in cpu_names + gpu_names + xpu_names:
+        raise KeyError("the device should be cpu, cuda, or xpu but got "
+                       "{}".format(device_type))
     assert type(device_ids) is list
     device_ids_new = []
     for device in device_ids:
@@ -28,8 +29,9 @@ def convert_device_name(device_type, device_ids):
 
     if device_type in gpu_names:
         return "cuda", device_ids_new
-    else:
-        return "cpu", device_ids_new
+    if device_type in xpu_names:
+        return "xpu", device_ids_new
+    return "cpu", device_ids_new
 
 
 def convert_framework_name(framework):

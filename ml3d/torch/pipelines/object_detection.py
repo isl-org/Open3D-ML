@@ -13,8 +13,7 @@ from torch.utils.data import DataLoader
 from .base_pipeline import BasePipeline
 from ..dataloaders import TorchDataloader, ConcatBatcher
 from torch.utils.tensorboard import SummaryWriter
-# pylint: disable-next=unused-import
-from open3d.visualization.tensorboard_plugin import summary
+from ...utils.tensorboard_o3d import ensure_tensorboard_plugin
 from ..utils import latest_torch_ckpt
 from ...utils import make_dir, PIPELINE, get_runid, code2md
 from ...datasets.utils import BEVBox3D
@@ -523,6 +522,7 @@ class ObjectDetection(BasePipeline):
             for key, val in self.valid_losses.items():
                 writer.add_scalar("valid/" + key, np.mean(val), epoch)
         for stage in self.summary.keys():
+            ensure_tensorboard_plugin()
             for key, summary_dict in self.summary[stage].items():
                 label_to_names = summary_dict.pop('label_to_names', None)
                 writer.add_3d('/'.join((stage, key)),

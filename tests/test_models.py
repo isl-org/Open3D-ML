@@ -1,11 +1,17 @@
-import pytest
+import copy
 import os
+
 import numpy as np
 import open3d as o3d
+import pytest
+
 try:
     import torch
 except ImportError:
     torch = None
+
+from torch_backend_parity import (assert_cpu_accelerator_parity, clone_module_to_device,
+                                  move_to_device, parity_accelerator)
 
 if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
     base = os.environ['PATH_TO_OPEN3D_ML']
@@ -27,13 +33,24 @@ except ImportError:
 try:
     from open3d.ml.torch.models import OpenVINOModel
     openvino_available = True
-except:
+except Exception:
     openvino_available = False
+
+
+# Looser tolerance on XPU; CUDA and CPU-only use defaults in helper calls.
+def _parity_tolerance():
+    accel = parity_accelerator()
+    if accel is not None and accel.type == "xpu":
+        return 1e-3, 1e-4
+    return 1e-4, 1e-5
 
 
 @pytest.mark.skipif("not o3d._build_config['BUILD_PYTORCH_OPS']")
 def test_randlanet_torch():
     import open3d.ml.torch as ml3d
+
+    np.random.seed(11)
+    torch.manual_seed(11)
 
     net = ml3d.models.RandLANet(num_points=5000, num_classes=10, in_channels=6)
     net.device = 'cpu'
@@ -68,9 +85,33 @@ def test_randlanet_torch():
         'features': torch.from_numpy(np.array([inputs['features']])),
         'labels': torch.from_numpy(np.array([inputs['labels']]))
     }
-    out = net(inputs).detach().numpy()
 
-    assert out.shape == (1, 5000, 10)
+    net.eval()
+    with torch.no_grad():
+        out_cpu = net(inputs)
+
+    assert out_cpu.detach().numpy().shape == (1, 5000, 10)
+
+    state = copy.deepcopy(net.state_dict())
+
+    def forward_on_device(device):
+        model = ml3d.models.RandLANet(num_points=5000,
+                                      num_classes=10,
+                                      in_channels=6)
+        model.load_state_dict(state)
+        model.device = str(device)
+        model.to(device)
+        model.eval()
+        with torch.no_grad():
+            return model(move_to_device(inputs, device))
+
+    rtol, atol = _parity_tolerance()
+    assert_cpu_accelerator_parity(
+        out_cpu,
+        forward_on_device,
+        rtol=rtol,
+        atol=atol,
+    )
 
 
 @pytest.mark.skipif("not o3d._build_config['BUILD_TENSORFLOW_OPS']")
@@ -118,6 +159,9 @@ def test_randlanet_tf():
 def test_kpconv_torch():
     import open3d.ml.torch as ml3d
 
+    np.random.seed(22)
+    torch.manual_seed(22)
+
     net = ml3d.models.KPFCNN(lbl_values=[0, 1, 2, 3, 4, 5],
                              num_classes=4,
                              ignored_label_inds=[0],
@@ -134,23 +178,37 @@ def test_kpconv_torch():
                      dtype=np.int32)
     }
     attr = {'split': 'train'}
-    batcher = ml3d.dataloaders.ConcatBatcher('cpu')
 
     data = net.preprocess(data, attr)
-    inputs = {'data': net.transform(data, attr), 'attr': attr}
-    inputs = batcher.collate_fn([inputs])
+    transform_data = net.transform(data, attr)
+    sample = {'data': transform_data, 'attr': attr}
 
-    net.eval()
-    out = net(inputs['data']).detach().numpy()
+    def run_forward(device):
+        batcher = ml3d.dataloaders.ConcatBatcher(str(device))
+        model = clone_module_to_device(net, device)
+        batch = batcher.collate_fn([sample])
+        with torch.no_grad():
+            return model(batch['data'])
 
-    assert out.shape[1] == 5
+    out_cpu = run_forward('cpu')
+    assert out_cpu.detach().numpy().shape[1] == 5
+
+    rtol, atol = _parity_tolerance()
+    assert_cpu_accelerator_parity(
+        out_cpu,
+        lambda dev: run_forward(dev),
+        rtol=rtol,
+        atol=atol,
+    )
 
     if openvino_available:
+        batcher = ml3d.dataloaders.ConcatBatcher('cpu')
+        inputs = batcher.collate_fn([sample])
         ov_net = ml3d.models.OpenVINOModel(net)
         ov_net.to("cpu")
         ov_out = ov_net(inputs['data']).detach().numpy()
-        assert ov_out.shape == out.shape
-        assert np.max(np.abs(ov_out - out)) < 1e-7
+        assert ov_out.shape == out_cpu.detach().numpy().shape
+        assert np.max(np.abs(ov_out - out_cpu.detach().numpy())) < 1e-7
 
 
 @pytest.mark.skipif("not o3d._build_config['BUILD_TENSORFLOW_OPS']")
@@ -206,12 +264,14 @@ def test_pointpillars_torch():
     import open3d.ml.torch as ml3d
     from open3d.ml.utils import Config
 
+    np.random.seed(33)
+    torch.manual_seed(33)
+
     cfg_path = base + '/ml3d/configs/pointpillars_kitti.yml'
     cfg = Config.load_from_file(cfg_path)
 
     net = ml3d.models.PointPillars(**cfg.model, device='cpu')
 
-    batcher = ml3d.dataloaders.ConcatBatcher('cpu', model='PointPillars')
     data = {
         'point': np.array(np.random.random((10000, 4)), dtype=np.float32),
         'calib': None,
@@ -219,19 +279,38 @@ def test_pointpillars_torch():
     }
     data = net.preprocess(data, {'split': 'test'})
     data = net.transform(data, {'split': 'test'})
-    data = batcher.collate_fn([{'data': data, 'attr': {'split': 'test'}}])
+    sample = {'data': data, 'attr': {'split': 'test'}}
 
-    net.eval()
-    with torch.no_grad():
-        results = net(data)
-        boxes = net.inference_end(results, data)
-        assert type(boxes) == list
+    def run_forward(device):
+        dev = device if isinstance(device, torch.device) else torch.device(
+            device)
+        batcher = ml3d.dataloaders.ConcatBatcher(str(dev),
+                                                 model='PointPillars')
+        model = clone_module_to_device(net, dev)
+        batch = batcher.collate_fn([sample])
+        if dev.type != 'cpu':
+            batch.to(dev)
+        with torch.no_grad():
+            return model(batch), batch
+
+    results_cpu, batch_cpu = run_forward('cpu')
+    boxes = net.inference_end(results_cpu, batch_cpu)
+    assert type(boxes) == list
+
+    rtol, atol = _parity_tolerance()
+    assert_cpu_accelerator_parity(
+        results_cpu,
+        lambda dev: run_forward(dev)[0],
+        rtol=rtol,
+        atol=atol,
+    )
 
     if openvino_available:
+        batcher = ml3d.dataloaders.ConcatBatcher('cpu', model='PointPillars')
+        batch = batcher.collate_fn([sample])
         ov_net = ml3d.models.OpenVINOModel(net)
-        ov_results = ov_net(data)
-
-        for out, ref in zip(ov_results, results):
+        ov_results = ov_net(batch)
+        for out, ref in zip(ov_results, results_cpu):
             assert out.shape == ref.shape
             assert torch.max(torch.abs(out - ref)) < 1e-5
 

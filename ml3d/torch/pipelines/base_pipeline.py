@@ -57,7 +57,19 @@ class BasePipeline(ABC):
             make_dir(self.cfg.main_log_dir)
             make_dir(self.cfg.logs_dir)
 
-        if device == 'cpu' or not torch.cuda.is_available():
+        if device == 'cpu':
+            if distributed:
+                raise NotImplementedError(
+                    "Distributed training for CPU is not supported yet.")
+            self.device = torch.device('cpu')
+        elif (device == 'xpu' or str(device).startswith('xpu')) and hasattr(
+                torch, 'xpu') and torch.xpu.is_available():
+            if distributed:
+                raise NotImplementedError(
+                    "Distributed training for XPU is not supported yet.")
+            self.device = torch.device(
+                device if ':' in str(device) else 'xpu')
+        elif not torch.cuda.is_available():
             if distributed:
                 raise NotImplementedError(
                     "Distributed training for CPU is not supported yet.")

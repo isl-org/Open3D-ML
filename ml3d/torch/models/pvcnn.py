@@ -10,7 +10,9 @@ from ...utils import MODEL
 from ..modules.losses import filter_valid_label
 from ...datasets.augment import SemsegAugmentation
 
-if open3d.core.cuda.device_count() > 0:
+from ...utils.open3d_ops import pytorch_ops_built
+
+if pytorch_ops_built():
     from open3d.ml.torch.ops import trilinear_devoxelize_forward, trilinear_devoxelize_backward
 
 

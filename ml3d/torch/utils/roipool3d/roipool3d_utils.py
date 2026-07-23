@@ -1,6 +1,8 @@
 import torch
 import open3d
-if open3d.core.cuda.device_count() > 0:
+from ....utils.open3d_ops import pytorch_ops_built, require_pytorch_ops
+
+if pytorch_ops_built():
     from open3d.ml.torch.ops import roi_pool
 import numpy as np
 
@@ -39,8 +41,7 @@ def roipool3d_gpu(pts,
         pooled_features: (B, M, 512, 3 + C)
         pooled_empty_flag: (B, M)
     """
-    if not open3d.core.cuda.device_count() > 0:
-        raise NotImplementedError
+    require_pytorch_ops()
 
     batch_size = pts.shape[0]
     pooled_boxes3d = enlarge_box3d(boxes3d.view(-1, 7),
