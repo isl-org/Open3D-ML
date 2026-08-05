@@ -11,6 +11,7 @@ from ..modules.losses import filter_valid_label
 from ...datasets.augment import SemsegAugmentation
 
 from ...utils.open3d_ops import pytorch_ops_built
+from ..utils.torch_utils import default_training_device
 
 if pytorch_ops_built():
     from open3d.ml.torch.ops import trilinear_devoxelize_forward, trilinear_devoxelize_backward
@@ -86,7 +87,7 @@ class PVCNN(BaseModel):
 
     def __init__(self,
                  name='PVCNN',
-                 device="cuda",
+                 device=None,
                  num_classes=13,
                  num_points=40960,
                  extra_feature_channels=6,
@@ -95,6 +96,8 @@ class PVCNN(BaseModel):
                  batcher='DefaultBatcher',
                  augment=None,
                  **kwargs):
+        if device is None:
+            device = default_training_device()
         super(PVCNN, self).__init__(
             name=name,
             device=device,
@@ -290,7 +293,7 @@ class PVCNN(BaseModel):
             sem_seg_loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
-            device: device(cpu or cuda).
+            device: Torch device (cpu, cuda, or xpu).
         
         Returns:
             Returns loss, labels and scores.

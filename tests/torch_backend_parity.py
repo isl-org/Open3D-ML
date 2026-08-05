@@ -40,7 +40,12 @@ def assert_cpu_accelerator_parity(run_on_device, atol=None, grad_atol=None):
 
     if o3d.core.cuda.is_available():
         accel = torch.device('cuda')
-    elif o3d.core.sycl.is_available():
+    elif o3d.core.sycl.is_available() and torch.xpu.is_available():
+        # o3d.core.sycl.is_available() is True whenever Open3D's SYCL module was
+        # built, even on hosts with no Intel GPU (it falls back to a SYCL CPU
+        # device). torch.xpu.is_available() additionally confirms a real XPU
+        # device is visible to PyTorch, so this only picks 'xpu' on actual GPU
+        # hardware.
         accel = torch.device('xpu')
     else:
         return cpu_output, cpu_model

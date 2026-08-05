@@ -32,7 +32,7 @@ class BaseModel(ABC, torch.nn.Module):
             Loss: A loss object.
             results: This is the output of the model.
             inputs: This is the input to the model.
-            device: The torch device to be used.
+            device: Torch device (cpu, cuda, or xpu).
 
         Returns:
             Returns the loss value.

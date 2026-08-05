@@ -39,7 +39,7 @@ from ..modules.losses.cross_entropy import CrossEntropyLoss
 from ..modules.pointnet import Pointnet2MSG, PointnetSAModule
 from ..utils.objdet_helper import xywhr_to_xyxyr
 from open3d.ml.torch.ops import nms
-from ..utils.torch_utils import gen_CNN
+from ..utils.torch_utils import gen_CNN, default_training_device
 from ...datasets.utils import BEVBox3D, DataProcessing
 from ...datasets.utils.operations import points_in_box
 from ...datasets.augment import ObjdetAugmentation
@@ -68,8 +68,8 @@ class PointRCNN(BaseModel):
     Args:
         name (string): Name of model.
             Default to "PointRCNN".
-        device (string): 'cuda' or 'cpu'.
-            Default to 'cuda'.
+        device (string): 'cuda', 'xpu', or 'cpu'. Default: first available
+            accelerator (cuda, then xpu), else cpu.
         classes (string[]): List of classes used for object detection:
             Default to ['Car'].
         score_thres (float): Min confindence score for prediction.
@@ -86,7 +86,7 @@ class PointRCNN(BaseModel):
 
     def __init__(self,
                  name="PointRCNN",
-                 device="cuda",
+                 device=None,
                  classes=['Car'],
                  score_thres=0.3,
                  npoints=16384,
@@ -94,6 +94,9 @@ class PointRCNN(BaseModel):
                  rcnn={},
                  mode="RCNN",
                  **kwargs):
+
+        if device is None:
+            device = default_training_device()
 
         super().__init__(name=name, device=device, **kwargs)
         assert mode == "RPN" or mode == "RCNN"

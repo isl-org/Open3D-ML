@@ -31,7 +31,7 @@ class ObjectDetection(BasePipeline):
                  dataset=None,
                  name='ObjectDetection',
                  main_log_dir='./logs/',
-                 device='cuda',
+                 device=None,
                  split='train',
                  **kwargs):
         super().__init__(model=model,
@@ -335,9 +335,11 @@ class ObjectDetection(BasePipeline):
 
         # wrap model for multiple GPU
         if self.distributed:
-            model.cuda(self.device)
+            model.to(self.device)
+            device_index = (self.device.index if self.device.index is not None
+                            else 0)
             model = torch.nn.parallel.DistributedDataParallel(
-                model, device_ids=[self.device])
+                model, device_ids=[device_index])
             model.get_loss = model.module.get_loss
             model.cfg = model.module.cfg
             model.inference_end = model.module.inference_end

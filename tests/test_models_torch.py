@@ -2,7 +2,39 @@
 
 Each CPU+accelerator model test builds the same model and batch on each device,
 runs one forward and one backward pass per device, and compares outputs and
-gradients. Models whose ops have no CPU kernel run on the accelerator only.
+gradients (see ``torch_backend_parity.assert_cpu_accelerator_parity``). Models
+whose ops have no CPU kernel run on the accelerator only (``@skip_no_accelerator``).
+
+Registered PyTorch models in ``ml3d/torch/models`` and how they are covered here:
+
++------------------+----------+--------------------------------+--------+-----------------------------+
+| Model            | Task     | Dedicated test                 | Parity | Basic                       |
++==================+==========+================================+========+=============================+
+| RandLANet        | Semseg   | test_randlanet_torch           | Yes    | Yes (CPU path if no GPU)    |
+| KPFCNN           | Semseg   | test_kpconv_torch              | Yes    | Yes; OpenVINO optional      |
+| PointPillars     | Obj det  | test_pointpillars_torch        | Yes    | Yes; OpenVINO optional      |
+| SparseConvUnet   | Semseg   | test_sparseconvunet_torch      | Yes    | Yes (relaxed atol)          |
+| PointRCNN (RPN)  | Obj det  | test_pointrcnn_rpn_torch       | No     | Yes (@skip_no_accelerator)  |
+| PointRCNN (RCNN) | Obj det  | test_pointrcnn_rcnn_torch      | No     | Yes (@skip_no_accelerator)  |
+| PointTransformer | Semseg   | test_pointtransformer_torch    | No     | Yes (@skip_no_accelerator)  |
+| PVCNN            | Semseg   | test_pvcnn_torch               | No     | Yes (@skip_no_accelerator)  |
++------------------+----------+--------------------------------+--------+-----------------------------+
+
+**Parity** — ``assert_cpu_accelerator_parity``: same weights, forward + backward on
+CPU and CUDA/XPU, compare outputs and gradients.
+
+**Basic** — forward + backward smoke; accelerator-only rows require CUDA or XPU.
+
+OpenVINOModel (wrapper, not in table): no dedicated test; exercised in
+``test_kpconv_torch`` / ``test_pointpillars_torch`` when OpenVINO is available
+(CPU torch vs OpenVINO, not CPU vs GPU parity).
+
+Other PyTorch tests outside this file: ``test_integration_torch`` only constructs
+RandLANet from a config (no forward pass).
+
+Parity tests need ``BUILD_PYTORCH_OPS`` and a CUDA or XPU device for the
+accelerator half. CPU CI (``./ci/run_ci.sh cpu``) does not run this file; use
+``./ci/run_ci.sh cuda`` or ``xpu`` locally for the full matrix.
 """
 
 import copy
@@ -39,7 +71,12 @@ _ACCEL_ONLY_REASON = (
 _accel = None
 if o3d.core.cuda.is_available():
     _accel = torch.device('cuda')
-elif o3d.core.sycl.is_available():
+elif o3d.core.sycl.is_available() and torch.xpu.is_available():
+    # o3d.core.sycl.is_available() is True whenever Open3D's SYCL module was
+    # built, even on hosts with no Intel GPU (it falls back to a SYCL CPU
+    # device). torch.xpu.is_available() additionally confirms a real XPU
+    # device is visible to PyTorch, so this only picks 'xpu' on actual GPU
+    # hardware.
     _accel = torch.device('xpu')
 
 skip_no_pytorch_ops = pytest.mark.skipif(

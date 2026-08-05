@@ -343,7 +343,7 @@ class PointTransformer(BaseModel):
             sem_seg_loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
-            device: device(cpu or cuda).
+            device: Torch device (cpu, cuda, or xpu).
 
         Returns:
             Returns loss, labels and scores.
@@ -730,7 +730,8 @@ def knn_batch(points,
                      return_distances=True)
     if return_distances:
         return ans.neighbors_index.reshape(
-            -1, k).long().cuda(), ans.neighbors_distance.reshape(-1, k).to(device)
+            -1, k).long().to(device), ans.neighbors_distance.reshape(-1, k).to(
+                device)
     else:
         return ans.neighbors_index.reshape(-1, k).long().to(device)
 

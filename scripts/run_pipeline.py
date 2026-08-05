@@ -31,11 +31,11 @@ def parse_args():
     parser.add_argument('--dataset_path', help='path to the dataset')
     parser.add_argument('--ckpt_path', help='path to the checkpoint')
     parser.add_argument('--device',
-                        help='devices to run the pipeline',
+                        help='device: cpu, cuda, xpu, gpu, or sycl',
                         default='cuda')
     parser.add_argument('--device_ids',
                         nargs='+',
-                        help='cuda device list',
+                        help='accelerator device indices (e.g. 0 1)',
                         default=['0'])
     parser.add_argument('--split', help='train or test', default='train')
     parser.add_argument('--mode', help='additional mode', default=None)
@@ -61,7 +61,8 @@ def parse_args():
     parser.add_argument(
         '--backend',
         help=
-        'backend for distributed training. One of (nccl, gloo)}, default: gloo',
+        'backend for distributed training. One of (nccl, gloo, xccl for XPU), '
+        'default: gloo',
         default='gloo')
 
     args, unknown = parser.parse_known_args()
@@ -117,9 +118,15 @@ def main():
                             "Multi-GPU training with TensorFlow is not yet implemented."
                         )
                     tf.config.set_visible_devices(gpus[0], 'GPU')
-                else:
+                elif device == 'xpu':
+                    tf.config.set_visible_devices([], 'GPU')
+                elif ':' in device:
                     idx = device.split(':')[1]
                     tf.config.set_visible_devices(gpus[int(idx)], 'GPU')
+                else:
+                    raise ValueError(
+                        f"Unsupported TensorFlow device {device!r}; "
+                        "use cpu, cuda, or cuda:N.")
             except RuntimeError as e:
                 print(e)
 
@@ -225,7 +232,7 @@ def main_worker(local_rank, Dataset, Model, Pipeline, cfg_dict_dataset,
     cfg_dict_model['seed'] = rng
     cfg_dict_pipeline['seed'] = rng
 
-    device = f"cuda:{args.device_ids[local_rank]}"
+    device = f"{args.device}:{args.device_ids[local_rank]}"
     print(
         f"local_rank = {local_rank}, rank = {rank}, world_size = {world_size},"
         f" gpu = {device}")

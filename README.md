@@ -50,6 +50,8 @@ pip install -r requirements-tensorflow.txt
 pip install -r requirements-torch.txt
 # To install a compatible version of PyTorch with CUDA on Linux
 pip install -r requirements-torch-cuda.txt
+# To install a compatible version of PyTorch with XPU (Intel GPU) on Linux
+pip install -r requirements-torch-xpu.txt
 ```
 
 To test the installation use
@@ -420,6 +422,7 @@ For downloading these datasets visit the respective webpages and have a look at 
 -   [Adding a new model](docs/howtos.md#adding-a-new-model)
 -   [Adding a new dataset](docs/howtos.md#adding-a-new-dataset)
 -   [Distributed training](docs/howtos.md#distributed-training)
+-   [Testing CPU / CUDA / XPU parity](docs/howtos.md#testing-cpu--cuda--xpu-parity)
 -   [Visualize and compare input data, ground truth and results in TensorBoard](docs/tensorboard.md)
 -   [Inference with Intel OpenVINO](docs/openvino.md)
 

@@ -168,8 +168,9 @@ class Anchor3DRangeGenerator(object):
 
         Args:
             featmap_size (tuple[int]): Size of the feature map.
-            device (str, optional): Device the tensor will be put on.
-                Defaults to 'cuda'.
+            device (str, optional): Device the tensor will be put on (cpu, cuda,
+                or xpu). Callers should pass the model device; default ``cuda``
+                is for CUDA-only legacy paths.
 
         Returns:
             torch.Tensor: Anchors in the overall feature map.
@@ -203,7 +204,7 @@ class Anchor3DRangeGenerator(object):
                 shape [N, 3], in order of x, y, z.
             rotations (list[float] | np.ndarray | torch.Tensor): Rotations of
                 anchors in a single feature grid.
-            device (str): Devices that the anchors will be put on.
+            device (str): Device for anchors (cpu, cuda, or xpu).
 
         Returns:
             torch.Tensor: Anchors with shape \

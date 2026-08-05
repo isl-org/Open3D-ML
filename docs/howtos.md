@@ -258,3 +258,40 @@ Distributed training uses the PyTorch Distributed Data Parallel (DDP) module and
 ![PointPillars training on Waymo per epoch training time with number of GPUs](https://user-images.githubusercontent.com/41028320/220750523-57075575-8cc7-4e40-99b0-a4e79995f1ec.png)
 
 See [`scripts/train_scripts/pointpillars_waymo.sh`](../scripts/train_scripts/pointpillars_waymo.sh) for an example SLURM training script for distributed training on two nodes, using four GPUs on each node. The remaining configuration is read from the config file [`pointpillars_waymo.yml`](../ml3d/configs/pointpillars_waymo.yml).
+
+## Testing CPU / CUDA / XPU parity
+
+The PyTorch model tests in [`tests/test_models_torch.py`](../tests/test_models_torch.py) build the same model and batch on CPU and on an accelerator (CUDA or XPU), then assert that outputs and gradients match within a tolerance (see [`tests/torch_backend_parity.py`](../tests/torch_backend_parity.py)). Correctness is verified as follows:
+
+-   **CUDA**: new CUDA results are compared against the existing CPU results.
+-   **XPU (Intel GPU)**: new XPU results are compared against the same CPU results, using separate tolerances tuned for SYCL's op ordering.
+
+Both accelerator paths reuse the same CPU baseline, so CPU correctness is the
+common foundation both backends are checked against.
+
+Run the full suite locally with:
+
+```bash
+./tests/run_tests.sh
+# or select specific tests, e.g.
+./tests/run_tests.sh tests/test_models_torch.py -k "not sparse"
+```
+
+### Note on GitHub Actions CI
+
+GitHub-hosted runners have no NVIDIA or Intel GPU. CI runs `./ci/run_ci.sh cpu`,
+which installs the `open3d_cpu` wheel and PyTorch CPU, then runs integration and
+TensorFlow model tests only. **Torch CPU/accelerator parity** (`tests/test_models_torch.py`)
+is not part of CPU CI.
+
+Run parity locally (or on GPU machines) with:
+
+```bash
+./ci/run_ci.sh cuda   # NVIDIA GPU + open3d CUDA wheel
+./ci/run_ci.sh xpu    # Intel GPU + open3d_xpu wheel
+```
+
+Both `cuda` and `xpu` variants install the matching PyTorch build and run the
+full test tree, including `test_models_torch.py`. The `cpu` variant skips those
+parity tests because they require a real accelerator and are not meaningful on
+CPU-only hosts.

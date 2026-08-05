@@ -560,7 +560,7 @@ class ConcatBatcher(object):
         """Initialize.
 
         Args:
-            device: torch device 'gpu' or 'cpu'
+            device: Torch device (cpu, cuda, or xpu).
 
         Returns:
             class: The corresponding class.

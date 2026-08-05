@@ -26,7 +26,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run Open3D-ML tests against the prebuilt open3d_xpu wheel
+      - name: Run Open3D-ML tests (CPU wheel, no torch parity)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: ./ci/run_ci.sh
+        run: ./ci/run_ci.sh cpu

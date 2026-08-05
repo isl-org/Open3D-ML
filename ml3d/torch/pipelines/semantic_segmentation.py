@@ -70,7 +70,7 @@ class SemanticSegmentation(BasePipeline):
             scheduler_gamma: The decaying factor associated with the scheduler.
             momentum: The momentum that accelerates the training rate schedule.
             main_log_dir: The directory where logs are stored.
-            device: The device to be used for training.
+            device: Device for training (cpu, cuda, or xpu).
             split: The dataset split to be used. In this example, we have used "train".
             train_sum_dir: The directory where the trainig summary is stored.
 
@@ -94,7 +94,7 @@ class SemanticSegmentation(BasePipeline):
             scheduler_gamma=0.95,
             momentum=0.98,
             main_log_dir='./logs/',
-            device='cuda',
+            device=None,
             split='train',
             train_sum_dir='train_log',
             **kwargs):

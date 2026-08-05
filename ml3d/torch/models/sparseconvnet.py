@@ -8,6 +8,7 @@ from ..modules.losses import filter_valid_label
 from ...datasets.augment import SemsegAugmentation
 from open3d.ml.torch.layers import SparseConv, SparseConvTranspose
 from open3d.ml.torch.ops import voxelize, reduce_subarrays_sum
+from ..utils.torch_utils import default_training_device
 
 
 class SparseConvUnet(BaseModel):
@@ -18,7 +19,7 @@ class SparseConvUnet(BaseModel):
     Attributes:
         name: Name of model.
           Default to "SparseConvUnet".
-        device: Which device to use (cpu or cuda).
+        device: Which device to use (cpu, cuda, or xpu).
         voxel_size: Voxel length for subsampling.
         multiplier: min length of feature length in each layer.
         conv_block_reps: repetition of Unet Blocks.
@@ -30,7 +31,7 @@ class SparseConvUnet(BaseModel):
     def __init__(
             self,
             name="SparseConvUnet",
-            device="cuda",
+            device=None,
             multiplier=16,  # Proportional to number of neurons in each layer.
             voxel_size=0.05,
             conv_block_reps=1,  # Conv block repetitions.
@@ -41,6 +42,8 @@ class SparseConvUnet(BaseModel):
             batcher='ConcatBatcher',
             augment=None,
             **kwargs):
+        if device is None:
+            device = default_training_device()
         super(SparseConvUnet, self).__init__(name=name,
                                              device=device,
                                              multiplier=multiplier,
@@ -197,7 +200,7 @@ class SparseConvUnet(BaseModel):
             Loss: Object of type `SemSegLoss`.
             results: Output of the model.
             inputs: Input of the model.
-            device: device(cpu or cuda).
+            device: Torch device (cpu, cuda, or xpu).
         
         Returns:
             Returns loss, labels and scores.
