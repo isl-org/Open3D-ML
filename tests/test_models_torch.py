@@ -16,7 +16,7 @@ Registered PyTorch models in ``ml3d/torch/models`` and how they are covered here
 | SparseConvUnet   | Semseg   | test_sparseconvunet_torch      | Yes    | Yes (relaxed atol)          |
 | PointRCNN (RPN)  | Obj det  | test_pointrcnn_rpn_torch       | No     | Yes (@skip_no_accelerator)  |
 | PointRCNN (RCNN) | Obj det  | test_pointrcnn_rcnn_torch      | No     | Yes (@skip_no_accelerator)  |
-| PointTransformer | Semseg   | test_pointtransformer_torch    | No     | Yes (@skip_no_accelerator)  |
+| PointTransformer | Semseg   | test_pointtransformer_torch    | Yes    | Yes                         |
 | PVCNN            | Semseg   | test_pvcnn_torch               | No     | Yes (@skip_no_accelerator)  |
 +------------------+----------+--------------------------------+--------+-----------------------------+
 
@@ -467,22 +467,23 @@ def test_pointrcnn_rcnn_torch():
 
 
 @skip_no_pytorch_ops
-@skip_no_accelerator
 def test_pointtransformer_torch():
-    # NOTE: furthest_point_sampling (encoder downsampling) has no CPU kernel, same as
-    # PointRCNN -- forward+backward on accelerator only; no CPU/XPU parity baseline.
     import open3d.ml.torch as ml3d
 
     np.random.seed(66)
     torch.manual_seed(66)
 
-    net = ml3d.models.PointTransformer(device=str(_accel),
-                                       num_classes=13,
-                                       in_channels=6,
-                                       augment={},
-                                       ignored_label_inds=[])
-    net.to(_accel)
-    net.eval()
+    def make_net(device=torch.device('cpu')):
+        net = ml3d.models.PointTransformer(device=str(device),
+                                           num_classes=13,
+                                           in_channels=6,
+                                           augment={},
+                                           ignored_label_inds=[])
+        net.eval()
+        return net.to(device)
+
+    net = make_net()
+    state = copy.deepcopy(net.state_dict())
 
     n = 4096
     data = {
@@ -491,19 +492,25 @@ def test_pointtransformer_torch():
         'label': np.random.randint(13, size=(n,)).astype(np.int32),
     }
     attr = {'split': 'train'}
-    data = net.preprocess(data, attr)
-    data = net.transform(data, attr)
-    sample = {'data': data, 'attr': attr}
-    batcher = ml3d.dataloaders.ConcatBatcher(str(_accel),
-                                             model='PointTransformer')
-    batch = batcher.collate_fn([sample])
-    batch['data'].to(_accel)
-    out = net(batch['data'])
-    assert out.shape[1] == 13
+    sample = {
+        'data': net.transform(net.preprocess(data, attr), attr),
+        'attr': attr,
+    }
 
-    loss, _, _ = net.get_loss(semseg_loss, out, batch, _accel)
-    loss.backward()
-    assert any(p.grad is not None for p in net.parameters())
+    def run(device):
+        model = make_net(device)
+        model.load_state_dict(state)
+        batcher = ml3d.dataloaders.ConcatBatcher(
+            str(device), model='PointTransformer')
+        batch = batcher.collate_fn([sample])
+        batch['data'].to(device)
+        out = model(batch['data'])
+        loss, _, _ = model.get_loss(semseg_loss, out, batch, device)
+        loss.backward()
+        return out, model
+
+    out_cpu, _ = assert_cpu_accelerator_parity(run)
+    assert out_cpu.shape[1] == 13
 
 
 @skip_no_pytorch_ops
