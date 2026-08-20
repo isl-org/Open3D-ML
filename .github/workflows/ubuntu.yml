@@ -26,6 +26,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # open3d / open3d_cpu wheels link EGL for offscreen rendering (GUI=ON).
+      - name: Install Open3D runtime deps
+        run: sudo apt-get update && sudo apt-get install --yes libegl1
       - name: Run Open3D-ML tests (CPU wheel, no torch parity)
         env:
           GH_TOKEN: ${{ github.token }}
