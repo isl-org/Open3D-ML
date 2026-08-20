@@ -280,18 +280,8 @@ Run the full suite locally with:
 ### Note on GitHub Actions CI
 
 GitHub-hosted runners have no NVIDIA or Intel GPU. CI runs `./ci/run_ci.sh cpu`,
-which installs the `open3d_cpu` wheel and PyTorch CPU, then runs integration and
-TensorFlow model tests only. **Torch CPU/accelerator parity** (`tests/test_models_torch.py`)
-is not part of CPU CI.
+which installs the `open3d_cpu` wheel and PyTorch CPU, then runs the full pytest
+tree. Individual tests skip when an op backend or accelerator is unavailable.
 
-Run parity locally (or on GPU machines) with:
-
-```bash
-./ci/run_ci.sh cuda   # NVIDIA GPU + open3d CUDA wheel
-./ci/run_ci.sh xpu    # Intel GPU + open3d_xpu wheel
-```
-
-Both `cuda` and `xpu` variants install the matching PyTorch build and run the
-full test tree, including `test_models_torch.py`. The `cpu` variant skips those
-parity tests because they require a real accelerator and are not meaningful on
-CPU-only hosts.
+Run `./ci/run_ci.sh cuda` or `./ci/run_ci.sh xpu` locally or on GPU machines to
+exercise CUDA/XPU wheels and PyTorch builds.

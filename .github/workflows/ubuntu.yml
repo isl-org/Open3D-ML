@@ -29,7 +29,7 @@ jobs:
       # open3d / open3d_cpu wheels link EGL for offscreen rendering (GUI=ON).
       - name: Install Open3D runtime deps
         run: sudo apt-get update && sudo apt-get install --yes libegl1
-      - name: Run Open3D-ML tests (CPU wheel, no torch parity)
+      - name: Run Open3D-ML tests (CPU wheel)
         env:
           GH_TOKEN: ${{ github.token }}
         run: ./ci/run_ci.sh cpu

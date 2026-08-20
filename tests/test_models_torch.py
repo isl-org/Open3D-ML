@@ -33,8 +33,9 @@ Other PyTorch tests outside this file: ``test_integration_torch`` only construct
 RandLANet from a config (no forward pass).
 
 Parity tests need ``BUILD_PYTORCH_OPS`` and a CUDA or XPU device for the
-accelerator half. CPU CI (``./ci/run_ci.sh cpu``) does not run this file; use
-``./ci/run_ci.sh cuda`` or ``xpu`` locally for the full matrix.
+accelerator half; without a GPU, ``assert_cpu_accelerator_parity`` runs CPU only.
+CPU CI (``./ci/run_ci.sh cpu``) runs the same torch model tests with parity
+skipped on GPU-less runners; use ``./ci/run_ci.sh cuda`` or ``xpu`` for full parity.
 """
 
 import copy
