@@ -30,6 +30,15 @@ def collect_grads(module):
     }
 
 
+def _synchronize_accel(accel_type):
+    if hasattr(torch, "accelerator"):
+        torch.accelerator.synchronize()
+    elif accel_type == "cuda":
+        torch.cuda.synchronize()
+    elif accel_type == "xpu" and hasattr(torch, "xpu"):
+        torch.xpu.synchronize()
+
+
 def assert_cpu_accelerator_parity(run_on_device, atol=None, grad_atol=None):
     """Run one forward + backward pass per device and compare outputs and grads.
 
@@ -39,7 +48,7 @@ def assert_cpu_accelerator_parity(run_on_device, atol=None, grad_atol=None):
     """
     cpu_output, cpu_model = run_on_device(torch.device("cpu"))
 
-    if o3d.core.cuda.is_available():
+    if o3d.core.cuda.is_available() and torch.cuda.is_available():
         accel = torch.device('cuda')
     elif o3d.core.sycl.is_available() and torch.xpu.is_available():
         # o3d.core.sycl.is_available() is True whenever Open3D's SYCL module was
@@ -52,7 +61,7 @@ def assert_cpu_accelerator_parity(run_on_device, atol=None, grad_atol=None):
         return cpu_output, cpu_model
 
     accel_output, accel_model = run_on_device(accel)
-    torch.accelerator.synchronize()
+    _synchronize_accel(accel.type)
 
     rtol = RTOL[accel.type]
     atol = ATOL[accel.type] if atol is None else atol

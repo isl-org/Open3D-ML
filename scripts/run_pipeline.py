@@ -120,13 +120,10 @@ def main():
                     tf.config.set_visible_devices(gpus[0], 'GPU')
                 elif device == 'xpu':
                     tf.config.set_visible_devices([], 'GPU')
-                elif ':' in device:
-                    idx = device.split(':')[1]
-                    tf.config.set_visible_devices(gpus[int(idx)], 'GPU')
                 else:
                     raise ValueError(
                         f"Unsupported TensorFlow device {device!r}; "
-                        "use cpu, cuda, or cuda:N.")
+                        "use cpu, cuda, or xpu (set --device_ids for a specific GPU).")
             except RuntimeError as e:
                 print(e)
 

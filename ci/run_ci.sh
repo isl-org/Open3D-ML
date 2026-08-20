@@ -90,21 +90,17 @@ export PATH_TO_OPEN3D_ML="$PWD"
 python -m pip install -r requirements.txt -r "${TORCH_REQUIREMENTS}" \
     -r requirements-tensorflow.txt
 
+# Load ml3d from this checkout (wheel _ml3d may lag main-devel until the next Open3D release).
+export OPEN3D_ML_ROOT="${PATH_TO_OPEN3D_ML}"
+
 run_test_suite() {
     echo "Running: ./tests/run_tests.sh tests"
     echo "Add --randomly-seed=SEED via pytest env if reproducing order."
     ./tests/run_tests.sh tests
 }
 
-echo "5. Run the Open3D-ML pytest suite against the installed wheel"
+echo "5. Run the Open3D-ML pytest suite (open3d wheel + ml3d from OPEN3D_ML_ROOT)"
 echo
 run_test_suite
-
-echo "6. Also verify the OPEN3D_ML_ROOT dev-mode path (models loaded from this"
-echo "   checkout instead of the wheel bundle)"
-echo
-export OPEN3D_ML_ROOT="${PATH_TO_OPEN3D_ML}"
-run_test_suite
-unset OPEN3D_ML_ROOT
 
 deactivate

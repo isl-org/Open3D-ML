@@ -69,7 +69,7 @@ _ACCEL_ONLY_REASON = (
     "this model (see test comment).")
 
 _accel = None
-if o3d.core.cuda.is_available():
+if o3d.core.cuda.is_available() and torch.cuda.is_available():
     _accel = torch.device('cuda')
 elif o3d.core.sycl.is_available() and torch.xpu.is_available():
     # o3d.core.sycl.is_available() is True whenever Open3D's SYCL module was

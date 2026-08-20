@@ -280,8 +280,9 @@ Run the full suite locally with:
 ### Note on GitHub Actions CI
 
 GitHub-hosted runners have no NVIDIA or Intel GPU. CI runs `./ci/run_ci.sh cpu`,
-which installs the `open3d_cpu` wheel and PyTorch CPU, then runs the full pytest
-tree. Individual tests skip when an op backend or accelerator is unavailable.
+which installs the `open3d_cpu` wheel and PyTorch CPU, sets `OPEN3D_ML_ROOT` to
+this checkout (so model code matches the PR), then runs the full pytest tree.
+Individual tests skip when an op backend or accelerator is unavailable.
 
 Run `./ci/run_ci.sh cuda` or `./ci/run_ci.sh xpu` locally or on GPU machines to
 exercise CUDA/XPU wheels and PyTorch builds.

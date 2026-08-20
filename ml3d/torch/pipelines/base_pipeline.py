@@ -87,7 +87,7 @@ class BasePipeline(ABC):
                 if hasattr(torch, 'accelerator'):
                     torch.accelerator.set_device_index(device_index)
                 elif self.device.type == 'cuda':
-                    torch.cuda.set_device(self.device)
+                    torch.cuda.set_device(device_index)
             else:
                 self.device = torch.device('cuda')
 
