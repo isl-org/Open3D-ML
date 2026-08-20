@@ -123,7 +123,8 @@ def main():
                 else:
                     raise ValueError(
                         f"Unsupported TensorFlow device {device!r}; "
-                        "use cpu, cuda, or xpu (set --device_ids for a specific GPU).")
+                        "use cpu, cuda, or xpu (set --device_ids for a "
+                        "specific GPU).")
             except RuntimeError as e:
                 print(e)
 
