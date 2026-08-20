@@ -86,7 +86,7 @@ echo
 python -m venv open3d_test.venv
 # shellcheck disable=SC1091
 source open3d_test.venv/bin/activate
-python -m pip install -U pip=="${PIP_VER}"
+python -m pip install -U pip=="${PIP_VER}" pytest
 python -m pip install "${WHEEL_PATH}"
 
 echo "3. Sanity-check the installed package"
