@@ -485,7 +485,7 @@ def test_pointtransformer_torch():
     net = make_net()
     state = copy.deepcopy(net.state_dict())
 
-    n = 4096
+    n = 8192
     data = {
         'point': np.random.random((n, 3)).astype(np.float32),
         'feat': np.random.random((n, 3)).astype(np.float32),
