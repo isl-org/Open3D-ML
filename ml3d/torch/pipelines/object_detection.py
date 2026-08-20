@@ -336,8 +336,8 @@ class ObjectDetection(BasePipeline):
         # wrap model for multiple GPU
         if self.distributed:
             model.to(self.device)
-            device_index = (self.device.index if self.device.index is not None
-                            else 0)
+            device_index = (self.device.index
+                            if self.device.index is not None else 0)
             model = torch.nn.parallel.DistributedDataParallel(
                 model, device_ids=[device_index])
             model.get_loss = model.module.get_loss

@@ -7,6 +7,7 @@ import torch
 RTOL = {"cuda": 1e-4, "xpu": 1e-3}
 ATOL = {"cuda": 1e-5, "xpu": 1e-4}
 
+
 def move_to_device(obj, device):
     """Recursively move tensors in nested batch structures to ``device``."""
     if torch.is_tensor(obj):

@@ -47,8 +47,7 @@ import open3d as o3d
 import pytest
 import torch
 
-from torch_backend_parity import (assert_cpu_accelerator_parity,
-                                  move_to_device)
+from torch_backend_parity import (assert_cpu_accelerator_parity, move_to_device)
 
 if 'PATH_TO_OPEN3D_ML' in os.environ.keys():
     base = os.environ['PATH_TO_OPEN3D_ML']
@@ -92,8 +91,8 @@ semseg_loss = SimpleNamespace(
 
 def _bev_box3d():
     """BEVBox3D lives in Open3D-ML (ml3d), not in open3d.ml.datasets."""
-    ml_root = (os.environ.get('OPEN3D_ML_ROOT')
-               or os.environ.get('PATH_TO_OPEN3D_ML') or base)
+    ml_root = (os.environ.get('OPEN3D_ML_ROOT') or
+               os.environ.get('PATH_TO_OPEN3D_ML') or base)
     if ml_root not in sys.path:
         sys.path.insert(0, ml_root)
     from ml3d.datasets.utils import BEVBox3D
@@ -115,8 +114,7 @@ def _pointrcnn_ctor_kwargs(mode):
             npoints=[256, 64, 16, 4],
             radius=[[0.1, 0.5], [0.5, 1.0], [1.0, 2.0], [2.0, 4.0]],
             nsample=[[4, 8], [4, 8], [4, 8], [4, 8]],
-            mlps=[[[8, 8, 16], [16, 16, 32]],
-                  [[32, 32, 64], [32, 48, 64]],
+            mlps=[[[8, 8, 16], [16, 16, 32]], [[32, 32, 64], [32, 48, 64]],
                   [[64, 98, 128], [64, 98, 128]],
                   [[128, 128, 256], [128, 192, 256]]],
         ),
@@ -500,8 +498,8 @@ def test_pointtransformer_torch():
     def run(device):
         model = make_net(device)
         model.load_state_dict(state)
-        batcher = ml3d.dataloaders.ConcatBatcher(
-            str(device), model='PointTransformer')
+        batcher = ml3d.dataloaders.ConcatBatcher(str(device),
+                                                 model='PointTransformer')
         batch = batcher.collate_fn([sample])
         batch['data'].to(device)
         out = model(batch['data'])

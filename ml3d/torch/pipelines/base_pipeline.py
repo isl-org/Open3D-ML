@@ -72,8 +72,7 @@ class BasePipeline(ABC):
             if distributed:
                 raise NotImplementedError(
                     "Distributed training for XPU is not supported yet.")
-            self.device = torch.device(
-                device if ':' in str(device) else 'xpu')
+            self.device = torch.device(device if ':' in str(device) else 'xpu')
         elif not torch.cuda.is_available():
             if distributed:
                 raise NotImplementedError(
@@ -83,8 +82,8 @@ class BasePipeline(ABC):
             if distributed:
                 self.device = torch.device(device)
                 print(f"Rank : {self.rank} using device : {self.device}")
-                device_index = (self.device.index if self.device.index is not None
-                                else 0)
+                device_index = (self.device.index
+                                if self.device.index is not None else 0)
                 if hasattr(torch, 'accelerator'):
                     torch.accelerator.set_device_index(device_index)
                 elif self.device.type == 'cuda':

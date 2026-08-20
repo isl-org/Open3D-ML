@@ -730,8 +730,9 @@ def knn_batch(points,
                      return_distances=True)
     if return_distances:
         return ans.neighbors_index.reshape(
-            -1, k).long().to(device), ans.neighbors_distance.reshape(-1, k).to(
-                device)
+            -1,
+            k).long().to(device), ans.neighbors_distance.reshape(-1,
+                                                                 k).to(device)
     else:
         return ans.neighbors_index.reshape(-1, k).long().to(device)
 
