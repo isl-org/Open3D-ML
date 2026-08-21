@@ -12,9 +12,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  NPROC: 3
-
 jobs:
   ubuntu:
     permissions:
@@ -25,31 +22,14 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-      - name: Setup cache
-        uses: actions/cache@v3
-        with:
-          # Ref: https://github.com/apache/incubator-mxnet/pull/18459/files
-          path: ~/.ccache
-          # We include the commit sha in the cache key, as new cache entries are
-          # only created if there is no existing entry for the key yet.
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          # Restore any ccache cache entry, if none for
-          # ${{ runner.os }}-ccache-${{ github.sha }} exists.
-          # Common prefix will be used so that ccache can be used across commits.
-          restore-keys: |
-            ${{ runner.os }}-ccache
       - name: Set up Python version
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # Pre-installed  packages: https://github.com/actions/runner-images/tree/main/images
-      - name: Install ccache
-        run: |
-          sudo apt-get --yes install ccache
-          ccache -M 2G  # GitHub's total cache limit is 5GB for all OSes.
-      - name: Config and build
-        run: |
-          PATH=/usr/lib/ccache:$PATH
-          ccache -s
-          ./ci/run_ci.sh
-          ccache -s
+      # open3d / open3d_cpu wheels link EGL for offscreen rendering (GUI=ON).
+      - name: Install Open3D runtime deps
+        run: sudo apt-get update && sudo apt-get install --yes libegl1
+      - name: Run Open3D-ML tests (CPU wheel)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./ci/run_ci.sh cpu

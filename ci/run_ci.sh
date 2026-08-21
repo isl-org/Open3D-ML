@@ -1,66 +1,106 @@
 #!/usr/bin/env bash
+#
+# Install a prebuilt Open3D wheel + Open3D-ML deps, then run tests.
+#
+# Usage: ./ci/run_ci.sh [cpu|cuda|xpu]
+#
+#   cpu  — open3d_cpu wheel + requirements-torch.txt
+#   cuda — default open3d manylinux wheel + requirements-torch-cuda.txt
+#   xpu  — open3d_xpu wheel + requirements-torch-xpu.txt
+#
+# Pytest skips (parity, accelerator-only ops, missing ops) are handled in the
+# test modules. See docs/howtos.md.
 
 set -euo pipefail
 
-NPROC=${NPROC:?'env var must be set to number of available CPUs.'}
-PIP_VER="24.3.1"
+usage() {
+    sed -n '2,12p' "$0" | sed 's/^# \?//'
+    echo
+    echo "Example: ./ci/run_ci.sh cpu"
+    exit "${1:-0}"
+}
 
-echo 1. Prepare the Open3D-ML repo and install dependencies
+BACKEND="${1:-cpu}"
+case "${BACKEND}" in
+    cpu | cuda | xpu) ;;
+    -h | --help) usage 0 ;;
+    *)
+        echo "Unknown backend: ${BACKEND}" >&2
+        usage 1
+        ;;
+esac
+
+PIP_VER="24.3.1"
+OPEN3D_REPO="isl-org/Open3D"
+RELEASE_TAG="main-devel"
+PY_TAG="cp312"
+
+case "${BACKEND}" in
+    cpu)
+        WHEEL_GLOB="open3d_cpu-*-${PY_TAG}-${PY_TAG}-manylinux*_x86_64.whl"
+        TORCH_REQUIREMENTS="requirements-torch.txt"
+        ;;
+    cuda)
+        WHEEL_GLOB="open3d-[0-9]*-${PY_TAG}-${PY_TAG}-manylinux*_x86_64.whl"
+        TORCH_REQUIREMENTS="requirements-torch-cuda.txt"
+        ;;
+    xpu)
+        WHEEL_GLOB="open3d_xpu-*-${PY_TAG}-${PY_TAG}-manylinux*_x86_64.whl"
+        TORCH_REQUIREMENTS="requirements-torch-xpu.txt"
+        ;;
+esac
+
+echo "Open3D-ML CI backend: ${BACKEND}"
+echo "  wheel pattern: ${WHEEL_GLOB}"
+echo "  torch requirements: ${TORCH_REQUIREMENTS}"
+echo
+
+echo "1. Download the latest Open3D devel wheel from ${OPEN3D_REPO}@${RELEASE_TAG}"
+echo
+gh release download "${RELEASE_TAG}" \
+    --repo "${OPEN3D_REPO}" \
+    --pattern "${WHEEL_GLOB}" \
+    --dir . \
+    --clobber
+shopt -s nullglob
+wheel_matches=( ${WHEEL_GLOB} )
+shopt -u nullglob
+if [ "${#wheel_matches[@]}" -ne 1 ]; then
+    echo "Expected exactly one wheel matching ${WHEEL_GLOB}, found ${#wheel_matches[@]}" >&2
+    exit 1
+fi
+WHEEL_PATH="${wheel_matches[0]}"
+echo "Downloaded: ${WHEEL_PATH}"
+
+echo "2. Install the wheel in a fresh virtual environment"
+echo
+python -m venv open3d_test.venv
+# shellcheck disable=SC1091
+source open3d_test.venv/bin/activate
+python -m pip install -U pip=="${PIP_VER}" pytest
+python -m pip install "${WHEEL_PATH}"
+
+echo "3. Sanity-check the installed package"
+echo
+python -W default -c "import open3d; print('Installed:', open3d)"
+
+echo "4. Install Open3D-ML dependencies"
 echo
 export PATH_TO_OPEN3D_ML="$PWD"
-echo "$PATH_TO_OPEN3D_ML"
-# the build system of the main repo expects a main branch. make sure main exists
-git checkout -b main || true
-python -m pip install -U pip==$PIP_VER
-python -m pip install -r requirements.txt \
-    -r requirements-torch.txt \
+python -m pip install -r requirements.txt -r "${TORCH_REQUIREMENTS}" \
     -r requirements-tensorflow.txt
-# -r requirements-openvino.txt # Numpy version conflict with TF 2.8.2
-cd ..
-python -m pip install -U Cython
 
-echo 2. clone Open3D and install dependencies
+# Load ml3d from this checkout (wheel _ml3d may lag main-devel until the next Open3D release).
+export OPEN3D_ML_ROOT="${PATH_TO_OPEN3D_ML}"
+
+run_test_suite() {
+    echo "Running: ./tests/run_tests.sh tests"
+    echo "Add --randomly-seed=SEED via pytest env if reproducing order."
+    ./tests/run_tests.sh tests
+}
+
+echo "5. Run the Open3D-ML pytest suite (open3d wheel + ml3d from OPEN3D_ML_ROOT)"
 echo
-git clone --branch main --depth 1 https://github.com/isl-org/Open3D.git
+run_test_suite
 
-./Open3D/util/install_deps_ubuntu.sh assume-yes
-python -m pip install -r Open3D/python/requirements.txt \
-    -r Open3D/python/requirements_style.txt \
-    -r Open3D/python/requirements_test.txt
-
-echo 3. Configure for bundling the Open3D-ML part
-echo
-mkdir Open3D/build
-pushd Open3D/build
-cmake -DBUNDLE_OPEN3D_ML=ON \
-    -DOPEN3D_ML_ROOT="${PATH_TO_OPEN3D_ML}" \
-    -DBUILD_TENSORFLOW_OPS=ON \
-    -DBUILD_PYTORCH_OPS=ON \
-    -DBUILD_GUI=ON \
-    -DBUILD_UNIT_TESTS=OFF \
-    -DBUILD_BENCHMARKS=OFF \
-    -DBUILD_EXAMPLES=OFF \
-    ..
-
-echo 4. Build and install wheel
-echo
-make -j"$NPROC" install-pip-package
-
-echo 5. run examples/tests in the Open3D-ML repo outside of the repo directory to
-echo make sure that the installed package works.
-echo
-popd
-mkdir test_workdir
-pushd test_workdir
-mv "$PATH_TO_OPEN3D_ML/tests" .
-echo Add --randomly-seed=SEED to the test command to reproduce test order.
-python -m pytest tests
-
-echo "... now do the same but in dev mode by setting OPEN3D_ML_ROOT"
-echo
-export OPEN3D_ML_ROOT="$PATH_TO_OPEN3D_ML"
-echo Add --randomly-seed=SEED to the test command to reproduce test order.
-python -m pytest tests
-unset OPEN3D_ML_ROOT
-
-popd
+deactivate

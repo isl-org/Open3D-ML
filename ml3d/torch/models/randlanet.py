@@ -363,7 +363,7 @@ class RandLANet(BaseModel):
             Loss: Object of type `SemSegLoss`.
             results: Output of the model (B, N, C).
             inputs: Input of the model.
-            device: device(cpu or cuda).
+            device: Torch device (cpu, cuda, or xpu).
 
         Returns:
             Returns loss, labels and scores.

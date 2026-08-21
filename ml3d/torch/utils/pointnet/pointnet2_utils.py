@@ -30,9 +30,11 @@ from torch.autograd import Function
 import torch.nn as nn
 from typing import Tuple
 
+from ....utils.open3d_ops import pytorch_ops_built, require_pytorch_ops
+
 import open3d
 
-if open3d.core.cuda.device_count() > 0:
+if pytorch_ops_built():
     from open3d.ml.torch.ops import furthest_point_sampling, three_nn, three_interpolate, three_interpolate_grad, ball_query
 
 
@@ -48,8 +50,7 @@ class FurthestPointSampling(Function):
         :param npoint: int, number of features in the sampled set
         :return:tensor containing the set
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         assert xyz.is_contiguous()
         output = furthest_point_sampling(xyz, npoint)
@@ -79,8 +80,7 @@ class FurthestPointSamplingV2(Function):
         Returns:
             Returns indices of sampled points with shape (new_row_splits[-1], ).
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         if not xyz.is_contiguous():
             raise ValueError(
@@ -120,8 +120,7 @@ class ThreeNN(Function):
             dist: (B, N, 3) l2 distance to the three nearest neighbors
             idx: (B, N, 3) index of 3 nearest neighbors
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         assert query_pts.is_contiguous()
         assert data_pts.is_contiguous()
@@ -151,8 +150,7 @@ class ThreeInterpolate(Function):
         :return:
             output: (B, C, N) tensor of the interpolated features
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         assert features.is_contiguous()
         assert idx.is_contiguous()
@@ -175,8 +173,7 @@ class ThreeInterpolate(Function):
             None:
             None:
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         idx, weight, m = ctx.three_interpolate_for_backward
 
@@ -203,8 +200,7 @@ class BallQuery(Function):
         :return:
             idx: (B, npoint, nsample) tensor with the indices of the features that form the query balls
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         assert new_xyz.is_contiguous()
         assert xyz.is_contiguous()
@@ -244,8 +240,7 @@ class QueryAndGroup(nn.Module):
         :return:
             new_features: (B, 3 + C, npoint, nsample)
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         batch_size = xyz.shape[0]
 
@@ -296,8 +291,7 @@ class GroupAll(nn.Module):
         :return:
             new_features: (B, C + 3, 1, N)
         """
-        if not open3d.core.cuda.device_count() > 0:
-            raise NotImplementedError
+        require_pytorch_ops()
 
         grouped_xyz = xyz.transpose(1, 2).unsqueeze(2)
         if features is not None:

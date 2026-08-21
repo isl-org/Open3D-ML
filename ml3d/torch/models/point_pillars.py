@@ -32,6 +32,7 @@ from open3d.ml.torch.ops import voxelize, ragged_to_dense
 from .base_model_objdet import BaseModel
 
 from ...utils import MODEL
+from ..utils.torch_utils import default_training_device
 from ..utils.objdet_helper import Anchor3DRangeGenerator, BBoxCoder, multiclass_nms, limit_period, get_paddings_indicator, bbox_overlaps, box3d_to_bev2d
 from ..modules.losses.focal_loss import FocalLoss
 from ..modules.losses.smooth_L1 import SmoothL1Loss
@@ -60,7 +61,7 @@ class PointPillars(BaseModel):
 
     def __init__(self,
                  name="PointPillars",
-                 device="cuda",
+                 device=None,
                  point_cloud_range=[0, -40.0, -3, 70.0, 40.0, 1],
                  classes=['car'],
                  voxelize={},
@@ -71,6 +72,9 @@ class PointPillars(BaseModel):
                  head={},
                  loss={},
                  **kwargs):
+
+        if device is None:
+            device = default_training_device()
 
         super().__init__(name=name,
                          point_cloud_range=point_cloud_range,

@@ -1,7 +1,17 @@
 import os
 import re
+import torch
 from torch import nn
 import torch.nn.functional as F
+
+
+def default_training_device():
+    """Pick cuda, xpu, or cpu for model defaults (matches pipeline/test logic)."""
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        return "xpu"
+    return "cpu"
 
 
 def atoi(text):

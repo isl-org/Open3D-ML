@@ -7,6 +7,7 @@ from os.path import join, exists, dirname, abspath
 
 # use relative import for being compatible with Open3d main repo
 from ...utils import Config, make_dir
+from ..utils.torch_utils import default_training_device
 
 
 class BasePipeline(ABC):
@@ -15,7 +16,7 @@ class BasePipeline(ABC):
     def __init__(self,
                  model,
                  dataset=None,
-                 device='cuda',
+                 device=None,
                  distributed=False,
                  **kwargs):
         """Initialize.
@@ -23,13 +24,17 @@ class BasePipeline(ABC):
         Args:
             model: A network model.
             dataset: A dataset, or None for inference model.
-            device: 'cuda' or 'cpu'.
+            device: ``cuda``, ``xpu``, or ``cpu``. Default: first available
+                accelerator (cuda, then xpu), else cpu.
             distributed: Whether to use multiple gpus.
             kwargs:
 
         Returns:
             class: The corresponding class.
         """
+        if device is None:
+            device = default_training_device()
+
         self.cfg = Config(kwargs)
 
         if kwargs['name'] is None:
@@ -57,7 +62,18 @@ class BasePipeline(ABC):
             make_dir(self.cfg.main_log_dir)
             make_dir(self.cfg.logs_dir)
 
-        if device == 'cpu' or not torch.cuda.is_available():
+        if device == 'cpu':
+            if distributed:
+                raise NotImplementedError(
+                    "Distributed training for CPU is not supported yet.")
+            self.device = torch.device('cpu')
+        elif (device == 'xpu' or str(device).startswith('xpu')) and hasattr(
+                torch, 'xpu') and torch.xpu.is_available():
+            if distributed:
+                raise NotImplementedError(
+                    "Distributed training for XPU is not supported yet.")
+            self.device = torch.device(device if ':' in str(device) else 'xpu')
+        elif not torch.cuda.is_available():
             if distributed:
                 raise NotImplementedError(
                     "Distributed training for CPU is not supported yet.")
@@ -66,7 +82,12 @@ class BasePipeline(ABC):
             if distributed:
                 self.device = torch.device(device)
                 print(f"Rank : {self.rank} using device : {self.device}")
-                torch.cuda.set_device(self.device)
+                device_index = (self.device.index
+                                if self.device.index is not None else 0)
+                if hasattr(torch, 'accelerator'):
+                    torch.accelerator.set_device_index(device_index)
+                elif self.device.type == 'cuda':
+                    torch.cuda.set_device(device_index)
             else:
                 self.device = torch.device('cuda')
 

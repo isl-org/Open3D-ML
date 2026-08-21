@@ -1,0 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/xpu/
+torch==2.13.0+xpu
+torchvision==0.28.0+xpu
+tensorboard
