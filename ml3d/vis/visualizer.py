@@ -141,7 +141,7 @@ class Model:
         elif isinstance(ary, np.ndarray):
             if len(ary.shape) == 2 and ary.shape[0] == 1:
                 ary = ary[0]  # "1D" array as 2D: [[1, 2, 3,...]]
-            if ary.dtype.name.startswith('int'):
+            if np.issubdtype(ary.dtype, np.integer):
                 return np.array(ary, dtype='float32')
             else:
                 return ary
