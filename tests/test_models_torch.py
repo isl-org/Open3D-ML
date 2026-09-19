@@ -512,6 +512,38 @@ def test_pointtransformer_torch():
     assert out_cpu.shape[1] == 13
 
 
+def test_pointtransformer_knn_batch_ragged_neighbors():
+    """knn_search returns fewer than k neighbors per query whenever there are
+    fewer candidate points than k (see docstring of open3d.ml.torch.ops.knn_search).
+    knn_batch used to reshape(-1, k) that ragged result directly, which raises or
+    misaligns rows whenever any query in the batch has fewer than k neighbors.
+
+    Regression test for https://github.com/isl-org/Open3D-ML/issues/683.
+    """
+    from open3d.ml.torch.models.point_transformer import knn_batch
+
+    torch.manual_seed(0)
+    k = 16
+    n_points = 5  # fewer than k: every query gets fewer than k neighbors
+    points = torch.rand((n_points, 3), dtype=torch.float32)
+    queries = points
+    points_row_splits = torch.tensor([0, n_points], dtype=torch.int64)
+    queries_row_splits = torch.tensor([0, n_points], dtype=torch.int64)
+
+    idx, dist = knn_batch(points, queries, k, points_row_splits,
+                          queries_row_splits, return_distances=True)
+
+    assert idx.shape == (n_points, k)
+    assert dist.shape == (n_points, k)
+    assert (idx >= 0).all() and (idx < n_points).all(), (
+        "every neighbor index must stay valid for points/feat lookups")
+
+    idx_no_dist = knn_batch(points, queries, k, points_row_splits,
+                            queries_row_splits, return_distances=False)
+    assert idx_no_dist.shape == (n_points, k)
+    assert (idx_no_dist >= 0).all() and (idx_no_dist < n_points).all()
+
+
 @skip_no_pytorch_ops
 @skip_no_accelerator
 def test_pvcnn_torch():

@@ -5,7 +5,7 @@ import torch.utils.dlpack
 import open3d.core as o3c
 
 from sklearn.neighbors import KDTree
-from open3d.ml.torch.ops import knn_search
+from open3d.ml.torch.ops import knn_search, ragged_to_dense
 
 from .base_model import BaseModel
 from ...utils import MODEL
@@ -728,13 +728,40 @@ def knn_batch(points,
                      points_row_splits=points_row_splits,
                      queries_row_splits=queries_row_splits,
                      return_distances=True)
+
+    # knn_search returns fewer than k neighbors per query whenever there are
+    # fewer than k candidate points, so neighbors_index is ragged (its total
+    # length need not be a multiple of k) and a flat reshape(-1, k) can raise
+    # or silently misalign rows. Densify to (num_queries, k) using
+    # neighbors_row_splits, the same way FixedRadiusSearch's ragged output is
+    # densified elsewhere in this repo (see kpconv.py), then fill any padded
+    # slots by repeating that query's own first neighbor -- callers such as
+    # queryandgroup index directly into `points`/`feat` with this result, so
+    # padding must stay a valid in-range index rather than a sentinel.
+    n_queries = queries.shape[0]
+    pad_sentinel = points.shape[0]
+    idx = ragged_to_dense(ans.neighbors_index.reshape(-1, 1),
+                          ans.neighbors_row_splits, k,
+                          torch.tensor([pad_sentinel],
+                                       dtype=torch.int64)).reshape(
+                                           n_queries, k)
+    first_neighbor = idx[:, 0:1].expand(-1, k)
+    idx = torch.where(idx == pad_sentinel, first_neighbor, idx)
+    # A query with zero neighbors at all (pathological, but possible for a
+    # point cloud with fewer than k points) leaves its whole row at the
+    # sentinel even after the fill above; clamp those to point 0 so every
+    # index stays valid for points/feat.
+    idx = torch.where(idx == pad_sentinel, torch.zeros_like(idx), idx)
     if return_distances:
-        return ans.neighbors_index.reshape(
-            -1,
-            k).long().to(device), ans.neighbors_distance.reshape(-1,
-                                                                 k).to(device)
+        dist = ragged_to_dense(
+            ans.neighbors_distance.reshape(-1, 1), ans.neighbors_row_splits,
+            k, torch.tensor([float("inf")])).reshape(n_queries, k)
+        first_distance = dist[:, 0:1].expand(-1, k)
+        dist = torch.where(torch.isinf(dist), first_distance, dist)
+        dist = torch.where(torch.isinf(dist), torch.zeros_like(dist), dist)
+        return idx.long().to(device), dist.to(device)
     else:
-        return ans.neighbors_index.reshape(-1, k).long().to(device)
+        return idx.long().to(device)
 
 
 def interpolation(points,
